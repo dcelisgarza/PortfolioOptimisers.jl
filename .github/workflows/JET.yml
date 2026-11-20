@@ -3,28 +3,21 @@ name: JET
 # The JET half of the code-health gate. One `report_package` call costs about six minutes of wall
 # time and 2.4 GiB of peak resident memory, and the script makes three calls.
 #
-# This workflow carries a `paths:` filter and Complexity.yml deliberately does not. JET's number
-# cannot change unless the source, the load set or the analyser pin changed, and this repository
-# produces a great many docs-only commits, so the filter skips most six-minute runs and misses no
-# code change. ADR 0077.
+# The pull-request trigger carries a `paths:` filter, and the push trigger does not. JET's number
+# cannot change unless the source, the load set or the analyser pin changed, so the filter skips the
+# run of a docs-only pull request from a fork. ADR 0077.
 #
-# Caveat for whoever configures branch protection: a workflow skipped by a `paths:` filter leaves
-# its check pending rather than skipped, and a pending REQUIRED check blocks a pull request. No
-# check is required in this repository today.
+# The push trigger has no filter because the ruleset of `main` requires the check `JET - push` on
+# the head of a pull request into `main`. A workflow that a `paths:` filter skips leaves its check
+# pending, and a pending required check blocks the merge. ADR 0220, #1832.
 
 on:
   push:
     branches:
       - main
       - dev*
-      - agents/*
+      - agents/**
     tags: ["*"]
-    paths:
-      - 'src/**'
-      - 'ext/**'
-      - 'code_health/**'
-      - 'Project.toml'
-      - '.github/workflows/JET.yml'
   workflow_dispatch:
   pull_request:
     paths:
@@ -50,6 +43,13 @@ concurrency:
 
 jobs:
   build:
+    # The name carries the event, so the ruleset of `main` can require the push check by a name that
+    # a skipped pull-request run never carries. ADR 0220.
+    name: JET - ${{ github.event_name }}
+    # A pull request from `dev*` or `agents/**` in this repository skips this job. The push to that
+    # branch runs it, and its check shows on the head commit of the pull request. ADR 0220.
+    if: >-
+      github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository || !((startsWith(github.head_ref, 'dev') && !contains(github.head_ref, '/')) || startsWith(github.head_ref, 'agents/'))
     runs-on: ubuntu-latest
     steps:
       # Checkout comes BEFORE setup-julia, which inverts Aqua.yml's order, because the Julia

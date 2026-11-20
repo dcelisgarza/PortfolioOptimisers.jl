@@ -1,0 +1,2272 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+One row of a factor attribution: the volatility, the volatility contribution, the variance share, the mean return contribution and the correlation of one component of the portfolio return.
+
+A component is the systematic part, the idiosyncratic part, the unattributed remainder or the total. The four instances a [`FactorAttributionResult`](@ref) carries hold the same six numbers, so a reader that tabulates one tabulates all four. Every number is scaled to the `ppy` the Result carries.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    AttributionComponent(vol, vol_contrib, pct_var, mu_contrib, corr, mu_se)
+        -> AttributionComponent
+
+Arguments correspond to the struct's fields, in the order they are declared. The type is a part of a Result, so [`factor_attribution`](@ref) builds it and a caller reads it. It has no keyword constructor, and it validates nothing of its own.
+
+# Related
+
+  - [`FactorAttributionResult`](@ref)
+  - [`factor_attribution`](@ref)
+"""
+@concrete struct AttributionComponent <: AbstractResult
+    """
+    Volatility of the component's own return series. It is `NaN` on the predicted side of the unattributed remainder, which is a gap between two moments and carries no series.
+    """
+    vol
+    """
+    Contribution of the component to the portfolio volatility. The four components sum to the portfolio volatility exactly.
+    """
+    vol_contrib
+    """
+    Share of the portfolio variance the component explains. The four components sum to one exactly.
+    """
+    pct_var
+    """
+    Contribution of the component to the portfolio mean return. The four components sum to the portfolio mean return exactly.
+    """
+    mu_contrib
+    """
+    Correlation of the component's return series with the portfolio return series. It is `NaN` on the predicted side of the unattributed remainder.
+    """
+    corr
+    """
+    Standard error of `mu_contrib`, or `nothing`. The realised side fills it under `se = true`, and it is `nothing` everywhere else. Under [`EntrywiseUnknown`](@ref) it is `NaN` when its sandwich gives a held Leverage-One Pair a coefficient that is not zero, because the variance of the pair is not identified.
+    """
+    mu_se
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The factor axis or the family axis of a factor attribution, one entry per row of the axis.
+
+The factor axis carries no labels, because the factor names are carried input that the caller already holds. The family axis carries its own labels, because they are derived from the family labels of the block and exist nowhere else. Every number is scaled to the `ppy` the Result carries.
+
+A family is a set of factors. The four additive fields `exposure`, `vol_contrib`, `pct_var` and `mu_contrib` carry the sum of the rows of the family. `vol`, `corr` and `mu` are `nothing`, because no single standalone volatility, correlation or mean return describes a set.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    AttributionBreakdown(labels, exposure, exposure_std, vol, corr, vol_contrib, pct_var,
+                         mu, mu_contrib, mu_se) -> AttributionBreakdown
+
+Arguments correspond to the struct's fields, in the order they are declared. The type is a part of a Result, so [`factor_attribution`](@ref) builds it and a caller reads it. It has no keyword constructor, and it validates nothing of its own.
+
+# Related
+
+  - [`FactorAttributionResult`](@ref)
+  - [`factor_attribution`](@ref)
+"""
+@concrete struct AttributionBreakdown <: AbstractResult
+    """
+    Label of each row, or `nothing`. It is `nothing` on the factor axis and the sorted unique family labels on the family axis.
+    """
+    labels
+    """
+    Portfolio exposure to each row. It is `M' * w` on the predicted side, and the mean of the per-observation exposure on the realised side.
+    """
+    exposure
+    """
+    Standard deviation of the per-observation portfolio exposure to each row, or `nothing`. It is `nothing` on the predicted side, which reads one exposure and no history.
+    """
+    exposure_std
+    """
+    Standalone volatility of each factor, or `nothing` on the family axis.
+    """
+    vol
+    """
+    Correlation of each factor with the portfolio return, or `nothing` on the family axis.
+    """
+    corr
+    """
+    Contribution of each row to the portfolio volatility. The rows sum to the systematic component.
+    """
+    vol_contrib
+    """
+    Share of the portfolio variance each row explains. The rows sum to the variance share of the systematic component.
+    """
+    pct_var
+    """
+    Mean return of each factor, or `nothing` on the family axis.
+    """
+    mu
+    """
+    Contribution of each row to the portfolio mean return. The rows sum to the mean return contribution of the systematic component.
+    """
+    mu_contrib
+    """
+    Standard error of `mu_contrib`, one entry per row, or `nothing`. The realised side fills it under `se = true`, and a row of an observed factor, or of a family of observed factors, reports `NaN`. Under [`EntrywiseUnknown`](@ref) a row is `NaN` when its sandwich gives a held Leverage-One Pair a coefficient that is not zero: the level whose only member is the pair, and every factor that the zero-sum constraint of its family ties to that level.
+    """
+    mu_se
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The asset axis of a factor attribution, one entry per asset.
+
+Each asset carries its weight, its standalone moments and its systematic, idiosyncratic and total contributions, so a reader sees which holding drove a factor row. Every number is scaled to the `ppy` the Result carries.
+
+The axis decomposes the factor model, so the systematic rows sum to the systematic component, the idiosyncratic rows to the idiosyncratic component, and `vol_contrib`, which is the two together, to both of them. It does not reach the total. The difference is the unattributed remainder, which is a property of the portfolio and has no per-asset split.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    AssetAttributionBreakdown(weight, weight_std, sys_vol_contrib, sys_mu_contrib,
+                              idio_vol_contrib, idio_mu_contrib, vol, corr, vol_contrib,
+                              pct_var, mu, mu_contrib) -> AssetAttributionBreakdown
+    AssetAttributionBreakdown(; weight, weight_std, sys_vol_contrib, sys_mu_contrib,
+                              idio_vol_contrib, idio_mu_contrib, vol, corr, vol_contrib,
+                              pct_var, mu, mu_contrib) -> AssetAttributionBreakdown
+
+Arguments correspond to the struct's fields, in the order they are declared, and the keyword constructor takes each field by its name, with no default. The type is a part of a Result, so [`factor_attribution`](@ref) builds it and a caller reads it. The keyword form lets [`rebuild_struct`](@ref) replace a field, as [`attribution_leverage_nan`](@ref) does. It validates nothing of its own.
+
+# Related
+
+  - [`FactorAttributionResult`](@ref)
+  - [`factor_attribution`](@ref)
+"""
+@concrete struct AssetAttributionBreakdown <: AbstractResult
+    """
+    Weight of each asset. It is the weight vector on the predicted side and under a constant weight, and the mean of the weight history otherwise.
+    """
+    weight
+    """
+    Standard deviation of the weight of each asset, or `nothing`. It is `nothing` wherever the weights are constant, and a weight history fills it.
+    """
+    weight_std
+    """
+    Contribution of each asset to the systematic part of the portfolio volatility. It is `NaN` at a held Leverage-One Pair under [`EntrywiseUnknown`](@ref), because the split of the pair is not identified.
+    """
+    sys_vol_contrib
+    """
+    Contribution of each asset to the systematic part of the portfolio mean return.
+    """
+    sys_mu_contrib
+    """
+    Contribution of each asset to the idiosyncratic part of the portfolio volatility. It is `NaN` at a held Leverage-One Pair under [`EntrywiseUnknown`](@ref), as the systematic part is.
+    """
+    idio_vol_contrib
+    """
+    Contribution of each asset to the idiosyncratic part of the portfolio mean return.
+    """
+    idio_mu_contrib
+    """
+    Standalone volatility of each asset.
+    """
+    vol
+    """
+    Correlation of each asset with the portfolio return.
+    """
+    corr
+    """
+    Contribution of each asset to the portfolio volatility, the systematic and the idiosyncratic parts together. The rows sum to the systematic and idiosyncratic components together.
+    """
+    vol_contrib
+    """
+    Share of the portfolio variance each asset explains. The rows sum to the variance share of the systematic and idiosyncratic components together.
+    """
+    pct_var
+    """
+    Mean return of each asset.
+    """
+    mu
+    """
+    Contribution of each asset to the portfolio mean return, the systematic and the idiosyncratic parts together. The rows sum to the systematic and idiosyncratic components together.
+    """
+    mu_contrib
+end
+function AssetAttributionBreakdown(; weight, weight_std, sys_vol_contrib, sys_mu_contrib,
+                                   idio_vol_contrib, idio_mu_contrib, vol, corr,
+                                   vol_contrib, pct_var, mu,
+                                   mu_contrib)::AssetAttributionBreakdown
+    return AssetAttributionBreakdown(weight, weight_std, sys_vol_contrib, sys_mu_contrib,
+                                     idio_vol_contrib, idio_mu_contrib, vol, corr,
+                                     vol_contrib, pct_var, mu, mu_contrib)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The asset-by-factor contributions of a factor attribution, two matrices of assets by factors.
+
+The entry `(i, k)` is what asset `i` contributed through factor `k`. Summing a column over the assets gives the factor's row of the factor axis, and summing a row over the factors gives the asset's systematic row of the asset axis. Every number is scaled to the `ppy` the Result carries.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    AssetFactorContribution(vol_contrib, mu_contrib) -> AssetFactorContribution
+
+Arguments correspond to the struct's fields, in the order they are declared. The type is a part of a Result, so [`factor_attribution`](@ref) builds it and a caller reads it. It has no keyword constructor, and it validates nothing of its own.
+
+# Related
+
+  - [`FactorAttributionResult`](@ref)
+  - [`factor_attribution`](@ref)
+"""
+@concrete struct AssetFactorContribution <: AbstractResult
+    """
+    Contribution to the portfolio volatility, `assets × factors`.
+    """
+    vol_contrib
+    """
+    Contribution to the portfolio mean return, `assets × factors`.
+    """
+    mu_contrib
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Decomposes a portfolio's volatility and mean return over the factors, the factor families and the assets of a factor model.
+
+`FactorAttributionResult` is what [`factor_attribution`](@ref) returns. It carries the four components and the factor axis. It also carries the family axis when the block names families, and the asset axis and the asset-by-factor matrices when the caller asks for assets. A caller can tabulate an attribution, plot it, compare it across runs or assert on it in a test.
+
+Every field that an axis does not have is `nothing`, so a reader dispatches on `::Nothing` rather than branching. `fmbd` is `nothing` when the block names no family, and `abd` and `afc` are `nothing` unless the caller passed `assets = true`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    FactorAttributionResult(sys, idio, unattr, total, fbd, fmbd, abd, afc, realised, ppy)
+        -> FactorAttributionResult
+
+Arguments correspond to the struct's fields, in the order they are declared. The type is a Result, so [`factor_attribution`](@ref) builds it and a caller reads it. It has no keyword constructor, and it validates nothing of its own.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`AttributionComponent`](@ref)
+  - [`AttributionBreakdown`](@ref)
+  - [`AssetAttributionBreakdown`](@ref)
+  - [`AssetFactorContribution`](@ref)
+"""
+@concrete struct FactorAttributionResult <: AbstractResult
+    """
+    The systematic component, the part of the portfolio the factors explain.
+    """
+    sys
+    """
+    The idiosyncratic component, the part of the portfolio the assets' own residuals explain.
+    """
+    idio
+    """
+    The unattributed remainder, the part of the portfolio the factor model does not explain.
+    """
+    unattr
+    """
+    The total, the portfolio's own volatility and mean return.
+    """
+    total
+    """
+    The factor axis, one row per raw factor.
+    """
+    fbd
+    """
+    The family axis, one row per factor family, or `nothing` when the block names no family.
+    """
+    fmbd
+    """
+    The asset axis, or `nothing` unless the caller passed `assets = true`.
+    """
+    abd
+    """
+    The asset-by-factor contributions, or `nothing` unless the caller passed `assets = true`.
+    """
+    afc
+    """
+    Whether the attribution reads a realised history. A realised attribution reports a mean return, and a predicted one reports an expected return.
+    """
+    realised
+    """
+    Periods per year the numbers are scaled to. Means and variances scale by `ppy`, volatilities by its square root, and shares and correlations not at all.
+    """
+    ppy
+end
+"""
+    attribution_idiosyncratic_covariance(rr::AbstractLoadingsRegressionResult)
+    attribution_idiosyncratic_covariance(rr::CrossSectionalFactorModel)
+    attribution_idiosyncratic_covariance(rr::Regression)
+
+Return the idiosyncratic covariance a factor attribution adds to the systematic block.
+
+It is one of the five reads that [`factor_attribution`](@ref) takes off a loadings result. The root refuses, so the verb names a loadings result that carries no idiosyncratic block rather than attributing zero to it.
+
+A [`Regression`](@ref) answers its own `esigma`, which [`FactorPrior`](@ref) fills under `rsd = true`. Under `rsd = false` the field is `nothing` and the read answers a vector of zeros rather than refusing, because the covariance of the prior result carries no residual block either. The predicted idiosyncratic component is then zero, the systematic component reaches the total on its own, and the remainder stays at rounding level. A realised attribution is unaffected, because it measures the idiosyncratic series from the returns rather than from this field.
+
+# Arguments
+
+  - `rr`: A loadings regression result.
+
+# Validation
+
+  - The root method always raises an `ArgumentError` naming the type.
+  - A [`CrossSectionalFactorModel`](@ref) whose `esigma` is `nothing` raises an `IsNothingError`.
+
+# Returns
+
+  - `esigma::VecNum_MatNum`: The idiosyncratic variances, or the idiosyncratic covariance. A [`Regression`](@ref) that carries none answers a vector of zeros.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`Regression`](@ref)
+  - [`idiosyncratic_variances`](@ref)
+"""
+function attribution_idiosyncratic_covariance(rr::AbstractLoadingsRegressionResult)
+    return throw(ArgumentError("`attribution_idiosyncratic_covariance` is not defined for `$(nameof(typeof(rr)))`. A factor attribution reads the idiosyncratic covariance of the block it decomposes, and every member of `AbstractLoadingsRegressionResult` that a caller attributes must add a method beside its own definition."))
+end
+function attribution_idiosyncratic_covariance(rr::CrossSectionalFactorModel)
+    return assert_attribution_field(rr.esigma, :esigma)
+end
+function attribution_idiosyncratic_covariance(rr::Regression)
+    return attribution_idiosyncratic_covariance(rr.esigma, rr.M)
+end
+function attribution_idiosyncratic_covariance(::Nothing, M::MatNum)
+    return zeros(eltype(M), size(M, 1))
+end
+function attribution_idiosyncratic_covariance(esigma::VecNum_MatNum, ::MatNum)
+    return esigma
+end
+"""
+    attribution_idiosyncratic_returns(rr::AbstractLoadingsRegressionResult,
+                                      pr::AbstractPriorResult)
+    attribution_idiosyncratic_returns(rr::CrossSectionalFactorModel,
+                                      pr::AbstractPriorResult)
+    attribution_idiosyncratic_returns(rr::Regression, pr::AbstractPriorResult)
+
+Return the idiosyncratic return series a realised factor attribution weights by the portfolio.
+
+It is one of the five reads that [`factor_attribution`](@ref) takes off a loadings result. The root refuses, so the verb names a loadings result that keeps no residual history rather than attributing zero to it.
+
+The read takes the prior result `pr` beside the block, because a block that stores no series recovers it from the prior result that carries it. A [`CrossSectionalFactorModel`](@ref) keeps its own residuals and ignores `pr`. A [`Regression`](@ref) keeps none, so the series is `original_returns(pr) - pr.X`, the difference between the returns the prior was fitted on and the reconstruction `F * M' .+ b'` that `pr` holds. A wrapping prior that replaces `X` moves this series, and the difference lands in the unattributed remainder.
+
+# Arguments
+
+  - `rr`: A loadings regression result.
+  - `pr`: The prior result that carries the block.
+
+# Validation
+
+  - The root method always raises an `ArgumentError` naming the type.
+  - A [`CrossSectionalFactorModel`](@ref) whose `csr` is `nothing` raises an `IsNothingError`.
+  - A [`Regression`](@ref) on a prior result whose `o_X` is `nothing` raises an `IsNothingError`, because such a prior result reconstructed nothing and the difference is zero at every observation.
+
+# Returns
+
+  - `eps::MatNum`: The idiosyncratic returns, `observations × assets`.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`CrossSectionalRegression`](@ref)
+  - [`Regression`](@ref)
+  - [`original_returns`](@ref)
+"""
+function attribution_idiosyncratic_returns(rr::AbstractLoadingsRegressionResult,
+                                           ::AbstractPriorResult)
+    return throw(ArgumentError("`attribution_idiosyncratic_returns` is not defined for `$(nameof(typeof(rr)))`. A realised factor attribution reads the idiosyncratic return series of the block it decomposes, and every member of `AbstractLoadingsRegressionResult` that a caller attributes must add a method beside its own definition."))
+end
+function attribution_idiosyncratic_returns(rr::CrossSectionalFactorModel,
+                                           ::AbstractPriorResult)
+    return assert_attribution_field(rr.csr, :csr).eps
+end
+function attribution_idiosyncratic_returns(::Regression, pr::AbstractPriorResult)
+    return assert_attribution_prior_field(pr.o_X, :o_X) - pr.X
+end
+"""
+    attribution_factor_returns(rr::AbstractLoadingsRegressionResult,
+                               pr::AbstractPriorResult)
+    attribution_factor_returns(rr::CrossSectionalFactorModel, pr::AbstractPriorResult)
+    attribution_factor_returns(rr::Regression, pr::AbstractPriorResult)
+
+Return the factor return series a realised factor attribution multiplies by the exposures.
+
+It is one of the five reads that [`factor_attribution`](@ref) takes off a loadings result. The series is on the raw factor axis, which is the axis the loadings name, so a family re-basis does not move it.
+
+The read takes the prior result `pr` beside the block, as [`attribution_idiosyncratic_returns`](@ref) does and for the same reason. A [`CrossSectionalFactorModel`](@ref) fits the factor returns itself, and reads them off its own fit when no family is constrained, with its observed factor returns after them through [`cross_sectional_factor_returns`](@ref). A constrained Factor Family makes the fit solve in a reduced basis, one column short per constrained family, so a re-based block reads its own `fr` instead, which holds the same coefficients already expanded onto the raw axis over every row of the fit. It does not read `pr.fpr.X`, because a Scenario Cap keeps the last rows of that field alone, and the other reads of the block cover every row. A [`Regression`](@ref) regresses on factors the caller supplied, so the series is `pr.fpr.X`, the scenarios of the nested factor-axis prior. That field needs no refusal of its own, because [`LowOrderPrior`](@ref) admits `rr` and `fpr` only together, so a prior result that answers a loadings result answers a factor-axis prior beside it.
+
+# Arguments
+
+  - `rr`: A loadings regression result.
+  - `pr`: The prior result that carries the block.
+
+# Validation
+
+  - The root method always raises an `ArgumentError` naming the type.
+  - A [`CrossSectionalFactorModel`](@ref) whose `csr` is `nothing` raises an `IsNothingError`, with or without a family re-basis.
+  - A re-based [`CrossSectionalFactorModel`](@ref) whose `fr` is `nothing` raises an `IsNothingError`. A block the prior fits carries it.
+
+# Returns
+
+  - `f::MatNum`: The factor returns, `observations × factors`.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`CrossSectionalRegression`](@ref)
+  - [`Regression`](@ref)
+"""
+function attribution_factor_returns(rr::AbstractLoadingsRegressionResult,
+                                    ::AbstractPriorResult)
+    return throw(ArgumentError("`attribution_factor_returns` is not defined for `$(nameof(typeof(rr)))`. A realised factor attribution reads the factor return series of the block it decomposes, and every member of `AbstractLoadingsRegressionResult` that a caller attributes must add a method beside its own definition."))
+end
+function attribution_factor_returns(rr::CrossSectionalFactorModel, pr::AbstractPriorResult)
+    assert_attribution_field(rr.csr, :csr)
+    # `csr.f` holds the coefficients in the basis the fit solved in, and a Factor Family
+    # re-basis drops one column per constrained family. The contract above is the raw factor
+    # axis -- the axis `Ms` names -- so a re-based block reads `fr`, which carries the same
+    # coefficients already expanded onto that axis, on the rows of `csr.f`. Without a
+    # re-basis the raw axis is the reduced one, and the observed factors follow the
+    # estimated ones on it.
+    return if has_family_rebasis(rr)
+        assert_attribution_field(rr.fr, :fr)
+    else
+        cross_sectional_factor_returns(rr)
+    end
+end
+"""
+    attribution_observed_count(rr::AbstractLoadingsRegressionResult) -> Int
+    attribution_observed_count(rr::CrossSectionalFactorModel) -> Int
+
+Return the number of observed factors of a loadings result, which are the last factors of its axis.
+
+A [`Regression`](@ref) regresses on factor returns the caller supplied and estimates the loadings, so it has no observed factor in this sense. A [`CrossSectionalFactorModel`](@ref) states its observed factors through `fx`, and they are the trailing columns of both of its axes.
+
+# Arguments
+
+  - `rr`: A loadings regression result.
+
+# Returns
+
+  - `no::Int`: The number of observed factors.
+
+# Related
+
+  - [`attribution_align`](@ref)
+  - [`attribution_observed_indices`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function attribution_observed_count(::AbstractLoadingsRegressionResult)::Int
+    return 0
+end
+function attribution_observed_count(rr::CrossSectionalFactorModel)::Int
+    return isnothing(rr.fx) ? 0 : size(rr.fx, 2)
+end
+function attribution_factor_returns(::Regression, pr::AbstractPriorResult)
+    return pr.fpr.X
+end
+"""
+    attribution_exposures(rr::AbstractLoadingsRegressionResult)
+    attribution_exposures(rr::CrossSectionalFactorModel)
+    attribution_exposures(rr::Regression)
+
+Return the exposure history a realised factor attribution reads, one slice per observation.
+
+It is one of the five reads that [`factor_attribution`](@ref) takes off a loadings result. A block whose exposures do not move answers its loadings matrix, and the attribution then reads one static slice.
+
+A [`Regression`](@ref) fits one loadings matrix over the whole sample, so it always answers that matrix and every observation reads the same slice.
+
+# Arguments
+
+  - `rr`: A loadings regression result.
+
+# Validation
+
+  - The root method always raises an `ArgumentError` naming the type.
+
+# Returns
+
+  - `Ms::Union{MatNum, Arr3Num}`: The exposure history `assets × factors × observations`, or the static loadings `assets × factors`.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`Regression`](@ref)
+  - [`attribution_lag`](@ref)
+"""
+function attribution_exposures(rr::AbstractLoadingsRegressionResult)
+    return throw(ArgumentError("`attribution_exposures` is not defined for `$(nameof(typeof(rr)))`. A realised factor attribution reads the exposure history of the block it decomposes, and every member of `AbstractLoadingsRegressionResult` that a caller attributes must add a method beside its own definition."))
+end
+function attribution_exposures(rr::CrossSectionalFactorModel)
+    return attribution_exposures(rr.Ms, rr.M)
+end
+function attribution_exposures(rr::Regression)
+    return rr.M
+end
+function attribution_exposures(::Nothing, M::MatNum)
+    return M
+end
+function attribution_exposures(Ms::Arr3Num, ::MatNum)
+    return Ms
+end
+"""
+    attribution_lag(rr::AbstractLoadingsRegressionResult)
+    attribution_lag(rr::CrossSectionalFactorModel)
+    attribution_lag(rr::Regression)
+
+Return the number of observations by which the exposures lag the returns.
+
+It is one of the five reads that [`factor_attribution`](@ref) takes off a loadings result. The attribution keeps the exposures of observation `t - lag` with the returns of observation `t`, so a block that states no lag answers zero and the two axes line up as they stand.
+
+A [`Regression`](@ref) fits the returns of an observation on the factor returns of the same observation, so its lag is zero.
+
+# Arguments
+
+  - `rr`: A loadings regression result.
+
+# Validation
+
+  - The root method always raises an `ArgumentError` naming the type.
+
+# Returns
+
+  - `lag::Int`: The exposure lag, as a count.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`Regression`](@ref)
+  - [`cs_regression_lag`](@ref)
+"""
+function attribution_lag(rr::AbstractLoadingsRegressionResult)
+    return throw(ArgumentError("`attribution_lag` is not defined for `$(nameof(typeof(rr)))`. A realised factor attribution aligns the exposures against the returns by the lag of the block it decomposes, and every member of `AbstractLoadingsRegressionResult` that a caller attributes must add a method beside its own definition."))
+end
+function attribution_lag(rr::CrossSectionalFactorModel)
+    return cs_regression_lag(rr.lag)
+end
+function attribution_lag(::Regression)
+    return 0
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The key that names the observation of each row of a factor model block or of a return series: its position and its timestamp.
+
+This type is an implementation detail and is not intended for direct use. [`attribution_row_key`](@ref) makes the key of a block, and [`attribution_series_key`](@ref) makes the key of the series of a cross-validation. [`attribution_key_pair`](@ref) reads both.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`attribution_row_key`](@ref)
+  - [`attribution_series_key`](@ref)
+  - [`attribution_key_pair`](@ref)
+"""
+@concrete struct AttributionRowKey
+    """
+    `idx`: The position of each row in the returns data that it was read from, or `nothing`.
+    """
+    idx
+    """
+    `ts`: The timestamp of each row, or `nothing`.
+    """
+    ts
+end
+"""
+    attribution_row_key(rr::AbstractLoadingsRegressionResult)
+    attribution_row_key(rr::CrossSectionalFactorModel)
+    attribution_row_key(rr::Regression)
+
+Return the key that names the observation of each row of a factor model block.
+
+A realised [`factor_attribution`](@ref) of a cross-validation reads it to find the block rows of each fold. The key has two parts: `idx`, the position of each block row in the returns data that the prior read, and `ts`, the timestamp of each block row. A [`CrossSectionalFactorModel`](@ref) records both when its prior fits it. A [`Regression`](@ref) records both when [`FactorPrior`](@ref) fits it, and its rows are the observations of the factor returns and the reconstruction of the prior result. A block of another type records neither, so it answers `nothing` for each, and the attribution lines the series up with the block at their tail.
+
+# Arguments
+
+  - `rr`: A loadings regression result.
+
+# Returns
+
+  - `key::AttributionRowKey`: The position `idx` of each block row, or `nothing`, and the timestamp `ts` of each block row, or `nothing`.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`attribution_block_arrays`](@ref)
+  - [`AttributionRowKey`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`Regression`](@ref)
+"""
+function attribution_row_key(::AbstractLoadingsRegressionResult)
+    return AttributionRowKey(nothing, nothing)
+end
+function attribution_row_key(rr::Union{CrossSectionalFactorModel, Regression})
+    return AttributionRowKey(rr.idx, rr.ts)
+end
+"""
+    attribution_families(rr::AbstractLoadingsRegressionResult)
+    attribution_families(rr::CrossSectionalFactorModel)
+
+Return the family label of each raw factor, or `nothing` when the block names none.
+
+The family axis of a [`FactorAttributionResult`](@ref) exists exactly when this read answers a vector, so a block type that carries no family concept answers `nothing` through the root and needs no method of its own.
+
+# Arguments
+
+  - `rr`: A loadings regression result.
+
+# Returns
+
+  - `fam::Option{<:VecStr}`: The family label of each raw factor, or `nothing`.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`attribution_family_basis`](@ref)
+"""
+function attribution_families(::AbstractLoadingsRegressionResult)::Nothing
+    return nothing
+end
+function attribution_families(rr::CrossSectionalFactorModel)
+    return rr.fam
+end
+"""
+    attribution_family_basis(rr::AbstractLoadingsRegressionResult)
+    attribution_family_basis(rr::CrossSectionalFactorModel)
+
+Return the family re-basis the block's fit was written in, or `nothing`.
+
+A realised attribution computes its standard errors in the reduced full-rank basis and maps them back onto the raw axis, because a constrained family makes the raw Gram matrix singular. A block type that constrains no family answers `nothing` through the root, and the sandwich then runs on the raw axis.
+
+# Arguments
+
+  - `rr`: A loadings regression result.
+
+# Returns
+
+  - `fcb::Option{<:AbstractFactorFamilyBasis}`: The family re-basis, or `nothing`.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`FactorFamilyBasis`](@ref)
+"""
+function attribution_family_basis(::AbstractLoadingsRegressionResult)::Nothing
+    return nothing
+end
+function attribution_family_basis(rr::CrossSectionalFactorModel)
+    return rr.fcb
+end
+"""
+    attribution_unseen_rule(rr::AbstractLoadingsRegressionResult)
+    attribution_unseen_rule(rr::CrossSectionalFactorModel)
+
+Return the Unseen Member rule the block's fit regressed under.
+
+The standard errors of a realised attribution rebuild the design of each observation, and at an observation with an Unseen Member the fit regressed on a changed design. A block type that constrains no family has no Unseen Member, so the root answers [`SolvedUnseenMember`](@ref), which changes no design.
+
+# Arguments
+
+  - `rr`: A loadings regression result.
+
+# Returns
+
+  - `rule::AbstractUnseenMemberRule`: The Unseen Member rule.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`attribution_family_basis`](@ref)
+  - [`unseen_member_design`](@ref)
+"""
+function attribution_unseen_rule(::AbstractLoadingsRegressionResult)::SolvedUnseenMember
+    return SolvedUnseenMember()
+end
+function attribution_unseen_rule(rr::CrossSectionalFactorModel)
+    return rr.unseen
+end
+"""
+    attribution_regression_weights(rr::AbstractLoadingsRegressionResult)
+    attribution_regression_weights(rr::CrossSectionalFactorModel)
+
+Return the regression weight history the sandwich covariance reads, or `nothing`.
+
+The standard errors of a realised attribution need the weight each asset carried in the fit of each observation. A block type that records none answers `nothing` through the root, and `se = true` then refuses.
+
+# Arguments
+
+  - `rr`: A loadings regression result.
+
+# Returns
+
+  - `rw::Option{<:MatNum}`: The regression weight history `observations × assets`, or `nothing`.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`attribution_idiosyncratic_variances`](@ref)
+"""
+function attribution_regression_weights(::AbstractLoadingsRegressionResult)::Nothing
+    return nothing
+end
+function attribution_regression_weights(rr::CrossSectionalFactorModel)
+    return rr.rw
+end
+"""
+    attribution_idiosyncratic_variances(rr::AbstractLoadingsRegressionResult)
+    attribution_idiosyncratic_variances(rr::CrossSectionalFactorModel)
+
+Return the idiosyncratic variance history the sandwich covariance reads, or `nothing`.
+
+The standard errors of a realised attribution need the idiosyncratic variance of each asset at each observation. A block type that records none answers `nothing` through the root, and `se = true` then refuses.
+
+# Arguments
+
+  - `rr`: A loadings regression result.
+
+# Returns
+
+  - `vs::Option{<:MatNum}`: The idiosyncratic variance history `observations × assets`, or `nothing`.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`attribution_regression_weights`](@ref)
+"""
+function attribution_idiosyncratic_variances(::AbstractLoadingsRegressionResult)::Nothing
+    return nothing
+end
+function attribution_idiosyncratic_variances(rr::CrossSectionalFactorModel)
+    return rr.vs
+end
+"""
+    assert_attribution_field(x::Nothing, sym::Symbol)
+    assert_attribution_field(x, sym::Symbol)
+
+Return an optional field of a factor model block, or raise naming it.
+
+The five reads a factor attribution takes are optional fields of the block, so one refusal names the field a caller must keep rather than letting a `nothing` reach the arithmetic.
+
+# Arguments
+
+  - `x`: The field's value.
+  - `sym`: The field's name.
+
+# Validation
+
+  - `x` is not `nothing`, else an `IsNothingError` naming the field is raised.
+
+# Returns
+
+  - `x`: The field's value, unchanged.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function assert_attribution_field(::Nothing, sym::Symbol)
+    return throw(IsNothingError("$(sym) cannot be nothing: a factor attribution reads it off the factor model block it decomposes"))
+end
+function assert_attribution_field(x, ::Symbol)
+    return x
+end
+"""
+    assert_attribution_prior_field(x::Nothing, sym::Symbol)
+    assert_attribution_prior_field(x, sym::Symbol)
+
+Return an optional field of the prior result that carries a factor model block, or raise naming it.
+
+It is the sibling of [`assert_attribution_field`](@ref), and it names the prior result rather than the block. A [`Regression`](@ref) stores no return series of its own and reads the two series off the prior result, so a `nothing` there is a missing input of the attribution and not a missing field of the block.
+
+# Arguments
+
+  - `x`: The field's value.
+  - `sym`: The field's name.
+
+# Validation
+
+  - `x` is not `nothing`, else an `IsNothingError` naming the field is raised.
+
+# Returns
+
+  - `x`: The field's value, unchanged.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`assert_attribution_field`](@ref)
+  - [`Regression`](@ref)
+"""
+function assert_attribution_prior_field(::Nothing, sym::Symbol)
+    return throw(IsNothingError("$(sym) cannot be nothing: a factor attribution over a static loadings block reads the return series it decomposes off the prior result the block travels on"))
+end
+function assert_attribution_prior_field(x, ::Symbol)
+    return x
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype of the rules a factor attribution applies to an entry the factor model does not state.
+
+A Prior Estimator states no idiosyncratic variance for an asset in the warm-up of its variance, and no loadings for an asset that delisted. A portfolio that holds such an asset has a variance that reads the unknown entry, so the attribution must say what it does with it. Each concrete rule is one answer, and [`factor_attribution`](@ref) takes it through the keyword `unknown`.
+
+  - [`EntrywiseUnknown`](@ref) keeps every entry the model states, and gives `NaN` for every number that reads an entry it does not state. It is the default.
+  - [`ZeroUnknown`](@ref) reads every entry the model does not state as zero, and an absent return as a zero return.
+  - [`KindwiseUnknown`](@ref) applies one rule to each kind of unknown entry.
+
+The rule applies on the predicted side to every number, and on both sides to the standalone moments of the asset axis. An entry of an asset the portfolio does not hold has a weight of zero, so it adds nothing to a sum under either rule.
+
+A Leverage-One Pair is a second kind of unknown entry. The fit reproduced the return of the pair, so its total is exact and the split between its systematic and its idiosyncratic part is unknown. This is the opposite of an asset in the warm-up of its variance, whose split is exact up to its unknown idiosyncratic part. The rule applies to this kind on both sides, through [`attribution_leverage_split`](@ref).
+
+# Interfaces
+
+In order to implement a new rule for an unknown entry which will work seamlessly with the library, subtype `AbstractUnknownEntryRule` and implement the following six methods. The first four apply the rule to an entry the factor model does not state, and the last two apply it to the variance split of a Leverage-One Pair. A rule that implements all six applies to every kind, and it can also be a field of [`KindwiseUnknown`](@ref).
+
+## The held assets that keep their unknown entries
+
+  - `attribution_unknown_keep(rule::MyRule, w::VecNum) -> BitVector`: Returns the assets whose unknown entries stay unknown in a predicted attribution.
+
+### Arguments
+
+  - `rule`: The rule.
+  - `w`: Portfolio weights.
+
+### Returns
+
+  - `keep::BitVector`: `true` at every asset whose unknown entries stay `NaN`. An asset with a weight of zero adds nothing to a sum, so the attribution reads its unknown entries as zero whatever the rule returns.
+
+## The standalone moments of the predicted asset axis
+
+  - `attribution_standalone(rule::MyRule, A::AbstractArray) -> AbstractArray`: Returns the entries of a block that the standalone volatility and mean of each asset read.
+
+### Arguments
+
+  - `rule`: The rule.
+  - `A`: The loadings, the factor-orthogonal mean or the idiosyncratic block.
+
+### Returns
+
+  - `A::AbstractArray`: The entries the standalone moments read, the shape of `A`.
+
+## The observations of the realised standalone moments
+
+  - `attribution_standalone_pairs(rule::MyRule, act::AbstractVector{Bool}) -> AbstractVector{Bool}`: Returns the observations that the realised standalone moments of one asset read.
+
+### Arguments
+
+  - `rule`: The rule.
+  - `act`: Whether each aligned pair of the asset is active.
+
+### Returns
+
+  - `a::AbstractVector{Bool}`: The observations the moments read, the length of `act`.
+
+## The note of the report
+
+  - `attribution_unknown_note(rule::MyRule) -> String`: Returns the sentence that a predicted attribution adds to the report of a held asset that is not investable.
+
+### Arguments
+
+  - `rule`: The rule.
+
+### Returns
+
+  - `note::String`: The sentence. It states what the rule does with the unknown entries, so that the reader knows which numbers to trust.
+
+## The marks of a Leverage-One Pair
+
+  - `attribution_leverage_split(rule::MyRule, lev::Option{<:AbstractVector{Bool}}, w::VecNum, M::MatNum) -> Option{<:LeverageSplitResult}`: Returns the marks of a predicted attribution.
+  - `attribution_leverage_split(rule::MyRule, h1::Option{<:AbstractMatrix{Bool}}, W::VecNum_MatNum, B::MatNum_Arr3Num) -> Option{<:LeverageSplitResult}`: Returns the marks of a realised attribution.
+
+### Arguments
+
+  - `rule`: The rule.
+  - `lev`: Assets the leverage-one mask marks at one row or more, or `nothing` when the model marks no pair.
+  - `h1`: The leverage-one mask, `observations × assets`, or `nothing` when the model marks no pair.
+  - `w`: Portfolio weights.
+  - `W`: Portfolio weights, or the weight history, `observations × assets`.
+  - `M`: Loadings, `assets × factors`.
+  - `B`: Loadings, or the exposure history, `assets × factors × observations`. Earlier releases held the observations of the history on its first axis. A method written for them reads `B[t, :, :]`, and it must now read `B[:, :, t]`, or the slice that `attribution_slice(B, t)` gives.
+
+### Returns
+
+  - `lv::Option{<:LeverageSplitResult}`: `nothing` when the rule marks nothing. Otherwise a [`LeverageSplitResult`](@ref) with the asset mask `assets` and the factor mask `factors`, whose constructor refuses marks that name no asset. `attribution_leverage_nan` puts `NaN` in every variance number that the marks read.
+
+## The standard errors of a Leverage-One Pair
+
+  - `attribution_leverage_errors(rule::MyRule, h1::Option{<:AbstractMatrix{Bool}}, reg::AbstractMatrix{Bool}, ses::AttributionErrorsResult, pass) -> AttributionErrorsResult`: Returns the standard errors of the mean return contributions after the rule.
+
+### Arguments
+
+  - `rule`: The rule.
+  - `h1`: The leverage-one mask, `observations × assets`, or `nothing` when the model marks no pair.
+  - `reg`: Whether each pair is in the regression, `observations × assets`.
+  - `ses`: The standard errors, an [`AttributionErrorsResult`](@ref) with the fields `sys`, `factor` and `family`.
+  - `pass`: The reduction of `attribution_error_pass`, a function of a matrix of variances, `observations × assets`, which returns an [`AttributionErrorsResult`](@ref).
+
+### Returns
+
+  - `ses::AttributionErrorsResult`: The standard errors after the rule. A method that changes an error builds a new [`AttributionErrorsResult`](@ref), whose constructor checks that the three answers agree on what they state.
+
+# Related
+
+  - [`EntrywiseUnknown`](@ref)
+  - [`ZeroUnknown`](@ref)
+  - [`KindwiseUnknown`](@ref)
+  - [`factor_attribution`](@ref)
+"""
+abstract type AbstractUnknownEntryRule <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Keeps every entry the factor model states, and gives `NaN` for every number that reads an entry it does not state.
+
+It is the default rule of [`factor_attribution`](@ref). A held asset in the warm-up of its variance keeps its loadings, so the exposures, the systematic variance and the systematic mean are exact. Its idiosyncratic variance is unknown, so the portfolio volatility is unknown, and with it the idiosyncratic part, the total, the remainder and every number divided by the portfolio volatility. A held asset without loadings makes the exposures that read them unknown too. On the asset axis the standalone moments read the entries of the asset alone, and on the realised side its active pairs alone.
+
+A portfolio that holds a Leverage-One Pair has an exact total and an unknown split. The volatility, the volatility contribution, the variance share and the correlation of the systematic and the idiosyncratic component are `NaN`, and so are those of the factor whose only member is the pair, and the systematic and idiosyncratic volatility contributions of the asset. The total, the remainder and every mean keep their values.
+
+# Related
+
+  - [`AbstractUnknownEntryRule`](@ref)
+  - [`ZeroUnknown`](@ref)
+  - [`KindwiseUnknown`](@ref)
+  - [`factor_attribution`](@ref)
+"""
+struct EntrywiseUnknown <: AbstractUnknownEntryRule end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Reads every entry the factor model does not state as zero, and an absent return as a zero return.
+
+The rule is a stated assumption, not a fact of the model. An unknown idiosyncratic variance read as zero makes the portfolio variance a lower bound, so it understates the volatility and every share divided by it. A missing return read as zero dilutes the mean of an asset by the observations it was absent. A total moment the prior does not state reads the model, with every unknown entry of the model read as zero, so the gap of the remainder reads the stated entries alone.
+
+A Leverage-One Pair keeps the split as fitted: its idiosyncratic variance is zero, so the attribution reports a held pair as wholly systematic. This understates the idiosyncratic part by the unknown own variance of the asset, and the factor whose only member is the pair carries that variance.
+
+# Related
+
+  - [`AbstractUnknownEntryRule`](@ref)
+  - [`EntrywiseUnknown`](@ref)
+  - [`KindwiseUnknown`](@ref)
+  - [`factor_attribution`](@ref)
+"""
+struct ZeroUnknown <: AbstractUnknownEntryRule end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Applies one rule to each kind of unknown entry.
+
+[`EntrywiseUnknown`](@ref) and [`ZeroUnknown`](@ref) are presets that apply one rule to every kind. This rule holds one rule per kind, so a caller can read one kind as zero and keep the other unknown.
+
+  - `unstated`: An entry the factor model does not state. It is the idiosyncratic variance of an asset in the warm-up of its variance, or the loadings of an asset that is not investable.
+  - `leverage`: The variance split of a Leverage-One Pair. The fit reproduced the return of the pair, so the data identify its total return and not the split between its systematic and its idiosyncratic part. [`EntrywiseUnknown`](@ref) gives `NaN` for every variance number that reads the split of a held pair. [`ZeroUnknown`](@ref) reads the split as fitted, the idiosyncratic variance of the pair as zero.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    KindwiseUnknown(;
+        unstated::AbstractUnknownEntryRule = EntrywiseUnknown(),
+        leverage::AbstractUnknownEntryRule = EntrywiseUnknown()
+    ) -> KindwiseUnknown
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - Neither field is a `KindwiseUnknown`, else an `ArgumentError` is raised. A field is the rule of one kind, and a rule per kind has no kind inside it to apply to.
+
+# Related
+
+  - [`AbstractUnknownEntryRule`](@ref)
+  - [`EntrywiseUnknown`](@ref)
+  - [`ZeroUnknown`](@ref)
+  - [`factor_attribution`](@ref)
+"""
+@concrete struct KindwiseUnknown <: AbstractUnknownEntryRule
+    """
+    Rule for an entry the factor model does not state.
+    """
+    unstated
+    """
+    Rule for the variance split of a Leverage-One Pair.
+    """
+    leverage
+    function KindwiseUnknown(unstated::T1,
+                             leverage::T2) where {T1 <: AbstractUnknownEntryRule,
+                                                  T2 <: AbstractUnknownEntryRule}
+        @argcheck(!isa(unstated, KindwiseUnknown) && !isa(leverage, KindwiseUnknown),
+                  ArgumentError("each field of `KindwiseUnknown` is the rule of one kind of unknown entry, so it cannot be a `KindwiseUnknown`"))
+        return new{T1, T2}(unstated, leverage)
+    end
+end
+function KindwiseUnknown(; unstated::AbstractUnknownEntryRule = EntrywiseUnknown(),
+                         leverage::AbstractUnknownEntryRule = EntrywiseUnknown())::KindwiseUnknown
+    return KindwiseUnknown(unstated, leverage)
+end
+"""
+    attribution_finite(A::AbstractArray)
+    attribution_finite(A::Nothing)
+
+Return an array with every non-finite entry replaced by zero, or the array itself.
+
+A point-in-time panel carries `NaN` at every cell of an inactive asset, and a Prior Estimator that fits on the coverage universe carries `NaN` in the rows of an asset it could not estimate. `0 * NaN` is `NaN`, so the entry would make every sum `NaN` whether the asset is held or not. The verb replaces the entries once rather than guarding each of the sums. The callers apply it where an unknown entry reads as zero: the factor returns and the regression weights of the realised side, the asset returns of a pair the policy of [`attribution_net_returns`](@ref) fills, and every entry under [`ZeroUnknown`](@ref).
+
+The verb returns an array that is finite throughout as it is, without a copy. That is the case when every asset is investable. It is a repair, so it owns the identity on the form that needs no repair: an optional history that a block does not carry, such as the regression weights, is `nothing`, and the method on `Nothing` returns `nothing`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\tilde{a}_{j} &= \\begin{cases} a_{j} & \\text{if } a_{j} \\text{ is finite}\\,, \\\\ 0 & \\text{otherwise}\\,. \\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``a_{j}``: Entry ``j`` of the array, in any order of its indices.
+  - ``\\tilde{a}_{j}``: Entry ``j`` of the returned array.
+
+# Arguments
+
+  - `A`: The array, or `nothing`.
+
+# Returns
+
+  - `A::Option{<:AbstractArray}`: The array, with every non-finite entry replaced by zero, or `nothing`.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`attribution_investable_diagnostic`](@ref)
+  - [`investable_mask`](@ref)
+"""
+function attribution_finite(A::AbstractArray)
+    return all(isfinite, A) ? A : map(x -> isfinite(x) ? x : zero(x), A)
+end
+function attribution_finite(::Nothing)::Nothing
+    return nothing
+end
+"""
+    attribution_investable_diagnostic(w::VecNum_MatNum, pr::AbstractPriorResult,
+                                      strict::Bool)
+    attribution_investable_diagnostic(w::VecNum_MatNum, imsk::Option{BitVector},
+                                      strict::Bool, note::AbstractString)
+
+Report a portfolio that holds an asset the prior could not estimate.
+
+A non-investable asset carries `NaN` at least on the diagonal of `sigma`, so its variance is unknown, and with it the variance of any portfolio that holds it. A holding in it takes the library's strictness policy through [`strict_diagnostic`](@ref). A warning names the assets and the decomposition proceeds, or, under `strict`, an `ArgumentError` names them.
+
+The warning states what the decomposition does with the holding, in the sentence `note`. On the predicted side the sentence comes from the rule for an unknown entry, through [`attribution_unknown_note`](@ref). On the realised side the first method states it: a pair the block does not decompose adds nothing to any component, so the return the holding earned there lands in the unattributed remainder, which is where the reader looks for what the model does not explain.
+
+A walk-forward produces a weight history that holds a non-investable asset. A prior fit on the whole history marks every asset that delisted inside it non-investable, and an early fold held that asset while it was listed. That is why the default is to warn.
+
+# Algorithm
+
+ 1. Refuse weights that do not hold one entry for each asset of `pr` through [`assert_attribution_assets`](@ref), so the mask is never read at an index it lacks.
+ 2. Read the investable mask `imsk` off `pr`. An absent mask means that every asset is investable, and the verb returns.
+ 3. Find the non-investable assets that carry a non-zero weight, in the vector or at any observation of the history, giving `held`.
+ 4. When `held` is not empty, warn naming it and stating `note`, or raise under `strict`, through [`strict_diagnostic`](@ref).
+
+# Arguments
+
+  - `w`: The constant weights, or the weight history.
+  - `pr`: The prior result.
+  - `imsk`: The assets the model states, or `nothing` when it states every asset.
+  - `strict`: Whether a held non-investable asset raises rather than warns.
+  - `note`: The sentence that states what the decomposition does with the holding.
+
+# Validation
+
+  - `w` holds one entry for each asset of `pr`, else a `DimensionMismatch` is raised.
+  - Every weight at a non-investable asset is zero, else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`.
+
+# Returns
+
+  - Nothing is returned.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`assert_attribution_assets`](@ref)
+  - [`strict_diagnostic`](@ref)
+  - [`investable_mask`](@ref)
+  - [`attribution_unknown_note`](@ref)
+"""
+function attribution_investable_diagnostic(w::VecNum_MatNum, pr::AbstractPriorResult,
+                                           strict::Bool)::Nothing
+    assert_attribution_assets(w, length(pr.mu))
+    return attribution_investable_diagnostic(w, investable_mask(pr), strict,
+                                             "A pair the block does not decompose adds nothing to any component, so the return they earned there lands in the unattributed remainder")
+end
+function attribution_investable_diagnostic(::VecNum_MatNum, ::Nothing, ::Bool,
+                                           ::AbstractString)::Nothing
+    return nothing
+end
+function attribution_investable_diagnostic(w::VecNum, imsk::BitVector, strict::Bool,
+                                           note::AbstractString)::Nothing
+    held = held_non_investable(imsk, w)
+    return attribution_investable_diagnostic(held, "the portfolio holds them", strict, note)
+end
+function attribution_investable_diagnostic(W::MatNum, imsk::BitVector, strict::Bool,
+                                           note::AbstractString)::Nothing
+    held = held_non_investable(imsk, W)
+    return attribution_investable_diagnostic(held, "the weight history holds them", strict,
+                                             note)
+end
+function attribution_investable_diagnostic(held::AbstractVector{<:Integer},
+                                           holder::AbstractString, strict::Bool,
+                                           note::AbstractString)::Nothing
+    if isempty(held)
+        return nothing
+    end
+    strict_diagnostic("a factor attribution cannot decompose a holding in an asset the prior could not estimate. Assets $(held) are not investable, and $(holder). $(note). Pass `strict = true` to refuse instead, reduce the weights to the investable universe, or refit the prior over a history that covers these assets.",
+                      strict; id = @log_id(holder, note))
+    return nothing
+end
+"""
+    assert_attribution_assets(W::VecNum_MatNum, N::Integer)
+
+Refuse weights that do not hold one entry for each asset of the factor model.
+
+The decomposition reads the weight of asset `i` against row `i` of the loadings, so the weights and the model must describe one universe. A path of [`MultipleRandomised`](@ref) holds a subset of the assets, so its weights describe fewer assets than a prior fitted on the whole universe. The check runs before any read of the weights, so the refusal names the two counts rather than an index the arithmetic would fail on.
+
+# Arguments
+
+  - `W`: The constant weights, or the weight history, `observations × assets`.
+  - `N`: The number of assets of the factor model.
+
+# Validation
+
+  - The weights hold `N` assets, else a `DimensionMismatch` naming both counts is raised.
+
+# Returns
+
+  - Nothing is returned.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`attribution_investable_diagnostic`](@ref)
+"""
+function assert_attribution_assets(W::VecNum_MatNum, N::Integer)::Nothing
+    n = size(W, ndims(W))
+    @argcheck(n == N,
+              DimensionMismatch("the weights hold $n assets, and the factor model describes $N. A factor attribution reads both on one universe. A path of `MultipleRandomised` holds a subset of the assets: attribute it against a prior fitted on the same subset, `prior(pe, port_opt_view(rd, :, cols))`."))
+    return nothing
+end
+"""
+    attribution_prior_block(pr::AbstractPriorResult)
+
+Return the factor model block and the factor distribution a factor attribution decomposes.
+
+A prior result carries the loadings in `rr` and the factor distribution in `fpr`, and its constructor keeps the two together, so one check establishes the whole block. Every wrapping prior forwards both unchanged while it replaces `mu` and `sigma`, which is why the totals come from the prior result and the gaps land in the unattributed remainder.
+
+# Arguments
+
+  - `pr`: A prior result.
+
+# Validation
+
+  - `pr.rr` is not `nothing`, else the `IsNothingError` of [`assert_prior_regression`](@ref) is raised.
+
+# Returns
+
+The tuple `(rr, fpr)`:
+
+  - `rr::AbstractLoadingsRegressionResult`: The factor model block.
+  - `fpr::LowOrderPrior`: The factor distribution.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`assert_prior_regression`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
+function attribution_prior_block(pr::AbstractPriorResult)
+    assert_prior_regression(pr)
+    return pr.rr, pr.fpr
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The two scale factors that an annualisation applies, one for a mean or a variance and one for a volatility.
+
+This type is an implementation detail and is not intended for direct use. [`attribution_scale`](@ref) makes it, and the predicted and the realised attribution read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`attribution_scale`](@ref)
+  - [`FactorAttributionResult`](@ref)
+"""
+@concrete struct AnnualisationScale
+    """
+    `s1`: The factor a mean or a variance takes.
+    """
+    s1
+    """
+    `s2`: The factor a volatility takes.
+    """
+    s2
+end
+"""
+    attribution_scale(ppy::Number, x::Number = ppy)
+
+Return the two scale factors an annualisation applies.
+
+Means and variances scale by `ppy`, and volatilities by its square root. Shares and correlations are ratios of two quantities that scale alike, so they are not scaled at all.
+
+The square root takes the type of `ppy` promoted with the type of `x`, a value of the data the factors scale. The default `ppy = 1` is an `Int`, and its bare square root is a `Float64`, which would widen every volatility of `Float32` data while the correlations beside them stayed `Float32`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+s_{1} &= p\\,, \\\\
+s_{2} &= \\sqrt{p}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``s_{1}``: Scale factor of a mean or a variance.
+  - ``s_{2}``: Scale factor of a volatility.
+  - $(math_dict[:p_ppy])
+
+# Arguments
+
+  - `ppy`: Periods per year the numbers are scaled to.
+  - `x`: A value of the data the factors scale. Only its type is read.
+
+# Validation
+
+  - `ppy > 0`, else a `DomainError` is raised.
+
+# Returns
+
+  - `sc::AnnualisationScale`: The factor `s1` a mean or a variance takes, `ppy` itself, and the factor `s2` a volatility takes, in the type of `ppy * one(x)` or wider.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`FactorAttributionResult`](@ref)
+"""
+function attribution_scale(ppy::Number, x::Number = ppy)
+    @argcheck(ppy > zero(ppy), DomainError(ppy, "ppy must be positive"))
+    return AnnualisationScale(ppy, sqrt(ppy * one(x)))
+end
+"""
+    attribution_idiosyncratic_matrix(esigma::VecNum)
+    attribution_idiosyncratic_matrix(esigma::MatNum)
+
+Return the idiosyncratic covariance as a matrix the quadratic form reads.
+
+The idiosyncratic block takes two shapes, a vector of variances and a full covariance. The method dispatches on the shape, so no caller tests it.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathbf{D} &= \\begin{cases} \\operatorname{diag}(\\boldsymbol{e}) & \\text{for a vector of variances}\\,, \\\\ \\mathbf{E} & \\text{for a covariance}\\,. \\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{e}``: Idiosyncratic variances, ``N \\times 1``.
+  - ``\\mathbf{E}``: Idiosyncratic covariance, ``N \\times N``.
+  - ``\\mathbf{D}``: Returned idiosyncratic covariance, ``N \\times N``.
+  - $(math_dict[:N])
+
+# Arguments
+
+  - `esigma`: The idiosyncratic variances, or the idiosyncratic covariance.
+
+# Returns
+
+  - `D::AbstractMatrix`: The idiosyncratic covariance.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`attribution_idiosyncratic_covariance`](@ref)
+"""
+function attribution_idiosyncratic_matrix(esigma::VecNum)
+    return LinearAlgebra.Diagonal(esigma)
+end
+function attribution_idiosyncratic_matrix(esigma::MatNum)
+    return esigma
+end
+"""
+    attribution_safe_corr(cv::Number, s1::Number, s2::Number)
+
+Return a correlation, or `NaN` when the pair of volatilities cannot normalise it.
+
+A factor whose standalone volatility is zero has no correlation with anything. The plain quotient would give `Inf`, `-Inf` or `NaN` by the sign of the covariance, so the verb answers `NaN` for every such row.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\rho &= \\begin{cases} \\dfrac{c}{\\sigma_{1} \\sigma_{2}} & \\text{if } \\sigma_{1} \\sigma_{2} > 0\\,, \\\\ \\mathrm{NaN} & \\text{otherwise}\\,. \\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``\\rho``: Correlation.
+  - ``c``: Covariance of the two quantities.
+  - ``\\sigma_{1}``, ``\\sigma_{2}``: Volatilities of the two quantities.
+
+A `NaN` product fails the test, so it also gives `NaN`.
+
+# Arguments
+
+  - `cv`: The covariance.
+  - `s1`: The first volatility.
+  - `s2`: The second volatility.
+
+# Returns
+
+  - `rho::Real`: The correlation, or `NaN`.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+"""
+function attribution_safe_corr(cv::Number, s1::Number, s2::Number)
+    d = s1 * s2
+    return d > zero(d) ? cv / d : convert(typeof(cv / oneunit(d)), NaN)
+end
+"""
+    attribution_family_index(fam::VecStr)
+
+Return the rows of the family axis and the raw factors each of them sums.
+
+The axis is the sorted unique labels, so it is deterministic and independent of the order the factors were built in. Every consumer of the family axis reads the axis from here, so the labels, the sums, the exposure spread and the standard errors are in one order.
+
+# Algorithm
+
+ 1. Convert each label of `fam` to a `String`, remove the duplicates and sort the rest, giving `labels`.
+ 2. For each entry of `labels`, find the positions of `fam` that carry it, giving one entry of `idx`.
+
+# Arguments
+
+  - `fam`: The family label of each raw factor.
+
+# Returns
+
+The tuple `(labels, idx)`:
+
+  - `labels::Vector{String}`: The sorted unique family labels.
+  - `idx::Vector{Vector{Int}}`: The raw factors of each family.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`attribution_family_axis`](@ref)
+"""
+function attribution_family_index(fam::VecStr)
+    labels = sort(unique(String[String(f) for f in fam]))
+    return labels, [findall(f -> String(f) == l, fam) for l in labels]
+end
+"""
+    attribution_family_axis(fam::Nothing, args...)
+    attribution_family_axis(fam::VecStr, fbd::AttributionBreakdown, exposure_std, mu_se)
+
+Return the family axis of a factor attribution as a sum of the rows of the factor axis.
+
+A family is a set of factors, so the four additive fields sum over the rows of the family. The axis is the sorted unique labels, which makes it deterministic and independent of the order the factors were built in; a plot that shows the largest families sorts the rows it draws. `vol`, `corr` and `mu` are `nothing`, because no single standalone volatility, correlation or mean return describes a set of factors.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+x_{\\mathcal{F}} &= \\sum_{k \\in \\mathcal{F}} x_{k}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``x_{k}``: Entry of factor ``k`` in one of the four additive fields of the factor axis: the exposure, the volatility contribution, the variance share and the mean return contribution.
+  - ``x_{\\mathcal{F}}``: Entry of the family in the same field of the family axis.
+  - $(math_dict[:F_fam_att])
+
+The families partition the raw factors, so each field of the family axis sums to the same total as that field of the factor axis.
+
+# Algorithm
+
+ 1. Index the families with [`attribution_family_index`](@ref), giving the sorted labels and the raw factors of each.
+ 2. Sum each of the four additive fields of `fbd` over the raw factors of each family.
+ 3. Build the family axis from the labels, the four sums, `exposure_std` and `mu_se`, with `nothing` for `vol`, `corr` and `mu`.
+
+# Arguments
+
+  - `fam`: The family label of each raw factor, or `nothing`.
+  - `fbd`: The factor axis.
+  - `exposure_std`: The standard deviation of the per-observation family exposure, or `nothing`.
+  - `mu_se`: The standard error of the family mean return contribution, or `nothing`.
+
+# Returns
+
+  - `fmbd::Option{<:AttributionBreakdown}`: The family axis, or `nothing` when the block names no family.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`AttributionBreakdown`](@ref)
+"""
+function attribution_family_axis(::Nothing, args...)::Nothing
+    return nothing
+end
+function attribution_family_axis(fam::VecStr, fbd::AttributionBreakdown,
+                                 exposure_std::Option{<:VecNum}, mu_se::Option{<:VecNum})
+    labels, fidx = attribution_family_index(fam)
+    total(v) = [sum(view(v, i)) for i in fidx]
+    return AttributionBreakdown(labels, total(fbd.exposure), exposure_std, nothing, nothing,
+                                total(fbd.vol_contrib), total(fbd.pct_var), nothing,
+                                total(fbd.mu_contrib), mu_se)
+end
+"""
+    factor_attribution(w::VecNum, pr::AbstractPriorResult; assets::Bool = false,
+                       ppy::Number = 1, strict::Bool = false,
+                       unknown::AbstractUnknownEntryRule = EntrywiseUnknown())
+        -> FactorAttributionResult
+    factor_attribution(res::OptimisationResult, pr::Option{<:Pr_RR} = nothing;
+                       kwargs...) -> FactorAttributionResult
+    factor_attribution(w::VecNum, pr::AbstractPriorResult, X::MatNum,
+                       fees::Option{<:Fees} = nothing; assets::Bool = false,
+                       se::Bool = false, ppy::Number = 1, strict::Bool = false,
+                       ddof::Integer = 1,
+                       unknown::AbstractUnknownEntryRule = EntrywiseUnknown())
+        -> FactorAttributionResult
+    factor_attribution(w::VecNum, pr::AbstractPriorResult, rd::ReturnsResult,
+                       fees::Option{<:Fees} = nothing; kwargs...) -> FactorAttributionResult
+    factor_attribution(res::OptimisationResult, pr::Option{<:Pr_RR}, rd::ReturnsResult;
+                       kwargs...) -> FactorAttributionResult
+    factor_attribution(W::VecNum_MatNum, pr::AbstractPriorResult, ret::VecNum;
+                       kwargs...) -> FactorAttributionResult
+    factor_attribution(pred::MultiPeriodPredictionResult, pr::AbstractPriorResult;
+                       kwargs...) -> FactorAttributionResult
+    factor_attribution(ppred::PopulationPredictionResult, pr::AbstractPriorResult,
+                       args...; kwargs...) -> Vector
+    factor_attribution(w::VecNum, B::MatNum, F::MatNum, d::VecNum_MatNum;
+                       mu_f::Option{<:VecNum} = nothing, b::Option{<:VecNum} = nothing,
+                       sigma::Option{<:MatNum} = nothing, mu::Option{<:VecNum} = nothing,
+                       fam::Option{<:VecStr} = nothing,
+                       lev::Option{<:AbstractVector{Bool}} = nothing, assets::Bool = false,
+                       ppy::Number = 1, strict::Bool = false,
+                       unknown::AbstractUnknownEntryRule = EntrywiseUnknown())
+        -> FactorAttributionResult
+    factor_attribution(W::VecNum_MatNum, B::MatNum_Arr3Num, f::MatNum, eps::MatNum,
+                       ret::VecNum; lag::Integer = B isa Arr3Num ? 1 : 0,
+                       trim::Bool = false, rw::Option{<:MatNum} = nothing,
+                       vs::Option{<:MatNum} = nothing,
+                       fcb::Option{<:FactorFamilyBasis} = nothing,
+                       unseen::AbstractUnseenMemberRule = SolvedUnseenMember(),
+                       observed::Integer = 0, fam::Option{<:VecStr} = nothing,
+                       h1::Option{<:AbstractMatrix{Bool}} = nothing,
+                       dc::Option{<:AbstractMatrix{Bool}} = nothing, assets::Bool = false,
+                       se::Bool = false, ppy::Number = 1, ddof::Integer = 1,
+                       unknown::AbstractUnknownEntryRule = EntrywiseUnknown())
+        -> FactorAttributionResult
+    factor_attribution(args..., window::Integer; step::Integer = 1,
+                       kwargs...) -> Vector{<:FactorAttributionResult}
+
+Decompose a portfolio's volatility and mean return over the factors of a factor model.
+
+The verb reads the weights and the factor model block, and returns one [`FactorAttributionResult`](@ref). The predicted methods take no return series and decompose the moments the optimiser saw. The realised methods take one, and decompose the history the portfolio actually produced. Each realised method has a rolling twin that takes a positional `window` and returns one Result per window.
+
+**The bare arrays are the bottom level, and a prior method unpacks the prior result into them.** A caller who holds a factor model as arrays, a vendor risk model for example, attributes with no fitted object. `factor_attribution(w, pr)` is the bare-array method on `pr.rr.M`, `pr.fpr.sigma`, the idiosyncratic covariance of the block, `pr.fpr.mu`, `pr.rr.b`, `pr.sigma`, `pr.mu` and the family labels of the block, so the two methods answer the same numbers. Without `sigma` and `mu` the model is the total, and the unattributed remainder is an exact zero. The realised bare-array method reads the histories on one observation axis, untrimmed, and aligns them itself: the returns of observation `t` pair with the exposures of observation `t - lag`. `lag` defaults to one for an exposure history. A static matrix has no time index, so it describes every observation, and a lag changes nothing for it unless `trim = true` cuts the first `lag` observations, for a common sample with a run on an exposure history. A prior method reads each of these arrays off the block.
+
+**A cross-validation is matched to the block row by row.** The series of a walk-forward covers the test rows of its folds, and the prior result usually covers the whole sample, so the two do not end on the same row. Each fold records its rows, the positions `idx` of a [`PredictionResult`](@ref) and the timestamps of its `rd.ts`. A [`CrossSectionalFactorModel`](@ref) records the rows its fit covers, and a [`Regression`](@ref) records the observations of the prior result that [`FactorPrior`](@ref) fitted. A [`Pipeline`](@ref) fold records its positions only when every fitted step keeps the observations, see [`keeps_observations`](@ref). The method matches the two by timestamp when both carry timestamps, and by position otherwise. The positions agree only when the prior read the returns data that the cross-validation split. The method aligns the exposures of the whole block before it cuts the block to the matched rows, so the first test row keeps the exposures of the row before it. The test rows before the first row the block decomposes, or after its last row, are left out. A block that records no rows, or a series that carries no key it shares, is lined up at the tail as a single series is. A [`CombinatorialCrossValidation`](@ref) or a [`MultipleRandomised`](@ref) produces a population of paths, and the method over a [`PopulationPredictionResult`](@ref) attributes each path in this way. A path of [`MultipleRandomised`](@ref) holds a subset of the assets, so it is attributed against a prior fitted on the same subset.
+
+**The predicted totals of a prior method come from the prior result, not from the model.** `pr.mu` and `pr.sigma` are what the optimiser saw and what [`expected_return`](@ref) and [`expected_risk`](@ref) report, so they are the totals. A wrapping prior replaces them while it forwards the block unchanged, so the model no longer reproduces them, and the two gaps `dot(w, pr.mu - M * fpr.mu - b)` and `dot(w, (pr.sigma - M * F * M' - D) * w) / sigma_P` land in the unattributed remainder. The remainder is therefore present on the predicted side too, and it is at rounding level on a plain fit.
+
+**Every source of unexplained return lands in the remainder, and no guard reports it.** On the realised side the identity per observation is `portfolio return = systematic + idiosyncratic + unattributed`, and the remainder holds the per-observation intercept share `b_t * sum(w)`, the fees, the cash, the weight drift inside a period and the exposure lag. A large `pct_var` on the remainder means the model does not explain the portfolio, and the reader draws that conclusion.
+
+**A holding the prior could not estimate gets a warning, `strict` turns the warning into a refusal, and `unknown` states what the numbers do with it.** A non-investable asset carries `NaN` at least on the diagonal of `sigma`, so its variance is unknown, and with it the variance of any portfolio that holds it. A portfolio that holds one takes the library's strictness policy through [`attribution_investable_diagnostic`](@ref). Under `strict = true` an `ArgumentError` names the assets. Under the default `strict = false` a warning names them, and the rule `unknown` decides the numbers, entry by entry. The default [`EntrywiseUnknown`](@ref) keeps every entry the prior states, so the finite loadings of a held asset in the warm-up of its variance give exact exposures, an exact systematic variance and an exact systematic mean. Every number that reads an entry the prior does not state is `NaN`: the idiosyncratic part, the total, the remainder and every share divided by the portfolio volatility. [`ZeroUnknown`](@ref) reads every such entry as zero, which understates the portfolio variance, and on the realised side it reads an absent return as zero in the standalone moments of the asset axis.
+
+**A held pair with no return is a holiday when the asset is active, and an unknown otherwise.** A returns result whose Asset Panel carries an active mask separates the two through [`attribution_net_returns`](@ref). An active pair is a holiday, its price does not move, and it fills zero with no message. An inactive pair, after a delisting for example, takes the strictness policy: a warning names the observations and the assets and the pair contributes zero, or `strict = true` refuses. A bare matrix carries no mask, so every held pair with no return takes the policy. A pair the block cannot decompose, with no idiosyncratic return or no exposure, is zero in the systematic and the idiosyncratic series too, through [`attribution_zero_inactive`](@ref), so a pair that adds nothing to the total adds nothing to any component. A weight history from a walk-forward holds exactly this shape whenever an asset delisted inside the history, which is why the default warns rather than refuses.
+
+**A held Leverage-One Pair has an exact total and an unknown split.** The pair has a direction of the design of its own, for example the only member of a level of a one-hot family, so the fit reproduces its return and the factor return of that level holds the own return of the asset. Under the default the variance numbers that read the split are `NaN`: the volatility, the volatility contribution, the variance share and the correlation of the systematic and the idiosyncratic component, the same numbers of the factor whose only member is the pair, and the systematic and idiosyncratic volatility contributions of the asset. The total, the remainder and every mean keep their values, because the own return has an expected value of zero. The predicted side marks an asset that the fit marks at any row, because the factor covariance reads every row. The realised side marks a pair at each row the portfolio holds it, and a portfolio with a weight of zero at every marked pair is unchanged. Under `se = true` a standard error is `NaN` when its sandwich gives a marked pair a coefficient that is not zero, because the sandwich reads the variance of the pair. This holds for the systematic error of a holder, for the level whose only member is the pair, and for the factors that the zero-sum constraint of its family ties to the level. An error whose coefficient on the pair is round-off keeps its value. `unknown = KindwiseUnknown(; leverage = ZeroUnknown())` reads the split as fitted, with no own variance, see [`KindwiseUnknown`](@ref).
+
+**The weight spread of the realised asset axis divides by `T - ddof`.** The exposure spread beside it divides by `T - 1`, and the exposure is linear in the weights, so the default `ddof = 1` makes the two comparable. `ddof = 0` gives the population spread. A constant weight states a spread of exactly zero.
+
+**The factor shares disagree with [`factor_risk_contribution`](@ref), and the disagreement is one term.** That verb computes `(M' w)_k * (pinv(M) * grad)_k` with `grad` a finite difference of any risk measure, so for the variance and `sigma = M F M' + D` it reads `grad = (M F M' w + D w) / sigma_P` and its factor share is `(M' w)_k * (F M' w + pinv(M) D w)_k / sigma_P`. This decomposition's factor share is the first term alone, `(M' w)_k * (F M' w)_k / sigma_P`, and it holds the second, the leakage `(M' w)_k * (pinv(M) D w)_k / sigma_P`, in the idiosyncratic component instead. The two therefore agree exactly when `pinv(M) D w` is zero. Neither is wrong. That verb is an Euler decomposition through a pseudo-inverse and holds for any risk measure, and this one is the analytic split of the model, specific to the variance.
+
+# Mathematical definition
+
+The predicted side splits the portfolio variance and the expected portfolio return into three components, the systematic ``S``, the idiosyncratic ``I`` and the unattributed ``U``:
+
+```math
+\\begin{align}
+\\sigma_{P}^{2} &= \\boldsymbol{w}^{\\intercal} \\mathbf{\\Sigma} \\boldsymbol{w}\\,, \\\\
+\\sigma_{S}^{2} &= \\boldsymbol{g}^{\\intercal} \\mathbf{F} \\boldsymbol{g}\\,, \\\\
+\\sigma_{I}^{2} &= \\boldsymbol{w}^{\\intercal} \\mathbf{D} \\boldsymbol{w}\\,, \\\\
+\\sigma_{U}^{2} &= \\sigma_{P}^{2} - \\sigma_{S}^{2} - \\sigma_{I}^{2}\\,, \\\\
+\\mu_{P} &= \\boldsymbol{w}^{\\intercal} \\boldsymbol{\\mu}\\,, \\\\
+\\mu_{S} &= \\boldsymbol{g}^{\\intercal} \\boldsymbol{\\mu}_{f}\\,, \\\\
+\\mu_{I} &= \\boldsymbol{w}^{\\intercal} \\boldsymbol{b}\\,, \\\\
+\\mu_{U} &= \\mu_{P} - \\mu_{S} - \\mu_{I}\\,.
+\\end{align}
+```
+
+Each component ``C \\in \\{S, I, U\\}`` and the total ``P`` report a volatility contribution, a variance share and a mean return contribution. The systematic and the idiosyncratic component, and the total, also report a volatility and a correlation with the portfolio:
+
+```math
+\\begin{align}
+\\mathrm{VC}_{C} &= \\sqrt{p}\\, \\frac{\\sigma_{C}^{2}}{\\sigma_{P}}\\,, \\\\
+\\mathrm{PV}_{C} &= \\frac{\\sigma_{C}^{2}}{\\sigma_{P}^{2}}\\,, \\\\
+\\mathrm{MC}_{C} &= p\\, \\mu_{C}\\,, \\\\
+\\mathrm{vol}_{C} &= \\sqrt{p}\\, \\sigma_{C}\\,, \\\\
+\\rho_{C} &= \\frac{\\sigma_{C}}{\\sigma_{P}}\\,.
+\\end{align}
+```
+
+The factor axis reports, for each factor ``k``:
+
+```math
+\\begin{align}
+\\mathrm{VC}_{k} &= \\sqrt{p}\\, \\frac{g_{k} (\\mathbf{F} \\boldsymbol{g})_{k}}{\\sigma_{P}}\\,, \\\\
+\\mathrm{PV}_{k} &= \\frac{g_{k} (\\mathbf{F} \\boldsymbol{g})_{k}}{\\sigma_{P}^{2}}\\,, \\\\
+\\mathrm{MC}_{k} &= p\\, g_{k} \\mu_{f,k}\\,, \\\\
+\\mathrm{vol}_{k} &= \\sqrt{p\\, F_{kk}}\\,, \\\\
+\\rho_{k} &= \\frac{(\\mathbf{F} \\boldsymbol{g})_{k}}{\\sqrt{F_{kk}}\\, \\sigma_{P}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{\\Sigma}``: Covariance matrix of the prior result, ``N \\times N``, with every non-finite entry set to zero.
+  - ``\\boldsymbol{\\mu}``: Expected returns of the prior result, ``N \\times 1``, with every non-finite entry set to zero.
+  - ``\\sigma_{C}^{2}``, ``\\mu_{C}``: Variance and expected return of component ``C``. ``\\sigma_{U}^{2}`` is a difference of variances and can be negative.
+  - ``\\mu_{P}``: Expected portfolio return.
+  - ``\\mathrm{VC}``, ``\\mathrm{PV}``, ``\\mathrm{MC}``, ``\\mathrm{vol}``, ``\\rho``: Volatility contribution, variance share, mean return contribution, volatility and correlation with the portfolio.
+  - ``F_{kk}``: Variance of factor ``k``, the diagonal entry of ``\\mathbf{F}``.
+  - ``\\mu_{f,k}``: Expected return of factor ``k``, entry ``k`` of ``\\boldsymbol{\\mu}_{f}``.
+  - $(math_dict[:sigma_P_patt])
+  - $(math_dict[:w_port])
+  - $(math_dict[:g_patt])
+  - $(math_dict[:B_patt])
+  - $(math_dict[:F_patt])
+  - $(math_dict[:mu_f_patt])
+  - $(math_dict[:D_patt])
+  - $(math_dict[:b_patt])
+  - $(math_dict[:p_ppy])
+  - $(math_dict[:N])
+  - $(math_dict[:K])
+
+The three components sum to the total: ``\\sum_{C} \\mathrm{VC}_{C} = \\sqrt{p}\\, \\sigma_{P}``, ``\\sum_{C} \\mathrm{PV}_{C} = 1`` and ``\\sum_{C} \\mathrm{MC}_{C} = p\\, \\mu_{P}``. The factor rows sum to the systematic component, because ``\\sum_{k} g_{k} (\\mathbf{F} \\boldsymbol{g})_{k} = \\sigma_{S}^{2}``. The correlations are those of the model. Under ``\\mathbf{\\Sigma} = \\mathbf{B} \\mathbf{F} \\mathbf{B}^{\\intercal} + \\mathbf{D}``, with factors uncorrelated with the idiosyncratic returns, the covariance of the systematic return with the portfolio return is ``\\sigma_{S}^{2}``, and that of factor ``k`` is ``(\\mathbf{F} \\boldsymbol{g})_{k}``. The unattributed component carries no volatility and no correlation, because it is a gap between two moments and not a return series.
+
+# Algorithm
+
+ 1. Read the block and the factor distribution off `pr`, and the five series off the block.
+ 2. Take the totals from `pr.mu` and `pr.sigma` on the predicted side, and from the return series on the realised side.
+ 3. Decompose the systematic and the idiosyncratic parts, and put every gap into the remainder.
+ 4. Sum the factor rows by family when the block names families, and over the assets when `assets = true`.
+ 5. Scale by `ppy`: means and variances by `ppy`, volatilities by its square root.
+
+The method on a net series `ret` is the canonical form of the realised side. It reports a holding in a non-investable asset through [`attribution_investable_diagnostic`](@ref), and reads the block into bare arrays with [`attribution_block_arrays`](@ref). The four methods on asset returns, a matrix `X` or a returns result `rd`, each with or without a `window`, check the weights through [`assert_attribution_assets`](@ref), form the net series with [`attribution_net_returns`](@ref), and call the method on `ret`. The method on `rd` passes the active mask of its Asset Panel through [`panel_active_cells`](@ref), and the method on `X` passes none. The method on `pred` holds a copy of the steps of the method on `ret`, because it also passes the row key of each observation, and the copies agree.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+  - `W`: Portfolio weight history, `observations × assets`, or the constant weights.
+  - `pr`: Prior result carrying the factor model block.
+  - `res`: Optimisation result whose weights, prior and fees the verb reads through [`result_investable_view`](@ref). The result's own prior is on the universe the fit solved, and its weights are on the caller's, so the two meet on the result's investable universe, a caller's `pr` or `rd` is viewed at the same mask, and the attribution's asset axis spans the investable assets alone.
+  - `X`: Asset returns, `observations × assets`.
+  - `rd`: Returns result carrying the asset returns.
+  - `ret`: Net portfolio return series.
+  - `pred`: Multi-period prediction result whose folds give the weight history, the return series and the row key of each observation.
+  - `ppred`: Population prediction result, whose paths are each attributed as a `pred`.
+  - `args`: The positional `window` of a rolling attribution, or nothing.
+  - `B`: Loadings, `assets × factors`, or on the realised side the exposure history, `assets × factors × observations`. A `NaN` row marks an asset the model does not state.
+  - `F`: Factor covariance, `factors × factors`.
+  - `d`: Idiosyncratic variances, `assets`, or the idiosyncratic covariance, `assets × assets`.
+  - `mu_f`: Expected factor returns, or `nothing` for zeros.
+  - `b`: Factor-orthogonal expected return of each asset, or `nothing` for zeros.
+  - `sigma`: Asset covariance the total variance reads, or `nothing` for the model's own.
+  - `mu`: Expected asset returns the total mean reads, or `nothing` for the model's own.
+  - `fam`: Family label of each factor, or `nothing` for no family axis.
+  - `lev`: Assets whose variance split the model does not identify, a Leverage-One Pair at one row or more, or `nothing` for none. A prior method reads it off the `h1` field of a cross-sectional fit, through [`attribution_marked_assets`](@ref).
+  - `h1`: Leverage-one mask, `observations × assets`, on the observations of `eps`, or `nothing` for none.
+  - `dc`: Dropped-column mask of the fit, `observations × estimated factors`, on the observations of `eps` and on the axis the regression was written in, or `nothing` for none. A factor it marks took a return of zero by the rule of [`DependentColumnDrop`](@ref), so `se = true` gives it no estimation error, and reads the other factors on the columns that the fit kept. A prior method reads it off the `dc` field of a cross-sectional fit.
+  - `f`: Factor returns, `observations × factors`.
+  - `eps`: Idiosyncratic returns, `observations × assets`, `NaN` at a pair the model does not decompose.
+  - `lag`: Number of observations by which the exposures lag the returns.
+  - $(arg_dict[:trim_att])
+  - `rw`: Regression weight history, `observations × assets`, which `se = true` reads, or `nothing`.
+  - `vs`: Idiosyncratic variance history, `observations × assets`, which `se = true` reads, or `nothing`.
+  - `fcb`: Family re-basis the regression was written in, or `nothing`.
+  - `unseen`: The Unseen Member rule the regression ran under. The default changes no design, so the standard errors read the reduced exposures themselves.
+  - `observed`: Number of observed factors, the last columns of `f`. The fit takes their returns as given, so they leave the standard errors.
+  - `fees`: Fees the net series is formed against.
+  - `window`: Size of the rolling window, in observations.
+  - `step`: Stride between two consecutive windows.
+  - `assets`: Whether to fill the asset axis and the asset-by-factor matrices.
+  - `se`: Whether to fill the standard errors of the mean return contributions.
+  - `ppy`: Periods per year the numbers are scaled to.
+  - `strict`: Whether a holding in a non-investable asset, or a non-finite return at an inactive held observation, raises an `ArgumentError` rather than a warning.
+  - $(arg_dict[:ddof]) It sets the divisor `T - ddof` of the weight spread of the realised asset axis.
+  - $(arg_dict[:unknown_att])
+
+# Validation
+
+  - `pr` carries a factor model block, else the `IsNothingError` of [`assert_prior_regression`](@ref) is raised.
+  - The factor covariance and the expected factor returns are finite, else an `IsNonFiniteError` is raised.
+  - `f` and `eps` carry the same observations, an exposure history carries them too, `ret` carries at least as many, and `0 <= lag` is below their number, else a `DimensionMismatch` or a `DomainError` is raised. A `pred` whose folds share a row key with the block needs no length: at least one test row is a row the block decomposes, and no test row between two of them is missing from the block, else a `DimensionMismatch` or an `ArgumentError` is raised.
+  - `ppy > 0`, else a `DomainError` is raised.
+  - The weights hold one entry for each asset of `pr`, else a `DimensionMismatch` is raised.
+  - Every weight at a non-investable asset is zero, else a warning names the assets, or an `ArgumentError` names them under `strict`.
+  - Every held `(observation, asset)` pair of `X` outside the active mask of `rd` is finite, else a warning names the pairs, or an `ArgumentError` names them under `strict`. A bare `X` carries no mask, so the rule reads every held pair.
+  - `ret` is finite throughout, else an `IsNonFiniteError` naming the observations is raised.
+  - The block carries the fields the chosen decomposition reads, else an `IsNothingError` names the field.
+  - The portfolio variance is positive or `NaN` on the predicted side, and the portfolio volatility is positive on the realised side, else a `DomainError` is raised. The predicted variance is `NaN` when it reads an entry the prior does not state.
+  - `0 <= ddof < T` over the observations of the realised series or the window, else a `DomainError` is raised.
+  - `2 <= window <= T`, else a `DomainError` is raised. A window of one observation has no sample volatility.
+  - `step >= 1`, else a `DomainError` is raised.
+  - `se = true` needs the regression weight history and the idiosyncratic variance history, else an `IsNothingError` names the field.
+
+# Returns
+
+  - `fa::FactorAttributionResult`: The attribution, or a vector of them from a rolling method. A population gives one entry per path.
+
+# Related
+
+  - [`FactorAttributionResult`](@ref)
+  - [`factor_risk_contribution`](@ref)
+  - [`result_investable_view`](@ref)
+  - [`plot_attribution_vol_contrib`](@ref)
+  - [`plot_attribution_mu_contrib`](@ref)
+  - [`plot_attribution_exposure`](@ref)
+  - [`plot_attribution_mu_vs_vol`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function factor_attribution(w::VecNum, B::MatNum, F::MatNum, d::VecNum_MatNum;
+                            assets::Bool = false, ppy::Number = 1, strict::Bool = false,
+                            unknown::AbstractUnknownEntryRule = EntrywiseUnknown(),
+                            kwargs...)::FactorAttributionResult
+    return predicted_attribution(w, attribution_array_model(B, F, d; kwargs...);
+                                 assets = assets, ppy = ppy, strict = strict,
+                                 unknown = unknown)
+end
+function factor_attribution(w::VecNum, pr::AbstractPriorResult;
+                            kwargs...)::FactorAttributionResult
+    rr, fpr = attribution_prior_block(pr)
+    return factor_attribution(w, rr.M, fpr.sigma, attribution_idiosyncratic_covariance(rr);
+                              mu_f = fpr.mu, b = rr.b, sigma = pr.sigma, mu = pr.mu,
+                              fam = attribution_families(rr),
+                              lev = attribution_marked_assets(attribution_leverage_marks(rr)),
+                              kwargs...)
+end
+function factor_attribution(res::OptimisationResult, pr::Option{<:Pr_RR} = nothing;
+                            kwargs...)::FactorAttributionResult
+    _, w, pr = result_investable_view(res, pr)
+    return factor_attribution(w, pr; kwargs...)
+end
+function factor_attribution(ppred::PopulationPredictionResult, pr::AbstractPriorResult,
+                            args...; kwargs...)
+    return [factor_attribution(p, pr, args...; kwargs...) for p in ppred.pred]
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+A factor model block as the bare arrays that a realised attribution reads, untrimmed, on one observation axis.
+
+This type is an implementation detail and is not intended for direct use. [`attribution_block_arrays`](@ref) reads it off a factor model block, and [`attribution_array_block`](@ref) builds it from the arrays of a caller. [`attribution_align`](@ref) and [`attribution_key_align`](@ref) align it against a return series.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`attribution_block_arrays`](@ref)
+  - [`attribution_array_block`](@ref)
+  - [`attribution_align`](@ref)
+"""
+@concrete struct AttributionBlock
+    """
+    `B`: The static loadings, `assets × factors`, or the exposure history, `assets × factors × observations`.
+    """
+    B
+    """
+    `f`: The factor returns, `observations × factors`.
+    """
+    f
+    """
+    `eps`: The idiosyncratic returns, `observations × assets`.
+    """
+    eps
+    """
+    `lag`: The number of observations by which the exposures lag the returns.
+    """
+    lag
+    """
+    `rw`: The regression weight history, `observations × assets`, or `nothing`.
+    """
+    rw
+    """
+    `vs`: The idiosyncratic variance history, `observations × assets`, or `nothing`.
+    """
+    vs
+    """
+    `fcb`: The family re-basis the regression was written in, or `nothing`.
+    """
+    fcb
+    """
+    `unseen`: The Unseen Member rule the regression ran under.
+    """
+    unseen
+    """
+    `no`: The number of observed factors, the last factors of the axis.
+    """
+    no
+    """
+    `fam`: The family label of each factor, or `nothing`.
+    """
+    fam
+    """
+    `h1`: The leverage-one mask, `observations × assets`, or `nothing`.
+    """
+    h1
+    """
+    `dc`: The dropped-column mask of the fit, `observations × estimated factors`, or `nothing`.
+    """
+    dc
+    """
+    `key`: The row key of the block, from [`attribution_row_key`](@ref).
+    """
+    key
+end
+"""
+    attribution_array_block(B::MatNum_Arr3Num, f::MatNum, eps::MatNum;
+                            lag::Integer = B isa Arr3Num ? 1 : 0, trim::Bool = false,
+                            rw::Option{<:MatNum} = nothing, vs::Option{<:MatNum} = nothing,
+                            fcb::Option{<:FactorFamilyBasis} = nothing,
+                            unseen::AbstractUnseenMemberRule = SolvedUnseenMember(),
+                            observed::Integer = 0, fam::Option{<:VecStr} = nothing)
+        -> AttributionBlock
+
+Return the bare arrays of a realised attribution as the block [`attribution_align`](@ref) reads.
+
+The exposures, the factor returns and the idiosyncratic returns are the model, so they are positional. An exposure history lags the returns by one observation by default: the return of observation `t` pairs with the exposure known at `t - lag`. A static loadings matrix has no time index, so a lag pairs nothing for it, and the block reads every observation whatever `lag` is. `trim = true` cuts the first `lag` observations of a static matrix all the same, so its sample is the sample of a run on an exposure history with the same lag.
+
+# Arguments
+
+  - `B`: Loadings, `assets × factors`, or the exposure history, `assets × factors × observations`.
+  - `f`: Factor returns, `observations × factors`.
+  - `eps`: Idiosyncratic returns, `observations × assets`.
+  - `lag`: Number of observations by which the exposures lag the returns.
+  - $(arg_dict[:trim_att])
+  - `rw`: Regression weight history, or `nothing`.
+  - `vs`: Idiosyncratic variance history, or `nothing`.
+  - `fcb`: Family re-basis the regression was written in, or `nothing`.
+  - `unseen`: The Unseen Member rule the regression ran under. The default changes no design, so the standard errors read the reduced exposures themselves.
+  - `observed`: Number of observed factors, the last columns of `f`.
+  - `fam`: Family label of each factor, or `nothing`.
+
+# Validation
+
+  - `lag >= 0`, else a `DomainError` is raised. A negative lag pairs each return with an exposure from after it.
+
+# Returns
+
+  - `blk::AttributionBlock`: The block, with the row key of no row. Its `lag` is zero for a static matrix unless `trim = true`.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`attribution_block_arrays`](@ref)
+"""
+function attribution_array_block(B::MatNum_Arr3Num, f::MatNum, eps::MatNum;
+                                 lag::Integer = B isa Arr3Num ? 1 : 0, trim::Bool = false,
+                                 rw::Option{<:MatNum} = nothing,
+                                 vs::Option{<:MatNum} = nothing,
+                                 fcb::Option{<:FactorFamilyBasis} = nothing,
+                                 unseen::AbstractUnseenMemberRule = SolvedUnseenMember(),
+                                 observed::Integer = 0, fam::Option{<:VecStr} = nothing,
+                                 h1::Option{<:AbstractMatrix{Bool}} = nothing,
+                                 dc::Option{<:AbstractMatrix{Bool}} = nothing)
+    @argcheck(lag >= zero(lag),
+              DomainError(lag,
+                          "the exposure lag must be non-negative: a negative lag pairs each return with an exposure from after it"))
+    return AttributionBlock(B, f, eps, ifelse((B isa Arr3Num) | trim, lag, zero(lag)), rw,
+                            vs, fcb, unseen, observed, fam, h1, dc,
+                            AttributionRowKey(nothing, nothing))
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The factor model that a predicted attribution reads, as bare arrays.
+
+This type is an implementation detail and is not intended for direct use. [`attribution_array_model`](@ref) builds it, and [`predicted_attribution`](@ref) and [`attribution_array_mask`](@ref) read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`attribution_array_model`](@ref)
+  - [`predicted_attribution`](@ref)
+"""
+@concrete struct AttributionModel
+    """
+    `M`: The loadings, `assets × factors`.
+    """
+    M
+    """
+    `F`: The factor covariance, `factors × factors`.
+    """
+    F
+    """
+    `d`: The idiosyncratic variances, or the idiosyncratic covariance.
+    """
+    d
+    """
+    `mu_f`: The expected factor returns.
+    """
+    mu_f
+    """
+    `b`: The factor-orthogonal expected return of each asset.
+    """
+    b
+    """
+    `sigma`: The asset covariance the total variance reads, or `nothing`.
+    """
+    sigma
+    """
+    `mu`: The expected asset returns the total mean reads, or `nothing`.
+    """
+    mu
+    """
+    `fam`: The family label of each factor, or `nothing`.
+    """
+    fam
+    """
+    `lev`: The assets whose variance split the model does not identify, or `nothing`.
+    """
+    lev
+end
+"""
+    attribution_array_model(B::MatNum, F::MatNum, d::VecNum_MatNum;
+                            mu_f::Option{<:VecNum} = nothing, b::Option{<:VecNum} = nothing,
+                            sigma::Option{<:MatNum} = nothing, mu::Option{<:VecNum} = nothing,
+                            fam::Option{<:VecStr} = nothing) -> AttributionModel
+
+Return the factor model a predicted attribution reads, from bare arrays.
+
+The loadings, the factor covariance and the idiosyncratic block are the model, so they are positional. The two means default to zero, as a model that states no premium and no orthogonal mean. The two totals `sigma` and `mu` default to `nothing`, and the model then closes the total on its own.
+
+# Arguments
+
+  - `B`: Loadings, `assets × factors`.
+  - `F`: Factor covariance, `factors × factors`.
+  - `d`: Idiosyncratic variances, or the idiosyncratic covariance.
+  - `mu_f`: Expected factor returns, or `nothing` for zeros.
+  - `b`: Factor-orthogonal expected return of each asset, or `nothing` for zeros.
+  - `sigma`: Asset covariance the total variance reads, or `nothing`.
+  - `mu`: Expected asset returns the total mean reads, or `nothing`.
+  - `fam`: Family label of each factor, or `nothing`.
+
+# Returns
+
+  - `mdl::AttributionModel`: The model, with zeros for an absent mean.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`predicted_attribution`](@ref)
+"""
+function attribution_array_model(B::MatNum, F::MatNum, d::VecNum_MatNum;
+                                 mu_f::Option{<:VecNum} = nothing,
+                                 b::Option{<:VecNum} = nothing,
+                                 sigma::Option{<:MatNum} = nothing,
+                                 mu::Option{<:VecNum} = nothing,
+                                 fam::Option{<:VecStr} = nothing,
+                                 lev::Option{<:AbstractVector{Bool}} = nothing)
+    return AttributionModel(B, F, d, something(mu_f, zeros(eltype(F), size(F, 1))),
+                            something(b, zeros(eltype(B), size(B, 1))), sigma, mu, fam, lev)
+end
+"""
+    attribution_array_mask(mdl::AttributionModel) -> Option{BitVector}
+
+Return the assets a predicted attribution can decompose, or `nothing` when it can decompose every asset.
+
+An asset is decomposable when the model states it: its loadings, its idiosyncratic variance and its factor-orthogonal mean are finite, and so are its total mean and variance when the caller gives them. The last two are the rule of [`investable_mask`](@ref), so on the arrays of a prior result the mask is the Investable Mask whenever the block states every investable asset.
+
+# Arguments
+
+  - `mdl`: The factor model, from [`attribution_array_model`](@ref).
+
+# Returns
+
+  - `imsk::Option{BitVector}`: `true` at every decomposable asset, or `nothing` when every asset is decomposable.
+
+# Related
+
+  - [`predicted_attribution`](@ref)
+  - [`investable_mask`](@ref)
+"""
+function attribution_array_mask(mdl::AttributionModel)
+    D = attribution_idiosyncratic_matrix(mdl.d)
+    imsk = vec(all(isfinite, mdl.M; dims = 2)) .& isfinite.(LinearAlgebra.diag(D)) .&
+           isfinite.(mdl.b) .& isfinite.(LinearAlgebra.diag(something(mdl.sigma, D))) .&
+           isfinite.(something(mdl.mu, mdl.b))
+    return all(imsk) ? nothing : imsk
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The total of a predicted moment and its gap to the model.
+
+This type is an implementation detail and is not intended for direct use. [`attribution_predicted_total`](@ref) makes it, and [`predicted_attribution`](@ref) reads it. The two values are numbers of one type, so a record names them.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`attribution_predicted_total`](@ref)
+  - [`predicted_attribution`](@ref)
+"""
+@concrete struct PredictedTotal
+    """
+    `total`: The total of the moment.
+    """
+    total
+    """
+    `gap`: The unattributed part, the total less the systematic and the idiosyncratic part.
+    """
+    gap
+end
+"""
+    attribution_predicted_total(anchor::Nothing, keep, w, sys::Number, idio::Number, mdl)
+    attribution_predicted_total(sigma::MatNum, keep, w, sys::Number, idio::Number, mdl)
+    attribution_predicted_total(mu::VecNum, keep, w, sys::Number, idio::Number, mdl)
+
+Return the total of a predicted moment and its gap to the model.
+
+Without an anchor the model is the total, so the gap is an exact zero and no round-off lands in the remainder. A covariance anchors the variance through its quadratic form, and a vector of expected returns anchors the mean through its linear form.
+
+An entry the anchor does not state is unknown. Between two assets that keep their unknown entries it stays `NaN`, so the total that reads it is unknown. Every other unknown entry reads the model's entry, with each unknown entry of the model read as zero. Under [`EntrywiseUnknown`](@ref) that entry belongs to an asset the portfolio does not hold, so it adds nothing. Under [`ZeroUnknown`](@ref) it is the model's own value of the entry, so the entry adds nothing to the gap, and the remainder reads the entries the anchor states.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\tilde{\\Sigma}_{ij} &= \\begin{cases} \\Sigma_{ij} & \\text{if } \\Sigma_{ij} \\text{ is finite, or } k_{i} = k_{j} = 1\\,, \\\\ (\\mathbf{B} \\mathbf{F} \\mathbf{B}^{\\intercal} + \\mathbf{D})_{ij} & \\text{otherwise}\\,, \\end{cases} \\\\
+\\tilde{\\mu}_{i} &= \\begin{cases} \\mu_{i} & \\text{if } \\mu_{i} \\text{ is finite, or } k_{i} = 1\\,, \\\\ (\\mathbf{B} \\boldsymbol{\\mu}_{f} + \\boldsymbol{b})_{i} & \\text{otherwise}\\,, \\end{cases} \\\\
+t &= \\begin{cases} s + i & \\text{without an anchor}\\,, \\\\ \\boldsymbol{w}^{\\intercal} \\tilde{\\mathbf{\\Sigma}} \\boldsymbol{w} & \\text{for a covariance}\\,, \\\\ \\boldsymbol{w}^{\\intercal} \\tilde{\\boldsymbol{\\mu}} & \\text{for expected returns}\\,, \\end{cases} \\\\
+u &= \\begin{cases} 0 & \\text{without an anchor}\\,, \\\\ t - s - i & \\text{otherwise}\\,. \\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``s``, ``i``: Systematic and idiosyncratic part of the moment.
+  - ``t``, ``u``: Total and unattributed part of the moment.
+  - ``\\mathbf{\\Sigma}``, ``\\tilde{\\mathbf{\\Sigma}}``: Asset covariance of the anchor, ``N \\times N``, before and after the rule.
+  - ``\\boldsymbol{\\mu}``, ``\\tilde{\\boldsymbol{\\mu}}``: Expected asset returns of the anchor, ``N \\times 1``, before and after the rule.
+  - ``k_{i}``: Whether asset ``i`` keeps its unknown entries, from [`attribution_unknown_keep`](@ref).
+  - ``\\mathbf{B}``, ``\\mathbf{D}``, ``\\boldsymbol{b}``: The loadings, the idiosyncratic covariance and the factor-orthogonal mean after the rule. A product that still reads a non-finite entry is set to zero for the fill.
+  - $(math_dict[:F_patt])
+  - $(math_dict[:mu_f_patt])
+  - $(math_dict[:w_port])
+  - $(math_dict[:N])
+
+# Arguments
+
+  - `anchor`, `sigma`, `mu`: The anchor, or `nothing`.
+  - `keep`: Whether each asset keeps its unknown entries.
+  - `w`: Portfolio weights.
+  - `sys`: The systematic part.
+  - `idio`: The idiosyncratic part.
+  - `mdl`: The model after the rule: the loadings `M`, the factor covariance `F`, the idiosyncratic covariance `D`, the expected factor returns `mu_f` and the factor-orthogonal mean `bp`.
+
+# Returns
+
+  - `tv::PredictedTotal`: The total `total` and the unattributed part `gap`.
+
+# Related
+
+  - [`predicted_attribution`](@ref)
+  - [`attribution_unknown_keep`](@ref)
+"""
+function attribution_predicted_total(::Nothing, ::AbstractVector{Bool}, ::VecNum,
+                                     sys::Number, idio::Number, ::NamedTuple)
+    total = sys + idio
+    return PredictedTotal(total, zero(total))
+end
+function attribution_predicted_total(sigma::MatNum, keep::AbstractVector{Bool}, w::VecNum,
+                                     sys::Number, idio::Number, mdl::NamedTuple)
+    S = if all(isfinite, sigma)
+        sigma
+    else
+        M = mdl.M
+        ifelse.(isfinite.(sigma) .| (keep .& transpose(keep)), sigma,
+                attribution_finite(M * mdl.F * transpose(M) + mdl.D))
+    end
+    total = LinearAlgebra.dot(w, S, w)
+    return PredictedTotal(total, total - sys - idio)
+end
+function attribution_predicted_total(mu::VecNum, keep::AbstractVector{Bool}, w::VecNum,
+                                     sys::Number, idio::Number, mdl::NamedTuple)
+    m = ifelse.(isfinite.(mu) .| keep, mu, attribution_finite(mdl.M * mdl.mu_f + mdl.bp))
+    total = LinearAlgebra.dot(w, m)
+    return PredictedTotal(total, total - sys - idio)
+end
+"""
+    predicted_attribution(w::VecNum, mdl::AttributionModel; assets::Bool = false,
+                          ppy::Number = 1, strict::Bool = false,
+                          unknown::AbstractUnknownEntryRule = EntrywiseUnknown())
+        -> FactorAttributionResult
+
+Decompose the predicted moments of a portfolio over the factors of a factor model.
+
+Every predicted method of [`factor_attribution`](@ref) calls this function, the bare-array method and the prior method alike, so the two answer the same numbers on the same arrays. [`factor_attribution`](@ref) states the decomposition.
+
+# Algorithm
+
+ 1. Refuse weights over another universe through [`assert_attribution_assets`](@ref). Find the decomposable assets `imsk` with [`attribution_array_mask`](@ref), and report a holding outside them through [`attribution_investable_diagnostic`](@ref), with the sentence of [`attribution_unknown_note`](@ref).
+ 2. Find the assets `keep` whose unknown entries stay unknown with [`attribution_unknown_keep`](@ref). Zero every other non-finite entry of the loadings `M`, the orthogonal mean `bp` and the idiosyncratic covariance `D`.
+ 3. Form the portfolio exposure `bexp`, its product `Fb` with the factor covariance, and the systematic and idiosyncratic variances and means.
+ 4. Take the totals and the two gaps from the anchors with [`attribution_predicted_total`](@ref). A total that reads an unknown entry is `NaN`, and so is every number divided by the portfolio volatility.
+ 5. Build the four components, the factor axis, the family axis and, when `assets = true`, the asset axis, each scaled by `ppy`.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+  - `mdl`: The factor model, from [`attribution_array_model`](@ref).
+  - `assets`: Whether to fill the asset axis and the asset-by-factor matrices.
+  - `ppy`: Periods per year the numbers are scaled to.
+  - `strict`: Whether a holding in an asset the model does not state raises rather than warns.
+  - $(arg_dict[:unknown_att])
+
+# Validation
+
+  - The factor covariance and the expected factor returns are finite, else an `IsNonFiniteError` is raised.
+  - `w` holds one entry for each row of the loadings, else a `DimensionMismatch` is raised.
+  - Every weight at an asset the model does not state is zero, else a warning names the assets, or an `ArgumentError` names them under `strict`.
+  - The portfolio variance is positive or `NaN`, and `ppy > 0`, else a `DomainError` is raised. The variance is `NaN` when it reads an unknown entry.
+
+# Returns
+
+  - `fa::FactorAttributionResult`: The attribution.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`attribution_array_model`](@ref)
+  - [`predicted_attribution_assets`](@ref)
+"""
+function predicted_attribution(w::VecNum, mdl::AttributionModel; assets::Bool = false,
+                               ppy::Number = 1, strict::Bool = false,
+                               unknown::AbstractUnknownEntryRule = EntrywiseUnknown())::FactorAttributionResult
+    F, mu_f = mdl.F, mdl.mu_f
+    @argcheck(all(isfinite, F) & all(isfinite, mu_f),
+              IsNonFiniteError("the factor covariance and the expected factor returns describe every factor of the model, so every entry of them must be finite."))
+    assert_attribution_assets(w, size(mdl.M, 1))
+    kinds = attribution_unknown_kinds(unknown)
+    ust = kinds.unstated
+    attribution_investable_diagnostic(w, attribution_array_mask(mdl), strict,
+                                      attribution_unknown_note(ust))
+    keep = attribution_unknown_keep(ust, w)
+    lv = attribution_leverage_split(kinds.leverage, mdl.lev, w, mdl.M)
+    M = attribution_unknown_rows(mdl.M, keep)
+    bp = attribution_unknown_rows(mdl.b, keep)
+    D = attribution_idiosyncratic_matrix(attribution_unknown_block(mdl.d, keep))
+    bexp = transpose(M) * w
+    Fb = F * bexp
+    sys_var = LinearAlgebra.dot(bexp, Fb)
+    idio_var = LinearAlgebra.dot(w, D, w)
+    md = (; M = M, F = F, D = D, mu_f = mu_f, bp = bp)
+    tv = attribution_predicted_total(mdl.sigma, keep, w, sys_var, idio_var, md)
+    total_var = tv.total
+    @argcheck(isnan(total_var) || total_var > zero(total_var),
+              DomainError(total_var,
+                          "the portfolio variance must be positive for an attribution to divide by its square root"))
+    sigma_p = sqrt(total_var)
+    sc = attribution_scale(ppy, sigma_p)
+    sys_mu = LinearAlgebra.dot(bexp, mu_f)
+    idio_mu = LinearAlgebra.dot(w, bp)
+    tm = attribution_predicted_total(mdl.mu, keep, w, sys_mu, idio_mu, md)
+    nan = convert(typeof(sigma_p), NaN)
+    sys = AttributionComponent(sqrt(max(sys_var, zero(sys_var))) * sc.s2,
+                               sys_var / sigma_p * sc.s2, sys_var / total_var,
+                               sys_mu * sc.s1, sqrt(max(sys_var, zero(sys_var))) / sigma_p,
+                               nothing)
+    idio = AttributionComponent(sqrt(max(idio_var, zero(idio_var))) * sc.s2,
+                                idio_var / sigma_p * sc.s2, idio_var / total_var,
+                                idio_mu * sc.s1,
+                                sqrt(max(idio_var, zero(idio_var))) / sigma_p, nothing)
+    unattr = AttributionComponent(nan, tv.gap / sigma_p * sc.s2, tv.gap / total_var,
+                                  tm.gap * sc.s1, nan, nothing)
+    total = AttributionComponent(sigma_p * sc.s2, sigma_p * sc.s2, one(total_var),
+                                 tm.total * sc.s1, one(total_var), nothing)
+    f_vol = sqrt.(max.(LinearAlgebra.diag(F), zero(eltype(F))))
+    fbd = AttributionBreakdown(nothing, bexp, nothing, f_vol .* sc.s2,
+                               [attribution_safe_corr(Fb[k], f_vol[k], sigma_p)
+                                for k in eachindex(Fb)], bexp .* Fb ./ sigma_p .* sc.s2,
+                               bexp .* Fb ./ total_var, mu_f .* sc.s1,
+                               bexp .* mu_f .* sc.s1, nothing)
+    sys, idio, fbd = attribution_leverage_nan.(Ref(lv), (sys, idio, fbd))
+    fmbd = attribution_family_axis(mdl.fam, fbd, nothing, nothing)
+    abd, afc = predicted_attribution_assets(assets, w,
+                                            (; md...,
+                                             Mr = attribution_standalone(ust, mdl.M),
+                                             bpr = attribution_standalone(ust, mdl.b),
+                                             er = attribution_standalone(ust, mdl.d)), Fb,
+                                            sigma_p, sc)
+    return FactorAttributionResult(sys, idio, unattr, total, fbd, fmbd,
+                                   attribution_leverage_nan(lv, abd),
+                                   attribution_leverage_nan(lv, afc), false, ppy)
+end
+"""
+    predicted_attribution_assets(assets::Bool, w, mdl::NamedTuple, Fb, sigma_p, sc)
+
+Return the asset axis and the asset-by-factor matrices of a predicted attribution.
+
+The asset axis decomposes the model, not the totals. Every row reads `M F M' + D` and `M mu_f + b`, so the systematic rows sum to the systematic component, the idiosyncratic rows to the idiosyncratic component, and `vol_contrib` to the two together. It therefore does not reach the total, and the difference is the unattributed remainder, which is a property of the portfolio and has no per-asset split. The realised asset axis satisfies the same identity, so a reader compares the two sides row by row.
+
+The contributions read the model after the rule for an unknown entry, as the components do. A contribution of an asset the portfolio does not hold is its weight, zero, times a finite number, so it is zero even when the portfolio volatility is unknown, through [`attribution_held_entries`](@ref). The standalone numbers are moments of the asset, not contributions, so they read the block's own entries through [`attribution_standalone`](@ref). Under [`EntrywiseUnknown`](@ref) the model states the mean of an asset whose loadings and factor-orthogonal mean it states, and it states no volatility for an asset whose idiosyncratic variance is unknown, in the warm-up of a relisted asset for example: that volatility and its correlation are `NaN`, and a zero would state a moment the block does not hold. Under [`ZeroUnknown`](@ref) every unknown entry reads as zero.
+
+# Mathematical definition
+
+For each asset ``i``, with the model covariance ``\\mathbf{\\Sigma}_{M}``:
+
+```math
+\\begin{align}
+\\mathbf{\\Sigma}_{M} &= \\mathbf{B} \\mathbf{F} \\mathbf{B}^{\\intercal} + \\mathbf{D}\\,, \\\\
+\\mathrm{VC}^{S}_{i} &= \\sqrt{p}\\, \\frac{w_{i} (\\mathbf{B} \\mathbf{F} \\boldsymbol{g})_{i}}{\\sigma_{P}}\\,, \\\\
+\\mathrm{VC}^{I}_{i} &= \\sqrt{p}\\, \\frac{w_{i} (\\mathbf{D} \\boldsymbol{w})_{i}}{\\sigma_{P}}\\,, \\\\
+\\mathrm{VC}_{i} &= \\mathrm{VC}^{S}_{i} + \\mathrm{VC}^{I}_{i} = \\sqrt{p}\\, \\frac{w_{i} (\\mathbf{\\Sigma}_{M} \\boldsymbol{w})_{i}}{\\sigma_{P}}\\,, \\\\
+\\mathrm{PV}_{i} &= \\frac{w_{i} (\\mathbf{\\Sigma}_{M} \\boldsymbol{w})_{i}}{\\sigma_{P}^{2}}\\,, \\\\
+\\mathrm{MC}^{S}_{i} &= p\\, w_{i} (\\mathbf{B} \\boldsymbol{\\mu}_{f})_{i}\\,, \\\\
+\\mathrm{MC}^{I}_{i} &= p\\, w_{i} b_{i}\\,, \\\\
+\\mathrm{MC}_{i} &= \\mathrm{MC}^{S}_{i} + \\mathrm{MC}^{I}_{i}\\,, \\\\
+\\mu_{i} &= p \\left( (\\mathbf{B} \\boldsymbol{\\mu}_{f})_{i} + b_{i} \\right)\\,, \\\\
+\\mathrm{vol}_{i} &= \\sqrt{p\\, (\\mathbf{\\Sigma}_{M})_{ii}}\\,, \\\\
+\\rho_{i} &= \\frac{(\\mathbf{\\Sigma}_{M} \\boldsymbol{w})_{i}}{\\sqrt{(\\mathbf{\\Sigma}_{M})_{ii}}\\, \\sigma_{P}}\\,.
+\\end{align}
+```
+
+For each asset ``i`` and factor ``k``:
+
+```math
+\\begin{align}
+\\mathrm{VC}_{ik} &= \\sqrt{p}\\, \\frac{w_{i} B_{ik} (\\mathbf{F} \\boldsymbol{g})_{k}}{\\sigma_{P}}\\,, \\\\
+\\mathrm{MC}_{ik} &= p\\, w_{i} B_{ik} \\mu_{f,k}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{\\Sigma}_{M}``: Model covariance, ``N \\times N``.
+  - ``\\mathrm{VC}``, ``\\mathrm{PV}``, ``\\mathrm{MC}``, ``\\mathrm{vol}``, ``\\rho``: Volatility contribution, variance share, mean return contribution, volatility and correlation with the portfolio. A superscript ``S`` or ``I`` names the systematic or the idiosyncratic part.
+  - ``\\mu_{i}``: Expected return of asset ``i`` under the model, scaled by ``p``.
+  - ``w_{i}``, ``b_{i}``, ``B_{ik}``, ``\\mu_{f,k}``: Entries of ``\\boldsymbol{w}``, ``\\boldsymbol{b}``, ``\\mathbf{B}`` and ``\\boldsymbol{\\mu}_{f}``.
+  - $(math_dict[:sigma_P_patt])
+  - $(math_dict[:w_port])
+  - $(math_dict[:g_patt])
+  - $(math_dict[:B_patt])
+  - $(math_dict[:F_patt])
+  - $(math_dict[:mu_f_patt])
+  - $(math_dict[:D_patt])
+  - $(math_dict[:b_patt])
+  - $(math_dict[:p_ppy])
+  - $(math_dict[:N])
+
+Summed over the assets, ``\\mathrm{VC}^{S}_{i}`` gives ``\\sqrt{p}\\, \\boldsymbol{g}^{\\intercal} \\mathbf{F} \\boldsymbol{g} / \\sigma_{P}``, the systematic volatility contribution, and ``\\mathrm{VC}^{I}_{i}`` gives ``\\sqrt{p}\\, \\boldsymbol{w}^{\\intercal} \\mathbf{D} \\boldsymbol{w} / \\sigma_{P}``, the idiosyncratic one. Summed over the assets, ``\\mathrm{VC}_{ik}`` and ``\\mathrm{MC}_{ik}`` give the row of factor ``k`` of the factor axis. Summed over the factors, they give ``\\mathrm{VC}^{S}_{i}`` and ``\\mathrm{MC}^{S}_{i}``. The volatility and the correlation of an asset read the model covariance, while ``\\sigma_{P}`` reads the covariance of the prior result. So ``\\rho_{i}`` is the correlation of asset ``i`` with the portfolio under the model only when ``\\boldsymbol{w}^{\\intercal} \\mathbf{\\Sigma}_{M} \\boldsymbol{w} = \\sigma_{P}^{2}``, which is when the unattributed variance is zero.
+
+# Arguments
+
+  - `assets`: Whether to compute the two answers at all.
+  - `w`: Portfolio weights.
+  - `mdl`: The factor model: the loadings `M`, the factor covariance `F`, the expected factor returns `mu_f`, the idiosyncratic covariance `D` and the factor-orthogonal expected return `bp`, after the rule for an unknown entry, and the loadings `Mr`, factor-orthogonal expected return `bpr` and idiosyncratic covariance `er` that the standalone numbers read.
+  - `Fb`: The product of the factor covariance and the portfolio exposure.
+  - `sigma_p`: Portfolio volatility.
+  - `sc`: The two annualisation factors.
+
+# Returns
+
+  - `abd::Option{<:AssetAttributionBreakdown}`: The asset axis, or `nothing`.
+  - `afc::Option{<:AssetFactorContribution}`: The asset-by-factor matrices, or `nothing`.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`AssetAttributionBreakdown`](@ref)
+  - [`AssetFactorContribution`](@ref)
+"""
+function predicted_attribution_assets(assets::Bool, w::VecNum, mdl::NamedTuple, Fb::VecNum,
+                                      sigma_p::Number, sc::AnnualisationScale)
+    if !assets
+        return nothing, nothing
+    end
+    M, F, mu_f, D, bp = mdl.M, mdl.F, mdl.mu_f, mdl.D, mdl.bp
+    sys_cov = M * F * transpose(M)
+    full_cov = sys_cov + D
+    cov_p = full_cov * w
+    # The standalone numbers read the block's own entries, so an entry the block does not state
+    # stays `NaN`, and a non-investable asset states the moments the model determines for it.
+    Mr = mdl.Mr
+    var_r = vec(sum((Mr * F) .* Mr; dims = 2)) .+
+            LinearAlgebra.diag(attribution_idiosyncratic_matrix(mdl.er))
+    vol = sqrt.(max.(var_r, zero(eltype(var_r))))
+    vol_contrib = attribution_held_entries(w .* cov_p ./ sigma_p, w)
+    sys_mu_contrib = attribution_held_entries(w .* (M * mu_f), w)
+    idio_mu_contrib = attribution_held_entries(w .* bp, w)
+    abd = AssetAttributionBreakdown(w, nothing,
+                                    attribution_held_entries(w .* (sys_cov * w) ./ sigma_p,
+                                                             w) .* sc.s2,
+                                    sys_mu_contrib .* sc.s1,
+                                    attribution_held_entries(w .* (D * w) ./ sigma_p, w) .*
+                                    sc.s2, idio_mu_contrib .* sc.s1, vol .* sc.s2,
+                                    [attribution_safe_corr(cov_p[i], vol[i], sigma_p)
+                                     for i in eachindex(vol)], vol_contrib .* sc.s2,
+                                    attribution_held_entries(vol_contrib ./ sigma_p, w),
+                                    (Mr * mu_f .+ mdl.bpr) .* sc.s1,
+                                    (sys_mu_contrib .+ idio_mu_contrib) .* sc.s1)
+    afc = AssetFactorContribution(attribution_held_entries((w * transpose(Fb)) .* M ./
+                                                           sigma_p, w) .* sc.s2,
+                                  attribution_held_entries((w * transpose(mu_f)) .* M, w) .*
+                                  sc.s1)
+    return abd, afc
+end
+
+export AttributionComponent, AttributionBreakdown, AssetAttributionBreakdown,
+       AssetFactorContribution, FactorAttributionResult, factor_attribution,
+       EntrywiseUnknown, ZeroUnknown, KindwiseUnknown
+public AbstractUnknownEntryRule

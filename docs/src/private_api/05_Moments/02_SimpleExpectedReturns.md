@@ -24,7 +24,10 @@ Base.copy(x::SimpleExpectedReturnsState)
 
 With a [`CoveragePolicy`](@ref) in its `cvg` field, the estimator computes the mean of each asset from the rows where that asset's return is finite and the asset is active. This is the available-case fit. Without a policy, the estimator computes the ordinary sample mean over the assets that have no gap in the window. [`PortfolioOptimisers.coverage_mean`](@ref) selects one of the two fits from the type of the `cvg` field.
 
+The available-case fit centres each asset on the mean of its own rows, so it takes no other centre. With observation weights, it fits each asset over its own rows with their weights, in one pass. The constructor of each estimator with a `cvg` field refuses a configuration that neither fit can read, with [`PortfolioOptimisers.assert_coverage_fittable`](@ref).
+
 ```@docs
+PortfolioOptimisers.assert_coverage_fittable
 PortfolioOptimisers.coverage_mean
 PortfolioOptimisers.coverage_mean(me::SimpleExpectedReturns, ::Nothing, X::MatNum)
 PortfolioOptimisers.coverage_mean(me::SimpleExpectedReturns, cvg::CoveragePolicy, X::MatNum)

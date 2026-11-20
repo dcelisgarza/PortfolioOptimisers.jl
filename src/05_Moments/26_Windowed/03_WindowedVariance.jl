@@ -18,16 +18,17 @@
         rule ┴ RollingWindow()
     """
 end
-function variance_count(ve::WindowedVariance, X::MatNum)
+function variance_count(ve::WindowedVariance, X::MatNum,
+                        amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
     inner, Xw, _ = windowed_preamble(ve.ve, ve.w, ve.window, X)
-    return variance_count(inner, Xw)
+    return variance_count(inner, Xw, windowed_rows(amsk, get_window(ve.window, X, 1), 1))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute the point-in-time variance series of a windowed variance estimator.
 
-Row `t` is the fit of the estimator on the observations `1` to `t`. The estimator keeps the last observations of its window among them, so the window rolls with `t`, and the last row equals the batch fit. Before the window is full, row `t` keeps every observation from `1` to `t`. [`windowed_variance_series`](@ref) states the rule.
+Row `t` is the fit of the estimator on the observations `1` to `t`. The estimator keeps the last observations of its window among them, so the window rolls with `t`, and the last row equals the batch fit. Before the window is full, row `t` keeps every observation from `1` to `t`. [`variance_series(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt}, X::MatNum, pnl::Option{<:AssetPanel})`](@ref) states the rule.
 
 A prior calls this method in its variance slot, with the `active_mask` and `estimation_mask` keywords, and each fit cuts them to its own rows.
 
@@ -41,6 +42,7 @@ A prior calls this method in its variance slot, with the `active_mask` and `esti
 # Validation
 
   - $(val_dict[:dims])
+  - $(val_dict[:nan_series_window])
 
 # Returns
 
@@ -49,12 +51,11 @@ A prior calls this method in its variance slot, with the `active_mask` and `esti
 # Related
 
   - [`WindowedVariance`](@ref)
-  - [`windowed_variance_series`](@ref)
+  - [`variance_series(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt}, X::MatNum, pnl::Option{<:AssetPanel})`](@ref)
   - [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function variance_series(ve::WindowedVariance, X::MatNum; dims::Int = 1, kwargs...)
-    return windowed_variance_series(ve.ve, ve.w, ve.window, X, nothing; dims = dims,
-                                    kwargs...)
+    return variance_series(ve.ve, ve.w, ve.window, X, nothing; dims = dims, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -74,6 +75,8 @@ Row `t` is the fit of the estimator on the observations `1` to `t` of the return
 # Validation
 
   - $(val_dict[:dims])
+  - $(val_dict[:nan_series_window])
+  - $(val_dict[:nan_frame])
 
 # Returns
 
@@ -82,10 +85,10 @@ Row `t` is the fit of the estimator on the observations `1` to `t` of the return
 # Related
 
   - [`WindowedVariance`](@ref)
-  - [`windowed_variance_series`](@ref)
+  - [`variance_series(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt}, X::MatNum, pnl::Option{<:AssetPanel})`](@ref)
   - [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
 """
 function variance_series(ve::WindowedVariance, X::MatNum, pnl::Option{<:AssetPanel};
                          dims::Int = 1, kwargs...)
-    return windowed_variance_series(ve.ve, ve.w, ve.window, X, pnl; dims = dims, kwargs...)
+    return variance_series(ve.ve, ve.w, ve.window, X, pnl; dims = dims, kwargs...)
 end

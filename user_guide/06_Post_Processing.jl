@@ -11,8 +11,7 @@ turns the weights into whole numbers of shares under a cash budget, and it plots
 more, see the [post-processing examples](@ref example-finite-allocation).
 =#
 
-using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
-      GraphRecipes
+using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots
 
 resfmt = (v, i, j) -> begin
     return if j == 1

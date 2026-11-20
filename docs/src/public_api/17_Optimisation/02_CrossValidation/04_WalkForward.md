@@ -1,5 +1,5 @@
 ```@meta
-Description = "WalkForward, public API of PortfolioOptimisers.jl: WalkForwardResult, IndexWalkForward, DateWalkForward, HindsightSplit, OnlineIndexWalkForward, …"
+Description = "WalkForward, public API of PortfolioOptimisers.jl: WalkForwardResult, IndexWalkForward, DateWalkForward, DateAdjusterEstimator, HindsightSplit, …"
 ```
 
 # WalkForward
@@ -8,6 +8,7 @@ Description = "WalkForward, public API of PortfolioOptimisers.jl: WalkForwardRes
 WalkForwardResult
 IndexWalkForward
 DateWalkForward
+PortfolioOptimisers.DateAdjusterEstimator
 HindsightSplit
 OnlineIndexWalkForward
 OnlineDateWalkForward

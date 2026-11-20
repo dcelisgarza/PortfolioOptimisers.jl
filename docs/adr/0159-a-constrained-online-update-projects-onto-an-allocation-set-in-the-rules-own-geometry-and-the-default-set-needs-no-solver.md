@@ -373,3 +373,49 @@ projection is infeasible and the step is a Held Step.
 The rejected option kept a zero as a small positive floor in the next raw step, so that the rule
 could recover. It is not the projection of the rule in its own geometry, which is the Decision
 above, and the floor would be one more number with no source.
+
+## Amendment (2026-11-13): the constraint kinds of the set are a Constraint Block, and map #1213 is closed
+
+The Decision sent the shared constraint block to map
+[#1213](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1213). That tier landed, and
+[ADR 0237](0237-a-constraint-block-holds-the-feasible-set-of-a-programme-and-the-entry-of-a-head-takes-a-list-of-blocks.md)
+records it. `ProgrammeAllocationSet` holds its constraint kinds in a `ConstraintBlock`, in the
+field `cbe`, as `JuMPOptimiser` does. The risk ceilings `r`, the return floor `ret`, the solver
+`slv` and the prior `pe` stay fields of the set. The names and the bounds of *The admissible
+constraints* hold, and the released keywords and the reads such as `set.wb` stay (#2039, #2040).
+
+**One resolver and one builder serve both owners.** The Decision stated that the set ran the
+builders in the order of `assemble_jump_model!`, on both arms. That was a copy of the pipeline of
+a JuMP head, and the copy drifted (#2030, #2032, #2035). Now `resolve_constraint_block` resolves
+the block of the set, and the builder of ADR 0237 adds it to a model in two phases (#2042, #2044).
+`resolve_allocation_set_rows` and `assemble_allocation_set!` are gone.
+
+- **The bare projection** is a bare head of the shared entry, `resolve_block_entry`, through
+  `resolve_projection_entry` (#2046). So a distance reader of the set that refuses an asset gives
+  that asset a zero weight with a warning, as in a batch fit, and `strict` refuses it.
+- **The leader re-solve** passes the set as a second block of the entry of the leader (ADR 0164,
+  amendment of 2026-11-13, #2047). The adapter on `ccnt`, `AllocationSetConstraint`, is gone.
+
+**The two stages of the resolution.** Stage 1 resolves once for each fold only the slots whose
+value follows a view at the Investable Mask. Stage 2 resolves at each step, after the reduction.
+It holds the slots that read the prior or the rows, and also `wb`, `lcse` and `gcarde` (#2042).
+So a row of `lcse` that names a departed asset drops, as in a head. A `ScoreWeightBounds` in `wb`
+resolves at stage 2 on the rows of each step (#2059).
+
+**The namespace of the set in a leader's model.** The `:aset_` namespace is gone. In the model of
+a JuMP head, block `i` after the first takes the Model State namespace `blk_i_`, so the set takes
+`blk_2_`. Phase 1 registers the weights of the model under it with `w_owner = Symbol("")`. So `W`
+and the marks stay with the weights, as the Decision states. Every builder with a fixed name takes
+the prefix, and the MIP bits belong to the weights (#2041). The rule "state a kind on the set or
+on the held optimiser, not on both" is gone. A kind on both gives two constraints.
+
+**The penalties.** The penalties of each block add to the one Objective Penalty. The `cobj` of
+the set gets the `ResolvedConstraintBlock` of the set, in a projection and in a leader's model.
+
+**A prior of the set that prices fewer assets.** In the leader re-solve, the entry intersects the
+Investable Masks of every block. So an asset that the prior of the set cannot price takes a zero
+weight with a warning, and `strict` refuses it (#2043). `assert_set_prior_priced` now refuses
+such an asset only in a direct call of `set_allocation_set_constraints!`.
+
+The last paragraph of *The admissible constraints* and the last item of *Consequences* name the
+map of issue #1213 as the owner of the block. The map closed with this amendment (#2048).

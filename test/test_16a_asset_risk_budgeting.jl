@@ -27,7 +27,8 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
             2.5e-1
         elseif i == 26
             1e-2
-        elseif i == 29
+        elseif i ∈ (28, 29)
+            # 28 measured at 1e-3 after `k` gained its bound (#1844, #1845).
             1e-3
         else
             5e-4
@@ -39,18 +40,19 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
         end
         @test success
 
-        rtol = if i ∈ (5, 7, 19, 25, 12) || Sys.isapple() && i == 2
-            1e-4
-        elseif i == 17
-            5e-3
-        elseif i ∈ (9, 10, 11, 18, 24)
+        # The pins were generated again after `k` gained its bound (#1844, #1845). They hold
+        # at 1e-6 on the host that made them. Each rtol is the largest `find_tol` over 20
+        # red CI runs of both host kinds (40536176678 to 40988847855) and over a local run
+        # under the CI flags (R14 of #1817). 18 needs 5e-4 on both host kinds since run
+        # 43500807458 (runs 43520317481, 43560900102 and 43573334652).
+        rtol = if i ∈ (9, 11, 18, 22, 24)
             5e-4
         elseif i == 20
             1e-3
-        elseif i ∈ (13, 21, 14, 15, 16, 22)
-            1e-2
+        elseif i ∈ (17, 21)
+            5e-3
         else
-            5e-5
+            1e-4
         end
         success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
         if !success
@@ -100,20 +102,18 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
         end
         @test success
 
-        rtol = if i ∈ (9, 11, 24)
+        # The pins were generated again after `k` gained its bound (#1844, #1845). They hold
+        # at 1e-6 on the host that made them. Each rtol is the largest `find_tol` over 20
+        # red CI runs of both host kinds (40536176678 to 40988847855) and over a local run
+        # under the CI flags (R14 of #1817). 9 needs 5e-4 on both host kinds since run
+        # 43500807458, and 11, 19 and 24 on the second host kind (runs 43520317481,
+        # 43560900102 and 43573334652).
+        rtol = if i ∈ (2, 9, 11, 17, 19, 24)
             5e-4
-        elseif i == 17
+        elseif i ∈ (20, 22)
             1e-3
         elseif i == 21
-            5e-2
-        elseif i == 14
-            # Was Apple-only. Linux CI drifted onto the same figure, needing 1e-2 where the
-            # 5e-3 below no longer covers it, so the carve-out is no longer platform-specific.
-            1e-2
-        elseif i ∈ (15, 16, 20, 22)
             5e-3
-        elseif i == 18
-            5e-4
         else
             1e-4
         end

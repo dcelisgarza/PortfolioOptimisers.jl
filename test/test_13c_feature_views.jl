@@ -87,9 +87,9 @@ end
     end
     blocks = ([1, 2, 3], [4, 5, 6], [7, 8])
     Zsq = block_features(StableRNG(707), N, blocks)
-    # Z3[i, j, k] names its own position, so a mis-sliced observation axis is visible in
-    # the values and not only in the shape.
-    Z3 = reshape(Float64.(1:(T * N * K)), T, N, K) ./ 1000
+    # Z3[j, k, t] names its own position, so a mis-sliced observation axis is visible in
+    # the values and not only in the shape. The array is `assets × features × observations`.
+    Z3 = permutedims(reshape(Float64.(1:(T * N * K)), T, N, K) ./ 1000, (2, 3, 1))
 
     rd_sq = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, pnl = sqpanel(nx, Zsq))
     # The same numbers, but the names no longer claim the features are the assets. This is
@@ -163,14 +163,14 @@ end
         res_3 = optimise(nco_3, rd_3d)
         idx3 = assignments(res_3.clr)
         cls3 = [findall(==(i), idx3) for i in 1:(res_3.clr.k)]
-        @test all(size(z) == (T, length(cls3[i]), K) for (i, z) in pairs(ri_3.seen))
-        @test all(ri_3.seen[i] == Z3[:, cls3[i], :] for i in eachindex(cls3))
+        @test all(size(z) == (length(cls3[i]), K, T) for (i, z) in pairs(ri_3.seen))
+        @test all(ri_3.seen[i] == Z3[cls3[i], :, :] for i in eachindex(cls3))
         ri_l = RecordingDistance(FeatureDistance())
         nco_l = NestedClustered(; cle = ClustersEstimator(; de = FeatureDistance()),
                                 opti = HierarchicalRiskParity(; opt = hopt(ri_l)),
                                 opto = plain_hrp(), ex = seq)
         optimise(nco_l, rd_3d)
-        @test all(ri_l.seen[i] == Z3[T:T, cls3[i], :] for i in eachindex(cls3))
+        @test all(ri_l.seen[i] == Z3[cls3[i], :, T:T] for i in eachindex(cls3))
     end
 
     @testset "SubsetResampling subsets both axes, and so does a Stacking nested in it" begin
@@ -247,13 +247,13 @@ end
                                      ex = seq)
             sp = split(cv, rd_3d)
             @test length(ri.seen) == length(sp.train_idx)
-            @test all(ri.seen[i] == Z3[sp.train_idx[i], :, :]
+            @test all(ri.seen[i] == Z3[:, :, sp.train_idx[i]]
                       for i in eachindex(sp.train_idx))
-            @test all(size(z, 1) == length(sp.train_idx[i]) for (i, z) in pairs(ri.seen))
+            @test all(size(z, 3) == length(sp.train_idx[i]) for (i, z) in pairs(ri.seen))
             # The default collapse stacks the fold's last row alone (#1064).
             rl = RecordingDistance(FeatureDistance())
             cross_val_predict(HierarchicalRiskParity(; opt = hopt(rl)), rd_3d, cv; ex = seq)
-            @test all(rl.seen[i] == Z3[sp.train_idx[i][end:end], :, :]
+            @test all(rl.seen[i] == Z3[:, :, sp.train_idx[i][end:end]]
                       for i in eachindex(sp.train_idx))
 
             rs = RecordingDistance(FeatureDistance())
@@ -263,10 +263,10 @@ end
 
         # `train_test_split` is a pair of `port_opt_view`s, so the same rule holds there.
         tr, te = train_test_split(rd_3d; train_size = 150)
-        @test panel_feature_matrix(tr.pnl)[2] == Z3[1:size(tr.X, 1), :, :]
-        @test panel_feature_matrix(te.pnl)[2] == Z3[(T - size(te.X, 1) + 1):T, :, :]
-        @test size(panel_feature_matrix(tr.pnl)[2], 1) +
-              size(panel_feature_matrix(te.pnl)[2], 1) == T
+        @test panel_feature_matrix(tr.pnl)[2] == Z3[:, :, 1:size(tr.X, 1)]
+        @test panel_feature_matrix(te.pnl)[2] == Z3[:, :, (T - size(te.X, 1) + 1):T]
+        @test size(panel_feature_matrix(tr.pnl)[2], 3) +
+              size(panel_feature_matrix(te.pnl)[2], 3) == T
     end
 
     @testset "MultipleRandomised splits observations and assets together" begin
@@ -277,11 +277,11 @@ end
         cross_val_predict(HierarchicalRiskParity(; opt = hopt(ri)), rd_3d, cv; ex = seq)
         s3 = split(cv, rd_3d)
         @test length(ri.seen) == length(s3.train_idx)
-        @test all(ri.seen[i] == Z3[s3.train_idx[i], s3.asset_idx[i], :]
+        @test all(ri.seen[i] == Z3[s3.asset_idx[i], :, s3.train_idx[i]]
                   for i in eachindex(s3.train_idx))
         rl = RecordingDistance(FeatureDistance())
         cross_val_predict(HierarchicalRiskParity(; opt = hopt(rl)), rd_3d, cv; ex = seq)
-        @test all(rl.seen[i] == Z3[s3.train_idx[i][end:end], s3.asset_idx[i], :]
+        @test all(rl.seen[i] == Z3[s3.asset_idx[i], :, s3.train_idx[i][end:end]]
                   for i in eachindex(s3.train_idx))
 
         # Square: the replication's asset draw moves BOTH axes. This is the same
@@ -289,7 +289,7 @@ end
         rs = RecordingDistance(FeatureDistance())
         cross_val_predict(HierarchicalRiskParity(; opt = hopt(rs)), rd_sq, cv; ex = seq)
         ss = split(cv, rd_sq)
-        @test all(size(z) == (cv.subset_size, cv.subset_size) for z in rs.seen)
+        @test all(size(z) == (cv.subset_size.val, cv.subset_size.val) for z in rs.seen)
         @test all(rs.seen[i] == Zsq[ss.asset_idx[i], ss.asset_idx[i]]
                   for i in eachindex(ss.train_idx))
     end
@@ -299,7 +299,7 @@ end
         tsp = collect(Date(2021, 1, 1):Day(1):(Date(2021, 1, 1) + Day(Tp - 1)))
         rngp = StableRNG(4242)
         Pv = 100 .+ cumsum(abs.(randn(rngp, Tp, N)) ./ 10; dims = 1)
-        Z3p = reshape(Float64.(1:(Tp * N * K)), Tp, N, K) ./ 1000
+        Z3p = permutedims(reshape(Float64.(1:(Tp * N * K)), Tp, N, K) ./ 1000, (2, 3, 1))
         Zsqp = block_features(StableRNG(24), N, blocks)
 
         # Price-level cross-validation: each fold converts its own window, losing the row
@@ -313,15 +313,15 @@ end
         cross_val_predict(pipe, prc, cv; ex = seq)
         sp = split(cv, prc)
         @test length(ri.seen) == length(sp.train_idx)
-        @test all(ri.seen[i] == Z3p[sp.train_idx[i][2:end], :, :]
+        @test all(ri.seen[i] == Z3p[:, :, sp.train_idx[i][2:end]]
                   for i in eachindex(sp.train_idx))
-        @test all(size(z, 1) == length(sp.train_idx[i]) - 1 for (i, z) in pairs(ri.seen))
+        @test all(size(z, 3) == length(sp.train_idx[i]) - 1 for (i, z) in pairs(ri.seen))
         rl = RecordingDistance(FeatureDistance())
         pipel = Pipeline(;
                          steps = (PricesToReturns(),
                                   HierarchicalRiskParity(; opt = hopt(rl))))
         cross_val_predict(pipel, prc, cv; ex = seq)
-        @test all(rl.seen[i] == Z3p[sp.train_idx[i][end:end], :, :]
+        @test all(rl.seen[i] == Z3p[:, :, sp.train_idx[i][end:end]]
                   for i in eachindex(sp.train_idx))
 
         # Stateful preprocessing inside the fold: `MissingDataFilter` drops an asset at
@@ -351,7 +351,7 @@ end
         @test rc.seen[1] == Zsqp[keep, keep]
 
         # Search cross-validation at price level draws assets *and* windows rows, through
-        # `pipeline_asset_view`/`pipeline_data_view` rather than the returns-level arities.
+        # `port_opt_view(data, :, cols)` and `port_opt_view(data, rows, :)`, which take the assets third at both levels.
         prs = PricesResult(; X = TimeArray(tsp, Pv, nx), pnl = sqpanel(nx, Zsqp))
         rg = RecordingDistance(FeatureDistance())
         mrs = MultipleRandomised(IndexWalkForward(60, 20); subset_size = 3, n_subsets = 2,
@@ -366,7 +366,7 @@ end
                                 prs)
         ss = split(mrs, prs)
         @test length(rg.seen) == length(ss.train_idx)
-        @test all(size(z) == (mrs.subset_size, mrs.subset_size) for z in rg.seen)
+        @test all(size(z) == (mrs.subset_size.val, mrs.subset_size.val) for z in rg.seen)
         @test all(any(z == Zsqp[c, c] for c in unique(ss.asset_idx)) for z in rg.seen)
     end
 

@@ -24,7 +24,8 @@ holds the target weights fixed. An unset `pws` follows `wd`: the next fold start
 fold's target weights when nothing drifts, and from its drifted weights when the series drifts.
 Those are the two consistent pairs, because a fund that drifts holds the drifted weights when it
 trades next. An explicit `pws`, [`TargetWeights`](@ref) or [`DriftedWeights`](@ref), overrides the
-rule, because a run can want one switch without the other.
+rule, because a run can want one switch without the other. The docstring of
+[`AbstractPreviousWeightsSource`](@ref) gives the four settings of the two switches in one table.
 
 !!! tip "When to reach for this"
     Reach for `wd` when the number you report is meant to be the number a fund earned, and the

@@ -35,7 +35,7 @@ A k-fold enumeration is not a timeline, so this scheme carries no Previous-Weigh
 
 ## Validation
 
-  - `n` must be non-empty, greater than zero, and finite.
+  - `n >= 2`, so that each test fold has a training set. With one fold, the test set of the one split holds every observation and its training set is empty. A `DomainError` is thrown otherwise.
   - `purged_size` and `embargo_size` must be non-empty, finite, and non-negative.
   - [`Base.split`](@ref) additionally checks `purged_size + embargo_size < div(T, n)`, because a gap as wide as the smallest fold would empty a training fold.
 
@@ -98,7 +98,10 @@ KFold
     function KFold(n::Integer, purged_size::Integer, embargo_size::Integer,
                    wd::Option{<:AbstractWeightDrift}, fa::Option{<:AbstractFeeAmortisation},
                    store_weight_path::Bool, strict::Bool)
-        assert_nonempty_gt0_finite_val(n, :n)
+        # One fold is the test set of its own split, and leaves that split no training rows.
+        @argcheck(n >= 2,
+                  DomainError(n,
+                              "a KFold needs n >= 2, so that each test fold has a training set, got n = $n"))
         assert_nonempty_nonneg_finite_val(purged_size, :purged_size)
         assert_nonempty_nonneg_finite_val(embargo_size, :embargo_size)
         return new{typeof(n), typeof(purged_size), typeof(embargo_size), typeof(wd),
@@ -239,11 +242,11 @@ end
 
 Read the evaluation switches of a [`KFold`](@ref).
 
-The folds of this scheme are not a timeline, so it carries no Previous-Weights Source and the tuple names `nothing` for it. There is no previous fold whose weights a fold of this scheme could inherit.
+The folds of this scheme are not a timeline, so it carries no Previous-Weights Source and the record holds `nothing` for it. There is no previous fold whose weights a fold of this scheme could inherit.
 
 # Returns
 
-  - `(; wd, pws, fa, store_weight_path, strict)`: The Weight Drift, the Previous-Weights Source, the Fee Clock of the fold's realised series, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
+  - `fe::FoldEvaluation`: The Weight Drift, the Previous-Weights Source, the Fee Clock of the fold's realised series, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
 
 # Related
 
@@ -253,7 +256,6 @@ The folds of this scheme are not a timeline, so it carries no Previous-Weights S
   - [`override_fee_amortisation`](@ref)
 """
 function fold_evaluation(cv::KFold)
-    return (; wd = cv.wd, pws = nothing, fa = cv.fa,
-            store_weight_path = cv.store_weight_path, strict = cv.strict)
+    return FoldEvaluation(cv.wd, nothing, cv.fa, cv.store_weight_path, cv.strict)
 end
 export KFold, KFoldResult

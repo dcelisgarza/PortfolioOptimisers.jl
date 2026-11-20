@@ -230,7 +230,8 @@ function active_weight_divisor(::RenormaliseActive, m::AbstractMatrix{Bool}, W::
 end
 """
     active_divide!(C::AbstractArray, d::Nothing, sq::Bool = false) -> C
-    active_divide!(C::AbstractArray, d::MatNum, sq::Bool = false) -> C
+    active_divide!(C::AbstractMatrix, d::MatNum, sq::Bool = false) -> C
+    active_divide!(C::AbstractArray{<:Any, 3}, d::MatNum, sq::Bool = false) -> C
 
 Divides the collapsed values of a time-varying Panel Field by the divisors of [`active_weight_divisor`](@ref), in place.
 
@@ -238,11 +239,15 @@ The divisor of row `t` and sub-portfolio `k` divides every label of that cell. W
 
 # Algorithm
 
-The method that Julia selects is the algorithm. `nothing` leaves `C` as it is. Else `C` divides by `d` along its first two axes, and, when `sq` is `true`, along its first and third axes.
+The method that Julia selects is the algorithm.
+
+ 1. `nothing` leaves `C` as it is.
+ 2. A matrix, `observations × sub-portfolios`, divides by `d` cell by cell.
+ 3. An array of rank three, `sub-portfolios × labels × observations`, divides each cell `(k, l, t)` by `d[t, k]`, and, when `sq` is `true`, by `d[t, l]` too.
 
 # Arguments
 
-  - `C`: The collapsed values, `observations × sub-portfolios`, or `observations × sub-portfolios × labels`.
+  - `C`: The collapsed values, `observations × sub-portfolios`, or `sub-portfolios × labels × observations`.
   - `d`: The divisors, `observations × sub-portfolios`, or `nothing`.
   - `sq`: `true` when the label axis is the sub-portfolio axis.
 
@@ -259,10 +264,15 @@ The method that Julia selects is the algorithm. `nothing` leaves `C` as it is. E
 function active_divide!(C::AbstractArray, ::Nothing, ::Bool = false)
     return C
 end
-function active_divide!(C::AbstractArray, d::MatNum, sq::Bool = false)
+function active_divide!(C::AbstractMatrix, d::MatNum, ::Bool = false)
     C ./= d
+    return C
+end
+function active_divide!(C::AbstractArray{<:Any, 3}, d::MatNum, sq::Bool = false)
+    dt = permutedims(d)
+    C ./= reshape(dt, size(dt, 1), 1, size(dt, 2))
     if sq
-        C ./= reshape(d, size(d, 1), 1, size(d, 2))
+        C ./= reshape(dt, 1, size(dt, 1), size(dt, 2))
     end
     return C
 end
@@ -322,15 +332,15 @@ end
 
 Collapses the values of one tensor Panel Field onto the sub-portfolios.
 
-A tensor array is `assets × labels` when it is static, and `observations × assets × labels` when it changes over time. The function always contracts the asset axis. When `sq` is `true`, the label axis is the asset axis, see [`features_are_assets`](@ref). Then the function contracts the label axis too, and the answer is square on the sub-portfolios. The two methods that take `m` read the active mask, as [`collapse_panel_numeric`](@ref) does, and a square field restricts both axes to the active members. [`collapse_asset_panel`](@ref) states the mathematics.
+A tensor array is `assets × labels` when it is static, and `assets × labels × observations` when it changes over time. The function always contracts the asset axis. When `sq` is `true`, the label axis is the asset axis, see [`features_are_assets`](@ref). Then the function contracts the label axis too, and the answer is square on the sub-portfolios. The two methods that take `m` read the active mask, as [`collapse_panel_numeric`](@ref) does, and a square field restricts both axes to the active members. [`collapse_asset_panel`](@ref) states the mathematics.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
  1. A matrix contracts as `transpose(W) * A`. When `sq` is `true`, the answer is multiplied by `W` on the right.
- 2. A three-dimensional array does the same for each observation, into a result that the method makes before the loop.
- 3. With a mask, the value of each inactive cell becomes zero, on the asset axis and, when `sq` is `true`, on the label axis. The array contracts by step 2, and the answer divides by `d` through [`active_divide!`](@ref).
+ 2. A three-dimensional array does the same for the contiguous slice of each observation, into a result that the method makes before the loop.
+ 3. With a mask, the value of each inactive cell becomes zero, on the asset axis and, when `sq` is `true`, on the label axis, through [`panel_tensor_mask`](@ref). The array contracts by step 2, and the answer divides by `d` through [`active_divide!`](@ref).
 
 # Arguments
 
@@ -358,11 +368,11 @@ function collapse_panel_tensor(A::AbstractMatrix, W::MatNum, sq::Bool)
 end
 function collapse_panel_tensor(A::AbstractArray{<:Any, 3}, W::MatNum, sq::Bool)
     k = size(W, 2)
-    nl = sq ? k : size(A, 3)
-    C = Array{promote_type(eltype(A), eltype(W))}(undef, size(A, 1), k, nl)
-    @inbounds for t in axes(A, 1)
-        Ct = transpose(W) * view(A, t, :, :)
-        C[t, :, :] = sq ? Ct * W : Ct
+    nl = sq ? k : size(A, 2)
+    C = Array{promote_type(eltype(A), eltype(W))}(undef, k, nl, size(A, 3))
+    @inbounds for t in axes(A, 3)
+        Ct = transpose(W) * view(A, :, :, t)
+        C[:, :, t] = sq ? Ct * W : Ct
     end
     return C
 end
@@ -371,11 +381,41 @@ function collapse_panel_tensor(A::AbstractArray, W::MatNum, sq::Bool, ::Nothing,
 end
 function collapse_panel_tensor(A::AbstractArray{<:Any, 3}, W::MatNum, sq::Bool,
                                m::AbstractMatrix{Bool}, d::Option{<:MatNum})
-    #! A square field holds the members on its label axis too, so an inactive member leaves
-    #! both axes.
-    ma = sq ? m .& reshape(m, size(m, 1), 1, size(m, 2)) : m
+    ma = panel_tensor_mask(m, sq)
     return active_divide!(collapse_panel_tensor(ifelse.(ma, A, zero(eltype(A))), W, sq), d,
                           sq)
+end
+"""
+    panel_tensor_mask(m::AbstractMatrix{Bool}, sq::Bool) -> BitArray{3}
+
+Lay the active mask of a time-varying panel out against the values of a tensor Panel Field.
+
+The active mask is `observations × assets`, and a tensor Panel Field is `assets × labels × observations`. A rectangular field reads an asset at every label, so its mask is `assets × 1 × observations`, and it broadcasts over the labels. A square field holds the members on its label axis too, see [`features_are_assets`](@ref), so an inactive member leaves both axes, and its mask is `assets × assets × observations`.
+
+# Algorithm
+
+ 1. Transpose `m`, and reshape it to `assets × 1 × observations`.
+ 2. When `sq` is `true`, take the conjunction with the same mask reshaped to `1 × assets × observations`.
+
+# Arguments
+
+  - `m`: The active mask of the panel, `observations × assets`.
+  - `sq`: `true` when the label axis is the asset axis.
+
+# Returns
+
+  - `ma::BitArray{3}`: The mask, `assets × 1 × observations`, or `assets × assets × observations` when `sq` is `true`.
+
+# Related
+
+  - [`collapse_panel_tensor`](@ref)
+  - [`collapse_read_tensor`](@ref)
+  - [`features_are_assets`](@ref)
+"""
+function panel_tensor_mask(m::AbstractMatrix{Bool}, sq::Bool)
+    mt = permutedims(m)
+    ma = reshape(mt, size(mt, 1), 1, size(mt, 2))
+    return BitArray(sq ? ma .& reshape(mt, 1, size(mt, 1), size(mt, 2)) : ma)
 end
 """
     collapse_panel_mask(m::Nothing, W::MatNum) -> nothing
@@ -436,7 +476,7 @@ The collapse acts on one field at a time and returns a field. So the collapsed p
   - A tensor field stays a tensor field with the same name and labels. When its labels are the asset names, the contraction acts on both axes. Then the sub-portfolios name the labels, and the groups are dropped, so the field is square on the sub-portfolios too.
   - A categorical field becomes a tensor field of membership fractions. It has the same name, the axis `"level"`, the levels as labels, and the combination of its one-hot block as values. A one-hot column of the Feature Matrix holds `0` and `1`. So its combination is the fraction of the weight of the sub-portfolio in that level, and the Feature Matrix of the collapsed panel is the collapse of the Feature Matrix of the panel. A combination of integer codes has no meaning, and a majority level loses the fractions and needs a rule for ties.
 
-A field that a time-varying panel lifts from a static input, see [`RepeatedLeading`](@ref), holds the same value at every row, and its collapse reads the active members of each row. So the collapsed field changes over time where the active members change.
+A field that a time-varying panel lifts from a static input, see [`RepeatedObservations`](@ref), holds the same value at every row, and its collapse reads the active members of each row. So the collapsed field changes over time where the active members change.
 
 The collapse reads a member only where it is active and its cell holds data: a value that the raw input carried, or that a fill policy wrote. A cell that holds the placeholder of a blank that no fill reached holds no data, so the rule `alg` divides by the weight of the active members that hold data. The collapsed value is then the same for every placeholder. A collapsed cell is observed where an active member with weight is observed, and it holds a placeholder where no active member with weight holds data.
 
@@ -602,7 +642,7 @@ end
 """
     collapse_read_onehot(H::AbstractArray, W::MatNum, r, alg::AbstractPanelCollapseAlgorithm) -> Array
 
-Collapse the one-hot block `H` of a categorical Panel Field, `assets × levels` or `observations × assets × levels`, over the cells that the mask `r` of [`read_cells`](@ref) marks. A cell holds data or not for every level at once, so one mask serves each level. It is [`collapse_read_numeric`](@ref) with a trailing level axis, through [`collapse_panel_tensor`](@ref).
+Collapse the one-hot block `H` of a categorical Panel Field, `assets × levels` or `assets × levels × observations`, over the cells that the mask `r` of [`read_cells`](@ref) marks. A cell holds data or not for every level at once, so one mask serves each level. It is [`collapse_read_numeric`](@ref) with a level axis, through [`collapse_panel_tensor`](@ref). A static block takes an observation axis of length one, and drops it after.
 
 # Related
 
@@ -620,8 +660,8 @@ function collapse_read_onehot(H::AbstractArray{<:Any, 3}, W::MatNum,
 end
 function collapse_read_onehot(H::AbstractMatrix, W::MatNum, r::AbstractVector{Bool},
                               alg::AbstractPanelCollapseAlgorithm)
-    C = collapse_read_onehot(reshape(H, 1, size(H)...), W, reshape(r, 1, :), alg)
-    return dropdims(C; dims = 1)
+    C = collapse_read_onehot(reshape(H, size(H)..., 1), W, reshape(r, 1, :), alg)
+    return dropdims(C; dims = 3)
 end
 """
     collapse_read_tensor(A::AbstractArray, W::MatNum, sq::Bool, m, o, alg::AbstractPanelCollapseAlgorithm) -> Array
@@ -637,10 +677,10 @@ A static field takes an observation axis of length one, and drops it after.
 
 # Arguments
 
-  - `A`: The values, `assets × labels` or `observations × assets × labels`.
+  - `A`: The values, `assets × labels` or `assets × labels × observations`.
   - `W`: The normalised inner weights, `assets × sub-portfolios`.
   - `sq`: `true` when the label axis is the asset axis.
-  - `m`: The active mask of the panel, or `nothing` for a static panel.
+  - `m`: The active mask of the panel, `observations × assets`, or `nothing` for a static panel.
   - `o`: The data mask of the Panel Field, with the shape of `A`, or `nothing`. See [`panel_data_mask`](@ref).
   - `alg`: The rule of the panel collapse.
 
@@ -664,30 +704,32 @@ function collapse_read_tensor(A::AbstractMatrix, W::MatNum, sq::Bool, ::Nothing,
     if all(o)
         return collapse_panel_tensor(A, W, sq)
     end
-    C = collapse_read_tensor(reshape(A, 1, size(A)...), W, sq, trues(1, size(A, 1)),
-                             reshape(o, 1, size(o)...), alg)
-    return dropdims(C; dims = 1)
+    C = collapse_read_tensor(reshape(A, size(A)..., 1), W, sq, trues(1, size(A, 1)),
+                             reshape(o, size(o)..., 1), alg)
+    return dropdims(C; dims = 3)
 end
 function collapse_read_tensor(A::AbstractArray{<:Any, 3}, W::MatNum, sq::Bool,
                               m::AbstractMatrix{Bool}, o::AbstractArray{Bool, 3},
                               alg::AbstractPanelCollapseAlgorithm)
-    ma = sq ? m .& reshape(m, size(m, 1), 1, size(m, 2)) : m
-    #! A cell of `o` sits at the leading indices of `ma`, which holds no label axis on a
-    #! rectangular field.
-    if all(k -> o[k] || !ma[CartesianIndex(Tuple(k)[1:ndims(ma)])], CartesianIndices(o))
+    #! A rectangular mask holds no label axis, and broadcasts over the labels of `o`.
+    ma = panel_tensor_mask(m, sq)
+    if all(Broadcast.instantiate(Broadcast.broadcasted((x, y) -> x | !y, o, ma)))
         return collapse_panel_tensor(A, W, sq, m, active_weight_divisor(alg, m, W))
     end
-    T, N, L = size(A)
+    N, L, T = size(A)
     if sq
-        r = reshape(ma .& o, T, N * L)
+        # The pairs `(asset, label)` are the columns of an `observations × (N · L)` matrix,
+        # the asset first, as `kron(W, W)` orders them.
+        r = permutedims(reshape(ma .& o, N * L, T))
         W2 = kron(W, W)
         k = size(W, 2)
-        C = collapse_panel_numeric(reshape(A, T, N * L), W2, r,
+        C = collapse_panel_numeric(transpose(reshape(A, N * L, T)), W2, r,
                                    active_weight_divisor(alg, r, W2))
-        return reshape(C, T, k, k)
+        return permutedims(reshape(C, T, k, k), (2, 3, 1))
     end
-    return stack((collapse_read_numeric(view(A, :, :, l), W, m .& view(o, :, :, l), alg)
-                  for l in 1:L))
+    return stack((transpose(collapse_read_numeric(transpose(view(A, :, l, :)), W,
+                                                  m .& transpose(view(o, :, l, :)), alg))
+                  for l in 1:L); dims = 2)
 end
 """
     collapse_categorical_mask(o::Nothing, W::MatNum, nl::Integer, m) -> nothing
@@ -700,7 +742,7 @@ The collapsed field has one label for each level, so its mask needs a level axis
 
 # Algorithm
 
-The method that Julia selects is the algorithm. `nothing` stays `nothing`. Else the asset mask collapses through [`collapse_panel_mask`](@ref), with the active mask `m`, and the answer repeats it `nl` times on a new last axis.
+The method that Julia selects is the algorithm. `nothing` stays `nothing`. Else the asset mask collapses through [`collapse_panel_mask`](@ref), with the active mask `m`, and the answer repeats it `nl` times on the level axis, the second axis. A time-varying answer holds the observations last.
 
 # Arguments
 
@@ -711,7 +753,7 @@ The method that Julia selects is the algorithm. `nothing` stays `nothing`. Else 
 
 # Returns
 
-  - The collapsed mask, `sub-portfolios × levels` or `observations × sub-portfolios × levels`, or `nothing`.
+  - The collapsed mask, `sub-portfolios × levels` or `sub-portfolios × levels × observations`, or `nothing`.
 
 # Related
 
@@ -728,7 +770,10 @@ function collapse_categorical_mask(o::AbstractVector{Bool}, W::MatNum, nl::Integ
 end
 function collapse_categorical_mask(o::AbstractMatrix{Bool}, W::MatNum, nl::Integer,
                                    m::AbstractMatrix{Bool})
-    return repeat(collapse_panel_mask(o, W, m), 1, 1, nl)
+    # The collapsed mask is `observations × sub-portfolios`, and the field holds the
+    # observations last.
+    Mt = permutedims(collapse_panel_mask(o, W, m))
+    return repeat(reshape(Mt, size(Mt, 1), 1, size(Mt, 2)), 1, nl, 1)
 end
 """
     collapse_asset_panel(pnl::Nothing, wi::MatNum, nx, alg) -> nothing
@@ -833,10 +878,11 @@ function collapse_asset_panel(pnl::AssetPanel, wi::MatNum, nx::Option{<:VecStr},
     W = synthetic_asset_weights(wi)
     syn = ["_$(k)" for k in 1:size(W, 2)]
     m = pnl.amsk
-    #! A panel with no Panel Field is the ingestion layer's shape. An untyped comprehension
-    #! over an empty vector answers a `Vector{Any}`, which the panel's constructor refuses,
-    #! so the comprehension is typed: it answers the same vector empty or full.
-    pf = AbstractPanelField[collapse_panel_field(f, W, nx, syn, m, alg) for f in pnl.pf]
+    pf = if isnothing(pnl.pf)
+        nothing
+    else
+        AbstractPanelField[collapse_panel_field(f, W, nx, syn, m, alg) for f in pnl.pf]
+    end
     return AssetPanel(; pf = pf, amsk = collapse_panel_mask(pnl.amsk, W),
                       emsk = collapse_panel_mask(pnl.emsk, W))
 end

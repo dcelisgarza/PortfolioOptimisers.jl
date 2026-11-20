@@ -1,9 +1,30 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Risk measure that contributes no risk.
+Measures no risk: its value is zero for every portfolio.
 
-`NoRisk` measures nothing: its functor returns zero and its optimisation formulation adds a zero risk expression. It exists so that a risk-taking optimiser can express a problem that genuinely has no risk term, without a vestigial one changing the model class.
+The JuMP formulation adds a zero risk expression and no row, so a linear programme stays a linear programme. [`MeanRisk`](@ref) needs a risk measure, and without `NoRisk` an objective that ignores the risk still builds the default [`Variance`](@ref) term. That term adds second-order cone rows, so the model needs a conic solver. Problems 9, 14 and 21 of [quintile](@cite) are linear programmes of this kind. They give the robust ``1/N`` and quintile portfolios, the dollar-neutral quintile portfolio and the inverse-volatility quintile portfolio. The global maximum return portfolio of Table I of [quintile](@cite) is another one.
+
+`NoRisk` is valid only under an objective that does not read the risk.
+
+  - [`MeanRisk`](@ref) accepts it under [`MaximumReturn`](@ref) and under [`MaximumUtility`](@ref). Under [`MaximumUtility`](@ref) the risk term is zero, so the two objectives give the same weights.
+  - [`MeanRisk`](@ref) refuses it under [`MinimumRisk`](@ref) and under [`MaximumRatio`](@ref), through [`assert_no_risk_objective_compatibility`](@ref).
+  - [`RiskBudgeting`](@ref), [`FactorRiskContribution`](@ref), [`NearOptimalCentering`](@ref), [`HierarchicalRiskParity`](@ref) and [`HierarchicalEqualRiskContribution`](@ref) refuse it, through [`assert_risk_measure_required`](@ref).
+
+A refusal is an `ArgumentError` from the constructor of the optimiser, and [`zero_risk_expression_cause`](@ref) names the cause in its message. A bound `settings.ub` has no effect, because [`RiskMeasureSettings`](@ref) refuses a negative bound and the risk is always zero.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{NoRisk}(\\boldsymbol{x}) &= 0\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{NoRisk}(\\boldsymbol{x})``: Risk of the portfolio, which is zero.
+  - $(math_dict[:xret])
 
 # Fields
 
@@ -14,21 +35,6 @@ $(DocStringExtensions.FIELDS)
     NoRisk(; settings::RiskMeasureSettings = RiskMeasureSettings()) -> NoRisk
 
 Keywords correspond to the struct's fields.
-
-# Details
-
-[`MeanRisk`](@ref) requires a risk measure, so an objective that ignores risk — [`MaximumReturn`](@ref) — would otherwise still build the default [`Variance`](@ref) term. That term is discarded by the objective, but it drags second-order cone constraints into the model, forcing a conic solver on a problem that is a linear program. `NoRisk` keeps such problems linear.
-
-Two families need this:
-
-  - The robust best-characteristic portfolios of [quintile](@cite) — the ``1/N``, quintile and inverse-volatility portfolios — which are linear programs (see [`CharacteristicUncertaintySet`](@ref)).
-  - The global maximum return portfolio (GMRP), `maximize μᵀw subject to w ≥ 0, 1ᵀw = 1`.
-
-# Notes
-
-`NoRisk` is only coherent under an objective that does not consult risk. [`MeanRisk`](@ref) rejects it with [`MinimumRisk`](@ref) (whose objective would be identically zero, so *any* feasible portfolio would be optimal) and with [`MaximumRatio`](@ref) (whose risk-normalisation constraint would become vacuous, leaving the model unbounded). Use it with [`MaximumReturn`](@ref), or with [`MaximumUtility`](@ref) where the risk-aversion term drops out.
-
-Setting `settings.ub` is legal but pointless: the bound applies to a quantity that is always zero.
 
 # Functor
 
@@ -52,6 +58,9 @@ NoRisk
 
 julia> r([0.1, -0.2, 0.05])
 0.0
+
+julia> r(Float32[0.1, -0.2])
+0.0f0
 ```
 
 # Related
@@ -59,7 +68,13 @@ julia> r([0.1, -0.2, 0.05])
   - [`RiskMeasure`](@ref)
   - [`RiskMeasureSettings`](@ref)
   - [`MaximumReturn`](@ref)
-  - [`CharacteristicUncertaintySet`](@ref)
+  - [`CharacteristicUncertaintySet`](@ref): The uncertainty set of the robust portfolios of [quintile](@cite).
+  - [`norisk_flag`](@ref)
+  - [`zero_risk_expression_flag`](@ref)
+
+# References
+
+  - $(ref_dict[:quintile]) Problems 9, 14 and 21, and Table I.
 """
 @concrete struct NoRisk <: RiskMeasure
     """
@@ -82,24 +97,30 @@ risk_input_kind(::NoRisk) = NetReturnsInput()
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true` when `r` is a [`NoRisk`](@ref), or a collection holding **one**.
+Return `true` when `r` is a [`NoRisk`](@ref), or a vector that holds at least one.
 
-The quantifier is `any`, not `all`, and it is earned on the hierarchical path. [`HierarchicalRiskParity`](@ref) and [`HierarchicalEqualRiskContribution`](@ref) allocate by *inverse* risk, so a single [`NoRisk`](@ref) can drive a divisor to zero even with a real measure beside it. `NoRisk`'s functor returns zero, so its unitary risks are all zero; HRP then forms `alpha = 1 - lrisk / (lrisk + rrisk)` and HERC forms `inv.(risk) ./ sum(inv.(risk))`.
+The test is `any`, not `all`, because of the hierarchical optimisers. [`HierarchicalRiskParity`](@ref) and [`HierarchicalEqualRiskContribution`](@ref) allocate by the inverse of a risk. The risk of [`NoRisk`](@ref) is zero, so one `NoRisk` can make a divisor zero even beside a real measure. HRP forms `alpha = 1 - lrisk / (lrisk + rrisk)`, and HERC forms `inv.(risk) ./ sum(inv.(risk))` for each measure.
 
-Measured on `r = [NoRisk(), Variance()]` over a 200×4 return matrix:
+The table gives the result for `r = [NoRisk(), Variance()]` over a 200×4 returns matrix, when no check refuses the vector.
 
-| Scalariser            | HRP `alpha`      | HERC inner weights |
-|:--------------------- |:---------------- |:------------------ |
-| `SumScalariser`       | finite           | `NaN`              |
-| `MinScalariser`       | `NaN`            | `NaN`              |
-| `MaxScalariser`       | finite           | finite             |
-| `LogSumExpScalariser` | finite, near 0.5 | `NaN`              |
+| Scalariser            | HRP weights   | HERC weights |
+|:--------------------- |:------------- |:------------ |
+| `SumScalariser`       | finite        | `NaN`        |
+| `MinScalariser`       | `NaN`         | `NaN`        |
+| `MaxScalariser`       | finite        | finite       |
+| `LogSumExpScalariser` | an even split | `NaN`        |
 
-Only [`MaxScalariser`](@ref) escapes on both, being the one reduction that can discard the zero term. HERC fails under three of the four: `inv(0)` is `Inf` and `Inf / Inf` is `NaN`, and that `NaN` is produced *inside* the per-measure closure, so every scalariser that combines the terms propagates it. HRP fails only under [`MinScalariser`](@ref), where the aggregate is itself zero and `alpha` becomes `0 / 0`; under [`LogSumExpScalariser`](@ref) it stays finite but collapses towards `0.5`, an uninformative split rather than an error.
+[`MaxScalariser`](@ref) is the only scalariser that gives finite weights for both, because it can discard the zero term. HERC computes `inv(0) = Inf` and then `Inf / Inf = NaN` for each measure, before the scalariser combines the measures, so every other scalariser keeps the `NaN`. HRP fails under [`MinScalariser`](@ref) alone, where the combined risk is zero and `alpha` is `0 / 0`. Under [`LogSumExpScalariser`](@ref), `alpha` is near `0.5`, so the split carries no information.
 
-`settings.rke` is inert on the hierarchical path, so a measure's type is the only signal available there. An `all` quantifier would admit every `NaN` row above.
+The hierarchical optimisers do not read `settings.rke`, so the type of a measure is the only signal there. A test with `all` accepts every `NaN` row of the table. The JuMP optimisers ask a different question, whether the `:risk` expression is zero, and [`zero_risk_expression_flag`](@ref) answers it.
 
-This is **not** the right quantifier for the JuMP axis, where the question is whether the `:risk` expression is identically zero. See [`zero_risk_expression_flag`](@ref).
+# Arguments
+
+  - $(arg_dict[:r])
+
+# Returns
+
+  - `Bool`: `true` when `r` is or holds a [`NoRisk`](@ref).
 
 # Related
 
@@ -113,37 +134,41 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true` when the model's `:risk` expression is identically zero.
+Return `true` when the `:risk` expression of the model is zero.
 
-The degeneracy guard tests the **state** of the expression, not the **type** of the term. Two routes reach that state, and this predicate is the disjunction of both:
+The function tests the state of the expression, and not the type of a measure. Two cases give a zero expression, and the function returns `true` when either holds.
 
- 1. A [`NoRisk`](@ref) measure is present. This is [`norisk_flag`](@ref), whose quantifier is
-    `any` — earned on the *hierarchical* path, where one `NoRisk` zeroes a divisor under three
-    of the four scalarisers, and documented there. On **this** axis `any` is wider than the
-    state it names: `[NoRisk(), Variance()]` leaves `:risk` non-zero, yet the predicate returns
-    `true`, so the pair is refused under [`MinimumRisk`](@ref) and [`MaximumRatio`](@ref) with a
-    cause string that overstates the case. The refusal is kept because the configuration is
-    vestigial — a `NoRisk` beside a real measure buys nothing, which is the opposite of what
-    [`NoRisk`](@ref) exists for — but it is a type test surviving inside a state test.
- 2. Every measure carries `settings.rke = false`, so [`set_risk_expression!`](@ref) pushes
-    nothing. The quantifier here is `all`, because one included measure leaves the expression
-    non-zero.
+ 1. A [`NoRisk`](@ref) measure is present, which [`norisk_flag`](@ref) tests with `any`. Here
+    `any` is wider than the state: `[NoRisk(), Variance()]` gives a `:risk` that is not zero,
+    and the function still returns `true`. So [`MinimumRisk`](@ref) and [`MaximumRatio`](@ref)
+    refuse the pair, with a message that overstates the cause. A `NoRisk` beside a real
+    measure has no use, so the refusal stays.
+ 2. Every measure sets `settings.rke = false`, so [`set_risk_expression!`](@ref) adds nothing to
+    the expression. The test is `all`, because one measure that enters keeps the expression
+    away from zero.
 
-The halves compose only because route 1's `any` subsumes the mixed case that a composed test
-would otherwise miss. The exact mirror of the return axis is `all(isa NoRisk || !rke)`, which
-agrees with this predicate everywhere except `[NoRisk(), Variance()]`, where the fused form is
-the accurate one. The return axis must fuse because it has no such subsuming half; see
-[`zero_return_expression_flag`](@ref).
+The two cases combine only because case 1 already covers the mixed vector. The return side
+tests `all(isa NoRisk || !rke)`, which agrees with this function except at
+`[NoRisk(), Variance()]`, where the return form is the accurate one. The return side has no
+case like case 1, so it must use the combined form. See [`zero_return_expression_flag`](@ref).
 
-`all` on the state route keeps a **constraint-only** measure expressible, which is the risk
-side of the term [`set_return_bounds!`](@ref) supports on the return side:
+The `all` of case 2 lets a measure bound the risk and stay out of the objective. This is the
+risk side of what [`set_return_bounds!`](@ref) does for the return:
 
 ```julia
 r = [Variance(), Variance(; settings = RiskMeasureSettings(; rke = false, ub = u))]
 ```
 
-The second measure binds a `ub` without entering the objective, and this predicate does not
-refuse it.
+The second measure bounds the risk by `ub` and does not enter the objective, and the function
+returns `false`.
+
+# Arguments
+
+  - $(arg_dict[:r])
+
+# Returns
+
+  - `Bool`: `true` when the risk expression of `r` is zero.
 
 # Related
 
@@ -162,13 +187,24 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert that a zero risk expression is paired with an objective that ignores risk.
+Check that a zero risk expression comes with an objective that does not read the risk.
 
-Rejects a zero `:risk` under [`MinimumRisk`](@ref) — whose objective would be identically zero, so the solver could return *any* feasible portfolio, silently — and under [`MaximumRatio`](@ref), whose risk-normalisation constraint would go vacuous and leave the model unbounded.
+Under [`MinimumRisk`](@ref) a zero `:risk` makes the objective zero, so every feasible portfolio is optimal and the solver returns any one of them. Under [`MaximumRatio`](@ref) the row that fixes the risk of the ratio has no effect, and the model is unbounded. [`zero_risk_expression_flag`](@ref) decides whether the expression is zero, so the check covers a [`NoRisk`](@ref) measure and a vector whose every measure sets `settings.rke = false`.
 
-The criterion is [`zero_risk_expression_flag`](@ref), so the guard covers both routes to a zero expression: a [`NoRisk`](@ref) measure, and every measure carrying `settings.rke = false`. The second route shipped unguarded since the inclusion flag was introduced.
+The constructor of [`MeanRisk`](@ref) calls the function. It skips a [`TimeDependent`](@ref) schedule, because [`assert_time_dependent_substitution`](@ref) runs the constructor again on each entry of the schedule.
 
-Called from [`MeanRisk`](@ref)'s constructor. [`TimeDependent`](@ref) schedules are skipped here and reached instead through [`assert_time_dependent_substitution`](@ref), which re-runs the constructor on each scheduled entry.
+# Arguments
+
+  - $(arg_dict[:r])
+  - `obj`: Objective function of the optimiser.
+
+# Validation
+
+  - When [`zero_risk_expression_flag`](@ref) is `true`: `!isa(obj, MinimumRisk)` and `!isa(obj, MaximumRatio)`. A failure throws an `ArgumentError` whose message names the cause from [`zero_risk_expression_cause`](@ref).
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -191,11 +227,23 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Name the route by which the risk expression became identically zero, for an error message.
+Return the cause of a zero risk expression, as a phrase for an error message.
+
+The function names a [`NoRisk`](@ref) measure when [`norisk_flag`](@ref) is `true`. Otherwise it names the `settings.rke = false` of every measure. A caller calls it only after [`zero_risk_expression_flag`](@ref) returns `true`.
+
+# Arguments
+
+  - $(arg_dict[:r])
+
+# Returns
+
+  - `String`: The cause, as a phrase that follows "but" or a colon in a sentence.
 
 # Related
 
   - [`zero_risk_expression_flag`](@ref)
+  - [`assert_no_risk_objective_compatibility`](@ref)
+  - [`assert_risk_measure_required`](@ref)
 """
 function zero_risk_expression_cause(r)::String
     return if norisk_flag(r)
@@ -207,16 +255,30 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert that `r` gives a non-zero risk expression, for optimisers built around one.
+Check that `r` gives a risk expression that is not zero, for an optimiser that is built on its risk.
 
-A zero risk expression is only coherent in [`MeanRisk`](@ref), under an objective that never consults it. Every other risk-taking optimiser *is* its risk measure — a risk budget with nothing to budget, a risk contribution that is always zero, a clustering optimiser dividing by a zero risk — so they reject it rather than return a degenerate answer.
+Only [`MeanRisk`](@ref) can use a zero risk expression, under an objective that does not read it. Every other optimiser that takes a risk measure depends on the risk. A risk budget has nothing to share, a risk contribution is zero, and a hierarchical optimiser divides by a zero risk. So these optimisers refuse the measure and do not return a degenerate result.
 
-`flag` selects the predicate, because the two families of caller do not see the same routes:
+`flag` selects the test, because the two kinds of caller do not see the same cases.
 
-  - The JuMP optimisers pass [`zero_risk_expression_flag`](@ref), which covers a [`NoRisk`](@ref) measure **and** every measure carrying `settings.rke = false`.
-  - [`HierarchicalRiskParity`](@ref) and [`HierarchicalEqualRiskContribution`](@ref) keep the default [`norisk_flag`](@ref). They never reach the JuMP risk builders, so `rke` is inert for them, and widening the predicate would refuse a configuration that solves correctly today.
+  - [`RiskBudgeting`](@ref), [`FactorRiskContribution`](@ref) and [`NearOptimalCentering`](@ref) pass [`zero_risk_expression_flag`](@ref). It covers a [`NoRisk`](@ref) measure and a vector whose every measure sets `settings.rke = false`.
+  - [`HierarchicalRiskParity`](@ref) and [`HierarchicalEqualRiskContribution`](@ref) keep the default [`norisk_flag`](@ref). They do not build a JuMP risk expression, so they do not read `rke`, and the wider test refuses a measure that they use correctly.
 
-`T` names the calling optimiser, for the error message. [`TimeDependent`](@ref) schedules are skipped here and reached instead through [`assert_time_dependent_substitution`](@ref).
+The function skips a [`TimeDependent`](@ref) schedule, because [`assert_time_dependent_substitution`](@ref) checks each entry of the schedule.
+
+# Arguments
+
+  - $(arg_dict[:r])
+  - `T::Symbol`: Name of the calling optimiser, for the error message.
+  - `flag`: Test of a zero risk expression, [`norisk_flag`](@ref) or [`zero_risk_expression_flag`](@ref).
+
+# Validation
+
+  - `!flag(r)`. A failure throws an `ArgumentError` that names `T` and the cause from [`zero_risk_expression_cause`](@ref).
+
+# Returns
+
+  - `nothing`.
 
 # Related
 

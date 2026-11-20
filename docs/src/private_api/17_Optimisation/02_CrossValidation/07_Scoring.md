@@ -1,5 +1,5 @@
 ```@meta
-Description = "Scoring, private API of PortfolioOptimisers.jl: AbstractCrossValidationScorer, PredictionScorer, PopulationScorer, PredictionCrossValScorer, …"
+Description = "Scoring, private API of PortfolioOptimisers.jl: AbstractCrossValidationScorer, PredictionScorer, PredictionCrossValScorer, oriented_score, oriented_value, …"
 ```
 
 # Scoring: private API
@@ -7,9 +7,22 @@ Description = "Scoring, private API of PortfolioOptimisers.jl: AbstractCrossVali
 ```@docs
 AbstractCrossValidationScorer
 PredictionScorer
-PopulationScorer
 PredictionCrossValScorer
-PopulationCrossValScorer
+```
+
+A scorer reads the oriented score of a path. The score orients each risk measure before it reduces a vector, so a higher score is always better.
+
+```@docs
+PortfolioOptimisers.oriented_score
+PortfolioOptimisers.oriented_value
+PortfolioOptimisers.oriented_member_score
+PortfolioOptimisers.prediction_returns
+```
+
+A reader of a population takes its reduction as an argument. So it refuses a `sca` in the keywords that it forwards to the score.
+
+```@docs
+PortfolioOptimisers.assert_path_reduction
 ```
 
 A scorer ranks only the members of a population whose every fold solved.

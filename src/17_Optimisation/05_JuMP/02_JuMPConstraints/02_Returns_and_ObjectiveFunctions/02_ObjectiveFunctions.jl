@@ -20,6 +20,10 @@ The objective reads no return expression, so it admits a [`NoReturn`](@ref) term
 `:ret`. It sets no floor on the return, so without a `settings.lb` on a term the solution can
 have a negative expected return.
 
+Page 82 of [markowitz1952](@cite) states the objective for the variance, as the minimum
+variance for a given expected return. Equation 8.7 of [cajas2025](@cite) states it for a
+general risk measure.
+
 # Related
 
   - [`MaximumUtility`](@ref)
@@ -30,8 +34,8 @@ have a negative expected return.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 8.2.1, equation 8.7.
-  - $(ref_dict[:markowitz1952])
+  - $(ref_dict[:markowitz1952]) Page 82.
+  - $(ref_dict[:cajas2025]) Section 8.2.1, Equation 8.7.
 """
 struct MinimumRisk <: ObjectiveFunction end
 """
@@ -80,8 +84,7 @@ Keywords correspond to the struct's fields.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 8.2.3, equation 8.12.
-  - $(ref_dict[:markowitz1952])
+  - $(ref_dict[:cajas2025]) Section 8.2.3, Equation 8.12. $(ref_dict[:no_original_source])
 """
 @concrete struct MaximumUtility <: ObjectiveFunction
     """
@@ -101,7 +104,8 @@ $(DocStringExtensions.TYPEDEF)
 
 Objective function that maximises the risk-adjusted Sharpe-type ratio.
 
-The ratio reads the aggregate return. Its numerator is the model's one return expression,
+Pages 122 and 123 of [sharpe1966](@cite) state the ratio for the standard deviation, and name
+it the reward-to-variability ratio. The ratio reads the aggregate return. Its numerator is the model's one return expression,
 whatever number of terms built it, so `rf` is one rate on that expression. A term that is not
 in return units leaves the numerator through `settings.rte = false`, not through a rate of its
 own.
@@ -116,7 +120,7 @@ deducts a worst-case penalty or a charge forces the risk form, because the retur
 solution in these cases. Thus a ``k`` equal to its floor shows that the objective never went
 above zero. The weights then maximise the return expression at that scale, not the ratio. The
 field `kmin` lets a caller read and set the floor, and a `kmin` that the caller names applies
-to both forms.
+to both forms. `kmin = 0` turns the floor off and keeps only ``k \\geq 0``.
 
 # Mathematical definition
 
@@ -163,7 +167,7 @@ Where:
   - $(math_dict[:R_w])
   - $(math_dict[:ohf_ratio])
   - $(math_dict[:d_homog]) Here it is the degree of the expression that the model builds.
-  - $(math_dict[:k_min_ratio])
+  - $(math_dict[:k_min])
   - ``\\mathbf{\\Sigma}``: The covariance matrix of the variance.
   - ``\\sigma(\\boldsymbol{w})``: The portfolio's standard deviation, ``\\sqrt{\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}}``.
   - $(math_dict[:W_lift])
@@ -195,7 +199,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `ohf` is provided: `ohf > 0`.
-  - If `kmin` is provided: `kmin > 0`.
+  - If `kmin` is provided: `kmin >= 0`.
 
 # Related
 
@@ -209,10 +213,10 @@ Keywords correspond to the struct's fields.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 8.2.4, equations 8.13 to 8.16.
-  - $(ref_dict[:sharpe1964])
-  - $(ref_dict[:schaibleibaraki1983])
+  - $(ref_dict[:sharpe1966]) Pages 122-123.
   - $(ref_dict[:charnescooper1962])
+  - $(ref_dict[:schaibleibaraki1983])
+  - $(ref_dict[:cajas2025]) Section 8.2.4, Equations 8.13 to 8.16. $(ref_dict[:no_original_source])
 """
 @concrete struct MaximumRatio <: ObjectiveFunction
     """
@@ -232,7 +236,7 @@ Keywords correspond to the struct's fields.
             @argcheck(ohf > zero(ohf), DomainError(ohf, "ohf must be > 0"))
         end
         if !isnothing(kmin)
-            @argcheck(kmin > zero(kmin), DomainError(kmin, "kmin must be > 0"))
+            @argcheck(kmin >= zero(kmin), DomainError(kmin, "kmin must be >= 0"))
         end
         return new{typeof(rf), typeof(ohf), typeof(kmin)}(rf, ohf, kmin)
     end
@@ -263,7 +267,9 @@ The objective reads the aggregate expression, not ``\\boldsymbol{\\mu}^\\interca
 A [`LogarithmicReturn`](@ref) term contributes a mean logarithmic return, and several terms
 contribute their weighted sum. The objective sets no ceiling on the risk. Without a
 `settings.ub` on a risk measure, the solution puts the most weight that the other
-constraints let it put on the assets of the highest return.
+constraints let it put on the assets of the highest return. Pages 77 to 79 of
+[markowitz1952](@cite) state this rule, and reject it because it never gives a diversified
+portfolio.
 
 # Related
 
@@ -275,8 +281,7 @@ constraints let it put on the assets of the highest return.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 8.2.2, equation 8.10.
-  - $(ref_dict[:markowitz1952])
+  - $(ref_dict[:markowitz1952]) Pages 77-79.
 """
 struct MaximumReturn <: ObjectiveFunction end
 """
@@ -673,7 +678,7 @@ k_{\\min} &= \\frac{10^{-4}\\,\\mathrm{ohf}}{\\max\\left(\\mathrm{ohf},\\, \\max
 
 Where:
 
-  - $(math_dict[:k_min_ratio]) A stated `obj.kmin` replaces the formula.
+  - $(math_dict[:k_min]) A stated `obj.kmin` replaces the formula.
   - $(math_dict[:ohf_ratio])
   - ``\\bar{\\mu}_i``: Entry ``i`` of the aggregate characteristic, the expected returns of the prior when no term in the expression carries one.
   - $(math_dict[:r_f_ratio])
@@ -693,7 +698,7 @@ thus cannot raise the floor above ``10^{-4}``.
 Where:
 
   - $(math_dict[:k_budget])
-  - $(math_dict[:k_min_ratio])
+  - $(math_dict[:k_min])
 
 # Arguments
 
@@ -713,6 +718,7 @@ Where:
   - [`MaximumRatio`](@ref)
   - [`set_maximum_ratio_normalisation!`](@ref)
   - [`set_max_ratio_return_constraints!`](@ref)
+  - [`risk_budgeting_scale_floor`](@ref)
 """
 function set_maximum_ratio_scale_floor!(model::JuMP.Model, obj::MaximumRatio,
                                         mu::Option{<:Num_VecNum}, pr::AbstractPriorResult,
@@ -843,13 +849,13 @@ function add_penalty_to_objective!(model::JuMP.Model, factor::Integer, expr)
     return expr
 end
 """
-    set_portfolio_objective_function!(model, obj, optimiser, attrs)
+    set_portfolio_objective_function!(model, obj)
 
 Set the portfolio objective function in the JuMP model.
 
 The function dispatches on the objective, builds its expression, and adds the [Objective Penalty](@ref add_to_objective_penalty!) that the regularisation, soft-constraint and custom-term builders accumulated.
 
-The custom objective terms go in before the penalty, because they add to the same accumulator. [`add_penalty_to_objective!`](@ref) applies the sign that matches the sense of the objective, so a contribution always worsens the objective, whichever objective the method builds.
+The function adds nothing to the Objective Penalty, so a model can take one objective after another, as the corners of a [`Frontier`](@ref) sweep do, and each objective holds each contribution once. [`assemble_jump_model!`](@ref) adds the custom objective terms. [`add_penalty_to_objective!`](@ref) applies the sign that matches the sense of the objective, so a contribution always worsens the objective, whichever objective the method builds.
 
 The return term is not an argument. Under [`MaximumRatio`](@ref) the method reads the form from the model instead. A registered `:sr_risk` means the risk form, and no `:sr_risk` means the return form.
 
@@ -857,15 +863,14 @@ The return term is not an argument. Under [`MaximumRatio`](@ref) the method read
 
  1. Read the objective scale `so`, and the entries that the objective reads.
  2. Register `obj_expr`, the expression of the objective.
- 3. Add the custom objective terms of `optimiser.opt.cobj` to the penalty, with [`add_custom_objective_term!`](@ref).
- 4. Add the penalty to `obj_expr` with [`add_penalty_to_objective!`](@ref). Use the sign `1` for a minimised objective and `-1` for a maximised one.
- 5. Set the objective to `so * obj_expr` in the sense of the objective.
+ 3. Add the penalty to `obj_expr` with [`add_penalty_to_objective!`](@ref). Use the sign `1` for a minimised objective and `-1` for a maximised one.
+ 4. Set the objective to `so * obj_expr` in the sense of the objective.
 
 # JuMP formulation
 
 ## Expressions
 
-  - `obj_expr`: the expression of the objective, before step 4 adds the penalty to it.
+  - `obj_expr`: the expression of the objective, before step 3 adds the penalty to it.
 
       + ``R(\\boldsymbol{w})`` under [`MinimumRisk`](@ref), and under the return form of [`MaximumRatio`](@ref).
       + ``\\mathrm{ret} - l\\, R(\\boldsymbol{w})`` under [`MaximumUtility`](@ref).
@@ -888,14 +893,12 @@ Where:
   - $(math_dict[:k_budget])
   - $(math_dict[:so_scale])
   - $(math_dict[:op_penalty])
-  - ``\\mathrm{obj\\_expr}``: The expression `obj_expr` before step 4.
+  - ``\\mathrm{obj\\_expr}``: The expression `obj_expr` before step 3.
 
 # Arguments
 
   - `model::JuMP.Model`: JuMP optimisation model.
   - `obj::ObjectiveFunction`: Portfolio objective, such as [`MinimumRisk`](@ref) or [`MaximumUtility`](@ref). It is the objective that the method builds, which in a [`Frontier`](@ref) sweep is not the one the user declared.
-  - `optimiser::JuMPOptimisationEstimator`: The outer optimisation estimator, such as the [`MeanRisk`](@ref) itself. Its `optimiser.opt.cobj` holds the custom objective terms.
-  - `attrs::ProcessedJuMPOptimiserAttributes`: Pre-computed constraint and prior bundle.
 
 # Returns
 
@@ -908,66 +911,55 @@ Where:
   - [`MaximumRatio`](@ref)
   - [`MaximumReturn`](@ref)
   - [`add_penalty_to_objective!`](@ref)
-  - [`add_custom_objective_term!`](@ref)
+  - [`assemble_jump_model!`](@ref)
 """
-function set_portfolio_objective_function!(model::JuMP.Model, obj::MinimumRisk,
-                                           optimiser::JuMPOptimisationEstimator, attrs)
+function set_portfolio_objective_function!(model::JuMP.Model, ::MinimumRisk)
     so = get_objective_scale(model)
     risk = get_risk(model)
     JuMP.@expression(model, obj_expr, risk)
-    add_custom_objective_term!(model, obj, optimiser.opt.cobj, optimiser, attrs)
     obj_expr = add_penalty_to_objective!(model, 1, obj_expr)
     JuMP.@objective(model, Min, so * obj_expr)
     return nothing
 end
-function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumUtility,
-                                           optimiser::JuMPOptimisationEstimator, attrs)
+function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumUtility)
     so = get_objective_scale(model)
     ret = get_ret(model)
     risk = get_risk(model)
     l = obj.l
     JuMP.@expression(model, obj_expr, ret - l * risk)
-    add_custom_objective_term!(model, obj, optimiser.opt.cobj, optimiser, attrs)
     obj_expr = add_penalty_to_objective!(model, -1, obj_expr)
     JuMP.@objective(model, Max, so * obj_expr)
     return nothing
 end
-function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
-                                           optimiser::JuMPOptimisationEstimator, attrs)
+function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio)
     so = get_objective_scale(model)
     if shared_has(model, :sr_risk)
         ret = get_ret(model)
         k = get_k(model)
         rf = obj.rf
         JuMP.@expression(model, obj_expr, ret - rf * k)
-        add_custom_objective_term!(model, obj, optimiser.opt.cobj, optimiser, attrs)
         obj_expr = add_penalty_to_objective!(model, -1, obj_expr)
         JuMP.@objective(model, Max, so * obj_expr)
     else
         risk = get_risk(model)
         JuMP.@expression(model, obj_expr, risk)
-        add_custom_objective_term!(model, obj, optimiser.opt.cobj, optimiser, attrs)
         obj_expr = add_penalty_to_objective!(model, 1, obj_expr)
         JuMP.@objective(model, Min, so * obj_expr)
     end
     return nothing
 end
-function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumReturn,
-                                           optimiser::JuMPOptimisationEstimator, attrs)
+function set_portfolio_objective_function!(model::JuMP.Model, ::MaximumReturn)
     so = get_objective_scale(model)
     ret = get_ret(model)
     JuMP.@expression(model, obj_expr, ret)
-    add_custom_objective_term!(model, obj, optimiser.opt.cobj, optimiser, attrs)
     obj_expr = add_penalty_to_objective!(model, -1, obj_expr)
     JuMP.@objective(model, Max, so * obj_expr)
     return nothing
 end
-function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumElementReturn,
-                                           optimiser::JuMPOptimisationEstimator, attrs)
+function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumElementReturn)
     so = get_objective_scale(model)
     ret = state_get(model, Symbol(""), :ret_, obj.i)
     JuMP.@expression(model, obj_expr, ret)
-    add_custom_objective_term!(model, obj, optimiser.opt.cobj, optimiser, attrs)
     obj_expr = add_penalty_to_objective!(model, -1, obj_expr)
     JuMP.@objective(model, Max, so * obj_expr)
     return nothing

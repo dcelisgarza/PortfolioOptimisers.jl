@@ -98,6 +98,21 @@ end
     # The declaration was throwaway, so drop it again and leave the checked registry as found.
     pop!(PO.PROPAGATABLE_CONTRACTS)
     @test length(PO.PROPAGATABLE_CONTRACTS) == n_registered
+    # A `@vprop` field also gives an `asset_axis_fields` method on this package's function,
+    # which names the tagged fields.
+    Base.eval(foreign,
+              quote
+                  @propagatable struct ForeignAxisProbe{T1, T2}
+                      @vprop sets::T1
+                      other::T2
+                  end
+                  ForeignAxisProbe(; sets = nothing, other = nothing) = ForeignAxisProbe(sets,
+                                                                                         other)
+              end)
+    @test count(m -> m.module === foreign, methods(PO.asset_axis_fields)) == 1
+    @test PO.asset_axis_fields(foreign.ForeignAxisProbe(; sets = 1, other = 2)) == (:sets,)
+    pop!(PO.PROPAGATABLE_CONTRACTS)
+    @test length(PO.PROPAGATABLE_CONTRACTS) == n_registered
     pool = PO.prior_result_property_pool()
     # `HighOrderPrior` forwards the whole of its `pr`, so the low-order names are in the
     # pool without being its fields.
@@ -200,12 +215,21 @@ end
     @test PO.prop_channel_active(:obs, wonly)
     @test !PO.prop_channel_active(:view, wonly)
     @test !PO.prop_channel_active(:prior, wonly)
-    # `@fprop` is in the observation channel's precedence but not its gate, so a struct with
-    # composed children and no weights of its own emits no `obs_weights_view` method and
-    # falls through to the identity.
+    # `@fprop` opens the observation channel too (#1960), so a cut of the observations
+    # reaches the weights of a child at any depth, through a wrapper with no weights of its
+    # own.
     fonly = merge(untagged, Dict(:fprop => [:a]))
     @test PO.prop_channel_active(:factory, fonly)
-    @test !PO.prop_channel_active(:obs, fonly)
+    @test PO.prop_channel_active(:obs, fonly)
+    # `@oprop` opens the observation channel alone, and only that channel reads it.
+    oonly = merge(untagged, Dict(:oprop => [:a]))
+    @test PO.prop_channel_active(:obs, oonly)
+    @test !PO.prop_channel_active(:factory, oonly)
+    @test !PO.prop_channel_active(:view, oonly)
+    @test !PO.prop_channel_active(:prior, oonly)
+    @test only(PO.prop_channel_pairs(:obs, oonly, [:a], :x, PO, (:i,))).args[2] ==
+          :($(PO).obs_weights_view(x.a, i))
+    @test only(PO.prop_channel_pairs(:factory, oonly, [:a], :x, PO, ())).args[2] == :(x.a)
     # The precedence is data, and the prior channel puts `@pprop` above `@fprop` (ADR 0012).
     pairs = PO.prop_channel_pairs(:prior, tagged, all_fields, :xr, PO, (:pr,))
     @test [p.args[1] for p in pairs] == all_fields
@@ -217,7 +241,7 @@ end
     @test prior_pair.args[2] == :($(PO).sel(xr.a, getproperty(pr, :a)))
     # The factory channel does not know `@pprop`, so the same field recurses there instead.
     factory_pair = only(PO.prop_channel_pairs(:factory, both, [:a], :x, PO, ()))
-    @test factory_pair.args[2] == :($(PO).factory_child(x.a, args...; kwargs...))
+    @test factory_pair.args[2] == :($(PO).factory(x.a, args...; kwargs...))
     #=
     A tag means what its CHANNEL says it means. `@wprop` names the same field in the factory
     channel and in the observation channel, and the two transforms differ: `factory`
@@ -229,13 +253,13 @@ end
     @test [p.args[1] for p in obs_pairs] == all_fields
     # `@fprop` recurses, `@wprop` indexes, everything else is carried through.
     @test obs_pairs[1].args[2] == :($(PO).obs_weights_view(x.a, i))
-    @test obs_pairs[2].args[2] == :($(PO).nothing_scalar_array_getindex(x.w, i))
+    @test obs_pairs[2].args[2] == :($(PO).obs_weights_index(x.w, i))
     @test obs_pairs[4].args[2] == :(x.plain)
     # The same field, the same tag, a different channel, a different transform.
     factory_w = PO.prop_channel_pairs(:factory, wonly, [:w], :x, PO, ())[1].args[2]
     obs_w = PO.prop_channel_pairs(:obs, wonly, [:w], :x, PO, (:i,))[1].args[2]
     @test factory_w == :($(PO)._wprop(x.w, args...; kwargs...))
-    @test obs_w == :($(PO).nothing_scalar_array_getindex(x.w, i))
+    @test obs_w == :($(PO).obs_weights_index(x.w, i))
     @test factory_w != obs_w
     # Indexing, not viewing: a `view` of an `AbstractWeights` is a `SubArray`, which the
     # weighted `Statistics.std` methods do not accept.
@@ -338,6 +362,15 @@ end
     # The same call with a weights type that does support the correction answers a number.
     @test PO.vec_to_real_measure(factory(StandardisedValue(), aweights(wv)), v) ==
           wm / sqrt(10 / 7)
+    # Issue 1954. A corrected weighted reduction of one entry has a divisor of zero. It is
+    # `NaN`, as the unweighted reduction of one entry is, and not the `Inf` that the rounding of
+    # the weighted mean gives. So the standardised value of one entry is the entry itself.
+    for W in (aweights, pweights, fweights), x in (0.013, -0.37, 0.1)
+        @test isnan(PO.vec_to_real_measure(StdValue(; w = W([0.4])), [x]))
+        @test isnan(PO.vec_to_real_measure(VarValue(; w = W([0.4])), (x,)))
+        @test PO.vec_to_real_measure(factory(StandardisedValue(), W([0.4])), [x]) ≈ x
+    end
+    @test isnan(PO.vec_to_real_measure(StdValue(), [0.013]))
     #=
     ADR 0087, the consistency the written default buys. The variance path and the covariance
     path answer the same number over the same data, on both branches, and they refuse a plain
@@ -382,6 +415,92 @@ end
     @test PO.vec_to_real_measure(sum, v) == 10.0
     @test PO.vec_to_real_measure(sum, t) == 10.0
     @test PO.vec_to_real_measure(maximum, v) == 4.0
+end
+# Two `DynamicAbstractWeights` probes for the test set below. The first resolves a vector to
+# probability weights proportional to the position of each observation. The second has no
+# method, so it reaches the fallback that raises.
+using StatsBase: StatsBase
+struct RampProbeWeights <: PortfolioOptimisers.DynamicAbstractWeights end
+function PortfolioOptimisers.get_observation_weights(::RampProbeWeights, X::AbstractVector;
+                                                     kwargs...)
+    return StatsBase.pweights(collect(1.0:length(X)))
+end
+struct UnresolvedProbeWeights <: PortfolioOptimisers.DynamicAbstractWeights end
+@testset "VectorToScalarMeasure: a weighted measure resolves dynamic weights against the data" begin
+    using PortfolioOptimisers, Test, Statistics, StatsBase
+    PO = PortfolioOptimisers
+    #=
+    Issue #1824. The weighted value measures gave their `w` to `Statistics` as it was. Their
+    constructors take a `DynamicAbstractWeights`, and with one `median`, `std` and `var` raised
+    a `MethodError`, and `mean` read the vector as a function. JET found it when the alias
+    `ObsWeights` took the plain spelling, because it then split the union. Each measure now
+    resolves its weights against the data with `get_observation_weights`.
+    =#
+    v = [1.0, 2.0, 3.0, 4.0]
+    t = (1.0, 2.0, 3.0, 4.0)
+    w = pweights([1.0, 2.0, 3.0, 4.0])
+    for M in (MeanValue, MedianValue)
+        @test PO.vec_to_real_measure(M(; w = RampProbeWeights()), v) ==
+              PO.vec_to_real_measure(M(; w = w), v)
+        @test PO.vec_to_real_measure(M(; w = RampProbeWeights()), t) ==
+              PO.vec_to_real_measure(M(; w = w), v)
+    end
+    # The weighted mean of the ramp: (1 + 4 + 9 + 16) / (1 + 2 + 3 + 4).
+    @test PO.vec_to_real_measure(MeanValue(; w = RampProbeWeights()), v) == 3.0
+    for M in (StdValue, VarValue), corrected in (true, false)
+        @test PO.vec_to_real_measure(M(; w = RampProbeWeights(), corrected = corrected),
+                                     v) ==
+              PO.vec_to_real_measure(M(; w = w, corrected = corrected), v)
+        @test PO.vec_to_real_measure(M(; w = RampProbeWeights(), corrected = corrected),
+                                     t) ==
+              PO.vec_to_real_measure(M(; w = w, corrected = corrected), v)
+    end
+    # A dynamic weight with no method for a vector raises the error that names the method.
+    for M in (MeanValue, MedianValue, StdValue, VarValue)
+        @test_throws PO.ObservationWeightsError PO.vec_to_real_measure(M(;
+                                                                         w = UnresolvedProbeWeights()),
+                                                                       v)
+    end
+end
+@testset "finite_vec_to_real_measure skips the non-finite entries and their weights (#2004)" begin
+    using PortfolioOptimisers, Test, Statistics, StatsBase
+    PO = PortfolioOptimisers
+    #=
+    Issue #2004. The correlation with a constant column is NaN under a `ce` with no repair, so
+    the summary of every column of the correlation matrix was NaN. The summary now reads the
+    finite entries alone, and a weighted measure loses the weight of each skipped entry.
+    =#
+    v = [1.0, NaN, 3.0, Inf, 4.0]
+    f = [1.0, 3.0, 4.0]
+    fin = isfinite.(v)
+    wv = [1.0, 5.0, 3.0, 7.0, 2.0]
+    # A vector with every entry finite gives the value of the measure on the full vector.
+    for M in (MeanValue(), MedianValue(), StdValue(), MaxValue(), sum, 0.5)
+        @test PO.finite_vec_to_real_measure(M, f) == PO.vec_to_real_measure(M, f)
+        @test PO.finite_vec_to_real_measure(M, v) == PO.vec_to_real_measure(M, f)
+    end
+    # The fixed weights of each weighted measure lose the weights of the skipped entries.
+    for W in (aweights, pweights), M in (MeanValue, MedianValue)
+        @test PO.finite_vec_to_real_measure(M(; w = W(wv)), v) ==
+              PO.vec_to_real_measure(M(; w = W(wv[fin])), f)
+    end
+    for M in (StdValue, VarValue), corrected in (true, false)
+        @test PO.finite_vec_to_real_measure(M(; w = aweights(wv), corrected = corrected),
+                                            v) ==
+              PO.vec_to_real_measure(M(; w = aweights(wv[fin]), corrected = corrected), f)
+    end
+    # The weighted mean of the entries 1, 3 and 4 under the weights 1, 3 and 2.
+    @test PO.finite_vec_to_real_measure(MeanValue(; w = aweights(wv)), v) ==
+          (1 + 9 + 8) / (1 + 3 + 2)
+    # A composed measure cuts the weights of each of its parts.
+    @test PO.finite_vec_to_real_measure(factory(StandardisedValue(), aweights(wv)), v) ==
+          PO.vec_to_real_measure(factory(StandardisedValue(), aweights(wv[fin])), f)
+    # A dynamic weight stays, and resolves on the finite entries.
+    @test PO.finite_vec_to_real_measure(MeanValue(; w = RampProbeWeights()), v) ==
+          PO.vec_to_real_measure(MeanValue(; w = pweights([1.0, 2.0, 3.0])), f)
+    # A vector with no finite entry has no entry to skip to, and the measure reads it whole.
+    @test isnan(PO.finite_vec_to_real_measure(MeanValue(), [NaN, NaN]))
+    @test PO.finite_vec_to_real_measure(0.5, [NaN, NaN]) == 0.5
 end
 @testset "The view and index seam selects the axis its verb names" begin
     using PortfolioOptimisers, Test, StatsBase, LinearAlgebra
@@ -535,6 +654,8 @@ end
     counted.
     =#
     cts = PO.traverse_concrete_subtypes(PO.VectorToScalarMeasure)
+    # A struct type is a `DataType` or a `UnionAll`, so the default array holds `Type` (#1979).
+    @test cts isa Vector{Type}
     own = filter(T -> parentmodule(T) === PO, cts)
     @test !isempty(own)
     @test all(T -> T <: PO.VectorToScalarMeasure, own)
@@ -559,10 +680,77 @@ end
     @test eltype(concrete_typed_array(Any[1, 2.0])) == Union{Float64, Int64}
     @test concrete_typed_array(Any[1, 2.0]) == [1, 2.0]
     @test size(concrete_typed_array(Any[1 2.0; 3 4.0])) == (2, 2)
+    # The union has one argument for each distinct type, so a long vector, such as the folds
+    # of a prediction Result, narrows in linear time (R73 of #1817). A union of one argument
+    # for each element took 2.4 s for these 50 000 entries, and the fix takes 8 ms.
+    long = Any[isodd(i) ? i : Float64(i) for i in 1:50_000]
+    @test eltype(concrete_typed_array(long)) == Union{Float64, Int64}
+    @test minimum(@elapsed(concrete_typed_array(long)) for _ in 1:3) < 0.5
     # The narrowing is opt-in and it is skipped when the element type is already concrete.
     already = [1.0, 2.0]
     @test PO.concrete_typed_array_if_abstract(already) === already
     @test eltype(PO.concrete_typed_array_if_abstract(Any[1, 2.0])) == Union{Float64, Int64}
+    # `isabstracttype` is false for a `Union` and for a `UnionAll`, so neither is narrowed (#440).
+    mixed = Union{Float64, Int64}[1, 2.0]
+    @test PO.concrete_typed_array_if_abstract(mixed) === mixed
+    nested = Vector[[1], [2.0]]
+    @test PO.concrete_typed_array_if_abstract(nested) === nested
+    # --- narrow_mixed_vector: a keyword constructor accepts a mixed literal (#1939) ---
+    @test PO.narrow_mixed_vector(already, Real, :x) === already
+    @test eltype(PO.narrow_mixed_vector(Any[1, 2.0], Real, :x)) == Union{Float64, Int64}
+    @test PO.narrow_mixed_vector(1.0, Real, :x) === 1.0
+    # A matrix and an estimator infer `Any`, which the bound refuses and the function narrows.
+    mats = [[1.0 0.0; 0.0 1.0], AssetSetsMatrixEstimator(; val = "a")]
+    @test !(mats isa PO.VecMatNum_ASetMatE)
+    @test PO.narrow_mixed_vector(mats, PO.MatNum_ASetMatE, :smtx) isa PO.VecMatNum_ASetMatE
+    # A threshold vector may hold `nothing`, so its element type is an `Option`.
+    w = fill(0.25, 4)
+    thr = [Threshold(; val = 0.1), nothing, ThresholdEstimator(; val = Dict("A" => 0.1))]
+    nthr = PO.narrow_mixed_vector(thr, PO.Option{<:PO.BtE_Bt}, :slt)
+    @test nthr isa PO.VecOptBtE_Bt
+    @test isequal(nthr, thr)
+    @test_throws ArgumentError PO.narrow_mixed_vector(Any[1, "a"], Real, :x)
+    msg = try
+        PO.narrow_mixed_vector(Any[1, "a"], Real, :tn)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("tn", msg) && occursin("String", msg)
+    # The keyword constructors take a mixed literal, which the positional bound refuses.
+    slv = Solver(; solver = nothing)
+    tnl = [Turnover(; w = w, val = 0.1), TurnoverEstimator(; w = w, val = Dict("A" => 0.1))]
+    sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C", "D"]))
+    jo = JuMPOptimiser(; slv = slv, tn = tnl, sets = sets)
+    @test jo.tn isa PO.VecTnE_Tn
+    @test ProgrammeAllocationSet(; slv = slv, tn = tnl, sets = sets).tn isa PO.VecTnE_Tn
+    @test_throws ArgumentError JuMPOptimiser(; slv = slv, tn = Any[tnl[1], 1.0])
+    # R31 of #1817: an empty vector is refused at construction, as `tn` and `cte` refuse it.
+    # A typed empty vector failed late in `optimise`, and the narrowing let an empty literal
+    # build no constraint with no error.
+    for (k, typed) in
+        ((:lcse, LinearConstraintEstimator[]), (:smtx, AssetSetsMatrixEstimator[]),
+         (:sgmtx, AssetSetsMatrixEstimator[]), (:ple, SemiDefinitePhylogenyEstimator[])),
+        v in (Any[], typed)
+
+        for C in (JuMPOptimiser, ProgrammeAllocationSet)
+            err = try
+                C(; slv = slv, (k => v,)...)
+                nothing
+            catch e
+                e
+            end
+            @test err isa IsEmptyError && occursin("$k cannot be empty", err.msg)
+        end
+    end
+    for v in (Any[], SemiDefinitePhylogenyEstimator[])
+        err = try
+            FactorRiskContribution(; opt = JuMPOptimiser(; slv = slv), frc_ple = v)
+            nothing
+        catch e
+            e
+        end
+        @test err isa IsEmptyError && occursin("frc_ple cannot be empty", err.msg)
+    end
     # --- float_if_integer: an integer type takes its float type, every other type is kept ---
     @test PO.float_if_integer(Int) === Float64
     @test PO.float_if_integer(Int32) === Float64
@@ -572,15 +760,42 @@ end
     @test PO.float_if_integer(BigFloat) === BigFloat
     @test PO.float_if_integer(Rational{Int}) === Rational{Int}
     @test PO.float_if_integer(Complex{Int}) === Complex{Int}
-    # --- factory and factory_child over a vector ---
+    # --- factory over an array: the traversal owns the identity on every leaf (#2109) ---
     @test factory([MeanValue(), nothing]) == [MeanValue(), nothing]
-    fc = PO.factory_child([MeanValue(), MedianValue()], aw)
+    fc = factory([MeanValue(), MedianValue()], aw)
     @test length(fc) == 2
     @test fc[1].w === aw
     @test fc[2].w === aw
-    # --- resolve_deferred_quantities: the universal fallback returns its argument ---
-    @test PO.resolve_deferred_quantities(7, nothing) === 7
-    @test PO.resolve_deferred_quantities(MinValue(), nothing) == MinValue()
+    # An array of any shape keeps its shape, and a `nothing` element comes back.
+    fm = factory(Union{Nothing, MeanValue}[MeanValue() nothing; nothing MeanValue()], aw)
+    @test size(fm) == (2, 2)
+    @test fm[1, 1].w === aw && fm[2, 2].w === aw
+    @test isnothing(fm[1, 2]) && isnothing(fm[2, 1])
+    # A leaf comes back with no change: `nothing`, a scalar, and a weights value, because only
+    # `_wprop` replaces weights (#440). An array of data is a leaf, so no copy is made.
+    @test factory(nothing, aw) === nothing
+    @test factory(7, aw) === 7
+    @test factory(aw, aw) === aw
+    xd = [1.0, 2.0]
+    @test factory(xd, aw) === xd
+    # A covariance estimator of `StatsBase` holds no weights, so it is a leaf too. An array of
+    # covariance estimators takes the weights element by element.
+    sc = StatsBase.SimpleCovariance()
+    @test factory(sc, aw) === sc
+    @test factory([sc, sc], aw) == [sc, sc]
+    fcv = factory([Covariance(), Covariance()], aw)
+    @test fcv isa Vector{<:Covariance}
+    @test all(c -> c.w === aw, fcv)
+    @test !isdefined(PO, :factory_child)
+    # --- resolve_deferred_quantities takes a prior result, and owns no fallback (#2108) ---
+    @test_throws MethodError PO.resolve_deferred_quantities(7, nothing)
+    @test_throws MethodError PO.resolve_deferred_quantities(MinValue(), nothing)
+    # --- the two examples that the /unslop pass of #440 wrote into the measure docstrings ---
+    # An exact zero deviation takes the guard `sqrt(eps)`.
+    @test PO.vec_to_real_measure(StandardisedValue(), [2.0, 2.0, 2.0]) ==
+          2 / sqrt(eps(Float64))
+    # A tie goes to the first value that reaches the highest count, not the first to appear.
+    @test PO.vec_to_real_measure(ModeValue(), [3.0, 1.0, 1.0, 3.0]) == 1.0
 end
 @testset "The propagation machinery reports its own broken rows" begin
     using PortfolioOptimisers, Test
@@ -597,6 +812,11 @@ end
     @test PO.extract_field_name(:a) === :a
     @test PO.extract_field_name(:(a::Int)) === :a
     @test_throws ErrorException PO.extract_field_name(1)
+    # The message names any tag, not `@fprop` alone (#440).
+    @test_throws "a propagation tag must precede" PO.extract_field_name(1)
+    # try_field_name tests the first argument of a `::` node as well as the head (#440).
+    @test PO.try_field_name(:(a::Int)) === :a
+    @test PO.try_field_name(:(a.b::Int)) === nothing
     # --- propagatable_bare_name: a name, a parametric name, a subtyped name ---
     @test PO.propagatable_bare_name(:A) === :A
     @test PO.propagatable_bare_name(:(A{T1})) === :A
@@ -865,6 +1085,69 @@ end
     @test sw.n == 7
     @test getfield(sw, :n) == 3
     #=
+    `hasproperty` gives the names of `propertynames` and no other name, for every rule. The
+    `forward` rule asks it of the child, so it must agree with the tuple that it replaces.
+    =#
+    for o in (f, fn, a, c, sw)
+        @test all(s -> hasproperty(o, s), propertynames(o))
+        @test !hasproperty(o, :absent)
+    end
+    @test hasproperty(c, :cw) && hasproperty(c, :fn)
+    #=
+    A read through a chain of `forward` rules allocates nothing. The test was `sym in
+    propertynames(child)`, and the `propertynames` of a decorated child removes its duplicate
+    names with `unique` on each call: a read of `retcode` through `forward(rr)` and
+    `forward(jr)` of a `FactorRiskContributionResult` allocated 6688 bytes.
+    =#
+    Base.eval(mb, quote
+                  struct Mid
+                      f::OuterF
+                      k::Int
+                  end
+                  struct Top
+                      g::Inner
+                      m::Mid
+                  end
+                  @forward_properties Mid begin
+                      forward(f)
+                  end
+                  @forward_properties Top begin
+                      forward(g, w)
+                      forward(m)
+                  end
+              end)
+    top = mb.Top(inn, mb.Mid(f, 5))
+    read_z(x) = x.z
+    read_k(x) = x.k
+    @test read_z(top) == "zed"
+    @test read_k(top) == 5
+    @test (@allocated read_z(top)) == 0
+    @test (@allocated read_k(top)) == 0
+    @test (@allocated hasproperty(top, :n)) == 0
+    #=
+    A signature with a free parameter, as `Regression{<:Any, Nothing, …}` is, builds a new
+    `UnionAll` on each call when the methods read its `fieldnames`, and allocates. The methods
+    read the names of the bare type name, a constant, so a read of a real field allocates
+    nothing: `re.M` of a `Regression` allocated 2304 bytes.
+    =#
+    Base.eval(mb, quote
+                  struct PSwap{A, B}
+                      a::A
+                      b::B
+                  end
+                  @forward_properties PSwap{<:Any, Nothing} begin
+                      swap(b, a)
+                  end
+              end)
+    ps = mb.PSwap([1.0], nothing)
+    read_a(x) = x.a
+    read_b(x) = x.b
+    @test read_a(ps) == [1.0]
+    @test read_b(ps) == [1.0]
+    @test (@allocated read_a(ps)) == 0
+    @test (@allocated read_b(ps)) == 0
+    @test (@allocated hasproperty(ps, :a)) == 0
+    #=
     Every rejection. The macro returns an `error` at expansion time, so `Base.eval` of the
     declaration raises a `LoadError` that wraps it. The message is asserted, because a rule
     that is rejected with the wrong message sends its author to the wrong line.
@@ -880,6 +1163,11 @@ end
         end
     end
     @test occursin("unknown option", rule_error(:(forward(pa; bogus))))
+    # An option on a rule that it does not apply to is refused, never ignored (#2037).
+    @test occursin("the option `broadcast` does not apply to `forward`, only to `compute` and `swap`",
+                   rule_error(:(forward(pa; broadcast))))
+    @test occursin("the option `settable` does not apply to `alias`, only to `forward`",
+                   rule_error(:(alias(zz, sol.z; settable))))
     @test occursin("`forward` needs a locator", rule_error(:(forward())))
     @test occursin("`forward` names must be bare identifiers",
                    rule_error(:(forward(pa, 1))))
@@ -897,7 +1185,13 @@ end
     @test occursin("`broadcast` does not apply to the function form of `swap`",
                    rule_error(:(swap(n, x -> x; broadcast))))
     @test occursin("`swap` source must be a bare name", rule_error(:(swap(n, 1))))
+    # A `derived` rule names one or more fields, and it takes no option (#2194).
+    @test occursin("`derived` needs one or more field names", rule_error(:(derived())))
+    @test occursin("`derived` names must be bare identifiers", rule_error(:(derived(1))))
+    @test occursin("the option `broadcast` does not apply to `derived`",
+                   rule_error(:(derived(n; broadcast))))
     @test occursin("unknown rule `elide`", rule_error(:(elide(n))))
+    @test occursin("`swap`, or `derived`", rule_error(:(elide(n))))
     #=
     `forward_walk_expr` is the half that builds the property walk. A path of depth two or more
     guards each step with `forward_nonnothing`, so an unset intermediate names the whole
@@ -1024,4 +1318,585 @@ using Accessors: Accessors
     s3 = Accessors.@set s.L = 1.5
     @test getfield(s3, :L) == 1.5
     @test s3 isa mk.KSwap{Float64}
+end
+@testset "@forward_properties: a settable `forward` rule passes its names to the keyword constructor (#2037)" begin
+    using PortfolioOptimisers, Test
+    PO = PortfolioOptimisers
+    #=
+    Item 4 of the ruling of Decision 3 of map #1213. A search sets a slot of a nested part,
+    such as `"opt.wb"`, through `Accessors.set`. A `forward` rule with the `settable` option
+    lets a patch name a slot that it forwards. The patch passes the slot to the keyword
+    constructor as a flat keyword, and the constructor replaces that slot of the part it is
+    given. `rebuild_struct` calls the constructor in the same way.
+    =#
+    ms = Module(:ForwardSettableProbe)
+    Base.eval(ms, :(using PortfolioOptimisers: @forward_properties))
+    Base.eval(ms,
+              quote
+                  struct SInner
+                      w::Any
+                      z::Any
+                  end
+                  struct SNamed
+                      pa::SInner
+                      sol::SInner
+                      n::Int
+                  end
+                  # The default `nothing` of `w` keeps the slot of the given `pa`.
+                  function SNamed(; pa = SInner(1, 2), sol = SInner(3, 4), n = 0,
+                                  w = nothing)
+                      n >= 0 || throw(DomainError(n, "n must be non-negative"))
+                      return SNamed(isnothing(w) ? pa : SInner(w, pa.z), sol, n)
+                  end
+                  @forward_properties SNamed begin
+                      forward(pa, w; settable)
+                      forward(sol, z)
+                  end
+                  struct SAll
+                      pa::SInner
+                  end
+                  function SAll(; pa = SInner(1, 2), w = nothing, z = nothing)
+                      return SAll(SInner(isnothing(w) ? pa.w : w, isnothing(z) ? pa.z : z))
+                  end
+                  @forward_properties SAll begin
+                      forward(pa; settable)
+                  end
+                  struct SShadow
+                      pa::SInner
+                      sol::SInner
+                  end
+                  SShadow(; pa = SInner(1, 2), sol = SInner(3, 4), w = nothing) = SShadow(pa,
+                                                                                          sol)
+                  @forward_properties SShadow begin
+                      forward(sol, w)
+                      forward(pa, w; settable)
+                  end
+                  struct SHead
+                      opt::SNamed
+                      k::Int
+                  end
+              end)
+    function set_error(f)
+        return try
+            f()
+            ""
+        catch err
+            sprint(showerror, err)
+        end
+    end
+    o = ms.SNamed(; n = 3)
+    # The patch replaces the slot of the part, and every other value stays.
+    o2 = Accessors.@set o.w = 9
+    @test o2.w == 9
+    @test o2.pa.w == 9
+    @test o2.pa.z == 2
+    @test o2.sol === o.sol
+    @test o2.n == 3
+    # A patch can name a field and a settable name together.
+    o3 = Accessors.setproperties(o, (; n = 5, w = 7))
+    @test (o3.n, o3.w) == (5, 7)
+    # The keyword constructor runs, so its guard refuses a bad value.
+    @test_throws DomainError Accessors.setproperties(o, (; n = -1, w = 7))
+    # A name of a rule without the option keeps the refusal of today.
+    @test occursin("forwards from `sol.z`", set_error(() -> Accessors.@set o.z = 0))
+    # `rebuild_struct` passes a name that is not a field to the same constructor.
+    @test PO.rebuild_struct(o, (; w = 9)) === o2
+    #=
+    A lens path of two levels. `Accessors.set` builds the head again with its default
+    method, and it builds the decorated type again through the method of the macro.
+    =#
+    h = ms.SHead(o, 1)
+    h2 = Accessors.set(h, PO.parse_lens("opt.w"), 11)
+    @test h2.opt.w == 11
+    @test h2.opt.pa.z == 2
+    @test h2.k == 1
+    @test h2.opt === PO.rebuild_struct(o, (; w = 11))
+    # The option on the form that forwards every property makes each of them settable.
+    a = ms.SAll()
+    a2 = Accessors.@set a.z = 5
+    @test (a2.w, a2.z) == (1, 5)
+    @test occursin("neither a field nor a property",
+                   set_error(() -> Accessors.setproperties(a, (; q = 1))))
+    #=
+    The rule that reads a name decides whether a patch can set it. `forward(sol, w)` reads
+    `w` first, so the settable rule after it never reads `w`, and the patch stays refused.
+    =#
+    s = ms.SShadow()
+    @test s.w == 3
+    @test occursin("forwards from `sol.w`", set_error(() -> Accessors.@set s.w = 0))
+end
+@testset "@forward_properties: the refusal of a forwarded name names the path that stores it (#2129)" begin
+    using PortfolioOptimisers, StableRNGs, Test
+    PO = PortfolioOptimisers
+    #=
+    A rule names the path that it reads, and a hop of that path can be a forwarded or
+    computed property of the value before it. The refusal follows the chain of rules, so the
+    path that it names does not refuse the patch too.
+    =#
+    mc = Module(:ForwardChainProbe)
+    Base.eval(mc, :(using PortfolioOptimisers: @forward_properties))
+    Base.eval(mc, quote
+                  struct CLeaf
+                      a::Int
+                  end
+                  struct CMid
+                      leaf::CLeaf
+                  end
+                  CMid(; leaf = CLeaf(1)) = CMid(leaf)
+                  @forward_properties CMid begin
+                      forward(leaf)
+                      alias(al, leaf.a)
+                      compute(c, x -> 1)
+                  end
+                  struct CTop
+                      mid::CMid
+                  end
+                  CTop(; mid = CMid()) = CTop(mid)
+                  @forward_properties CTop begin
+                      forward(mid)
+                      alias(m2, mid.c)
+                  end
+                  struct CHead
+                      top::CTop
+                  end
+                  @forward_properties CHead begin
+                      forward(top)
+                  end
+                  struct CMidS
+                      leaf::CLeaf
+                  end
+                  CMidS(; leaf = CLeaf(1), a = nothing) = CMidS(if isnothing(a)
+                                                                    leaf
+                                                                else
+                                                                    CLeaf(a)
+                                                                end)
+                  @forward_properties CMidS begin
+                      forward(leaf; settable)
+                  end
+                  struct CTopS
+                      mid::CMidS
+                  end
+                  CTopS(; mid = CMidS()) = CTopS(mid)
+                  @forward_properties CTopS begin
+                      forward(mid)
+                  end
+                  struct CTopN
+                      mid::Union{Nothing, CMid}
+                  end
+                  @forward_properties CTopN begin
+                      alias(x, mid.leaf.a)
+                  end
+              end)
+    function set_error(f)
+        return try
+            f()
+            ""
+        catch err
+            sprint(showerror, err)
+        end
+    end
+    t = mc.CTop(mc.CMid(mc.CLeaf(1)))
+    # A chain of `forward` and `alias` rules ends at the field that stores the value.
+    msg = set_error(() -> Accessors.@set t.a = 0)
+    @test occursin("forwards from `mid.a`", msg)
+    @test occursin("Set `mid.leaf.a` of the `CTop` instead", msg)
+    @test Accessors.set(t, PO.parse_lens("mid.leaf.a"), 5).a == 5
+    @test occursin("Set `mid.leaf.a` of the `CTop` instead",
+                   set_error(() -> Accessors.@set t.al = 0))
+    # A chain that ends at a computed property names it, and the fields of its type.
+    for (lens, path) in ((PO.parse_lens("c"), "mid.c"), (PO.parse_lens("m2"), "mid.c"))
+        msg = set_error(() -> Accessors.set(t, lens, 0))
+        @test occursin("forwards from `$(path)`", msg)
+        @test occursin("`mid.c` is a property that `CMid` computes from its fields", msg)
+        @test occursin("Set one of the fields (:leaf,) of `mid` of the `CTop` instead", msg)
+    end
+    # The walk follows a chain of any length, and a nested end at a computed property stops it.
+    msg = set_error(() -> Accessors.setproperties(mc.CHead(t), (; c = 0)))
+    @test occursin("forwards from `top.c`", msg)
+    @test occursin("`top.mid.c` is a property that `CMid` computes from its fields", msg)
+    @test occursin("of `top.mid` of the `CHead` instead", msg)
+    @test occursin("Set `top.mid.leaf.a` of the `CHead` instead",
+                   set_error(() -> Accessors.setproperties(mc.CHead(t), (; a = 0))))
+    # A settable name of the nested value ends the chain, and its path sets the value.
+    ts = mc.CTopS()
+    @test occursin("Set `mid.a` of the `CTopS` instead",
+                   set_error(() -> Accessors.@set ts.a = 0))
+    @test Accessors.set(ts, PO.parse_lens("mid.a"), 7).a == 7
+    # The walk reads nothing through a `nothing` node, and it keeps the rest of the path.
+    @test occursin("Set `mid.leaf.a` of the `CTopN` instead",
+                   set_error(() -> Accessors.setproperties(mc.CTopN(nothing), (; x = 0))))
+    # The case of the issue: a `HighOrderPrior` forwards `f_mu` from a `LowOrderPrior`.
+    rd = ReturnsResult(; nx = ["a", "b", "c", "d"], X = randn(StableRNG(1), 100, 4))
+    hp = prior(HighOrderPriorEstimator(), rd)
+    msg = set_error(() -> Accessors.setproperties(hp, (; f_mu = 1.0)))
+    @test occursin("`pr.f_mu` is a property that `LowOrderPrior` computes from its fields",
+                   msg)
+    @test occursin("of `pr` of the `HighOrderPrior` instead", msg)
+    @test occursin("Set `pr.mu` of the `HighOrderPrior` instead",
+                   set_error(() -> Accessors.setproperties(hp, (; mu = 1.0))))
+end
+@testset "@forward_properties: a derived field is computed again, and a patch of it is refused (#2194)" begin
+    using PortfolioOptimisers, StableRNGs, Test
+    PO = PortfolioOptimisers
+    #=
+    `forward_setproperties` and `rebuild_struct` call the keyword constructor with every
+    field. A field that the inner constructor computes from the others, such as `mrd` of a
+    `MultiPeriodPredictionResult`, is not a keyword, so the call raised a `MethodError`. A
+    `derived` rule leaves the field out of the call, and refuses a patch that names it.
+    =#
+    function set_error(f)
+        return try
+            f()
+            ""
+        catch err
+            sprint(showerror, err)
+        end
+    end
+    md = Module(:DerivedProbe)
+    Base.eval(md, :(using PortfolioOptimisers: @forward_properties))
+    Base.eval(md, quote
+                  struct DSum
+                      a::Int
+                      b::Int
+                      s::Int
+                      DSum(a::Int, b::Int) = new(a, b, a + b)
+                  end
+                  DSum(; a::Int = 1, b::Int = 2) = DSum(a, b)
+                  @forward_properties DSum begin
+                      derived(s)
+                  end
+              end)
+    @test PO.forward_derived(md.DSum) == (:s,)
+    @test PO.forward_derived(Int) == ()
+    d = md.DSum()
+    # The rule adds no name, and a read of the field is a field read.
+    @test propertynames(d) == (:a, :b, :s)
+    @test d.s == 3
+    # A patch of a field computes the derived field again.
+    @test (Accessors.@set d.a = 5).s == 7
+    @test PO.rebuild_struct(d, (; b = 10)).s == 11
+    @test PO.rebuild_struct(d, NamedTuple()).s == 3
+    # A patch of the derived field is refused, and the message names the fields to set.
+    msg = set_error(() -> Accessors.@set d.s = 0)
+    @test occursin("`s` cannot be set on a `DSum`: it is a derived field", msg)
+    @test occursin("Set one of the fields (:a, :b) instead", msg)
+    @test_throws ArgumentError PO.rebuild_struct(d, (; s = 0))
+    @test isnothing(PO.assert_not_derived(d, (; a = 1)))
+    # The case of the issue: `mrd` concatenates the folds of `pred`.
+    rng = StableRNG(123)
+    X = randn(rng, 120, 4) .* 0.01 .+ 0.0005
+    rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = X)
+    p = cross_val_predict(InverseVolatility(), rd, IndexWalkForward(30, 10))
+    p2 = Accessors.@set p.pred = p.pred[1:3]
+    @test p2.mrd.X == reduce(vcat, (q.rd.X for q in p.pred[1:3]))
+    @test PO.rebuild_struct(p, (; id = 7)).mrd.X == p.mrd.X
+    @test occursin("`mrd` cannot be set on a `MultiPeriodPredictionResult`",
+                   set_error(() -> Accessors.@set p.mrd = p.mrd))
+    # `PipelineResult` had no keyword constructor.
+    pr = fit(Pipeline(; steps = (EmpiricalPrior(), InverseVolatility())), rd)
+    pr2 = Accessors.@set pr.names = ("a", "b")
+    @test pr2.names == ("a", "b")
+    @test pr2.w == pr.w
+    #=
+    The census of the issue. For each `setproperties` method that the library makes, the
+    keyword constructor of the type takes every field, except a derived field. Every
+    derived name is a field. A new decorated type that breaks the contract of
+    `forward_setproperties` turns this test red.
+    =#
+    ms = filter(m -> m.module === PO, methods(Accessors.setproperties))
+    # 32 types on 2026-11-19, after R75 of #1817. A type can join the census, and none
+    # leaves it.
+    @test length(ms) >= 32
+    for m in ms
+        X = Base.rewrap_unionall(Base.unwrap_unionall(m.sig).parameters[2], m.sig)
+        S = Base.unwrap_unionall(X).name.wrapper
+        der = PO.forward_derived(X)
+        need = setdiff(fieldnames(S), der)
+        @test (S, issubset(der, fieldnames(S))) == (S, true)
+        @test (S, any(c -> issubset(need, Base.kwarg_decl(c)), methods(S))) == (S, true)
+    end
+end
+@testset "A lens write on an undecorated type with a derived field computes it again (R75 of #1817)" begin
+    using PortfolioOptimisers, StableRNGs, Test
+    PO = PortfolioOptimisers
+    #=
+    A type that `@forward_properties` does not decorate goes to the default `setproperties`
+    of ConstructionBase, which calls the positional constructor with every field. When no
+    hand-written constructor takes every field, the call reaches the generic constructor of
+    `@concrete`, which skips the inner constructor. So a field that the inner constructor
+    computes kept its old value, and no check ran. A search writes each candidate through
+    `Accessors.set`, so a search over `x` of a `LogRegimeAdjusted` scored the default `kappa`.
+    =#
+    function set_error(f)
+        return try
+            f()
+            ""
+        catch err
+            sprint(showerror, err)
+        end
+    end
+    la = PO.LogRegimeAdjusted()
+    la2 = Accessors.@set la.x = 3.0
+    @test la2.kappa == PO.LogRegimeAdjusted(3.0, 2.0).kappa
+    @test la2.kappa != la.kappa
+    @test PO.rebuild_struct(la, (; y = 3.0)).kappa == PO.LogRegimeAdjusted(0.5, 3.0).kappa
+    @test_throws DomainError Accessors.@set la.x = -1.0
+    @test occursin("`kappa` cannot be set on a `LogRegimeAdjusted`",
+                   set_error(() -> Accessors.@set la.kappa = 0.0))
+    nef = NormalEquationsFit(; XtX = [4.0 0.0; 0.0 16.0], Xty = [4.0, 8.0], n = 3)
+    @test (Accessors.@set nef.Xty = [8.0, 8.0]).coef == [2.0, 0.5]
+    @test occursin("`coef` cannot be set on a `NormalEquationsFit`",
+                   set_error(() -> Accessors.@set nef.coef = [0.0, 0.0]))
+    cv = PO.CustomValueReturnForecastResult([0.1, 0.2])
+    @test (Accessors.@set cv.mu = [0.3, 0.4]).mu == [0.3, 0.4]
+    @test_throws IsEmptyError Accessors.@set cv.mu = Float64[]
+    @test occursin("`hist` cannot be set on a `CustomValueReturnForecastResult`",
+                   set_error(() -> Accessors.@set cv.hist = 1))
+    tr = PO.TargetReturnForecastResult(; mu = [0.1, 0.2], calib = 1.0)
+    @test (Accessors.@set tr.calib = 2.0).calib == 2.0
+    @test occursin("`hist` cannot be set on a `TargetReturnForecastResult`",
+                   set_error(() -> Accessors.@set tr.hist = 1))
+    # `Resume` reads `opt` from `res`.
+    rng = StableRNG(123)
+    X = randn(rng, 120, 4) .* 0.01 .+ 0.0005
+    rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = X)
+    o1 = cross_val_predict(InverseVolatility(), rd, OnlineIndexWalkForward(60, 20))
+    o2 = cross_val_predict(InverseVolatility(), rd, OnlineIndexWalkForward(40, 20))
+    rs = Resume(o1)
+    @test (Accessors.@set rs.res = o2).opt === o2.opt
+    @test PO.rebuild_struct(rs, NamedTuple()).opt === rs.opt
+    b = cross_val_predict(InverseVolatility(), rd, IndexWalkForward(30, 10))
+    @test_throws ArgumentError Accessors.@set rs.res = b
+    @test occursin("`opt` cannot be set on a `Resume`",
+                   set_error(() -> Accessors.@set rs.opt = o2.opt))
+    #=
+    The census. Each concrete type of the package that has a keyword constructor, and no
+    hand-written constructor that takes every field positionally, names in a `derived` rule
+    each field that no keyword constructor takes.
+    =#
+    generated(m) = occursin("ConcreteStructs", string(m.file))
+    reached = Symbol[]
+    for n in names(PO; all = true)
+        isdefined(PO, n) || continue
+        T = getfield(PO, n)
+        T isa Type || continue
+        S = Base.unwrap_unionall(T)
+        (S isa DataType &&
+         isstructtype(S) &&
+         !isabstracttype(S) &&
+         parentmodule(S) === PO &&
+         S.name.wrapper === T) || continue
+        nf = fieldcount(S)
+        nf == 0 && continue
+        ms = collect(methods(T))
+        kws = [Base.kwarg_decl(m)
+               for m in ms if m.nargs == 1 && !isempty(Base.kwarg_decl(m))]
+        isempty(kws) && continue
+        any(m -> !generated(m) && (m.nargs - 1 == nf || m.isva), ms) && continue
+        push!(reached, n)
+        free = setdiff(fieldnames(S), union(kws...))
+        @test (n, issubset(free, PO.forward_derived(T))) == (n, true)
+    end
+    # 37 types on 2026-11-19. A type can join the census. A type leaves it only when it takes
+    # a hand-written constructor of every field, which a lens write then reaches: the fix of
+    # #2197 gave one to 11 types, so 26 remained.
+    @test length(reached) >= 26
+end
+@testset "A lens write and a positional call run the checks of the keyword constructor (#2197)" begin
+    using PortfolioOptimisers, Test
+    PO = PortfolioOptimisers
+    #=
+    A lens write on an undecorated type calls the positional constructor with every field.
+    The checks of `Pipeline` and of eleven states sat in the keyword constructor alone, so a
+    lens write, a rebuild and a positional call built a value that the keyword constructor
+    refuses. A search writes each candidate through `Accessors.set`, so a candidate that put
+    an optimiser before a prior step fitted with no refusal.
+    =#
+    pipe = Pipeline(; steps = (EmpiricalPrior(), InverseVolatility()))
+    @test_throws ArgumentError Accessors.@set pipe.steps = (InverseVolatility(),
+                                                            EmpiricalPrior())
+    @test_throws ArgumentError Pipeline(("a", "b"), (InverseVolatility(), EmpiricalPrior()))
+    @test_throws ArgumentError PO.rebuild_struct(pipe,
+                                                 (;
+                                                  steps = (InverseVolatility(),
+                                                           EmpiricalPrior())))
+    @test_throws ArgumentError Pipeline(("a", "b"), (EqualWeighted(), PricesToReturns()))
+    @test_throws ArgumentError Pipeline(("a", "b"), (EmpiricalPrior(), PricesToReturns()))
+    @test_throws IsEmptyError Pipeline(; steps = ())
+    pipe2 = Accessors.@set pipe.steps = (EmpiricalPrior(), EqualWeighted())
+    @test pipe2.names == pipe.names
+    @test isa(pipe2.steps[2], EqualWeighted)
+    # A fold of a schedule puts a precomputed result in the place of the schedule, and the
+    # inner constructor checks that fold, so the result states its slot.
+    rd = ReturnsResult(; nx = ["A", "B"], X = [0.01 0.02; -0.01 0.0; 0.02 -0.01])
+    res = optimise(EqualWeighted(), rd)
+    # A dynamic call, because a direct call folds the constant and runs no line of it.
+    @test Base.invokelatest(PO.pipe_writes, res) === :opt
+    @test Base.invokelatest(PO.pipe_reads, res) == (:returns,)
+    @test Pipeline(; steps = (EmpiricalPrior(), res)).names == ("prior", "opt")
+    sb = PO.SampleBufferState(; max_history = 2)
+    @test_throws DomainError Accessors.@set sb.max_history = 0
+    @test_throws DomainError Accessors.@set sb.off = -1
+    @test PO.SampleBufferState(; X = zeros(2, 2), G = falses(2)).G == [false, false]
+    @test_throws DimensionMismatch PO.SampleBufferState(; X = zeros(2, 2), G = falses(3))
+    @test_throws DomainError Accessors.@set PO.ReturnsBufferState().max_history = 0
+    @test_throws DomainError Accessors.@set PO.PipelineBufferState().max_history = 0
+    cs = PO.CovarianceState(; mu = zeros(3))
+    @test_throws DomainError Accessors.@set cs.n = -1
+    @test_throws DimensionMismatch Accessors.@set cs.M = zeros(2, 2)
+    @test_throws IsNonFiniteError PO.CovarianceState(; mu = [NaN, 0.0])
+    vs = PO.SimpleVarianceState(; mu = zeros(3))
+    @test_throws DimensionMismatch Accessors.@set vs.M = zeros(2)
+    @test_throws IsNonFiniteError PO.SimpleVarianceState(; mu = zeros(2), M = [Inf, 0.0])
+    ms = PO.SimpleExpectedReturnsState(; mu = zeros(3))
+    @test_throws DomainError Accessors.@set ms.n = -1
+    @test_throws IsEmptyError Accessors.@set ms.mu = Float64[]
+    @test_throws IsNonFiniteError PO.SimpleExpectedReturnsState(; mu = [NaN])
+    mf = PO.MissingDataFilterState(; nx = [:a], miss = [0], n = 0)
+    @test_throws DomainError Accessors.@set mf.n = -1
+    @test_throws DimensionMismatch Accessors.@set mf.miss = [0, 1]
+    pg = PO.PriceGapFillState(; nx = [:a], v = [1.0], held = [true], te = nothing)
+    @test_throws DimensionMismatch Accessors.@set pg.v = [1.0, 2.0]
+    pr = PO.PriceGapFillResult(; nx = [:a], v = [1.0], te = nothing, fill = CarriedPrice(),
+                               strict = false)
+    @test_throws DimensionMismatch Accessors.@set pr.v = [1.0, 2.0]
+    ops = PO.OnlinePortfolioSelectionState(; w = [0.5, 0.5])
+    @test_throws DomainError Accessors.@set ops.n = -1
+    @test_throws DimensionMismatch Accessors.@set ops.nx = ["A"]
+    @test_throws DimensionMismatch Accessors.@set ops.amsk = [true]
+    @test_throws ArgumentError PO.EntropyBudget(nothing)
+    @test_throws ArgumentError PO.EntropyBudget()
+    eb = PO.EntropyBudget(; target = -1.3)
+    @test_throws ArgumentError Accessors.@set eb.target = nothing
+    sr = StepwiseRegression()
+    @test (Accessors.@set sr.crit = :aic).crit === Val(:aic)
+    @test_throws ArgumentError Accessors.@set sr.crit = :none
+    @test StepwiseRegression(; crit = :bic).crit === Val(:bic)
+    #=
+    The census. A keyword constructor of a struct of the package holds no check: the inner
+    constructor holds it, so every route runs it. A keyword constructor that takes only
+    keywords is read from the parsed source, because no reflection reads the body of a
+    method. Each exception names its reason.
+    =#
+    KW_CHECK_EXCEPTIONS = Dict(:CovarianceState => "the scan for finite values costs as much as the fold of one observation, which builds the state through the positional constructor",
+                               :SimpleVarianceState => "the scan for finite values, as for `CovarianceState`",
+                               :SimpleExpectedReturnsState => "the scan for finite values, as for `CovarianceState`")
+    function census_files(root)
+        out = String[]
+        for d in ("src", "ext"), (dir, _, fs) in walkdir(joinpath(root, d)), f in fs
+            endswith(f, ".jl") && push!(out, joinpath(dir, f))
+        end
+        return out
+    end
+    function struct_names!(acc, x)
+        x isa Expr || return acc
+        if x.head === :struct
+            h = x.args[2]
+            h isa Expr && h.head === :(<:) && (h = h.args[1])
+            h isa Expr && h.head === :curly && (h = h.args[1])
+            h isa Symbol && push!(acc, h)
+            return acc
+        end
+        foreach(a -> struct_names!(acc, a), x.args)
+        return acc
+    end
+    function holds_check(x)
+        x isa Expr || return false
+        if x.head === :macrocall && string(x.args[1]) in ("@argcheck", "@assert")
+            return true
+        end
+        if x.head === :call && x.args[1] isa Symbol
+            s = string(x.args[1])
+            (s in ("throw", "error") || startswith(s, "assert") || startswith(s, "check")) &&
+                return true
+        end
+        return any(holds_check, x.args)
+    end
+    function strip_head(x)
+        while x isa Expr && x.head in (:(::), :where)
+            x = x.args[1]
+        end
+        return x
+    end
+    function keyword_checks!(acc, x, structs)
+        (x isa Expr && x.head !== :struct) || return acc
+        if x.head in (:function, :(=)) && length(x.args) == 2
+            call = strip_head(x.args[1])
+            if call isa Expr &&
+               call.head === :call &&
+               call.args[1] in structs &&
+               length(call.args) == 2 &&
+               call.args[2] isa Expr &&
+               call.args[2].head === :parameters
+                holds_check(x.args[2]) && push!(acc, call.args[1])
+                return acc
+            end
+        end
+        foreach(a -> keyword_checks!(acc, a, structs), x.args)
+        return acc
+    end
+    parsed = [Meta.parseall(read(f, String); filename = f)
+              for f in census_files(pkgdir(PortfolioOptimisers))]
+    structs = Set{Symbol}()
+    foreach(ex -> struct_names!(structs, ex), parsed)
+    found = Set{Symbol}()
+    foreach(ex -> keyword_checks!(found, ex, structs), parsed)
+    @test length(structs) > 500
+    @test found == Set(keys(KW_CHECK_EXCEPTIONS))
+end
+using Dates
+@testset "A carrier converts integer data once, and fits as its float copy does (#1972)" begin
+    # Integer data are supported only where an integer is the natural type. The carriers
+    # that a user builds convert integer data at construction, so a continuous kernel
+    # reads floating-point data and takes its type with `eltype`.
+    PO = PortfolioOptimisers
+    Xi = [1 -2; -1 3; 2 -1; 0 1]
+    Xf = [1.0 -2.0; -1.0 3.0; 2.0 -1.0; 0.0 1.0]
+    # The array method copies an integer array, and keeps every other array as it is.
+    @test PO.float_if_integer(Xi) == Xf
+    @test PO.float_if_integer(Xi) isa Matrix{Float64}
+    @test PO.float_if_integer(Xf) === Xf
+    v = view(Xf, :, 1:1)
+    @test PO.float_if_integer(v) === v
+    @test PO.float_if_integer(Float32.(Xf)) isa Matrix{Float32}
+    @test PO.float_if_integer(Xi .// 2) isa Matrix{Rational{Int}}
+    @test isnothing(PO.float_if_integer(nothing))
+    # A lift converts its parent and stays lazy.
+    R = PO.float_if_integer(PO.RepeatedObservations([1, 2], 3))
+    @test R isa PO.RepeatedObservations{Float64}
+    @test R == [1.0 2.0; 1.0 2.0; 1.0 2.0]
+    # `ReturnsResult` converts every returns matrix, and a prior and an optimiser fit the
+    # integer input as they fit its float copy.
+    nx = ["A", "B"]
+    rdi = ReturnsResult(; nx = nx, X = Xi, nf = ["f"], F = Xi[:, 1:1], B = Xi[:, 2],
+                        ne = ["e"], E = Xi[:, 2:2], iv = abs.(Xi) .+ 1)
+    rdf = ReturnsResult(; nx = nx, X = Xf, nf = ["f"], F = Xf[:, 1:1], B = Xf[:, 2],
+                        ne = ["e"], E = Xf[:, 2:2], iv = abs.(Xf) .+ 1)
+    @test all(x -> eltype(x) === Float64, (rdi.X, rdi.F, rdi.B, rdi.E, rdi.iv))
+    pri = prior(EmpiricalPrior(), rdi)
+    prf = prior(EmpiricalPrior(), rdf)
+    @test isequal(pri.mu, prf.mu)
+    @test isequal(pri.sigma, prf.sigma)
+    @test optimise(InverseVolatility(), rdi).w == optimise(InverseVolatility(), rdf).w
+    # A view of float returns stays a view.
+    @test ReturnsResult(; nx = nx, X = view(Xf, :, :)).X isa SubArray
+    # `PricesResult` converts its time arrays and keeps their columns.
+    ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 5)
+    P = [10 20; 11 19; 12 21; 13 22; 12 20]
+    ppi = PricesResult(; X = TimeArray(ts, P, [:A, :B]))
+    ppf = PricesResult(; X = TimeArray(ts, P .+ 0.0, [:A, :B]))
+    @test eltype(values(ppi.X)) === Float64
+    @test colnames(ppi.X) == [:A, :B]
+    @test isequal(prices_to_returns(ppi).X, prices_to_returns(ppf).X)
+    # The numeric Panel Fields convert their values.
+    fi = NumericPanelField(; name = "mc", vals = [1, 2])
+    @test fi.vals == [1.0, 2.0]
+    @test eltype(fi.vals) === Float64
+    ti = TensorPanelField(; name = "t", axis = "f", labels = ["x"],
+                          vals = reshape([1, 2], 2, 1))
+    @test eltype(ti.vals) === Float64
+    @test eltype(NumericPanelField(; name = "f32", vals = Float32[1, 2]).vals) === Float32
+    # The codes of a categorical field are a natural integer, and they stay one.
+    ci = CategoricalPanelField(; name = "sector", levels = ["a", "b"], codes = [1, 2, 1])
+    @test ci.codes isa Vector{Int}
 end

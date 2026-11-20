@@ -8,10 +8,15 @@ Description = "Base regression, public API of PortfolioOptimisers.jl: AbstractTi
 AbstractTimeSeriesRegressionEstimator
 AbstractCrossSectionalRegressionEstimator
 AbstractRegressionTarget
+AbstractUnpenalisedRegressionTarget
+AbstractPenalisedRegressionTarget
+InterceptColumn
 factory(tgt::AbstractRegressionTarget, w::ObsWeights)
 regression_target_weights(tgt::AbstractRegressionTarget)
 regression_target_weights(tgt::Union{LinearModel, GeneralisedLinearModel})
 is_basis_invariant
+residual_count(::Any, A::MatNum)
+residual_count(m::PortfolioOptimisers.GLM.LinearModel, A::MatNum)
 LinearModel
 GeneralisedLinearModel
 Regression
@@ -22,6 +27,7 @@ StatsAPI.fit(tgt::GeneralisedLinearModel, X::MatNum, y::VecNum)
 regression(re::Regression, args...)
 regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult)
 port_opt_view(re::Regression, i, args...)
+obs_weights_view(tgt::Union{LinearModel, GeneralisedLinearModel}, i)
 ```
 
 ## References

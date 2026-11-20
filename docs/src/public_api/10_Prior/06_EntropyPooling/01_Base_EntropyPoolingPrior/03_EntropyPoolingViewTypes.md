@@ -1,20 +1,18 @@
 ```@meta
-Description = "Entropy pooling view types, public API of PortfolioOptimisers.jl: ValueatRiskView, LinearConditionalValueatRiskView, IntegerConditionalValueatRiskView, …"
+Description = "Entropy pooling view types, public API of PortfolioOptimisers.jl: ValueatRiskView, AbstractEntropyPoolingViewFormulation, LinearConditionalValueatRiskView, …"
 ```
 
 # Entropy pooling view types
 
 ```@docs
 ValueatRiskView
+PortfolioOptimisers.AbstractEntropyPoolingViewFormulation
 LinearConditionalValueatRiskView
 IntegerConditionalValueatRiskView
 ConicEntropicValueatRiskView
-GridEntropicValueatRiskView
 ConicRelativisticValueatRiskView
-GridRelativisticValueatRiskView
-SequentialConditionalValueatRiskView
-SequentialEntropicValueatRiskView
-SequentialRelativisticValueatRiskView
+SequentialTailView
+GridTailView
 RelativisticValueatRiskViewBracket
 ConditionalValueatRiskView
 EntropicValueatRiskView

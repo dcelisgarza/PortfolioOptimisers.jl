@@ -1,11 +1,15 @@
 ```@meta
-Description = "Feature selector, private API of PortfolioOptimisers.jl: panel_field_keys, panel_value_columns!, panel_key_column!, panel_group_columns!, …"
+Description = "Feature selector, private API of PortfolioOptimisers.jl: panel_field_keys, panel_claim!, panel_column_transpose, panel_onehot, panel_field_stack_observed!, …"
 ```
 
 # [Feature selector: private API](@id private-api-feature-selector)
 
 ```@docs
 PortfolioOptimisers.panel_field_keys
+PortfolioOptimisers.panel_claim!
+PortfolioOptimisers.panel_column_transpose
+PortfolioOptimisers.panel_onehot
+PortfolioOptimisers.panel_field_stack_observed!
 PortfolioOptimisers.panel_value_columns!
 PortfolioOptimisers.panel_key_column!
 PortfolioOptimisers.panel_group_columns!

@@ -123,6 +123,24 @@ end
 
 rows(m) = Dict(f => Dict(row(m.numbers[f])) for f in m.files)
 
+"""
+    holders(m, file, metric) -> String
+
+The definitions of `file` that hold the measured maximum of `metric`, as a sentence that a rise
+message ends with, or `""` for a metric that is not a maximum. A rise of the maximum of a file
+names the file alone, and a session once refactored the wrong function to lower it.
+"""
+function holders(m, file::AbstractString, metric::AbstractString)
+    n = get(m.numbers, file, nothing)
+    defs = n === nothing ? nothing : get(n.definitions, metric, nothing)
+    if defs === nothing || isempty(defs)
+        return ""
+    end
+    top = maximum(d -> d.value, defs)
+    named = ["`$(d.name)` (line $(d.line))" for d in defs if d.value == top]
+    return " Held by " * join(named, ", ") * "."
+end
+
 recorded_rows(recorded) = get(recorded, "file", Dict{String, Any}())
 
 # --- candidacy -------------------------------------------------------------
@@ -231,7 +249,8 @@ function verify(m, recorded)
     end
     rs = CodeHealth.rises(rec, rows(m), BINDING)
     for r in rs
-        CodeHealth.annotate(r.key, "$(r.metric) rose from $(r.old) to $(r.new).")
+        CodeHealth.annotate(r.key,
+                            "$(r.metric) rose from $(r.old) to $(r.new).$(holders(m, r.key, r.metric))")
     end
     if !isempty(rs)
         push!(failures, "The complexity ratchet tripped on $(length(rs)) number(s).")

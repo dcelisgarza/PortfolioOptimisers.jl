@@ -100,7 +100,7 @@ end on 2022-12-28. A result on one page is therefore comparable with a result on
 the prices, compute the returns and plot the prior.
 =#
 
-using PortfolioOptimisers, CSV, TimeSeries, StatsPlots, GraphRecipes
+using PortfolioOptimisers, CSV, TimeSeries, StatsPlots
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "../examples/SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 rd = prices_to_returns(X)

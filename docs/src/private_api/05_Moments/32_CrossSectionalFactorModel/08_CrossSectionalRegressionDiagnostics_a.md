@@ -1,0 +1,41 @@
+```@meta
+Description = "Cross-Sectional Regression Diagnostics (a), private API of PortfolioOptimisers.jl: RegressionHistory, cs_estimation_mask_weights, cs_gram_from_weights, …"
+```
+
+# Cross-Sectional Regression Diagnostics (a): private API
+
+## Types
+
+```@docs
+RegressionHistory
+```
+
+## Functions
+
+```@docs
+cs_estimation_mask_weights
+cs_gram_from_weights
+cs_gram_inverse_diagonal
+cs_gram_slice!
+cs_inverse_diagonal!
+cs_gram_inverse_diagonal!
+cs_write_inverse_diagonal!
+cs_design_slice
+cs_regression_data
+cs_regression_lag
+cs_lagged_rows
+cs_regression_design
+cs_diagnostic_mask_weights
+cs_row_is_finite
+cs_weighted_rss
+cs_t_stat_row!
+cs_assert_gram
+cs_gram_eltype
+cs_slice_inverse_diagonal!
+cs_regression_score_parts
+cs_score_regressors
+cs_score_observation!
+cs_systematic_return
+cs_weighted_score_sums
+cs_estimation_weights_only
+```

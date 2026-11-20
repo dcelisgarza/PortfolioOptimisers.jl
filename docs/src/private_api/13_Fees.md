@@ -20,7 +20,6 @@ assert_short_fee_convex
 override_fee_amortisation
 two_axis_fees_view
 strip_liquidation_charges
-investable_fees_view
 mark_fees
 lift_fees
 lift_fee_rate

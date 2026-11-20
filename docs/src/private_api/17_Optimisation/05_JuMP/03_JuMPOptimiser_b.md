@@ -1,16 +1,18 @@
 ```@meta
-Description = "JuMP Optimiser (b), private API of PortfolioOptimisers.jl: assert_universe_axis_order, processed_jump_optimiser_attributes, processed_jump_optimiser, …"
+Description = "JuMP Optimiser (b), private API of PortfolioOptimisers.jl: resolve_jump_optimiser, resolve_jump_head_block, processed_jump_optimiser, assemble_jump_model!, …"
 ```
 
 # [JuMP Optimiser (b): private API](@id private-api-jump-optimiser-b)
 
 ```@docs
-assert_universe_axis_order
-processed_jump_optimiser_attributes
+resolve_jump_optimiser
+resolve_jump_head_block
 processed_jump_optimiser
 assemble_jump_model!
 set_risk_and_scalarise!
 jump_optimiser_from_attributes
+constraint_block_steps
+later_constraint_blocks
 PortfolioOptimisers.bind_data_benchmark(::JuMPOptimiser, ::ReturnsResult)
 PortfolioOptimisers.reader_frames(::JuMPOptimiser, ::AbstractString, ::Bool)
 ```

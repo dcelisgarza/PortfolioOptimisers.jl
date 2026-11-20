@@ -98,7 +98,7 @@ The portfolios differ. CVaR is the mean loss over the worst 5 % of days. EVaR an
 put more weight on the *worst* of those days.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 plot_stacked_bar_composition(results, rd)
 
 #=

@@ -127,7 +127,7 @@ function parity_neutralise_prior(; neutralise = nothing,
                                             "style2" => parity_passthrough("style2")])
     pe = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
                         ce = RegimeAdjustedExpWeightedCovariance(; centring = PreCentred(),
-                                                                 debias = RawStatistic(),
+                                                                 debias = nothing,
                                                                  regime_lohi_mult = (0.7,
                                                                                      1.6)))
     return CrossSectionalFactorPrior(; lambda = 1, factors = factors,
@@ -200,9 +200,10 @@ end
         @test parity_compare(vec(@test_nowarn(factor_exposure(xs.d2, c.rd, L1))), O[:, 4];
                              name = "derived, grouped").ok
         B = factor_exposure(OneHotExposure(; field = "industry", family = "industry"), c.rd)
-        @test size(B, 3) == 4
+        @test size(B, 2) == 4
         for l in 1:4
-            @test parity_compare(vec(B[:, :, l]), O[:, 4 + l]; name = "one-hot $l").ok
+            @test parity_compare(vec(permutedims(B[:, l, :])), O[:, 4 + l];
+                                 name = "one-hot $l").ok
         end
         # The weight field holds NaN outside the active mask, and our read makes it zero.
         @test any(isnan, PortfolioOptimisers.panel_field_values(c.rd, "benchmark_weights"))
@@ -325,10 +326,10 @@ weights are known.
 function parity_cs_dense(; T::Integer = 40, N::Integer = 30, K::Integer = 4,
                          seed::Integer = 1382)
     rng = StableRNG(seed)
-    Z = randn(rng, T, N, K)
-    Z[:, :, 1] .= 1.0
+    Z = permutedims(randn(rng, T, N, K), (2, 3, 1))
+    Z[:, 1, :] .= 1.0
     f = 0.01 .* randn(rng, T, K)
-    X = [LinearAlgebra.dot(view(Z, t, i, :), view(f, t, :)) + 0.02 * randn(rng)
+    X = [LinearAlgebra.dot(view(Z, i, :, t), view(f, t, :)) + 0.02 * randn(rng)
          for t in 1:T, i in 1:N]
     mcap = exp.(randn(rng, T, N) .+ 3.0)
     W = sqrt.(mcap)
@@ -339,12 +340,12 @@ function parity_cs_dense(; T::Integer = 40, N::Integer = 30, K::Integer = 4,
             if u < 0.25
                 X[t, i] = NaN
             elseif u < 0.5
-                Z[t, i, 2] = NaN
+                Z[i, 2, t] = NaN
             end
         end
     end
-    Z2 = randn(rng, T, 7, K)
-    Z2[:, :, 1] .= 1.0
+    Z2 = permutedims(randn(rng, T, 7, K), (2, 3, 1))
+    Z2[:, 1, :] .= 1.0
     return (; Z, X, W, Z2)
 end
 # A design that is rank deficient on every observation: a market column beside a one-hot block of
@@ -353,13 +354,14 @@ end
 function parity_cs_deficient(; T::Integer = 12, N::Integer = 20, seed::Integer = 1383)
     rng = StableRNG(seed)
     ind = [mod1(i, 3) for i in 1:N]
-    Z = zeros(T, N, 5)
-    Z[:, :, 1] .= 1.0
+    Z = zeros(N, 5, T)
+    Z[:, 1, :] .= 1.0
     for i in 1:N
-        Z[:, i, 1 + ind[i]] .= 1.0
+        Z[i, 1 + ind[i], :] .= 1.0
     end
-    Z[:, :, 5] = randn(rng, T, N)
-    X = 0.01 .* randn(rng, T) .+ 0.005 .* randn(rng, T, N) .+ 0.003 .* Z[:, :, 5]
+    Z[:, 5, :] = permutedims(randn(rng, T, N))
+    X = 0.01 .* randn(rng, T) .+ 0.005 .* randn(rng, T, N) .+
+        0.003 .* permutedims(Z[:, 5, :])
     W = exp.(0.5 .* randn(rng, T, N))
     W[3, :] .= 0.0
     W[5, 4:end] .= 0.0
@@ -375,22 +377,23 @@ end
 function parity_cs_near_singular(; T::Integer = 6, N::Integer = 30, delta::Real = 1e-6,
                                  seed::Integer = 1384)
     rng = StableRNG(seed)
-    Z = zeros(T, N, 3)
-    Z[:, :, 1] .= 1.0
-    Z[:, :, 2] = randn(rng, T, N)
-    Z[:, :, 3] = Z[:, :, 2] .+ delta .* randn(rng, T, N)
-    X = 0.01 .* randn(rng, T) .+ 0.02 .* Z[:, :, 2] .+ 0.005 .* randn(rng, T, N)
+    Z = zeros(N, 3, T)
+    Z[:, 1, :] .= 1.0
+    Z[:, 2, :] = permutedims(randn(rng, T, N))
+    Z[:, 3, :] = Z[:, 2, :] .+ delta .* permutedims(randn(rng, T, N))
+    X = 0.01 .* randn(rng, T) .+ 0.02 .* permutedims(Z[:, 2, :]) .+
+        0.005 .* randn(rng, T, N)
     W = exp.(0.5 .* randn(rng, T, N))
     return (; Z, X, W)
 end
 # The exact weighted least-squares factor returns of each observation, in 256-bit arithmetic.
 function parity_cs_exact(Z, X, W)
     return setprecision(BigFloat, 256) do
-        F = zeros(BigFloat, size(X, 1), size(Z, 3))
+        F = zeros(BigFloat, size(X, 1), size(Z, 2))
         for t in axes(X, 1)
             idx = findall(>(0), view(W, t, :))
             w = big.(W[t, idx])
-            A = big.(Z[t, idx, :])
+            A = big.(Z[idx, :, t])
             y = big.(X[t, idx])
             F[t, :] = (transpose(A) * (w .* A)) \ (transpose(A) * (w .* y))
         end
@@ -462,7 +465,7 @@ const PARITY_CS_WEIGHT_CASES = ["Cap00" => (0.0, 0.0, 20.0, (0.025, 0.975)),
 # default. That default is #1383's to measure, and this file measures the weights.
 function parity_cs_weights(fx, (p, lambda, ratio, wins);
                            ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
-                                                                  debias = RawStatistic(),
+                                                                  debias = nothing,
                                                                   regime_lohi_mult = (0.7,
                                                                                       1.6)))
     alg = if iszero(lambda)
@@ -483,14 +486,14 @@ end
 # The writers of the exchange that the oracle side reads. Each factor is one file.
 function parity_cs_write(dir::AbstractString, Z, X, W; Z2 = nothing)
     mkpath(dir)
-    for k in axes(Z, 3)
-        parity_write_rows(joinpath(dir, "Z_$(k).csv"), Z[:, :, k])
+    for k in axes(Z, 2)
+        parity_write_rows(joinpath(dir, "Z_$(k).csv"), permutedims(Z[:, k, :]))
     end
     parity_write_rows(joinpath(dir, "X.csv"), X)
     parity_write_rows(joinpath(dir, "W.csv"), W)
     if !isnothing(Z2)
-        for k in axes(Z2, 3)
-            parity_write_rows(joinpath(dir, "Z2_$(k).csv"), Z2[:, :, k])
+        for k in axes(Z2, 2)
+            parity_write_rows(joinpath(dir, "Z2_$(k).csv"), permutedims(Z2[:, k, :]))
         end
     end
     return dir
@@ -542,7 +545,7 @@ end
         @test parity_compare(predict(csr, d.Z2), loadl("Dense", "Predict2");
                              name = "Dense predict").ok
 
-        Zi = d.Z[:, :, 2:end]
+        Zi = d.Z[:, 2:end, :]
         csi = cross_sectional_regression(lin(; intercept = true), Zi, d.X, d.W)
         # Measured maxrel 2.2e-14 and 1.1e-14.
         @test parity_compare(csi.f, loadl("DenseIntercept", "Coef"); name = "Intercept f").ok
@@ -691,8 +694,7 @@ end
         cfg = ("Blend05" => (0.5, 0.5, 20.0, (0.025, 0.975)))[2]
         stored = parity_load("BlendedInverseVarianceWeights", "Blend05Tiny", "W1")
         # The floor of the variance is off, so the inverse is infinite, as in the oracle.
-        ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
-                                               debias = RawStatistic(),
+        ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(), debias = nothing,
                                                regime_lohi_mult = (0.7, 1.6), min_val = 0.0)
         wz = parity_cs_weights_fixture(; zero = true)
         IV = PortfolioOptimisers.cross_sectional_lagged_inverse_variance(ve, wz.eps, wz.msk;
@@ -755,8 +757,7 @@ end
 
         # The full weight step against the oracle, which refuses an infinity, on the residuals
         # `1e-100` times the shared series. Our answers at zero and at 1e-100 are both its limit.
-        ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
-                                               debias = RawStatistic(),
+        ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(), debias = nothing,
                                                regime_lohi_mult = (0.7, 1.6), min_val = 0.0)
         cfg = ("Blend05" => (0.5, 0.5, 20.0, (0.025, 0.975)))[2]
         hz = parity_cs_weights_half()
@@ -804,11 +805,10 @@ end
         pe = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
                             ce = RegimeAdjustedExpWeightedCovariance(;
                                                                      centring = PreCentred(),
-                                                                     debias = RawStatistic(),
+                                                                     debias = nothing,
                                                                      regime_lohi_mult = (0.7,
                                                                                          1.6)))
-        ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
-                                               debias = RawStatistic(),
+        ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(), debias = nothing,
                                                regime_lohi_mult = (0.7, 1.6), min_val = 0.0)
         # Asset 4 is in its warm-up at the latest observation: both sides state its mean and
         # its covariances, and neither states its variance (#1384).

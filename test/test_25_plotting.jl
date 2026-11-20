@@ -1,6 +1,6 @@
 @testset "Plotting" begin
     using Test, PortfolioOptimisers, StatsPlots, GraphRecipes, Clarabel, CSV, TimeSeries,
-          LinearAlgebra, Random, Statistics
+          TOML, LinearAlgebra, Random, Statistics
 
     ## ── helpers ──────────────────────────────────────────────────────────────
     is_plot(x) = x isa Plots.Plot || x isa Plots.AbstractLayout
@@ -55,6 +55,65 @@
         # rolling validated in plot_rolling_measure, plot_rolling_drawdowns
         @test_throws DomainError plot_rolling_measure(r_cvr, w, X; rolling = -1)
         @test_throws DomainError plot_rolling_drawdowns(w, X; rolling = -1)
+    end
+
+    @testset "A plot function with no extension names its trigger packages (#1952)" begin
+        PO_h = PortfolioOptimisers
+        hint(exc, args...) = sprint(io -> PO_h.plots_extension_hint(io, exc, args...))
+        msg = hint(MethodError(plot_composition, (1,)), false)
+        @test occursin("`PortfolioOptimisersPlotsExt` implements `plot_composition`", msg)
+        @test occursin("using StatsPlots`.", msg)
+        # `plot_network` alone draws with GraphRecipes, so it has an extension of its own,
+        # and the other plot functions load without GraphRecipes and GeometryTypes (#2186).
+        msg = hint(MethodError(plot_network, (1,)), false)
+        @test occursin("`PortfolioOptimisersGraphRecipesExt` implements `plot_network`",
+                       msg)
+        @test occursin("using GraphRecipes, StatsPlots`.", msg)
+        exts = TOML.parsefile(joinpath(pkgdir(PO_h), "Project.toml"))["extensions"]
+        @test exts["PortfolioOptimisersPlotsExt"] == "StatsPlots"
+        @test Set(exts["PortfolioOptimisersGraphRecipesExt"]) ==
+              Set(["GraphRecipes", "StatsPlots"])
+        # With the extension loaded, a `MethodError` comes from a wrong argument. The handler
+        # that the error display calls reads the loaded extension.
+        @test isempty(hint(MethodError(plot_composition, (1,)), Any[Int], ()))
+        # A function with a method of the package itself is no plot function.
+        @test isempty(hint(MethodError(PO_h.finite_columns, (1,)), false))
+        # A function of another module gets no hint.
+        @test isempty(hint(MethodError(sum, (1, 2, 3)), false))
+        # The rule of the hint: each function of the package with no method of the package
+        # itself takes its methods from the extension that `plot_extension` names.
+        verbs = [f
+                 for f in (getfield(PO_h, n)
+                           for n in names(PO_h; all = true) if isdefined(PO_h, n))
+                 if f isa Function &&
+                        parentmodule(f) === PO_h &&
+                        !any(m -> m.module === PO_h, methods(f))]
+        @test default_report_figures in verbs
+        ext_of(f) = Base.get_extension(PO_h, first(PO_h.plot_extension(f)))
+        @test all(f -> any(m -> m.module === ext_of(f), methods(f)), verbs)
+    end
+
+    @testset "A page loads GraphRecipes only to draw a network (#2186)" begin
+        # GraphRecipes serves `plot_network` alone, and it invalidates much of the compiled
+        # code of the caller. A reader copies the `using` line of a page, so a page that draws
+        # no network loads StatsPlots alone. R71 of #1817 found 62 pages that still loaded both.
+        root = pkgdir(PortfolioOptimisers)
+        pages = [joinpath(dir, f) for top in ("examples", "user_guide")
+                 for (dir, _, fs) in walkdir(joinpath(root, top))
+                 for f in fs if endswith(f, ".jl")]
+        @test length(pages) > 50
+        # `\s` also matches a line break, so the pattern reads a `using` line that continues.
+        loads_graphrecipes(text) = occursin(r"^using\s+(?:[\w.]+\s*,\s*)*GraphRecipes\b"m,
+                                            text)
+        draws_network(text) = occursin(r"\bplot_network\(", text)
+        stale(p) = (text = read(p, String);
+                    loads_graphrecipes(text) && !draws_network(text))
+        @test isempty([relpath(p, root) for p in pages if stale(p)])
+        # The pattern reads a `using` line that continues, and a call of `plot_network`.
+        @test loads_graphrecipes("x = 1\nusing PortfolioOptimisers, StatsPlots,\n      GraphRecipes\n")
+        @test !loads_graphrecipes("# `plot_network` also needs `GraphRecipes`.\n")
+        @test draws_network("plot_network(NetworkEstimator(), rd)")
+        @test !draws_network("[`plot_network`](@ref)")
     end
 
     @testset "plot_portfolio_cumulative_returns" begin
@@ -164,6 +223,26 @@
         p_noref = plot_histogram(w, X; reference = false)
         @test length(p_noref.series_list) == length(p_ref.series_list) - 1
         @test !any(s -> startswith(s[:label], "Normal"), p_noref.series_list)
+    end
+
+    @testset "plot_histogram reads only the finite returns (#2056)" begin
+        # A fold that failed to solve has `NaN` returns. The figure draws the finite returns,
+        # and every series, the bins, the lines and the Normal density, equals the figure of
+        # the finite returns alone.
+        ret = X * w
+        ret_nan = copy(ret)
+        ret_nan[7] = NaN
+        ret_nan[40] = Inf
+        same(p, q) = length(p.series_list) == length(q.series_list) &&
+                     all(a[:label] == b[:label] &&
+                         isequal(a[:x], b[:x]) &&
+                         isequal(a[:y], b[:y])
+                         for (a, b) in zip(p.series_list, q.series_list))
+        @test same(plot_histogram(ret_nan), plot_histogram(ret_nan[isfinite.(ret_nan)]))
+        @test !same(plot_histogram(ret_nan), plot_histogram(ret))
+        # A series with no finite return, such as a path whose every fold failed, draws the
+        # axes alone.
+        @test isempty(plot_histogram([NaN, Inf, -Inf]).series_list)
     end
 
     @testset "plot_network" begin
@@ -348,6 +427,42 @@
         @test is_plot(plot_weight_stability(mpred))
         @test is_plot(plot_turnover(mpred))
         @test is_plot(plot_cv_dashboard(mpred))
+
+        # A failed fold has `NaN` weights and `NaN` returns, and every figure still draws. No
+        # allocation meets a lower bound of 0.6 on every asset, so every fold fails.
+        bad = cross_val_predict(MeanRisk(;
+                                         opt = JuMPOptimiser(; slv = slv,
+                                                             wb = WeightBounds(; lb = 0.6,
+                                                                               ub = 1.0))),
+                                rd, IndexWalkForward(80, 40))
+        @test all(f -> isa(f.res.retcode, OptimisationFailure), bad.pred)
+        @test isempty(plot_histogram(bad).series_list)
+        @test isempty(plot_weight_stability(bad).series_list)
+        @test is_plot(plot_cv_dashboard(bad))
+        # A failed fold holds no weight, so the boxes of a path with one equal the boxes of the
+        # path without it.
+        mixed = MultiPeriodPredictionResult(;
+                                            pred = [mpred.pred[1]; bad.pred[2];
+                                                    mpred.pred[3:end]])
+        kept = MultiPeriodPredictionResult(; pred = [mpred.pred[1]; mpred.pred[3:end]])
+        ys(p) = [s[:y] for s in p.series_list]
+        @test isequal(ys(plot_weight_stability(mixed)), ys(plot_weight_stability(kept)))
+        # A population draws one curve for each member, under the key of the member.
+        pop = PopulationPredictionResult(; pred = [mpred, bad])
+        pc = plot_portfolio_cumulative_returns(pop)
+        @test length(pc.series_list) == 2
+        @test isequal(pc.series_list[1][:y],
+                      plot_portfolio_cumulative_returns(mpred).series_list[1][:y])
+        @test all(isnan, pc.series_list[2][:y])
+        @test [s[:label] for s in pc.series_list] ==
+              [string(PortfolioOptimisers.population_path_key(p, k))
+               for (k, p) in enumerate(pop.pred)]
+        # A series attribute reaches each curve of a population, as it reaches the curve of a
+        # path, and the curve keeps the key of its member as its label.
+        pk = plot_portfolio_cumulative_returns(pop; linewidth = 5, linestyle = :dash)
+        @test all(s -> s[:linewidth] == 5 && s[:linestyle] === :dash, pk.series_list)
+        @test [s[:label] for s in pk.series_list] == [s[:label] for s in pc.series_list]
+        @test isempty(plot_weight_stability(PopulationPredictionResult(; pred = [bad])).series_list)
     end
 
     @testset "plot_efficient_frontier" begin
@@ -398,6 +513,33 @@
         @test isnan(ps_n.excess_ret)
         @test isequal(plot_performance_summary(pred_b; benchmark = nothing).series_list[1][:y],
                       plot_performance_summary(ps_n).series_list[1][:y])
+        # Many entries draw one panel for each figure, with one bar for each entry, and an
+        # extra measure draws a panel of its own (#1934). The label names the keys of the
+        # entry that are not `nothing`.
+        p_many = plot_performance_summary([pred_b, mpred_p]; names = ["b", "mr"],
+                                          measures = [:mdd => MaximumDrawdown()],
+                                          size = (900, 900))
+        @test length(p_many.subplots) == 12
+        @test p_many.subplots[12][:title] == "mdd"
+        @test p_many.subplots[1][:xaxis][:ticks][2] == ["b", "mr"]
+        ppop = cross_val_predict(EqualWeighted(), rd,
+                                 CombinatorialCrossValidation(; n_folds = 4,
+                                                              n_test_folds = 2))
+        p_pop = plot_performance_summary(performance_summary(ppop))
+        @test p_pop.subplots[1][:xaxis][:ticks][2][1] == "path 1"
+        pext = Base.get_extension(PortfolioOptimisers, :PortfolioOptimisersPlotsExt)
+        two = performance_summary([w, w], X)
+        @test pext.performance_summary_entry_labels(two) == ["member 1", "member 2"]
+        # A summary built by hand with no key labels each entry by its position.
+        named = performance_summary([X * w])
+        unnamed = PerformanceSummaryResult([nothing],
+                                           (getfield(named, f)
+                                            for f in
+                                                fieldnames(PerformanceSummaryResult)[2:end])...)
+        @test pext.performance_summary_entry_labels(unnamed) == ["Entry 1"]
+        # One entry with an extra measure draws one bar more.
+        p_one = plot_performance_summary(X * w; measures = [:mdd => MaximumDrawdown()])
+        @test length(p_one[1][:xaxis][:ticks][2]) == 12
     end
 
     @testset "plot_rolling_drawdowns" begin
@@ -465,11 +607,11 @@
         # because the diagnostics read only the histories the block carries.
         rng_cs = MersenneTwister(798)
         Tc, Nc, Kc = 10, 8, 3
-        Ms_cs = randn(rng_cs, Tc, Nc, Kc)
+        Ms_cs = permutedims(randn(rng_cs, Tc, Nc, Kc), (2, 3, 1))
         csr_cs = CrossSectionalRegression(; f = 0.02 * randn(rng_cs, Tc, Kc),
                                           eps = 0.01 * randn(rng_cs, Tc, Nc),
                                           n = fill(Nc, Tc))
-        csfm_cs = CrossSectionalFactorModel(; M = Ms_cs[Tc, :, :], b = zeros(Nc),
+        csfm_cs = CrossSectionalFactorModel(; M = Ms_cs[:, :, Tc], b = zeros(Nc),
                                             csr = csr_cs, Ms = Ms_cs,
                                             rw = abs.(randn(rng_cs, Tc, Nc)) .+ 0.1,
                                             nf = ["value", "size", "momentum"], lag = 1)
@@ -496,7 +638,7 @@
         @test is_plot(plot_cs_regression_t_stat_exceedance_rate(csfm_cs; threshold = 1,
                                                                 nf = ["a", "b", "c"]))
         # A block that names no factor is labelled by position.
-        bare = CrossSectionalFactorModel(; M = Ms_cs[Tc, :, :], b = zeros(Nc), csr = csr_cs,
+        bare = CrossSectionalFactorModel(; M = Ms_cs[:, :, Tc], b = zeros(Nc), csr = csr_cs,
                                          Ms = Ms_cs, lag = 1)
         @test is_plot(plot_exposure_vif(bare))
         # Each figure draws a view of the answer, labelled with the names the view keeps.
@@ -525,16 +667,16 @@
         # factors sit in two families, and the block keeps every history the realised attribution
         # and its standard errors read.
         rng_fa = StableRNG(782_101)
-        Ms_fa = Array{Float64, 3}(undef, 4, 3, 2)
+        Ms_fa = Array{Float64, 3}(undef, 3, 2, 4)
         for t in 1:4
-            Ms_fa[t, :, :] = [1.0 0.5+0.1*t; 1.0 -0.5; 1.0 1.5]
+            Ms_fa[:, :, t] = [1.0 0.5+0.1*t; 1.0 -0.5; 1.0 1.5]
         end
         f_fa = randn(rng_fa, 4, 2) ./ 50
         eps_fa = randn(rng_fa, 4, 3) ./ 200
         csr_fa = CrossSectionalRegression(; f = f_fa, eps = eps_fa, n = [3, 3, 3, 3])
         rw_fa = fill(1 / 3, 4, 3)
         vs_fa = fill(1.0e-4, 4, 3)
-        rr_fa = CrossSectionalFactorModel(; M = Ms_fa[4, :, :], b = [0.001, 0.0005, 0.0012],
+        rr_fa = CrossSectionalFactorModel(; M = Ms_fa[:, :, 4], b = [0.001, 0.0005, 0.0012],
                                           csr = csr_fa, Ms = Ms_fa, vs = vs_fa,
                                           esigma = [1.2e-4, 1.8e-4, 1.6e-4], rw = rw_fa,
                                           bw = rw_fa, nf = ["market", "value"],
@@ -581,11 +723,11 @@
         # because the default weighting of the exposure group reads it.
         rng_ex = MersenneTwister(799)
         Te, Ne, Ke = 12, 8, 3
-        Ms_ex = randn(rng_ex, Te, Ne, Ke)
+        Ms_ex = permutedims(randn(rng_ex, Te, Ne, Ke), (2, 3, 1))
         csr_ex = CrossSectionalRegression(; f = 0.02 * randn(rng_ex, Te, Ke),
                                           eps = 0.01 * randn(rng_ex, Te, Ne),
                                           n = fill(Ne, Te))
-        csfm_ex = CrossSectionalFactorModel(; M = Ms_ex[Te, :, :], b = zeros(Ne),
+        csfm_ex = CrossSectionalFactorModel(; M = Ms_ex[:, :, Te], b = zeros(Ne),
                                             csr = csr_ex, Ms = Ms_ex,
                                             rw = abs.(randn(rng_ex, Te, Ne)) .+ 0.1,
                                             bw = fill(1 / Ne, Te, Ne),
@@ -600,7 +742,7 @@
             @test is_plot(plt(csfm_ex))
             @test is_plot(plt(pr_ex))
             @test is_plot(plt(csfm_ex; nf = ["a", "b", "c"]))
-            @test is_plot(plt(csfm_ex; weighting = IdentityMetric()))
+            @test is_plot(plt(csfm_ex; weighting = nothing))
         end
         @test is_plot(plot_exposure_stability(csfm_ex; step = 3))
         @test is_plot(plot_exposure_stability(pr_ex; step = 3))
@@ -615,20 +757,20 @@
         @test is_plot(plot_exposure_distribution(csfm_ex; factor = 3, observation = 4,
                                                  nf = ["a", "b", "c"]))
         # A block that names no factor is labelled by position.
-        bare_ex = CrossSectionalFactorModel(; M = Ms_ex[Te, :, :], b = zeros(Ne),
+        bare_ex = CrossSectionalFactorModel(; M = Ms_ex[:, :, Te], b = zeros(Ne),
                                             csr = csr_ex, Ms = Ms_ex, lag = 1)
-        @test is_plot(plot_exposure_correlation(bare_ex; weighting = IdentityMetric()))
+        @test is_plot(plot_exposure_correlation(bare_ex; weighting = nothing))
         @test is_plot(plot_exposure_distribution(bare_ex))
         # A re-based block labels the cumulative information coefficient on the reduced
         # axis when it is asked for the reduced answer.
         fcb_ex = FactorFamilyBasis(; fnm = ["industry"], fi = [[1, 2]], di = [2],
                                    ratios = reshape(collect(range(0.4, 0.9; length = Te)),
                                                     Te, 1), K = Ke)
-        reb_ex = CrossSectionalFactorModel(; M = Ms_ex[Te, :, :],
+        reb_ex = CrossSectionalFactorModel(; M = Ms_ex[:, :, Te],
                                            L = PortfolioOptimisers.reduce_loadings(fcb_ex,
-                                                                                   Ms_ex[Te,
+                                                                                   Ms_ex[:,
                                                                                          :,
-                                                                                         :]),
+                                                                                         Te]),
                                            b = zeros(Ne),
                                            # A re-based fit states its factor returns on the
                                            # reduced axis (#1367).
@@ -672,11 +814,11 @@
         # covariance the prior carries.
         rng_fs = MersenneTwister(801)
         Tf, Nf, Kf = 12, 8, 3
-        Ms_fs = randn(rng_fs, Tf, Nf, Kf)
+        Ms_fs = permutedims(randn(rng_fs, Tf, Nf, Kf), (2, 3, 1))
         csr_fs = CrossSectionalRegression(; f = 0.02 * randn(rng_fs, Tf, Kf),
                                           eps = 0.01 * randn(rng_fs, Tf, Nf),
                                           n = fill(Nf, Tf))
-        csfm_fs = CrossSectionalFactorModel(; M = Ms_fs[Tf, :, :], b = zeros(Nf),
+        csfm_fs = CrossSectionalFactorModel(; M = Ms_fs[:, :, Tf], b = zeros(Nf),
                                             csr = csr_fs, Ms = Ms_fs,
                                             rw = abs.(randn(rng_fs, Tf, Nf)) .+ 0.1,
                                             bw = fill(1 / Nf, Tf, Nf),
@@ -697,11 +839,10 @@
         @test is_plot(plot_factor_model_summary(csfm_fs; ppy = 252, step = 3))
         @test is_plot(plot_factor_model_summary(pr_fs; ppy = 252, step = 3))
         @test is_plot(plot_factor_model_summary(csfm_fs; ppy = 252, step = 3,
-                                                nf = ["a", "b", "c"],
-                                                weighting = IdentityMetric(),
-                                                coverage_weighting = IdentityMetric()))
+                                                nf = ["a", "b", "c"], weighting = nothing,
+                                                coverage_weighting = nothing))
         # A block with no exposure history draws its four factor return columns alone.
-        bare_fs = CrossSectionalFactorModel(; M = Ms_fs[Tf, :, :], b = zeros(Nf),
+        bare_fs = CrossSectionalFactorModel(; M = Ms_fs[:, :, Tf], b = zeros(Nf),
                                             csr = csr_fs, lag = 1)
         @test is_plot(plot_factor_model_summary(bare_fs; ppy = 252))
 
@@ -719,7 +860,7 @@
         # An absent factor return contributes nothing to the running sum.
         f_gap = copy(csr_fs.f)
         f_gap[4, 2] = NaN
-        gap_fs = CrossSectionalFactorModel(; M = Ms_fs[Tf, :, :], b = zeros(Nf),
+        gap_fs = CrossSectionalFactorModel(; M = Ms_fs[:, :, Tf], b = zeros(Nf),
                                            csr = CrossSectionalRegression(; f = f_gap,
                                                                           eps = csr_fs.eps,
                                                                           n = csr_fs.n),
@@ -731,6 +872,28 @@
         @test [x[:label] for x in p_cum.series_list] == csfm_fs.nf
         p_gap = plot_factor_cumulative_returns(gap_fs)
         @test p_gap.series_list[2][:y][4] == p_gap.series_list[2][:y][3]
+        # A re-based block carries the factor return history on its own axis, and the names
+        # follow it (#1912).
+        fcb_fs = FactorFamilyBasis(; fnm = ["ind"], fi = [[1, 2, 3]], di = [3],
+                                   ratios = [0.5 0.25; 0.25 2.0], K = 3)
+        fr_fs = 0.02 * randn(rng_fs, Tf, 2)
+        # The regression holds factor returns other than `fr`, so a summary that read
+        # `csr.f` in place of the raw history draws other sums (#1926).
+        csr2_fs = CrossSectionalRegression(; f = 2 .* fr_fs .+ 0.01, eps = csr_fs.eps,
+                                           n = csr_fs.n)
+        @test csr2_fs.f != fr_fs
+        rebased_fs = CrossSectionalFactorModel(; M = Ms_fs[:, 1:2, Tf], L = Ms_fs[:, :, Tf],
+                                               b = zeros(Nf), csr = csr2_fs,
+                                               Ms = Ms_fs[:, 1:2, :],
+                                               nf = ["value", "size"], lag = 1,
+                                               fcb = fcb_fs, fr = fr_fs)
+        p_rb = plot_factor_cumulative_returns(rebased_fs)
+        @test is_plot(p_rb)
+        @test [x[:label] for x in p_rb.series_list] == rebased_fs.nf
+        # The running sums are those of the raw factor return history, not of the reduced
+        # axis.
+        @test [collect(x[:y]) for x in p_rb.series_list] ≈
+              [cumsum(fr_fs[:, j]) for j in 1:2]
         # A prior result that carries no factor block names the remedy.
         no_rr_fs = LowOrderPrior(; X = randn(rng_fs, Tf, Nf), mu = zeros(Nf),
                                  sigma = Matrix(1.0 * I, Nf, Nf))
@@ -797,10 +960,10 @@
         alpha_fp = [t < T_fp ? eps_fp[t + 1, i] + randn(rng_fp) / 400 : randn(rng_fp) / 100
                     for t in 1:T_fp, i in 1:N_fp]
         fe_fp = forecast_evaluation(alpha_fp, y_fp; ppy = 252)
-        Ms_fp = randn(rng_fp, T_fp, N_fp, K_fp)
+        Ms_fp = permutedims(randn(rng_fp, T_fp, N_fp, K_fp), (2, 3, 1))
         csr_fp = CrossSectionalRegression(; f = 0.02 * randn(rng_fp, T_fp, K_fp),
                                           eps = eps_fp, n = fill(N_fp, T_fp))
-        csfm_fp = CrossSectionalFactorModel(; M = Ms_fp[T_fp, :, :], b = zeros(N_fp),
+        csfm_fp = CrossSectionalFactorModel(; M = Ms_fp[:, :, T_fp], b = zeros(N_fp),
                                             csr = csr_fp, Ms = Ms_fp,
                                             rw = abs.(randn(rng_fp, T_fp, N_fp)) .+ 0.1,
                                             bw = fill(1 / N_fp, T_fp, N_fp),
@@ -1038,6 +1201,13 @@
         @test unique([sr[:label]
                       for sr in plot_forecast_evaluation_summary(fe_fp).series_list]) ==
               ["Forecast 1"]
+        # A summary of one evaluation holds scalar fields, and a spread over the tail
+        # fractions, and it draws as the length-1 case (#1934).
+        fs_one = forecast_evaluation_summary(fe_fp; quantiles = (0.1, 0.25))
+        @test fs_one.spearman_mean_ic isa Number
+        p_one = plot_forecast_evaluation_summary(fs_one)
+        @test unique([sr[:label] for sr in p_one.series_list]) == ["Forecast 1"]
+        @test length(p_one[1][:xaxis][:ticks][2]) == 12
         @test is_plot(plot_forecast_evaluation_summary(fe_fp, csfm_fp))
         @test is_plot(plot_forecast_evaluation_summary([fe_fp]; quantiles = (0.2,)))
         @test is_plot(plot_forecast_evaluation_summary([fe_fp], csfm_fp;
@@ -1467,6 +1637,11 @@
         @test bars_sw(plot_cv_scores(rs_sw, mpred_sw; sca = MaxScalariser())) ≈ max_sw
         @test bars_sw(plot_cv_scores(rs_sw, mpred_sw)) ≈ sum_sw
         @test !(max_sw ≈ sum_sw)
+        # A population draws one bar for each path, scored under the same `sca`.
+        ppred_sw = PopulationPredictionResult(; pred = [mpred_sw, mpred_sw])
+        pmax_sw = expected_risk(rs_sw, mpred_sw; sca = MaxScalariser())
+        @test bars_sw(plot_cv_scores(rs_sw, ppred_sw; sca = MaxScalariser())) ≈
+              [pmax_sw, pmax_sw]
         # A path scores to one number, which the scatter raised on. `plt` is drawn into.
         base_sw = plot(; title = "base")
         @test plot_measures(mpred_sw; plt = base_sw) === base_sw
@@ -1475,11 +1650,11 @@
         @test length(plot_measures(mpred_sw.pred[1]).series_list[1][:x]) == 1
 
         # ── the cross-sectional and forecast reference lines ─────────────────────────
-        Ms_sw = randn(rng_sw, 10, 8, 3)
+        Ms_sw = permutedims(randn(rng_sw, 10, 8, 3), (2, 3, 1))
         csr_sw = CrossSectionalRegression(; f = 0.02 * randn(rng_sw, 10, 3),
                                           eps = 0.01 * randn(rng_sw, 10, 8),
                                           n = fill(8, 10))
-        csfm_sw = CrossSectionalFactorModel(; M = Ms_sw[10, :, :], b = zeros(8),
+        csfm_sw = CrossSectionalFactorModel(; M = Ms_sw[:, :, 10], b = zeros(8),
                                             csr = csr_sw, Ms = Ms_sw,
                                             rw = abs.(randn(rng_sw, 10, 8)) .+ 0.1,
                                             nf = ["value", "size", "momentum"], lag = 1)

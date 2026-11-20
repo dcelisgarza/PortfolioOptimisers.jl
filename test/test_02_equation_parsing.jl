@@ -369,13 +369,13 @@ end
     end
     @test herr isa DomainError
     @test occursin("max_hop_count", herr.msg)
-    @test HopCount(; n = 3).n == 3
-    @test HopCount(; n = pe.HopCountQuantile()).n isa pe.HopCountQuantile  # a rule, uncapped
+    @test HopCount(; n = 3).n.val == 3
+    @test HopCount(; n = FractionOf(0.25)).n isa FractionOf  # a fraction, uncapped
     let nte = NetworkEstimator(), X = randn(50, 4)
         @test_throws DomainError pe.resolve_separation(HopCount(;
                                                                 n = (args...; kwargs...) -> 10^9),
                                                        nte, X)
-        @test pe.resolve_separation(HopCount(; n = (args...; kwargs...) -> 2), nte, X).n ==
+        @test pe.resolve_separation(HopCount(; n = (args...; kwargs...) -> 2), nte, X).n.val ==
               2
     end
     # A search grid is an Iterators.product: k parameters of N values are N^k candidates
@@ -406,19 +406,17 @@ end
                                                     "b" => collect(1:10)]])
     end
     # K sizes a binary block of the mixed-integer program an upper-bound or equality
-    # tail view builds, so the grid formulations take a cap of their own. The parity
-    # check alone admitted a grid of ten million binaries from one view.
-    @test_throws DomainError GridEntropicValueatRiskView(; K = 10_000_001)
-    @test_throws DomainError GridRelativisticValueatRiskView(; K = 10_000_001)
+    # tail view builds, so the grid formulation takes a cap of its own. The parity check
+    # alone admitted a grid of ten million binaries from one view.
     kerr = try
-        GridRelativisticValueatRiskView(; K = 10_000_001)
+        GridTailView(; K = 10_000_001)
         nothing
     catch e
         e
     end
     @test kerr isa DomainError
     @test occursin("max_ep_grid", kerr.msg)
-    @test GridEntropicValueatRiskView(; K = 21).K == 21
+    @test GridTailView(; K = 21).K == 21
     # A raised ceiling is honoured, and scoped overrides restore on exit.
     pe.with_resource_limits(; max_n_sim = 20_000_000_000) do
         @test NormalUncertaintySet(; n_sim = 10_000_000_000).n_sim == 10_000_000_000
@@ -430,14 +428,14 @@ end
         @test MutualInfoCovariance(; bins = 10_000_000).bins == 10_000_000
     end
     pe.with_resource_limits(; max_hop_count = 20_000_000) do
-        @test HopCount(; n = 10_000_000).n == 10_000_000
+        @test HopCount(; n = 10_000_000).n.val == 10_000_000
     end
     pe.with_resource_limits(; max_search_grid = 10^7) do
         @test length(pe.lens_val_grid(["a" => collect(1:100), "b" => collect(1:100)])[2]) ==
               10_000
     end
     pe.with_resource_limits(; max_ep_grid = 20_000_000) do
-        @test GridRelativisticValueatRiskView(; K = 10_000_001).K == 10_000_001
+        @test GridTailView(; K = 10_000_001).K == 10_000_001
     end
     @test pe.RESOURCE_LIMITS[].max_n_sim == 1_000_000
     # Preferences fail closed at load, like the equation caps.
@@ -501,6 +499,99 @@ end
                             max_ep_grid = 10_000)  # restore
     pe.set_equation_limits!(max_length = 4096, max_depth = 256)
     pe.set_string_distance!(dist = pe.StringDistances.Levenshtein(), min_score = 0.7)
+end
+@testset "Log limits cap the repeats of one log site (#1690)" begin
+    using PortfolioOptimisers, Test
+    pe = PortfolioOptimisers
+    # The shipped default sets no cap, so each site keeps the limit it states.
+    @test pe.LOG_LIMITS[] == pe.LogLimits(nothing, nothing, nothing)
+    @test pe.LogLimits() == pe.LogLimits(nothing, nothing, nothing)
+    @test pe.LogLimits(; max_info = 3).max_info == 3
+    @test pe.log_limit(:warn) === nothing
+    @test pe.log_limit(:warn, 1) == 1
+    # A cap is at least one, so it never hides the first message of a site.
+    @test_throws ArgumentError pe.LogLimits(; max_warn = 0)
+    @test_throws ArgumentError pe.LogLimits(; max_debug = -1)
+    @test_throws ArgumentError pe.LogLimits(; max_info = true)
+    @test_throws ArgumentError pe.set_log_limits!(max_warn = 0)
+    @test_throws ArgumentError pe.with_log_limits(() -> nothing; max_info = 0)
+    @test_throws ArgumentError pe.log_limit(:error)
+    # A set cap replaces the limit of every site of its level, a site limit included.
+    pe.with_log_limits(; max_warn = 2, max_info = 3, max_debug = 4) do
+        @test pe.log_limit(:warn) == 2
+        @test pe.log_limit(:warn, 1) == 2
+        @test pe.log_limit(:info) == 3
+        @test pe.log_limit(:debug, 1) == 4
+        # Nested overrides inherit the keywords they omit.
+        pe.with_log_limits(; max_warn = nothing) do
+            @test pe.log_limit(:warn, 1) == 1
+            @test pe.log_limit(:info) == 3
+        end
+    end
+    @test pe.LOG_LIMITS[] == pe.LogLimits()  # the scoped override is restored
+    pe.set_log_limits!(max_info = 5)
+    @test pe.LOG_LIMITS[] == pe.LogLimits(; max_info = 5)
+    pe.set_log_limits!(max_info = nothing)
+    @test pe.LOG_LIMITS[] == pe.LogLimits()
+    # The `_id` of `@log_id` keys on the site and on the parts, so a different part or a
+    # different site counts on its own, and the same part at the same site repeats.
+    # A macro resolves its module when the testset expands, before `pe` is bound.
+    id(k) = PortfolioOptimisers.@log_id(k)
+    @test id("a") == id("a")
+    @test id("a") != id("b")
+    @test PortfolioOptimisers.@log_id("a") != id("a")
+    # A site under the cap logs the cap and no more, once per `_id`.
+    diag(k) = pe.strict_diagnostic("unknown name `$k` at $(rand())", false; id = id(k))
+    logs, = Test.collect_test_logs() do
+        return pe.with_log_limits(; max_warn = 2) do
+            for _ in 1:4, k in ("a", "b")
+                diag(k)
+            end
+        end
+    end
+    @test length(logs) == 4
+    @test count(r -> occursin("`a`", r.message), logs) == 2
+    logs, = Test.collect_test_logs() do
+        for _ in 1:4
+            diag("a")
+        end
+    end
+    @test length(logs) == 4  # no cap, no limit
+    # The preferences seed the global default. A valid value is silent: a cap widens no
+    # guard, so it records nothing for the announcement.
+    logs, = Test.collect_test_logs() do
+        return pe.apply_preferences!(Dict{String, Any}("max_warn" => 1, "max_debug" => 7))
+    end
+    @test isempty(logs)
+    @test pe.LOG_LIMITS[] == pe.LogLimits(; max_warn = 1, max_debug = 7)
+    pe.apply_preferences!(Dict{String, Any}("max_info" => 2))
+    @test pe.LOG_LIMITS[] == pe.LogLimits(1, 2, 7)  # an unset key keeps its value
+    # The announcement of a widened guard runs under the cap the same load set. Each pass
+    # restores the shipped cap first, so each pass widens the guard again.
+    logs, = Test.collect_test_logs() do
+        for _ in 1:3
+            pe.set_resource_limits!(max_bins = 10_000)
+            pe.apply_preferences!(Dict{String, Any}("max_bins" => 50_000))
+        end
+    end
+    @test length(logs) == 1
+    pe.with_log_limits(; max_warn = nothing) do
+        logs, = Test.collect_test_logs() do
+            for _ in 1:3
+                pe.set_resource_limits!(max_bins = 10_000)
+                pe.apply_preferences!(Dict{String, Any}("max_bins" => 50_000))
+            end
+        end
+        @test length(logs) == 3
+    end
+    for (key, val) in
+        (("max_warn", 0), ("max_info", -1), ("max_debug", true), ("max_warn", "1"),
+         ("max_info", 1.5))
+        @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}(key => val))
+    end
+    pe.set_log_limits!(max_warn = nothing, max_info = nothing, max_debug = nothing)
+    pe.set_resource_limits!(max_bins = 10_000)  # restore
+    @test pe.LOG_LIMITS[] == pe.LogLimits()
 end
 @testset "Canonicalisation invariants (issue #513)" begin
     using PortfolioOptimisers, Test, Logging
@@ -631,8 +722,9 @@ end
     @test sorted(parse_equation("2e1 + 2f1 <= 1")) == (String[], Float64[], -39.0)
     @test sorted(parse_equation("2*f1 <= 1")) == (["f1"], [2.0], 1.0)
     @test isnothing(PO.collect_terms!(:x, 1.0, []))
-    @test PO._collect_terms(:(2 * 3 * 4)) == Any[(24.0, nothing)]
-    @test PO._collect_terms(:(x + 1)) isa Vector{Any}
+    @test PO._collect_terms(:(2 * 3 * 4)) == [(24.0, nothing)]
+    # The terms take the family of their values, not `Any` (#1979).
+    @test PO._collect_terms(:(x + 1)) isa Vector{Tuple{Number, PO.Option{String}}}
     # The right-hand side is accumulated in `datatype`.
     @test PO._parse_equation(:x, "<=", 1, Rational{Int}).rhs === 1 // 1
     # The uniform value is computed in `datatype`, so a Rational is exact.
@@ -1054,7 +1146,7 @@ end
         res = optimise(MeanRisk(;
                                 opt = JuMPOptimiser(; pe = FactorPrior(), slv = oslv,
                                                     sets = osets, lcse = oece)), rdo)
-        Mf = res.pa.pr.rr.M
+        Mf = res.jor.pr.rr.M
         # The mandate binds: momentum exposure sits on the cap it was written against.
         @test isapprox(dot(Mf[:, 1], res.w), 0.3; atol = 1e-6)
         # What reached the model is an ordinary asset-space constraint — one row, one column
@@ -1095,12 +1187,12 @@ end
                               rdo)
         held = ratio(MaximumRatio())
         @test isa(held.retcode, PortfolioOptimisers.OptimisationSuccess)
-        @test dot(held.pa.pr.rr.M[:, 1], held.w) >= 0.9 - 1e-5
+        @test dot(held.jor.pr.rr.M[:, 1], held.w) >= 0.9 - 1e-5
         # Which the collapsed scale did not: a floor below the ray reports the same success
         # and hands back weights that break the mandate the caller wrote.
         broken = ratio(MaximumRatio(; kmin = 1e-12))
         @test isa(broken.retcode, PortfolioOptimisers.OptimisationSuccess)
-        @test dot(broken.pa.pr.rr.M[:, 1], broken.w) < 0.9 - 1e-3
+        @test dot(broken.jor.pr.rr.M[:, 1], broken.w) < 0.9 - 1e-3
     end
 
     @testset "Every JuMP optimiser inherits it" begin
@@ -1110,7 +1202,7 @@ end
             res = optimise(est(;
                                opt = JuMPOptimiser(; pe = FactorPrior(), slv = oslv,
                                                    sets = osets, lcse = oece)), rdo)
-            @test dot(res.pa.pr.rr.M[:, 1], res.w) <= 0.3 + 1e-6
+            @test dot(res.jor.pr.rr.M[:, 1], res.w) <= 0.3 + 1e-6
         end
         # Near Optimal Centering round-trips `lcsr` back into an `lcse` slot through
         # `jump_optimiser_from_attributes`, where the pass-through method for a precomputed
@@ -1122,7 +1214,7 @@ end
                                             opt = JuMPOptimiser(; pe = FactorPrior(),
                                                                 slv = oslv, sets = osets,
                                                                 lcse = oece)), rdo)
-        @test isapprox(dot(noc.pa.pr.rr.M[:, 1], noc.w), 0.3; atol = 1e-6)
+        @test isapprox(dot(noc.jor.pr.rr.M[:, 1], noc.w), 0.3; atol = 1e-6)
     end
     @testset "Missing loadings throw at the optimiser, ignoring `strict`" begin
         # `strict` governs recoverable per-row name failures. Dropping every row of a factor
@@ -1201,11 +1293,11 @@ end
         @test length(preds.pred) == 2
         for (k, cap) in enumerate((0.3, 0.05))
             r = preds.pred[k].res
-            @test dot(r.pa.pr.rr.M[:, 1], r.w) <= cap + 1e-6
+            @test dot(r.jor.pr.rr.M[:, 1], r.w) <= cap + 1e-6
         end
         # The loadings are refit per fold, which is the whole reason the constraint is
         # re-based at generation time rather than written out once by the caller.
-        @test preds.pred[1].res.pa.pr.rr.M != preds.pred[2].res.pa.pr.rr.M
+        @test preds.pred[1].res.jor.pr.rr.M != preds.pred[2].res.jor.pr.rr.M
     end
     # A space carries the *source* of its basis (ADR 0047, amended). `FactorSpace` stopped
     # being a singleton and gained `re`, whose precedence is `resolve_factor_regression`'s —
@@ -1274,7 +1366,7 @@ end
                                 opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = oslv,
                                                     sets = osets, lcse = ece_fit)), rdo)
         # The prior really carries none: the basis came from the refit and nowhere else.
-        @test isnothing(res.pa.pr.rr)
+        @test isnothing(res.jor.pr.rr)
         fitted = regression(StepwiseRegression(), rdo)
         @test vec(res.lcsr.ineq.A) ≈ fitted.M[:, 1]
         # And it binds, measured against the loadings the refit produced.
@@ -1291,7 +1383,7 @@ end
                                                                                                             re = pin)))),
                         rdo)
         @test vec(resp.lcsr.ineq.A) == pin.M[:, 1]
-        @test vec(resp.lcsr.ineq.A) != resp.pa.pr.rr.M[:, 1]
+        @test vec(resp.lcsr.ineq.A) != resp.jor.pr.rr.M[:, 1]
     end
     @testset "A stated basis is viewed where the universe is sliced" begin
         # The loadings are assets-major, so a subset of assets is a subset of rows and the
@@ -1372,7 +1464,7 @@ end
         @test_throws ArgumentError Stacking(; opti = [jopt(oece)], opto = jopt(pinned))
         # `SubsetResampling` asserts the *internal* contract, because it slices. A stated
         # basis is therefore legal under it, and correct: the view follows the subset.
-        @test SubsetResampling(; opt = jopt(pinned)) isa SubsetResampling
+        @test SubsetResampling(; subset_size = 0.8, opt = jopt(pinned)) isa SubsetResampling
     end
 end
 
@@ -1409,4 +1501,46 @@ end
     # The re-based row is asset-length whatever the row was written in.
     @test PortfolioOptimisers.constraint_row_length(nothing, ["F1", "F2"]) == 2
     @test PortfolioOptimisers.constraint_row_length(rr, ["F1", "F2"]) == 3
+end
+
+@testset "Both re-basis routes drop an all-zero row at construction (issue #1797)" begin
+    using PortfolioOptimisers, Test, Logging
+    # No asset loads on F2, so a row that weights F2 alone re-bases to the zero row. The
+    # row does not depend on the weights, so every linear builder drops it: `strict = true`
+    # raises an `IsZeroError`, and the default warns.
+    M = [0.5 0.0; 0.1 0.0; 0.3 0.0]
+    rr = Regression(; M = M)
+    sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"]))
+    fs = FactorSpace()
+    # The precomputed route.
+    lc = LinearConstraint(;
+                          ineq = PartialLinearConstraint(; A = [1.0 0.0; 0.0 1.0],
+                                                         B = [1.0, 2.0]),
+                          eq = PartialLinearConstraint(; A = [0.0 3.0], B = [0.5]))
+    ece = ExposureConstraintEstimator(; lce = lc, space = fs)
+    whole = @test_logs (:warn, r"all-zero row") (:warn, r"all-zero row") match_mode = :any linear_constraints(ece,
+                                                                                                              sets;
+                                                                                                              rr = rr)
+    @test whole.ineq.A == transpose(reshape(M[:, 1], :, 1))
+    @test whole.ineq.B == [1.0]
+    @test isnothing(whole.eq)
+    @test_throws IsZeroError linear_constraints(ece, sets; rr = rr, strict = true)
+    # A constraint that loses every row is `nothing`, as the estimator route gives.
+    lc0 = LinearConstraint(; ineq = PartialLinearConstraint(; A = [0.0 1.0], B = [2.0]))
+    @test isnothing(@test_logs (:warn, r"all-zero row") PortfolioOptimisers.project_linear_constraint(lc0,
+                                                                                                      M))
+    # The estimator route drops the same row with the same error type.
+    lce = LinearConstraintEstimator(; val = ["F1 <= 1", "F2 <= 2"])
+    step = @test_logs (:warn, r"all-zero row") linear_constraints(ExposureConstraintEstimator(;
+                                                                                              lce = lce,
+                                                                                              space = fs),
+                                                                  sets; rr = rr)
+    @test step.ineq.A == whole.ineq.A
+    @test step.ineq.B == whole.ineq.B
+    @test_throws IsZeroError linear_constraints(ExposureConstraintEstimator(; lce = lce,
+                                                                            space = fs),
+                                                sets; rr = rr, strict = true)
+    # An asset-space row whose coefficients cancel raises the same type.
+    asets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+    @test_throws IsZeroError linear_constraints("A - A <= 0.1", asets; strict = true)
 end

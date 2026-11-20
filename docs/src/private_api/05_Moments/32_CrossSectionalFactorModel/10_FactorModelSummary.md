@@ -1,8 +1,14 @@
 ```@meta
-Description = "Factor Model Summary, private API of PortfolioOptimisers.jl: factor_summary_finite_column, factor_summary_column_mean, factor_summary_column_median, …"
+Description = "Factor Model Summary, private API of PortfolioOptimisers.jl: FactorReturnHistory, factor_summary_finite_column, factor_summary_column_mean, …"
 ```
 
 # Factor Model Summary: private API
+
+## Types
+
+```@docs
+FactorReturnHistory
+```
 
 ## Functions
 
@@ -21,4 +27,5 @@ factor_summary_exposure_variance
 factor_summary_constant_exposures
 factor_summary_stability
 factor_summary_exposure
+assert_factor_summary_columns
 ```

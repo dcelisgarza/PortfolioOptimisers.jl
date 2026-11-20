@@ -161,7 +161,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The headline statistics of one or more covariance forecast evaluations, one entry per evaluation.
 
-`CovarianceForecastSummaryResult` is what [`covariance_forecast_summary`](@ref) returns. Each column has one entry per evaluation, so one evaluation is the length-1 case and two forecasts side by side are the length-2 case. So, like [`ForecastSummaryResult`](@ref) for the return forecasts, it needs no separate comparison type. The summary reads every column from the per-step diagnostics of a [`CovarianceForecastEvaluationResult`](@ref). The bands are Gaussian references, and the summary does not correct them for heavy tails.
+`CovarianceForecastSummaryResult` is what [`covariance_forecast_summary`](@ref) returns. The shape follows the type of the input, as for [`PerformanceSummaryResult`](@ref). The method for one evaluation gives scalar fields, equal to entry 1 of the vector method on `[cfer]`, and `exceedance` is then a vector over the levels. The vector method gives one entry per evaluation, so two forecasts side by side are the length-2 case. So, like [`ForecastSummaryResult`](@ref) for the return forecasts, it needs no separate comparison type. Breaking: a summary of one evaluation held length-1 vectors before. The summary reads every column from the per-step diagnostics of a [`CovarianceForecastEvaluationResult`](@ref). The bands are Gaussian references, and the summary does not correct them for heavy tails.
 
 # Mathematical definition
 
@@ -215,7 +215,24 @@ $(DocStringExtensions.FIELDS)
         step_weighting
     ) -> CovarianceForecastSummaryResult
 
-Arguments correspond to the struct's fields, in the order they are declared. [`covariance_forecast_summary`](@ref) builds the type, and a caller reads it. The type has no keyword constructor, and it validates nothing.
+    CovarianceForecastSummaryResult(; names, mahalanobis_mean, mahalanobis_median,
+                                    mahalanobis_p5, mahalanobis_p95, mahalanobis_band_lo,
+                                    mahalanobis_band_hi, diagonal_mean, diagonal_median,
+                                    diagonal_p5, diagonal_p95, diagonal_band_lo,
+                                    diagonal_band_hi, bias_statistic, bias_p5, bias_p25,
+                                    bias_p75, bias_p95, qlike_mean, frobenius_mean,
+                                    portfolio_qlike_mean,
+                                    levels::Union{Tuple{Vararg{Real}}, AbstractVector{<:Real}},
+                                    exceedance, n_steps::Union{Integer, VecInt},
+                                    n_portfolios::Union{Integer, VecInt}, alpha::Number,
+                                    step_weighting::AbstractStepWeighting) -> CovarianceForecastSummaryResult
+
+Arguments correspond to the struct's fields, in the order they are declared. [`covariance_forecast_summary`](@ref) builds the type, and a caller reads it. The positional constructor checks the values with [`assert_covariance_summary_fields`](@ref). The keyword constructor takes each field by name, with no default, and calls it.
+
+## Validation
+
+  - The rules of [`assert_covariance_summary_fields`](@ref): the levels are valid, every field of an entry has the shape of `n_steps`, each evaluation scored a step, each exceedance rate is a rate, and each band is ordered. A breach raises a `DomainError` or a `DimensionMismatch`.
+  - The keyword constructor refuses a value of another type than its signature states with a `TypeError`. The positional constructor checks only the types of its signature: the generic positional method that `@concrete` adds takes values of any other type, such as a `Float64` `n_steps`, with no check.
 
 # Related
 
@@ -333,18 +350,121 @@ Arguments correspond to the struct's fields, in the order they are declared. [`c
     $(field_dict[:cfe_step_weighting])
     """
     step_weighting
+    function CovarianceForecastSummaryResult(names, mahalanobis_mean, mahalanobis_median,
+                                             mahalanobis_p5, mahalanobis_p95,
+                                             mahalanobis_band_lo, mahalanobis_band_hi,
+                                             diagonal_mean, diagonal_median, diagonal_p5,
+                                             diagonal_p95, diagonal_band_lo,
+                                             diagonal_band_hi, bias_statistic, bias_p5,
+                                             bias_p25, bias_p75, bias_p95, qlike_mean,
+                                             frobenius_mean, portfolio_qlike_mean,
+                                             levels::Union{Tuple{Vararg{Real}},
+                                                           AbstractVector{<:Real}},
+                                             exceedance, n_steps::Union{Integer, VecInt},
+                                             n_portfolios::Union{Integer, VecInt},
+                                             alpha::Number,
+                                             step_weighting::AbstractStepWeighting)
+        args = (names, mahalanobis_mean, mahalanobis_median, mahalanobis_p5,
+                mahalanobis_p95, mahalanobis_band_lo, mahalanobis_band_hi, diagonal_mean,
+                diagonal_median, diagonal_p5, diagonal_p95, diagonal_band_lo,
+                diagonal_band_hi, bias_statistic, bias_p5, bias_p25, bias_p75, bias_p95,
+                qlike_mean, frobenius_mean, portfolio_qlike_mean, levels, exceedance,
+                n_steps, n_portfolios, alpha, step_weighting)
+        s = new{map(typeof, args)...}(args...)
+        assert_covariance_summary_fields(s)
+        return s
+    end
+end
+function CovarianceForecastSummaryResult(; names, mahalanobis_mean, mahalanobis_median,
+                                         mahalanobis_p5, mahalanobis_p95,
+                                         mahalanobis_band_lo, mahalanobis_band_hi,
+                                         diagonal_mean, diagonal_median, diagonal_p5,
+                                         diagonal_p95, diagonal_band_lo, diagonal_band_hi,
+                                         bias_statistic, bias_p5, bias_p25, bias_p75,
+                                         bias_p95, qlike_mean, frobenius_mean,
+                                         portfolio_qlike_mean,
+                                         levels::Union{Tuple{Vararg{Real}},
+                                                       AbstractVector{<:Real}}, exceedance,
+                                         n_steps::Union{Integer, VecInt},
+                                         n_portfolios::Union{Integer, VecInt},
+                                         alpha::Number,
+                                         step_weighting::AbstractStepWeighting)::CovarianceForecastSummaryResult
+    return CovarianceForecastSummaryResult(names, mahalanobis_mean, mahalanobis_median,
+                                           mahalanobis_p5, mahalanobis_p95,
+                                           mahalanobis_band_lo, mahalanobis_band_hi,
+                                           diagonal_mean, diagonal_median, diagonal_p5,
+                                           diagonal_p95, diagonal_band_lo, diagonal_band_hi,
+                                           bias_statistic, bias_p5, bias_p25, bias_p75,
+                                           bias_p95, qlike_mean, frobenius_mean,
+                                           portfolio_qlike_mean, levels, exceedance,
+                                           n_steps, n_portfolios, alpha, step_weighting)
+end
+"""
+    assert_covariance_summary_fields(s::CovarianceForecastSummaryResult)
+
+Check the fields of a [`CovarianceForecastSummaryResult`](@ref) that its constructor built.
+
+The constructor builds the Result first and checks it here, so the check reads each field by its name and not by its position among twenty-seven arguments. A summary of one evaluation holds a number or a name in each field of an entry, and a summary of many evaluations holds one vector entry for each. `n_steps` gives the shape: an integer for one evaluation, and a vector otherwise. `levels` is the axis of the confidence levels, so `exceedance` is a vector over the levels for one evaluation, and `evaluations × levels` otherwise. The checks are the rules that [`covariance_forecast_summary`](@ref) states, so a summary that it builds always passes them.
+
+# Arguments
+
+  - `s`: The summary to check.
+
+# Validation
+
+  - `0 < alpha < 1`, and `0 < l < 1` for each level `l`. Raises a `DomainError`.
+  - Each field of an entry is not a vector when `n_steps` is an integer, and is a vector of `length(n_steps)` otherwise. `exceedance` has one entry per level for one evaluation, and the size `evaluations × levels` otherwise. Raises a `DimensionMismatch`.
+  - Each evaluation scored at least one step, `n_steps >= 1`, and `n_portfolios` is not negative. Raises a `DomainError`.
+  - Each exceedance rate is `NaN` or in ``[0, 1]``, and no lower end of a band lies above its upper end, a `NaN` end passes. Raises a `DomainError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`CovarianceForecastSummaryResult`](@ref)
+  - [`covariance_forecast_summary`](@ref)
+  - [`assert_ordered_bounds`](@ref)
+"""
+function assert_covariance_summary_fields(s::CovarianceForecastSummaryResult)::Nothing
+    assert_unit_interval(s.alpha, :alpha)
+    foreach(l -> assert_unit_interval(l, :levels), s.levels)
+    n = isa(s.n_steps, Integer) ? nothing : length(s.n_steps)
+    shaped = v -> isa(v, AbstractVector) ? length(v) === n : isnothing(n)
+    # Each field is read by its name, in a tuple, so the compiler unrolls the checks.
+    entry = (s.names, s.mahalanobis_mean, s.mahalanobis_median, s.mahalanobis_p5,
+             s.mahalanobis_p95, s.mahalanobis_band_lo, s.mahalanobis_band_hi,
+             s.diagonal_mean, s.diagonal_median, s.diagonal_p5, s.diagonal_p95,
+             s.diagonal_band_lo, s.diagonal_band_hi, s.bias_statistic, s.bias_p5,
+             s.bias_p25, s.bias_p75, s.bias_p95, s.qlike_mean, s.frobenius_mean,
+             s.portfolio_qlike_mean, s.n_steps, s.n_portfolios)
+    ex = isnothing(n) ? (length(s.levels),) : (n, length(s.levels))
+    @argcheck(all(shaped, entry) && size(s.exceedance) == ex,
+              DimensionMismatch("each field of an entry must have the shape of n_steps: one value for one evaluation, or a vector of $(n) entries, and exceedance must have the size $(ex)"))
+    @argcheck(all(>=(1), s.n_steps),
+              DomainError(s.n_steps,
+                          "each evaluation of a summary scored at least one step"))
+    assert_nan_or_nonneg(s.n_portfolios, :n_portfolios)
+    assert_nan_or_closed_unit_interval(s.exceedance, :exceedance)
+    assert_ordered_bounds(s.mahalanobis_band_lo, s.mahalanobis_band_hi,
+                          :mahalanobis_band_lo, :mahalanobis_band_hi)
+    assert_ordered_bounds(s.diagonal_band_lo, s.diagonal_band_hi, :diagonal_band_lo,
+                          :diagonal_band_hi)
+    return nothing
 end
 """
     covariance_forecast_summary(cfers::AbstractVector{<:CovarianceForecastEvaluationResult};
-                                names = nothing, alpha::Real = 0.05,
-                                levels = (0.95, 0.99),
+                                names::Option{<:AbstractVector} = nothing,
+                                alpha::Real = 0.05,
+                                levels::Union{Tuple{Vararg{Real}}, AbstractVector{<:Real}} = (0.95, 0.99),
                                 step_weighting::AbstractStepWeighting = DofStepWeighting())
         -> CovarianceForecastSummaryResult
     covariance_forecast_summary(cfer::CovarianceForecastEvaluationResult; kwargs...)
 
 Summarise one or more covariance forecast evaluations, one entry per evaluation.
 
-For each evaluation, the summary gives the mean, the median and the tail percentiles of the two calibration ratios, the Gaussian band on each mean, the bias statistic of the test portfolios with its percentiles over the portfolios, the mean of each loss, and the exceedance rate of the Mahalanobis statistic at each level. The method for one Result is the length-1 case.
+For each evaluation, the summary gives the mean, the median and the tail percentiles of the two calibration ratios, the Gaussian band on each mean, the bias statistic of the test portfolios with its percentiles over the portfolios, the mean of each loss, and the exceedance rate of the Mahalanobis statistic at each level. The method for one Result gives scalar fields, through [`covariance_summary_entry`](@ref), and the vector method gives one entry per evaluation, also for a vector of one. Breaking: the method for one Result gave length-1 vectors before.
 
 The mean of a ratio weights each step by `step_weighting`. The default, [`DofStepWeighting`](@ref), gives a ratio of sums, which weights each step by its degrees of freedom under the target of the evaluation ([`target_dof`](@ref), [`target_step_dof`](@ref)). A date walk-forward whose folds differ in length then weights each step by its length. A listing or a delisting also changes the weight of a step of the Mahalanobis ratio, because its degrees of freedom count the active assets. So the Mahalanobis mean is the plain mean only when every step has the same horizon and the same active count, and the diagonal mean is the plain mean when every step has the same horizon. [`EqualStepWeighting`](@ref) gives the plain mean in every case, with the band of the plain mean.
 
@@ -363,7 +483,7 @@ The mean of a ratio weights each step by `step_weighting`. The default, [`DofSte
   - `cfers`: The evaluations to summarise.
   - `names`: A name per evaluation, or `nothing` for `"forecast_1"`, `"forecast_2"`, ….
   - `alpha`: Level of the Gaussian bands, `1 - alpha` coverage.
-  - `levels`: Confidence levels of the exceedance rates.
+  - `levels`: Confidence levels of the exceedance rates, a tuple or a vector of real numbers.
   - $(arg_dict[:cfe_step_weighting])
 
 # Validation
@@ -389,7 +509,9 @@ The mean of a ratio weights each step by `step_weighting`. The default, [`DofSte
 """
 function covariance_forecast_summary(cfers::AbstractVector{<:CovarianceForecastEvaluationResult};
                                      names::Option{<:AbstractVector} = nothing,
-                                     alpha::Real = 0.05, levels = (0.95, 0.99),
+                                     alpha::Real = 0.05,
+                                     levels::Union{Tuple{Vararg{Real}},
+                                                   AbstractVector{<:Real}} = (0.95, 0.99),
                                      step_weighting::AbstractStepWeighting = DofStepWeighting())
     @argcheck(!isempty(cfers), IsEmptyError("`cfers` cannot be empty"))
     @argcheck(zero(alpha) < alpha < one(alpha),
@@ -468,7 +590,36 @@ function covariance_forecast_summary(cfers::AbstractVector{<:CovarianceForecastE
                                            pql, levels, ex, ns, np, alpha, step_weighting)
 end
 function covariance_forecast_summary(cfer::CovarianceForecastEvaluationResult; kwargs...)
-    return covariance_forecast_summary([cfer]; kwargs...)
+    return covariance_summary_entry(covariance_forecast_summary([cfer]; kwargs...))
+end
+"""
+    covariance_summary_entry(s::CovarianceForecastSummaryResult) -> CovarianceForecastSummaryResult
+
+The summary of one covariance forecast evaluation, with scalar fields, from a summary of one evaluation with length-1 columns.
+
+Each field becomes its entry 1 through [`first_summary_entry`](@ref). `levels` is the axis of the confidence levels and not of the evaluations, so it stays as it is, and `exceedance` becomes a vector over the levels.
+
+# Arguments
+
+  - `s`: The summary of the vector of one evaluation.
+
+# Returns
+
+  - `s1::CovarianceForecastSummaryResult`: The summary with scalar fields.
+
+# Related
+
+  - [`covariance_forecast_summary`](@ref)
+  - [`first_summary_entry`](@ref)
+"""
+function covariance_summary_entry(s::CovarianceForecastSummaryResult)
+    return CovarianceForecastSummaryResult((if f === :levels
+                                                getfield(s, f)
+                                            else
+                                                first_summary_entry(getfield(s, f))
+                                            end
+                                            for f in
+                                                fieldnames(CovarianceForecastSummaryResult))...)
 end
 """
     summary_quantile(x::VecNum, p::Number)
@@ -611,7 +762,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The Diebold–Mariano–West comparison of two covariance forecasts, one row per loss.
 
-`CovarianceForecastComparisonResult` is what [`covariance_forecast_compare`](@ref) returns. Each column has one entry per loss compared. The losses are the whole-matrix QLIKE, the Frobenius loss, and the portfolio QLIKE of each test portfolio. A positive mean difference says that the first forecast lost more.
+`CovarianceForecastComparisonResult` is what [`covariance_forecast_compare`](@ref) returns. Each column has one entry per loss compared. The losses are the whole-matrix QLIKE, the Frobenius loss, and the portfolio QLIKE of each test portfolio. A positive mean difference says that the first forecast lost more. The t-statistic, the p-value and the interval come from the Mean Test of the comparison, so read the p-value or the interval to judge the evidence: the t-statistic of [`WildBootstrapMeanTest`](@ref) is not on the scale of the normal law.
 
 # Fields
 
@@ -620,7 +771,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     CovarianceForecastComparisonResult(
-        names, mean_difference, variance, z, p, lags, n_steps
+        names, mean_difference, t_stat, p_value, mean_ci_lower, mean_ci_upper, n_steps
     ) -> CovarianceForecastComparisonResult
 
 Arguments correspond to the struct's fields, in the order they are declared. [`covariance_forecast_compare`](@ref) builds the type, and a caller reads it. The type has no keyword constructor, and it validates nothing.
@@ -640,21 +791,21 @@ Arguments correspond to the struct's fields, in the order they are declared. [`c
     """
     mean_difference
     """
-    Newey–West long-run variance of the per-step loss difference, at `lags` lags. One entry per loss.
+    t-statistic of the mean difference, the mean over its long-run standard error. One entry per loss.
     """
-    variance
+    t_stat
     """
-    Diebold–Mariano–West statistic, asymptotically standard normal under equal expected loss. One entry per loss.
+    Two-sided p-value of the t-statistic under equal expected loss, against the law that the Mean Test reads. One entry per loss.
     """
-    z
+    p_value
     """
-    Two-sided p-value of the statistic against the standard normal. One entry per loss.
+    Lower bound of the confidence interval of the mean difference, at the level that the Mean Test sets. One entry per loss.
     """
-    p
+    mean_ci_lower
     """
-    Number of lags of the Bartlett kernel.
+    Upper bound of the confidence interval of the mean difference, at the level that the Mean Test sets. One entry per loss.
     """
-    lags
+    mean_ci_upper
     """
     Number of steps compared, the steps that both evaluations scored.
     """
@@ -662,22 +813,20 @@ Arguments correspond to the struct's fields, in the order they are declared. [`c
 end
 """
     covariance_forecast_compare(a::CovarianceForecastEvaluationResult, b::CovarianceForecastEvaluationResult;
-                                lags::Integer = min(maximum(a.horizon), length(a.qlike)) - 1)
+                                mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
         -> CovarianceForecastComparisonResult
 
 Test whether two covariance forecasts differ in expected loss, one test per loss.
 
-The level of a loss on a proxy is not a calibration reading, so two mean losses side by side do not say which forecast is better. The comparison tests the difference of the losses instead. For each loss the per-step difference is a series, and the test compares its mean with zero through a long-run variance. The test windows of a walk-forward do not overlap, so no two steps share a test row. But the forecasts of two steps can share training rows, so their losses can be correlated, and the lags absorb a serial correlation of the difference up to their number. A step that either evaluation did not score has no loss, so the difference is taken over the steps that both scored, and the long-run variance reads them as adjacent.
+The level of a loss on a proxy is not a calibration reading, so two mean losses side by side do not say which forecast is better. The comparison tests the difference of the losses instead. For each loss the per-step difference is a series, and the Mean Test `mt` compares its mean with zero through a long-run standard error. A step that either evaluation did not score has no loss. It is missing from the series, and the lag between two steps is their distance in the walk-forward, as [`loss_difference_test`](@ref) states.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\delta_t &= L^{A}_t - L^{B}_t\\,, \\\\
-\\bar{\\delta} &= \\frac{1}{M} \\sum_{t=1}^{M} \\delta_t\\,, \\\\
-\\hat{\\omega}^2 &= \\hat{\\gamma}_0 + 2 \\sum_{k=1}^{\\ell} \\left(1 - \\frac{k}{\\ell + 1}\\right) \\hat{\\gamma}_k\\,, \\\\
-\\mathrm{DMW} &= \\frac{\\sqrt{M}\\, \\bar{\\delta}}{\\sqrt{\\hat{\\omega}^2}}\\,, \\\\
-p &= 2 \\left(1 - \\Phi\\left(\\lvert \\mathrm{DMW} \\rvert\\right)\\right)\\,.
+\\delta_t &= L^{A}_t - L^{B}_t\\,, \\quad t \\in \\mathcal{T}\\,, \\\\
+\\bar{\\delta} &= \\frac{1}{M} \\sum_{t \\in \\mathcal{T}} \\delta_t\\,, \\\\
+t_{\\delta} &= \\frac{\\bar{\\delta}}{s_{\\delta}}\\,.
 \\end{align}
 ```
 
@@ -685,29 +834,35 @@ Where:
 
   - ``\\delta_t``: Difference of the losses of forecasts ``A`` and ``B`` at step ``t``.
   - ``L^{A}_t``, ``L^{B}_t``: Loss of forecast ``A`` and of forecast ``B`` at step ``t``.
+  - ``\\mathcal{T}``: The steps that both evaluations scored.
+  - $(math_dict[:M_steps]) Here it counts the steps in ``\\mathcal{T}``.
   - ``\\bar{\\delta}``: Mean loss difference over the walk-forward.
-  - ``\\hat{\\omega}^2``: Long-run variance of ``\\delta_t``, the Bartlett-kernel estimate with ``\\ell`` lags ([`newey_west_variance`](@ref)).
-  - ``\\hat{\\gamma}_k``: Sample autocovariance of ``\\delta_t`` at lag ``k``.
-  - ``\\ell``: Number of lags.
-  - $(math_dict[:M_steps])
-  - ``\\mathrm{DMW}``: Diebold–Mariano–West statistic.
-  - ``p``: Two-sided p-value of the statistic.
-  - ``\\Phi``: Distribution function of the standard normal.
+  - ``s_{\\delta}``: Long-run standard error of ``\\bar{\\delta}``, which the Mean Test `mt` defines.
+  - ``t_{\\delta}``: t-statistic of the difference. The p-value and the interval of `mt` read it.
 
-Under equal expected loss, ``\\mathrm{DMW}`` is asymptotically standard normal. A positive value says that forecast ``A`` lost more than forecast ``B``. Two identical forecasts have ``\\bar{\\delta} = 0`` and ``\\hat{\\omega}^2 = 0``, so their statistic is not a number.
+Section 1.1 of [dieboldmariano1995](@cite) states the test of equal expected loss as a test of the mean of the loss difference against zero. Its rule takes ``k - 1`` lags under the uniform window for a forecast ``k`` entries of the loss series ahead. One step of a walk-forward is one entry, and the test windows do not overlap, so the rule takes zero lags. [`OverlapMeanTest`](@ref) gives that statistic, with the divisor and the Student law that its `law` sets.
+
+The rule of zero lags holds only when the differences of two steps are uncorrelated. Two steps can share training rows, and the losses of a covariance forecast cluster with the volatility, so the differences can be correlated over many steps. A fixed number of Bartlett lags does not repair that: the Bartlett weight of a lag is below one, so at a fixed number of lags the estimate does not converge to the long-run variance. The default [`WildBootstrapMeanTest`](@ref) reads the dependence at every lag up to a bandwidth that is a fixed fraction of the span of the steps. It reads the p-value off a wild bootstrap of the statistic, so a change of the volatility over time does not move the level of the test.
+
+Under equal expected loss, the law that `mt` reads is the null law of ``t_{\\delta}`` when the estimates that the forecasts read do not move its variance. Theorem 4.1(a) of [west1996](@cite) states two such cases: the steps are few next to the rows of the first training window, or the expected gradient of the loss difference in the estimates is zero. Otherwise Theorem 4.1(b) of [west1996](@cite) adds terms to the variance, and ``s_{\\delta}`` omits them. [west1996](@cite) states the theorem for a training window that grows, and Footnote 3 sends the rolling window to an earlier version of that work. A positive value says that forecast ``A`` lost more than forecast ``B``.
+
+Two degenerate differences have a stated answer:
+
+  - Two identical forecasts have ``\\bar{\\delta} = 0`` and no long-run variance, so their t-statistic, p-value and interval are `NaN`.
+  - A step that both evaluations scored and whose loss is not finite makes the mean difference of that loss not finite, and its test `NaN`.
 
 # Arguments
 
   - `a`: The first evaluation.
   - `b`: The second evaluation.
-  - `lags`: Number of lags of the Bartlett kernel. The default is the largest horizon less one, the rule of Diebold and Mariano for a forecast over ``h`` steps, capped at ``M - 1``.
+  - `mt`: The Mean Test of the loss difference. Each step is one entry of the series, so the test reads a window of one.
 
 # Validation
 
   - `a.dates == b.dates` and `a.horizon == b.horizon`. An `ArgumentError` is thrown otherwise, because a per-step difference needs the same steps on both sides.
   - `a.x_src == b.x_src`. An `ArgumentError` is thrown otherwise, because a forecast of `X - B` and a forecast of `X` are scored on different returns, so their losses do not compare.
   - `a` and `b` carry the same number of test portfolios. A `DimensionMismatch` is thrown otherwise.
-  - `0 <= lags < n_steps`, where `n_steps` counts the steps that both evaluations scored. A `DomainError` is thrown otherwise.
+  - At least one step is scored by both evaluations. An `IsEmptyError` is thrown otherwise.
 
 # Returns
 
@@ -719,17 +874,20 @@ Under equal expected loss, ``\\mathrm{DMW}`` is asymptotically standard normal. 
   - [`CovarianceForecastEvaluationResult`](@ref)
   - [`covariance_forecast_evaluation`](@ref)
   - [`covariance_forecast_summary`](@ref)
-  - [`newey_west_variance`](@ref)
+  - [`WildBootstrapMeanTest`](@ref)
+  - [`OverlapMeanTest`](@ref)
+  - [`loss_difference_test`](@ref)
+  - [`log_wealth_regret`](@ref)
 
 # References
 
-  - $(ref_dict[:dieboldmariano1995])
-  - $(ref_dict[:west1996])
+  - $(ref_dict[:dieboldmariano1995]) Section 1.1.
+  - $(ref_dict[:west1996]) Section 2, Theorem 4.1.
+  - $(ref_dict[:demetrescu2026robust]) Section 3.1 and Section 4.
 """
 function covariance_forecast_compare(a::CovarianceForecastEvaluationResult,
                                      b::CovarianceForecastEvaluationResult;
-                                     lags::Integer = min(maximum(a.horizon),
-                                                         length(a.qlike)) - 1)
+                                     mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
     @argcheck(isequal(a.dates, b.dates) && a.horizon == b.horizon,
               ArgumentError("the two evaluations do not share their steps: a comparison reads a per-step loss difference, so both must be run over one walk-forward, with the same dates and the same horizon at every step. Run both forecasts through `covariance_forecast_evaluation` with the same `rd` and `cv`."))
     @argcheck(a.x_src == b.x_src,
@@ -737,73 +895,111 @@ function covariance_forecast_compare(a::CovarianceForecastEvaluationResult,
     P = size(a.portfolio_qlike, 2)
     @argcheck(size(b.portfolio_qlike, 2) == P,
               DimensionMismatch("the first evaluation carries $(P) test portfolio(s) and the second $(size(b.portfolio_qlike, 2)); hand both the same `w`."))
-    t = findall((a.n_valid .> 0) .& (b.n_valid .> 0))
-    M = length(t)
-    @argcheck(0 <= lags < M, DomainError(lags, "`lags` must lie in [0, n_steps)"))
-    names = vcat(["qlike", "frobenius"], ["portfolio_qlike_$(k)" for k in 1:P])
-    series = vcat([a.qlike[t] .- b.qlike[t], a.frobenius[t] .- b.frobenius[t]],
-                  [a.portfolio_qlike[t, k] .- b.portfolio_qlike[t, k] for k in 1:P])
-    md = [Statistics.mean(s) for s in series]
-    v = [newey_west_variance(s, lags) for s in series]
-    z = sqrt(M) .* md ./ sqrt.(v)
-    p = 2 .* Distributions.ccdf.(Distributions.Normal(), abs.(z))
-    return CovarianceForecastComparisonResult(names, md, v, z, p, lags, M)
+    k = (a.n_valid .> 0) .& (b.n_valid .> 0)
+    M = count(k)
+    @argcheck(M > 0,
+              IsEmptyError("the two evaluations share no scored step: at every step one of them had no active asset, so there is no loss difference to test."))
+    names = vcat(["qlike", "frobenius"], ["portfolio_qlike_$(j)" for j in 1:P])
+    series = vcat([a.qlike .- b.qlike, a.frobenius .- b.frobenius],
+                  [view(a.portfolio_qlike, :, j) .- view(b.portfolio_qlike, :, j)
+                   for j in 1:P])
+    md = [Statistics.mean(view(s, k)) for s in series]
+    rng = mean_test_rng(mt)
+    res = [loss_difference_test(mt, s, k, rng) for s in series]
+    return CovarianceForecastComparisonResult(names, md, [r.t_stat for r in res],
+                                              [r.p_value for r in res],
+                                              [r.mean_ci_lower for r in res],
+                                              [r.mean_ci_upper for r in res], M)
 end
 """
-    newey_west_variance(d::VecNum, lags::Integer)
+    loss_difference_test(mt::AbstractMeanTestEstimator, d::VecNum, k::AbstractVector{Bool}, rng)
+        -> MeanTestResult
 
-Return the Bartlett-kernel long-run variance of a series, at `lags` lags.
+Return the Mean Test of a loss difference against zero, over the entries that both sides scored.
 
-# Mathematical definition
+[`covariance_forecast_compare`](@ref) and [`log_wealth_regret`](@ref) call it, so the two comparisons read one test. An entry outside `k` is one that a side did not score. It is missing, so it is in no pair, and the lag between two entries is their distance in the series, not in the subsequence of the scored entries. An entry inside `k` has a loss on both sides. A scored entry that is not finite is a defect of the data and not a missing entry, so the test answers `NaN`, as the mean of the difference does.
 
-```math
-\\begin{align}
-\\hat{\\gamma}_k &= \\frac{1}{M} \\sum_{t=k+1}^{M} \\left(d_t - \\bar{d}\\right) \\left(d_{t-k} - \\bar{d}\\right)\\,, \\\\
-\\hat{\\omega}^2 &= \\hat{\\gamma}_0 + 2 \\sum_{k=1}^{\\ell} \\left(1 - \\frac{k}{\\ell + 1}\\right) \\hat{\\gamma}_k\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``d_t``: Entry ``t`` of the series.
-  - ``\\bar{d}``: Mean of the series.
-  - ``M``: Length of the series.
-  - ``\\hat{\\gamma}_k``: Sample autocovariance of the series at lag ``k``.
-  - ``\\ell``: Number of lags.
-  - ``\\hat{\\omega}^2``: Long-run variance of the series.
-
-The Bartlett weights make ``\\hat{\\omega}^2`` non-negative for every series and every ``\\ell``. At ``\\ell = 0`` it is the sample variance with the divisor ``M``.
+One entry is one step of a walk-forward, or one row of a return series, and two steps do not share a test row. So the data of one entry spans one entry, and the test reads a `window` of one.
 
 # Arguments
 
-  - `d`: The series.
-  - `lags`: Number of lags, ``\\ell``.
+  - `mt`: The Mean Test.
+  - `d`: The loss difference, one entry per step.
+  - `k`: Whether both sides scored each step, one entry per entry of `d`.
+  - `rng`: The generator of [`mean_test_rng`](@ref).
 
 # Returns
 
-  - `omega2::Number`: The long-run variance.
+  - `res::MeanTestResult`: The answer of the Mean Test, as [`mean_test`](@ref) returns it, see [`MeanTestResult`](@ref).
 
 # Related
 
+  - [`mean_test`](@ref)
   - [`covariance_forecast_compare`](@ref)
-
-# References
-
-  - $(ref_dict[:neweywest1987])
+  - [`log_wealth_regret`](@ref)
 """
-function newey_west_variance(d::VecNum, lags::Integer)
-    M = length(d)
-    e = d .- Statistics.mean(d)
-    gamma(k) = LinearAlgebra.dot(view(e, (k + 1):M), view(e, 1:(M - k))) / M
-    omega2 = gamma(0)
-    for k in 1:lags
-        omega2 += 2 * (1 - k / (lags + 1)) * gamma(k)
+function loss_difference_test(mt::AbstractMeanTestEstimator, d::VecNum,
+                              k::AbstractVector{Bool}, rng)
+    Tm = real(eltype(d))
+    if any(t -> k[t] && !isfinite(d[t]), eachindex(d, k))
+        nan = typeof(sqrt(one(Tm)))(NaN)
+        return MeanTestResult(nan, nan, nan, nan)
     end
-    return omega2
+    return mean_test(mt, ifelse.(k, d, Tm(NaN)), 1, rng)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The portfolio diagnostics of the stored forecasts of an evaluation, scored again on a new test portfolio by [`covariance_forecast_portfolio`](@ref).
+
+Each matrix holds one row for each step of the evaluation and one column for each test portfolio, as the two portfolio fields of a [`CovarianceForecastEvaluationResult`](@ref) do.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    CovarianceForecastPortfolioResult(standardised_return::MatNum, portfolio_qlike::MatNum)
+    CovarianceForecastPortfolioResult(; standardised_return::MatNum, portfolio_qlike::MatNum)
+
+The positional constructor checks the values. The keyword constructor takes each field by name, with no default, and calls it.
+
+## Validation
+
+  - `standardised_return` and `portfolio_qlike` have the same size, `steps × portfolios`. Otherwise, the constructor raises a `DimensionMismatch`.
+  - The keyword constructor refuses a value that is not a matrix of numbers with a `TypeError`. The positional constructor checks only two matrices: the generic positional method that `@concrete` adds takes values of any other type, such as two vectors, with no check.
+
+# Related
+
+  - [`covariance_forecast_portfolio`](@ref)
+  - [`CovarianceForecastEvaluationResult`](@ref)
+  - [`CovarianceForecastStepResult`](@ref)
+"""
+@concrete struct CovarianceForecastPortfolioResult <: AbstractResult
+    """
+    Standardised return of each test portfolio at each step, `steps × portfolios`.
+    """
+    standardised_return
+    """
+    QLIKE loss of the variance of each test portfolio at each step, `steps × portfolios`.
+    """
+    portfolio_qlike
+    function CovarianceForecastPortfolioResult(standardised_return::MatNum,
+                                               portfolio_qlike::MatNum)
+        @argcheck(size(standardised_return) == size(portfolio_qlike),
+                  DimensionMismatch("standardised_return and portfolio_qlike hold one row for each step and one column for each test portfolio, so `size(standardised_return) == size(portfolio_qlike)` must hold.\nsize(standardised_return) => $(size(standardised_return))\nsize(portfolio_qlike) => $(size(portfolio_qlike))"))
+        return new{typeof(standardised_return), typeof(portfolio_qlike)}(standardised_return,
+                                                                         portfolio_qlike)
+    end
+end
+function CovarianceForecastPortfolioResult(; standardised_return::MatNum,
+                                           portfolio_qlike::MatNum)::CovarianceForecastPortfolioResult
+    return CovarianceForecastPortfolioResult(standardised_return, portfolio_qlike)
 end
 """
     covariance_forecast_portfolio(cfer::CovarianceForecastEvaluationResult, rd::ReturnsResult,
-                                  w::Option{<:VecNum_VecVecNum}) -> NamedTuple
+                                  w::Option{<:VecNum_VecVecNum}) -> CovarianceForecastPortfolioResult
 
 Score the stored forecasts of an evaluation again, on a new test portfolio.
 
@@ -833,7 +1029,7 @@ The test rows are read in the frame of the evaluation, `cfer.x_src`, because a f
 
 # Returns
 
-  - `proj::NamedTuple`: `standardised_return` and `portfolio_qlike`, each `steps × portfolios`.
+  - `proj::CovarianceForecastPortfolioResult`: `standardised_return` and `portfolio_qlike`, each `steps × portfolios`.
 
 # Related
 
@@ -861,10 +1057,11 @@ function covariance_forecast_portfolio(cfer::CovarianceForecastEvaluationResult,
         b[i, :] .= s.standardised_return
         pq[i, :] .= s.portfolio_qlike
     end
-    return (; standardised_return = b, portfolio_qlike = pq)
+    return CovarianceForecastPortfolioResult(b, pq)
 end
 
 export DofStepWeighting, EqualStepWeighting, covariance_forecast_summary,
        CovarianceForecastSummaryResult, covariance_forecast_compare,
-       CovarianceForecastComparisonResult, covariance_forecast_portfolio
+       CovarianceForecastComparisonResult, covariance_forecast_portfolio,
+       CovarianceForecastPortfolioResult
 public AbstractStepWeighting, covariance_step_weights

@@ -449,16 +449,25 @@ function apply_preprocessing(res::MissingDataFilterResult, pr::PricesResult)::Pr
     return port_opt_view(pr, TimeSeries.timestamp(pr.X)[rows], cols)
 end
 """
-    clock_gap_cells(A::TimeSeries.TimeArray, ts::AbstractVector) -> BitMatrix
+    clock_gap_cells(A::Nothing, ts::AbstractVector, n::Integer) -> BitMatrix
+    clock_gap_cells(A::TimeSeries.TimeArray, ts::AbstractVector, n::Integer) -> BitMatrix
 
-Mark the gaps of a series on the clock `ts`, one row for each timestamp of `ts` and one column for each column of `A`.
+Mark the gaps of an optional series on the clock `ts`, one row for each timestamp of `ts` and one column for each column of `A`.
 
-A cell is a gap when `A` holds no entry at the timestamp, or when its entry is missing by [`is_missing_value`](@ref). The factor, benchmark and implied volatility series of a [`PricesResult`](@ref) keep their own timestamps, so the function pairs them with the asset clock by timestamp and not by position.
+A cell is a gap when `A` holds no entry at the timestamp, or when its entry is missing by [`is_missing_value`](@ref). The factor, benchmark and implied volatility series of a [`PricesResult`](@ref) keep their own timestamps, so the function pairs them with the asset clock by timestamp and not by position. An absent series has no gap, so it gives `n` columns of `false`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `A` is `nothing`: return `n` columns of `false`.
+ 2. Otherwise find the position in `A` of each timestamp of `ts`. A timestamp that `A` does not hold is a gap in each column, and a found row is a gap where its entry is missing. A series ignores `n`, because its columns give the count.
 
 # Arguments
 
-  - `A`: The series.
+  - `A`: The series, or `nothing`.
   - `ts`: The clock, the timestamps of the asset prices.
+  - `n`: The count of columns of an absent series.
 
 # Returns
 
@@ -468,9 +477,11 @@ A cell is a gap when `A` holds no entry at the timestamp, or when its entry is m
 
   - [`asset_gap_cells`](@ref)
   - [`shared_gap_rows`](@ref)
-  - [`optional_gap_cells`](@ref)
 """
-function clock_gap_cells(A::TimeSeries.TimeArray, ts::AbstractVector)::BitMatrix
+function clock_gap_cells(::Nothing, ts::AbstractVector, n::Integer)::BitMatrix
+    return falses(length(ts), n)
+end
+function clock_gap_cells(A::TimeSeries.TimeArray, ts::AbstractVector, ::Integer)::BitMatrix
     tA = TimeSeries.timestamp(A)
     pos = Dict(zip(tA, eachindex(tA)))
     idx = get.(Ref(pos), ts, 0)
@@ -479,24 +490,6 @@ function clock_gap_cells(A::TimeSeries.TimeArray, ts::AbstractVector)::BitMatrix
     m = trues(length(ts), size(vals, 2))
     m[found, :] .= is_missing_value.(view(vals, idx[found], :))
     return m
-end
-"""
-    optional_gap_cells(A::Nothing, ts::AbstractVector, n::Integer) -> BitMatrix
-    optional_gap_cells(A::TimeSeries.TimeArray, ts::AbstractVector, n::Integer) -> BitMatrix
-
-Mark the gaps of an optional series on the clock `ts`. An absent series has no gap, so it gives `n` columns of `false`.
-
-# Related
-
-  - [`clock_gap_cells`](@ref)
-  - [`asset_gap_cells`](@ref)
-"""
-function optional_gap_cells(::Nothing, ts::AbstractVector, n::Integer)::BitMatrix
-    return falses(length(ts), n)
-end
-function optional_gap_cells(A::TimeSeries.TimeArray, ts::AbstractVector,
-                            ::Integer)::BitMatrix
-    return clock_gap_cells(A, ts)
 end
 """
     benchmark_columns(B::Nothing, shared::Bool) -> Nothing
@@ -539,8 +532,8 @@ function asset_gap_cells(pr::PricesResult)::BitMatrix
     ts = TimeSeries.timestamp(pr.X)
     vals = values(pr.X)
     n = size(vals, 2)
-    return BitMatrix(is_missing_value.(vals)) .| optional_gap_cells(pr.iv, ts, n) .|
-           optional_gap_cells(benchmark_columns(pr.B, false), ts, n)
+    return BitMatrix(is_missing_value.(vals)) .| clock_gap_cells(pr.iv, ts, n) .|
+           clock_gap_cells(benchmark_columns(pr.B, false), ts, n)
 end
 """
     shared_gap_rows(pr::PricesResult) -> BitVector
@@ -564,8 +557,8 @@ A fit that reads such a series drops the observation, see [`shared_series_view`]
 """
 function shared_gap_rows(pr::PricesResult)::BitVector
     ts = TimeSeries.timestamp(pr.X)
-    return vec(any(optional_gap_cells(benchmark_columns(pr.B, true), ts, 1); dims = 2)) .|
-           vec(any(optional_gap_cells(pr.F, ts, 1); dims = 2))
+    return vec(any(clock_gap_cells(benchmark_columns(pr.B, true), ts, 1); dims = 2)) .|
+           vec(any(clock_gap_cells(pr.F, ts, 1); dims = 2))
 end
 
 export MissingDataFilter, MissingDataFilterResult, SinglePassFilter, FixedPointFilter

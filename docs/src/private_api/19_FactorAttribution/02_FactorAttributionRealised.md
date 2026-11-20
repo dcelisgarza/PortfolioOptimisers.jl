@@ -1,5 +1,5 @@
 ```@meta
-Description = "Factor attribution realised, private API of PortfolioOptimisers.jl: attribution_slice, attribution_weights, attribution_cov, attribution_align, …"
+Description = "Factor attribution realised, private API of PortfolioOptimisers.jl: attribution_slice, attribution_weights, attribution_cov, AlignedAttributionBlock, …"
 ```
 
 # [Factor attribution realised: private API](@id private-api-factor-attribution-realised)
@@ -8,32 +8,31 @@ Description = "Factor attribution realised, private API of PortfolioOptimisers.j
 attribution_slice
 attribution_weights
 attribution_cov
+AlignedAttributionBlock
 attribution_align
 attribution_trim_exposures
+ZeroedInactivePairs
 attribution_zero_inactive
 attribution_trim_rows
-attribution_trim_basis
-attribution_finite_rows
 attribution_window
 attribution_window_exposures
-attribution_window_basis
 attribution_window_weights
+WeightMoments
 attribution_weight_moments
 assert_attribution_ddof
 realised_attribution
 attribution_remainder
 attribution_series_component
 attribution_family_spread
-attribution_no_errors
 attribution_standard_errors
 attribution_observed_indices
+ErrorRegressionBasis
 attribution_reduce_for_errors
 attribution_observed_flags
 attribution_broadcast_exposures
 attribution_sandwich
 attribution_changed_covariance
 attribution_dropped_observation
-attribution_expand_errors
 attribution_scatter
 attribution_family_errors
 realised_attribution_assets

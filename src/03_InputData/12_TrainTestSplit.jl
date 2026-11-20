@@ -3,28 +3,21 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve one side of a train/test split into a row count.
 
-A size is an `Integer` count of observations, or a fraction of the observations given as any other `Real` in `(0, 1)`. A count larger than `N` takes all `N` rows. The window checks of [`safe_index`](@ref) then reject a split that leaves either side empty.
+A size is a [`CountOf`](@ref) of observations or a [`FractionOf`](@ref) of the observations. A count larger than `N` takes all `N` rows. The window checks of [`safe_index`](@ref) then reject a split that leaves either side empty.
 
 # Algorithm
 
 The method that Julia selects is the first step, because a count and a fraction mean different things.
 
- 1. `s` is an `Integer`, so it is a count of rows. Check that `s > 0`, and return `min(Int(s), N)`.
- 2. `s` is any other `Real`, so it is a fraction of the rows. Check that `0 < s < 1`.
- 3. Round `s * N` to the nearest integer, giving `n`.
- 4. If `n / N`, computed in the type of `s`, exceeds `s`, subtract one from `n`. Now `n` is the largest count whose share of the rows does not exceed `s`, which is `floor(s * N)` in exact arithmetic. A direct `floor(Int, s * N)` loses a row when the product lands below a whole number, and `0.29 * 100` is `28.999999999999996`.
- 5. Return `clamp(n, 1, N)`. The clamp stops a small fraction of a short window from resolving to zero rows.
+ 1. `s` is a [`CountOf`](@ref) of rows. Return `min(Int(s.val), N)`.
+ 2. `s` is a [`FractionOf`](@ref) of the rows, with `f = s.val`. Round `f * N` to the nearest integer, giving `n`.
+ 3. If `n / N`, computed in the type of `f`, exceeds `f`, subtract one from `n`. Now `n` is the largest count whose share of the rows does not exceed `f`, which is `floor(f * N)` in exact arithmetic. A direct `floor(Int, f * N)` loses a row when the product lands below a whole number, and `0.29 * 100` is `28.999999999999996`.
+ 4. Return `clamp(n, 1, N)`. The clamp stops a small fraction of a short window from resolving to zero rows.
 
 # Arguments
 
-  - `s`: One side of the split, as a row count (`Integer`) or a fraction of the observations (any other `Real` in `(0, 1)`).
+  - `s`: One side of the split, as a [`CountOf`](@ref) of rows or a [`FractionOf`](@ref) of the observations.
   - `N`: The number of observations.
-  - `name`: The name of the side, which the error messages display.
-
-# Validation
-
-  - `s > 0` when `s` is an `Integer`. Otherwise the method throws a `DomainError`.
-  - `0 < s < 1` when `s` is any other `Real`. Otherwise the method throws a `DomainError`.
 
 # Returns
 
@@ -35,17 +28,13 @@ The method that Julia selects is the first step, because a count and a fraction 
   - [`safe_index`](@ref)
   - [`TrainTestSplit`](@ref)
 """
-function split_count(s::Integer, N::Integer, name::Symbol)::Int
-    @argcheck(s > zero(s),
-              DomainError(s, "the $name of a train/test split must be > 0, got $s"))
-    return min(Int(s), N)
+function split_count(s::CountOf, N::Integer)::Int
+    return min(Int(s.val), N)
 end
-function split_count(s::Real, N::Integer, name::Symbol)::Int
-    @argcheck(zero(s) < s < one(s),
-              DomainError(s,
-                          "the $name of a train/test split must lie in (0, 1) when given as a fraction, got $s"))
-    n = round(Int, s * N)
-    if n * one(s) / N > s
+function split_count(s::FractionOf, N::Integer)::Int
+    f = s.val
+    n = round(Int, f * N)
+    if n * one(f) / N > f
         n -= 1
     end
     return clamp(n, 1, N)
@@ -63,7 +52,7 @@ The training window is the first rows of the data and the test window is the las
 
 # Algorithm
 
- 1. Resolve the two window lengths `N_l` and `N_h`, through the branch that `lo` and `hi` select.
+ 1. Read a plain `lo` or `hi` through [`count_or_fraction`](@ref). Then resolve the two window lengths `N_l` and `N_h`, through the branch that `lo` and `hi` select.
 
      1. Neither is given. Resolve `D` with [`split_count`](@ref), giving `n`. Then `N_l = n` and `N_h = N - n`.
      2. Only `lo` is given. Resolve it with [`split_count`](@ref), giving `n`. Then `N_l = n` and `N_h = N - n`.
@@ -76,14 +65,14 @@ The training window is the first rows of the data and the test window is the las
 
 # Arguments
 
-  - `lo`: The training rows, as a count (`Integer`) or a fraction (any other `Real` in `(0, 1)`). `nothing` takes the complement of `hi`.
-  - `hi`: The test rows, as a count or a fraction. `nothing` takes the complement of `lo`.
+  - `lo`: The training rows, as a [`CountOf`](@ref), a [`FractionOf`](@ref) or a plain number that [`count_or_fraction`](@ref) reads. `nothing` takes the complement of `hi`.
+  - `hi`: The test rows, in the same forms. `nothing` takes the complement of `lo`.
   - `N`: The number of observations.
-  - `D = 0.75`: The training fraction when neither size is given.
+  - `D = FractionOf(0.75)`: The training size when neither size is given.
 
 # Validation
 
-  - Each size passes the checks of [`split_count`](@ref), which throws a `DomainError` otherwise.
+  - Each plain size passes [`count_or_fraction`](@ref), which throws a `DomainError` otherwise.
   - Both windows are non-empty. Otherwise the function throws an `ArgumentError`. A size that takes every row, such as `train_size = N`, leaves no row for the other window.
   - `N_l + N_h <= N`, so that the windows do not overlap. Otherwise the function throws an `ArgumentError`.
 
@@ -99,18 +88,20 @@ The training window is the first rows of the data and the test window is the las
   - [`KFold`](@ref)
   - [`CombinatorialCrossValidation`](@ref)
 """
-function safe_index(lo::Option{<:Number}, hi::Option{<:Number}, N::Integer, D = 0.75)
+function safe_index(lo::Option{<:Real_CountFraction}, hi::Option{<:Real_CountFraction},
+                    N::Integer, D::Real_CountFraction = FractionOf(0.75))
+    lo, hi = count_or_fraction(lo), count_or_fraction(hi)
     N_l, N_h = if isnothing(lo) && isnothing(hi)
-        n = split_count(D, N, :train_size)
+        n = split_count(count_or_fraction(D), N)
         n, N - n
     elseif isnothing(hi)
-        n = split_count(lo, N, :train_size)
+        n = split_count(lo, N)
         n, N - n
     elseif isnothing(lo)
-        n = split_count(hi, N, :test_size)
+        n = split_count(hi, N)
         N - n, n
     else
-        split_count(lo, N, :train_size), split_count(hi, N, :test_size)
+        split_count(lo, N), split_count(hi, N)
     end
     @argcheck(N_l > 0 && N_h > 0,
               ArgumentError("a train/test split of $N observations must leave both windows non-empty, got $N_l training and $N_h test observations"))
@@ -135,8 +126,8 @@ This is the function form of [`TrainTestSplit`](@ref). [`port_opt_view`](@ref) m
 # Arguments
 
   - `rd`, `pr`: The data to split.
-  - `train_size`: The training rows, as a count (`Integer`) or a fraction (any other `Real` in `(0, 1)`). `nothing` takes the complement of `test_size`.
-  - `test_size`: The test rows, as a count or a fraction. `nothing` takes the complement of `train_size`. If neither size is given, the split is 75/25.
+  - `train_size`: The training rows, as a [`CountOf`](@ref), a [`FractionOf`](@ref) or a plain number that [`count_or_fraction`](@ref) reads. `nothing` takes the complement of `test_size`.
+  - `test_size`: The test rows, in the same forms. `nothing` takes the complement of `train_size`. If neither size is given, the split is 75/25.
 
 # Validation
 
@@ -162,14 +153,16 @@ julia> size(train.X, 1), size(test.X, 1)
   - [`TrainTestSplit`](@ref)
   - [`safe_index`](@ref)
 """
-function train_test_split(rd::ReturnsResult; train_size::Option{<:Number} = nothing,
-                          test_size::Option{<:Number} = nothing)
+function train_test_split(rd::ReturnsResult;
+                          train_size::Option{<:Real_CountFraction} = nothing,
+                          test_size::Option{<:Real_CountFraction} = nothing)
     N = size(rd.X, 1)
     train, test = safe_index(train_size, test_size, N)
     return port_opt_view(rd, train, :), port_opt_view(rd, test, :)
 end
-function train_test_split(pr::PricesResult; train_size::Option{<:Number} = nothing,
-                          test_size::Option{<:Number} = nothing)
+function train_test_split(pr::PricesResult;
+                          train_size::Option{<:Real_CountFraction} = nothing,
+                          test_size::Option{<:Real_CountFraction} = nothing)
     N = size(TimeSeries.values(pr.X), 1)
     train, test = safe_index(train_size, test_size, N)
     return port_opt_view(pr, train), port_opt_view(pr, test)
@@ -196,11 +189,15 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     TrainTestSplit(;
-        train_size::Option{<:Number} = nothing,
-        test_size::Option{<:Number} = nothing,
+        train_size::Option{<:Real_CountFraction} = nothing,
+        test_size::Option{<:Real_CountFraction} = nothing,
     ) -> TrainTestSplit
 
-Keywords correspond to the struct's fields. A size is a row count (`Integer`) or a fraction of the observations (any other `Real` in `(0, 1)`). One size makes the other window its complement, two sizes embargo the rows between the windows, and no size gives a 75/25 split. The constructor does not check the sizes. [`safe_index`](@ref) checks them when the split runs on data.
+Keywords correspond to the struct's fields. A size is a [`CountOf`](@ref) of rows or a [`FractionOf`](@ref) of the observations, and the constructor reads a plain number through [`count_or_fraction`](@ref). One size makes the other window its complement, two sizes embargo the rows between the windows, and no size gives a 75/25 split. [`safe_index`](@ref) checks the windows when the split runs on data.
+
+## Validation
+
+  - Each plain size passes [`count_or_fraction`](@ref).
 
 # Examples
 
@@ -221,19 +218,22 @@ julia> pipe.names
 """
 @concrete struct TrainTestSplit <: AbstractPreprocessingEstimator
     """
-    The training observations, as a count (`Integer`) or a fraction (any other `Real` in `(0, 1)`). `nothing` takes the complement of `test_size`.
+    The training observations, as a [`CountOf`](@ref) or a [`FractionOf`](@ref). `nothing` takes the complement of `test_size`.
     """
     train_size
     """
-    The test observations, as a count or a fraction. `nothing` takes the complement of `train_size`.
+    The test observations, as a [`CountOf`](@ref) or a [`FractionOf`](@ref). `nothing` takes the complement of `train_size`.
     """
     test_size
-    function TrainTestSplit(train_size::Option{<:Number}, test_size::Option{<:Number})
+    function TrainTestSplit(train_size::Option{<:Real_CountFraction},
+                            test_size::Option{<:Real_CountFraction})
+        train_size = count_or_fraction(train_size)
+        test_size = count_or_fraction(test_size)
         return new{typeof(train_size), typeof(test_size)}(train_size, test_size)
     end
 end
-function TrainTestSplit(; train_size::Option{<:Number} = nothing,
-                        test_size::Option{<:Number} = nothing)::TrainTestSplit
+function TrainTestSplit(; train_size::Option{<:Real_CountFraction} = nothing,
+                        test_size::Option{<:Real_CountFraction} = nothing)::TrainTestSplit
     return TrainTestSplit(train_size, test_size)
 end
 """

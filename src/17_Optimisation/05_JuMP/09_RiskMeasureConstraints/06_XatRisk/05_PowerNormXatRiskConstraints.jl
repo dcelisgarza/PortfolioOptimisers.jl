@@ -78,6 +78,10 @@ This is the shared body of `PowerNormValueatRisk` and `PowerNormDrawdownatRisk`.
 one power cone programme over different series, so [`risk_series`](@ref) chooses the series
 and this function writes the cone once.
 
+The variables `slack` and `v` and their rows cover the observations of positive weight only.
+An observation of weight zero does not change the measure, but the rows of a large loss can
+stop the solver away from the optimum.
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -109,74 +113,38 @@ function set_power_norm_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeas
                                           prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
     ip = inv(r.p)
-    eta, t, slack, v = JuMP.@variables(model, begin
-                                           ()
-                                           ()
-                                           [1:T], (lower_bound = 0)
-                                           [1:T]
-                                       end)
-    state_set!(model, prefix, keys.eta, i, eta)
-    state_set!(model, prefix, keys.t, i, t)
-    state_set!(model, prefix, keys.slack, i, slack)
-    state_set!(model, prefix, keys.v, i, v)
     wi = nothing_scalar_array_selector(r.w, pr.w)
     wi = checked_observation_weights(wi, pr.X)
+    rows = positive_weight_rows(wi, T)
+    N = length(rows)
+    eta = state_set!(model, prefix, keys.eta, i, JuMP.@variable(model))
+    t = state_set!(model, prefix, keys.t, i, JuMP.@variable(model))
+    slack = state_set!(model, prefix, keys.slack, i,
+                       JuMP.@variable(model, [1:N], lower_bound = 0))
+    v = state_set!(model, prefix, keys.v, i, JuMP.@variable(model, [1:N]))
     iaT = if isnothing(wi)
         state_set!(model, prefix, keys.budget, i,
                    JuMP.@constraint(model, sc * (sum(v) - t) <= 0))
         inv(r.alpha * T^ip)
     else
         state_set!(model, prefix, keys.budget, i,
-                   JuMP.@constraint(model, sc * (LinearAlgebra.dot(wi, v) - t) <= 0))
+                   JuMP.@constraint(model,
+                                    sc * (LinearAlgebra.dot(view(wi, rows), v) - t) <= 0))
         inv(r.alpha * sum(wi)^ip)
     end
-    exceedance, pcone = JuMP.@constraints(model,
-                                          begin
-                                              sc * ((series + slack) .+ eta) >= 0
-                                              [i = 1:T],
-                                              [sc * v[i], sc * t, sc * slack[i]] in
-                                              JuMP.MOI.PowerCone(ip)
-                                          end)
-    state_set!(model, prefix, keys.exceedance, i, exceedance)
-    state_set!(model, prefix, keys.pcone, i, pcone)
+    state_set!(model, prefix, keys.exceedance, i,
+               JuMP.@constraint(model, sc * ((series[rows] + slack) .+ eta) >= 0))
+    state_set!(model, prefix, keys.pcone, i,
+               JuMP.@constraint(model, [k = 1:N],
+                                [sc * v[k], sc * t, sc * slack[k]] in
+                                JuMP.MOI.PowerCone(ip)))
     risk = state_set!(model, prefix, keys.risk, i, JuMP.@expression(model, eta + iaT * t))
     set_risk_bounds_and_expression!(model, opt, risk, r.settings, keys.risk, i;
                                     prefix = prefix)
     return risk
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Add JuMP risk constraints for `PowerNormValueatRiskRange` (PNVaR range) to `model`.
-
-Delegates to [`set_range_risk_constraints!`](@ref), which builds the loss tail from `alpha`
-and `pa` on the net portfolio returns, and the gain tail from `beta` and `pb` on their
-negation, then sums the two PNVaR expressions. Each tail brings its own power cone, shaped
-by *its own* norm order.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - $(arg_dict[:ci])
-  - `r::PowerNormValueatRiskRange`: The power-norm VaR range risk measure.
-  - $(arg_dict[:opt_rjumpe])
-  - $(arg_dict[:pr_X])
-
-# Returns
-
-  - `pvar_range_risk`: The combined `loss + gain` risk expression added to the model.
-
-# Related
-
-  - [`PowerNormValueatRiskRange`](@ref)
-  - [`range_tails`](@ref)
-  - [`set_range_risk_constraints!`](@ref)
-"""
-function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRiskRange,
-                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
-                               prefix::Symbol = Symbol(""), kwargs...)
-    return set_range_risk_constraints!(model, i, r, :pvar_range_risk_, opt, pr, args...;
-                                       prefix = prefix, kwargs...)
+function range_risk_key(::PowerNormValueatRiskRange)
+    return :pvar_range_risk_
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

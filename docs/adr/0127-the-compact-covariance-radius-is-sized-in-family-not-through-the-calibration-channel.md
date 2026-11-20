@@ -326,3 +326,14 @@ adds the factor `R` of the rows it drops, and pays the principal block of the fu
 exactly. The rank does not fall, `orthonormalise_basis` is deleted, and the radius that crosses
 the view unchanged is now the exact radius of the projected set, not a stale one. A caller who
 wants a radius sized on the cluster alone still fits the set on a reduced prior.
+
+## Amendment (2026-10-28)
+
+`IdentityMetric` is removed
+([#1867](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1867), ADR 0222). It named
+no weight source, so `metric = nothing` now spells the equal-weight metric, and
+`orthogonality_weights(::Nothing, rr)` returns `nothing` as the method on `IdentityMetric` did.
+Read each "under `IdentityMetric`" above as "under `metric = nothing`". `C = I` there, and `κ`
+carries the units of a variance. `k_compact` takes `metric::Option{<:AbstractOrthogonalityMetric}`,
+and one formula still serves every metric. `IdentityScaling` is removed in the same change:
+`scaling = nothing` is the default, and it gives `Λ = I`.

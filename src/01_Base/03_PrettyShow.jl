@@ -3,13 +3,13 @@
 
 Defines a `Base.show` method for `T` that prints the type name and one aligned line per field.
 
-A field that is itself pretty-printable is rendered under its parent and indented, and an oversized one is collapsed to `Name ⋯`. The height at which a nested field collapses is the budget that [`compact_show_budget`](@ref) reads; see [`set_compact_show!`](@ref). The fields that print are the ones [`pretty_show_fields`](@ref) resolves, so a field that holds `nothing` is hidden under the shipped default of [`SHOW_NOTHING_FIELDS`](@ref), and a type hides a field of its own choice through [`show_fields`](@ref).
+A field whose value also has a pretty `show` prints under its parent with an indent. A field of that kind that is too tall prints as `Name ⋯`. The budget that [`compact_show_budget`](@ref) reads sets the height at which a nested field collapses, and [`set_compact_show!`](@ref) sets the budget. The method prints the fields that [`pretty_show_fields`](@ref) resolves. The default of [`SHOW_NOTHING_FIELDS`](@ref) hides a field that holds `nothing`, and a type hides a field of its own choice through [`show_fields`](@ref).
 
 # Algorithm
 
-The macro emits two definitions. Steps 3 to 9 are the body of the `Base.show` method it emits.
+The macro emits two definitions. Steps 3 to 9 are the body of the `Base.show` method that it emits.
 
- 1. When `flag` is `true`, define `has_pretty_show_method(::T)::Bool = true`. The return type is annotated, as it is on the four methods that [`has_pretty_show_method`](@ref) declares by hand.
+ 1. When `flag` is `true`, define `has_pretty_show_method(::T)::Bool = true`. The method annotates its return type, as do the four methods that [`has_pretty_show_method`](@ref) declares by hand.
 
  2. Define `Base.show(io::IO, obj::T)`.
 
@@ -21,24 +21,24 @@ The macro emits two definitions. Steps 3 to 9 are the body of the `Base.show` me
 
  6. For each field in declaration order, read `val` with `getproperty`, so that a property a rule of [`@forward_properties`](@ref) swaps prints the swapped value.
 
- 7. Choose the connector `sym1`, giving `┴` for the last printed line and `┼` otherwise. The last printed line is the last field of `fields`, so a hidden field never carries the marker. A nested value whose own resolved field list is empty prints on one line, so it takes `┴` too.
+ 7. Choose the connector `sym1`. It is `┴` for the last printed line, and `┼` for each other line. The last printed line is the last field of `fields`, so a hidden field never gets the `┴`. A nested value whose own resolved field list is empty prints on one line, so it also gets `┴`.
 
  8. Print the field name, right-aligned to `padding`.
 
- 9. Print `val` through the first branch that matches it, giving the rest of the line:
+ 9. Print the rest of the line from `val`, through the first branch that matches it.
 
       + `nothing` prints as `nothing`.
-      + A value that has a pretty-show method is rendered into a buffer, giving `alglines`. When the number of non-empty lines exceeds `compact_show_budget(io)`, print the wrapper name of the value followed by `⋯`. Otherwise print the first line beside the connector, and indent the rest under `│`.
-      + A non-empty vector whose every element has a pretty-show method prints the summary from [`pretty_show_vector_summary`](@ref), then the lines from [`pretty_show_vector_body`](@ref), each indented under `│`.
+      + A value that has a pretty-show method renders into a buffer, and the lines of the buffer are `alglines`. When more than `compact_show_budget(io)` lines are not empty, print the wrapper name of the value and `⋯`. Otherwise print the first line after the connector, and indent the other lines under `│`.
+      + A non-empty vector whose every element has a pretty-show method prints the summary from [`pretty_show_vector_summary`](@ref). The lines from [`pretty_show_vector_body`](@ref) follow, each with an indent under `│`.
       + A matrix prints its size and its type.
       + A vector of more than six entries, or a vector of arrays, prints its length and its type.
-      + A `DataType` prints `DataType`, which is its type, then the wrapper name of the value, so a parametrised type reports the wrapper it instantiates and `Vector{Float64}` prints as `DataType: Array`.
-      + Any other value prints its type and `repr(val)`.
+      + A `DataType` prints `DataType`, which is its type, and then the wrapper name of the value. A parametrised type thus shows the wrapper that it instantiates, and `Vector{Float64}` prints as `DataType: Array`.
+      + Each other value prints its type and `repr(val)`.
 
 # Arguments
 
   - `T`: The type for which to define the pretty-printing method.
-  - `flag::Bool = true`: When `true`, the macro also defines `has_pretty_show_method(::T) = true`, which is how a parent finds that `T` renders through this method. Pass `false` for a type whose parent must print it by `repr` instead.
+  - `flag::Bool = true`: When `true`, the macro also defines `has_pretty_show_method(::T) = true`. A parent reads that method to find that `T` prints through this `show`. Pass `false` for a type that its parent must print with `repr`.
 
 # Returns
 
@@ -142,24 +142,24 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Build the single-line summary for a vector field rendered by [`@define_pretty_show`](@ref).
+Build the one-line summary of a vector field that [`@define_pretty_show`](@ref) prints.
 
-Returns a string of the form `"N-element Vector{Name}"`. A vector is treated as homogeneous when every element shares the same wrapper-type name (so elements that differ only in type parameters are still homogeneous): a homogeneous vector uses that common wrapper name, otherwise the wrapper of the element type, falling back to the raw `eltype` for `Union`s.
+The summary has the form `"N-element Vector{Name}"`. When all elements have the same wrapper-type name, `Name` is that name. Two elements that differ only in their type parameters have the same wrapper-type name. In other cases, `Name` is the wrapper name of the element type, or the element type itself when it is a `Union`.
 
 # Algorithm
 
- 1. Collect `names`, the wrapper-type name of every element. Two elements that differ only in their type parameters share one name.
+ 1. Collect `names`, the wrapper-type name of every element.
  2. Read `et`, the element type of the vector.
- 3. Take `tname` from the branch that `names` selects: the common name when every entry of `names` is equal, the string of `et` when `et` is a `Union`, and the wrapper name of `et` otherwise.
+ 3. Choose `tname`. It is the common name when every entry of `names` is equal, the string of `et` when `et` is a `Union`, and the wrapper name of `et` in the other cases.
  4. Build the summary from the length of the vector and `tname`.
 
 # Arguments
 
-  - `val`: Non-empty vector whose elements all have a custom pretty-printing method.
+  - `val`: A non-empty vector whose elements all have a custom pretty-printing method.
 
 # Returns
 
-  - `summary::String`: Single-line `"N-element Vector{Name}"` summary.
+  - `summary::String`: The one-line `"N-element Vector{Name}"` summary.
 
 # Related
 
@@ -182,9 +182,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Render a single vector element as a collapsed line for [`@define_pretty_show`](@ref).
+Render one vector element as a collapsed line for [`@define_pretty_show`](@ref).
 
-Every element of a listed vector is shown as just its wrapper-type name. When the element is a struct with fields, a trailing `" ⋯"` marks it as a collapsed struct (consistent with how an over-budget struct field collapses to `Name ⋯`); fieldless elements are left bare.
+Each element of a listed vector prints as its wrapper-type name only. When the element is a struct with fields, a `" ⋯"` after the name marks the collapsed struct. A struct field over the budget collapses to `Name ⋯` in the same way. An element with no field prints its name alone.
 
 # Algorithm
 
@@ -212,25 +212,25 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Apply the shared collapse budget to the per-element lines of a vector rendered by [`@define_pretty_show`](@ref).
+Apply the collapse budget to the element lines of a vector that [`@define_pretty_show`](@ref) prints.
 
-The budget comes from [`compact_show_budget`](@ref), so vector truncation honours the same `:limit` gate, global [`set_compact_show!`](@ref) setting, and per-call `:po_compact` override as struct collapsing. When the budget is `nothing` (disabled, unlimited output, or override-off) every line is returned. Otherwise, when the listing exceeds the budget it is split head-and-tail, mirroring how `Base` truncates long arrays, with a single `"⋮"` line marking the elision.
+The budget comes from [`compact_show_budget`](@ref). A vector thus obeys the same `:limit` key, global [`set_compact_show!`](@ref) setting and per-call `:po_compact` override as a struct field. The budget is `nothing` when the collapse is off, when the output is not limited, or when the override turns it off. The function then returns every line. When the list has more lines than the budget, the function keeps the first lines and the last lines, as `Base` does for a long array. One `"⋮"` line marks the lines that it removes.
 
 # Algorithm
 
  1. Read `budget` from [`compact_show_budget`](@ref), and `n`, the number of lines.
  2. Return `lines` unchanged when `budget` is `nothing`, or when `n` does not exceed it.
  3. Split the budget into `nhead`, its half rounded up, and `ntail`, the rest.
- 4. Return the first `nhead` lines, a single `"⋮"` line, and the last `ntail` lines.
+ 4. Return the first `nhead` lines, one `"⋮"` line, and the last `ntail` lines.
 
 # Arguments
 
-  - `io`: Output stream; drives the budget via [`compact_show_budget`](@ref).
-  - `lines`: Per-element display strings from [`pretty_show_vector_element`](@ref).
+  - `io`: The output stream. [`compact_show_budget`](@ref) reads the budget from it.
+  - `lines`: The display string of each element, from [`pretty_show_vector_element`](@ref).
 
 # Returns
 
-  - `body::Vector{String}`: Lines to print, possibly truncated with a `"⋮"` separator.
+  - `body::Vector{String}`: The lines to print. When the function removes lines, a `"⋮"` line stands in their place.
 
 # Related
 
@@ -251,17 +251,19 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Name the fields of `obj` that [`@define_pretty_show`](@ref) considers for rendering, in declaration order.
+Name the fields of `obj` that [`@define_pretty_show`](@ref) can print, in declaration order.
 
-The default method returns every declared field. A type that hides one of its fields overloads this method for itself and returns the others. The overload receives the instance, so it may hide a field whatever it holds — a partial-fit `cache`, which is running detail rather than configuration — or hide it by what it holds, as the moment estimators hide an opt-in `cvg` that is `nothing`: an opt-in the caller has not taken is not part of the configuration they chose, and a field added to a type this way moves no rendered docstring. That overload is the per-type arm of the field selection, and [`SHOW_NOTHING_FIELDS`](@ref) is the configured arm: [`pretty_show_fields`](@ref) resolves the two, and a per-name entry of the configuration overrides this method in either direction.
+The default method returns every declared field. A type that hides one of its fields overloads this method for itself and returns the other fields. The overload gets the instance, so it can hide a field always or only for some values. A partial-fit `cache` holds the state of an incremental fit and not configuration, so its type always hides it. The moment estimators hide an optional `cvg` only when it is `nothing`. The caller did not select that option, so it is not part of the configuration. A field added in this way changes no rendered docstring.
+
+This method selects fields by type, and [`SHOW_NOTHING_FIELDS`](@ref) selects them by configuration. [`pretty_show_fields`](@ref) combines the two, and a per-name entry of the configuration overrides this method in both directions.
 
 # Arguments
 
-  - `obj`: The value under rendering.
+  - `obj`: The value to print.
 
 # Returns
 
-  - `fields`: The field names to consider, as a tuple or a vector of `Symbol`.
+  - `fields`: The field names that the method can print, as a tuple or a vector of `Symbol`.
 
 # Related
 
@@ -275,18 +277,18 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the fields that [`@define_pretty_show`](@ref) renders for `obj`.
 
-Three sources take part, and the precedence is fixed: a per-name entry of [`SHOW_NOTHING_FIELDS`](@ref) beats the [`show_fields`](@ref) method of the type, which beats the global default of [`SHOW_NOTHING_FIELDS`](@ref). The name is the bare name of the type, so two types of one name in two modules share one entry.
+Three sources decide, in a fixed order of precedence. A per-name entry of [`SHOW_NOTHING_FIELDS`](@ref) overrides the [`show_fields`](@ref) method of the type, and that method overrides the global default of [`SHOW_NOTHING_FIELDS`](@ref). The name is the name of the type without its module, so two types with one name in two modules share one entry.
 
 # Algorithm
 
- 1. Read `cfg`, the active value of [`SHOW_NOTHING_FIELDS`](@ref), and `entry`, its per-name entry for the name of the type of `obj`, giving `nothing` when no entry is set.
- 2. Take `fields`: every declared field when `entry` is `true`, so that a per-name request to show everything overrides a [`show_fields`](@ref) overload, and the result of [`show_fields`](@ref) otherwise.
- 3. Take `show`, which is `entry` when an entry is set and the global default of `cfg` otherwise.
+ 1. Read `cfg`, the active value of [`SHOW_NOTHING_FIELDS`](@ref). Read `entry`, its per-name entry for the name of the type of `obj`, or `nothing` when the type has no entry.
+ 2. Choose `fields`. It is every declared field when `entry` is `true`, so that a per-name request to show all fields overrides a [`show_fields`](@ref) overload. In the other cases it is the result of [`show_fields`](@ref).
+ 3. Choose `show`. It is `entry` when the type has an entry, and the global default of `cfg` in the other case.
  4. Return `fields` when `show` is `true`. Otherwise return the members of `fields` whose value, read with `getproperty`, is not `nothing`.
 
 # Arguments
 
-  - `obj`: The value under rendering.
+  - `obj`: The value to print.
 
 # Returns
 
@@ -312,17 +314,17 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Default method indicating whether a type has a custom pretty-printing `show` method.
+Return whether the type of a value has a custom pretty-printing `show` method. The default method returns `false`.
 
-Overloading this method to return `true` indicates that type already has a custom pretty-printing method.
+A method that returns `true` for a type tells [`@define_pretty_show`](@ref) that the type has a custom pretty-printing method.
 
 # Arguments
 
-  - `::Any`: Any type.
+  - `::Any`: A value of any type.
 
 # Returns
 
-  - `flag::Bool`: `false` by default, indicating no custom pretty-printing method.
+  - `flag::Bool`: `false` for the default method, which means that the type has no custom pretty-printing method.
 
 # Related
 
@@ -332,4 +334,4 @@ has_pretty_show_method(::Any)::Bool = false
 has_pretty_show_method(::JuMP.Model)::Bool = true
 has_pretty_show_method(::Clustering.Hclust)::Bool = true
 has_pretty_show_method(::Clustering.KmeansResult)::Bool = true
-@define_pretty_show(Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult})
+@define_pretty_show(Union{AbstractEstimator, AbstractAlgorithm, AbstractResult})

@@ -103,7 +103,7 @@ Read the risk columns of the table against the 20% cap. The weights differ from 
 objective to the next. The plots below draw one risk profile per objective.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 
 for (name, _) in obj_specs
     display(plot_risk_contribution(rf_asset, asset_res[name], rd;

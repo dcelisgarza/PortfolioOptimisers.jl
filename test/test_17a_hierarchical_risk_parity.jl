@@ -165,12 +165,6 @@ end
     # A float sample of another width keeps its type.
     r32 = optimise(HierarchicalRiskParity(), ReturnsResult(; nx = rdx.nx, X = Float32.(X)))
     @test eltype(r32.w) == Float32
-    # An integer sample gives the weights of its Float64 copy.
-    Xi = rand(StableRNG(5), -20:20, 60, 6)
-    nxi = ["a$i" for i in 1:6]
-    wint = optimise(HierarchicalRiskParity(), ReturnsResult(; nx = nxi, X = Xi)).w
-    @test wint ==
-          optimise(HierarchicalRiskParity(), ReturnsResult(; nx = nxi, X = Float64.(Xi))).w
     # Validation.
     @test_throws IsEmptyError HierarchicalRiskParity(; r = PO.OptimisationRiskMeasure[])
     @test_throws ArgumentError HierarchicalRiskParity(; r = NoRisk())
@@ -215,7 +209,7 @@ end
     - `unitary_expected_risks` is ``R(e_i)``: the diagonal of the covariance for a
       `Variance`, the measure of column `i` for a measure that reads the returns, and the
       net series under fees. The in-place form agrees and leaves its scratch vector zero.
-      The risks take the type of the risk, so an integer `X` gives `Float64` risks.
+      The risks take the type of the risk, so a `Float32` `X` gives `Float32` risks.
     - `assert_clustering_universe` returns `nothing` on a match and raises
       `DimensionMismatch` on a mismatch.
     - The keyword constructor of `HierarchicalResult` expands `w` onto the mask, and the
@@ -257,21 +251,6 @@ end
         rk32 = PO.unitary_expected_risks(factory(Variance(), pr32), pr32.X)
         @test eltype(rk32) === Float32
         @test rk32 == diag(pr32.sigma)
-
-        # An integer returns matrix has fractional risks. Before the sweep the risk vector
-        # took `eltype(X)` and raised `InexactError`.
-        Xi = rand(StableRNG(5), -20:20, T, N)
-        pri = prior(EmpiricalPrior(), Xi)
-        prf = prior(EmpiricalPrior(), float(Xi))
-        for r in (Variance(), ConditionalValueatRisk())
-            rki = PO.unitary_expected_risks(factory(r, pri), pri.X)
-            @test eltype(rki) === Float64
-            @test rki ≈ PO.unitary_expected_risks(factory(r, prf), prf.X)
-        end
-        wki = zeros(N)
-        rki = zeros(N)
-        PO.unitary_expected_risks!(wki, rki, factory(Variance(), pri), pri.X)
-        @test rki ≈ diag(prf.sigma)
     end
 
     @testset "assert_clustering_universe refuses a clustering of another universe" begin
@@ -350,4 +329,42 @@ end
         # A schedule of two folds refuses a loop of three.
         @test_throws DimensionMismatch PO.assert_time_dependent_fold_count(hrp, 3)
     end
+end
+#=
+R46 of #1817. The estimator method of `weight_bounds_constraints` keeps a scalar or a `nothing`
+side, and the split of both bisection heads took `view` of each side, so every such estimator
+raised a `MethodError`: `view(::Float64, ::Vector{Int64})`. Each head now expands the sides to
+one bound per asset. Each estimator gives the weights of the same bounds stated as two vectors.
+=#
+@testset "A bisection head takes a scalar or a nothing side of a weight bounds estimator" begin
+    Xb = randn(StableRNG(12), 300, 3) ./ 100
+    rdb = ReturnsResult(; nx = ["A", "C", "B"], X = Xb)
+    sb = UniverseSets(; dict = Dict("nx" => rdb.nx))
+    vwb(lb, ub) = WeightBounds(; lb = lb, ub = ub)
+    cases = [(WeightBoundsEstimator(; lb = 0.0, ub = 0.6), vwb(fill(0.0, 3), fill(0.6, 3))),
+             (WeightBoundsEstimator(; ub = Dict("B" => 0.2)),
+              vwb(fill(0.0, 3), [1.0, 1.0, 0.2])),
+             (WeightBoundsEstimator(; lb = nothing, ub = Dict("B" => 0.2)),
+              vwb(fill(-Inf, 3), [1.0, 1.0, 0.2])),
+             (WeightBoundsEstimator(; lb = Dict("A" => 0.4), ub = 1.0),
+              vwb([0.4, 0.0, 0.0], fill(1.0, 3)))]
+    heads(wb) = [HierarchicalRiskParity(;
+                                        opt = HierarchicalOptimiser(; sets = sb, wb = wb)),
+                 HierarchicalRiskParity(; r = [Variance(), ConditionalValueatRisk()],
+                                        opt = HierarchicalOptimiser(; sets = sb, wb = wb)),
+                 SchurComplementHierarchicalRiskParity(;
+                                                       opt = HierarchicalOptimiser(;
+                                                                                   sets = sb,
+                                                                                   wb = wb)),
+                 SchurComplementHierarchicalRiskParity(;
+                                                       params = [SchurComplementParams(),
+                                                                 SchurComplementParams()],
+                                                       opt = HierarchicalOptimiser(;
+                                                                                   sets = sb,
+                                                                                   wb = wb))]
+    for (est, vec) in cases, (he, hv) in zip(heads(est), heads(vec))
+        @test optimise(he, rdb).w == optimise(hv, rdb).w
+    end
+    # The bound of `B` binds.
+    @test optimise(heads(cases[2][1])[1], rdb).w[3] <= 0.2 + sqrt(eps())
 end

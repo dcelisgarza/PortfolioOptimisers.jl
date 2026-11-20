@@ -1,6 +1,6 @@
 ---
 name: sweep-file-issues
-description: "Write, wire and reopen the sweep parent and sub-issues of #404 on the GitHub tracker for a file that joined the library without conforming — reopen the closed child map and the umbrella, open one sub-issue per file, and parent it. Use when sweep-conform reports step 3 or step 4 unmet, or when an addition already landed unswept."
+description: "Write, wire and reopen the sweep parent and sub-issues of #404 on the GitHub tracker for a file that joined the library without conforming. Reopen the closed child map and the umbrella, open one sub-issue per file, and parent it. Use when sweep-conform reports step 3 or step 4 unmet, or when an addition already landed unswept."
 ---
 
 # Filing the sweep issues
@@ -28,23 +28,24 @@ Drop `--file` to plan every file the weekly job would file, which is every row t
 `swept = false` under a **closed** child map. Repeat `--file` for more than one path.
 
 `sweep_issues.sh` refuses any repository but `dcelisgarza/PortfolioOptimisers.jl`, and
-`.github/workflows/Sweep.yml` calls the same script, so a hand run and the weekly job cannot drift.
+`.github/workflows/Sweep.yml` calls the same script, so a run by hand and the weekly job cannot
+differ.
 
 ## When `--file` is needed, and when it is not
 
 The weekly job's trigger is one condition: a row that reads `swept = false` **and** a child map
-that is **closed**. That trigger is also its deduplication — run 1 reopens the map, and run 2 then
+that is **closed**. That trigger also prevents duplicates. Run 1 reopens the map, and run 2 then
 sees an open map and files nothing.
 
-So the job cannot reach a file that joined an **open** child map. That is the residual gap ADR 0084
-names, and `--file` is what closes it. A path named with `--file` is planned whatever the state of
-its map, and its sub-issue body says the map was already open rather than claiming a reopen that
+So the job cannot reach a file that joined an **open** child map. ADR 0084 names this remaining
+gap, and `--file` closes it. The triage plans a path named with `--file` whatever the state of its
+map. Its sub-issue body says that the map was already open, and it does not claim a reopen that
 never happened.
 
-Nothing else is relaxed. The path must have a row, the row must read `swept = false`, and a path an
-open `sweep` issue already names is skipped rather than filed twice. A path with no row throws, and
-the message routes you to the census that prints the line to paste — **fix the row first**, in the
-commit that owes it.
+No other condition changes. The path must have a row, and the row must read `swept = false`. The
+triage skips a path that an open `sweep` issue already names, and does not file it twice. A path
+with no row throws an error, and the message sends you to the census that prints the line to
+paste. **Fix the row first**, in the commit that owes it.
 
 ## What the plan holds
 
@@ -59,9 +60,9 @@ commit that owes it.
 | `NN.title`, `NN.body` | the text of each sub-issue |
 | `summary.md` | the same plan as a table |
 
-Read `NN.body` before the apply. Every field of it is generated from `code_health/sweep_manifest.toml` and
-`code_health/coverage_baseline.toml`, so a wrong number there is a wrong number in a committed
-file, not a wrong number in the plan.
+Read `NN.body` before the apply. The triage generates every field of it from
+`code_health/sweep_manifest.toml` and `code_health/coverage_baseline.toml`. A wrong number there
+comes from a committed file, not from the plan.
 
 `reopen.tsv` lists only issues the dump reported closed, because `gh issue reopen` fails on an
 issue that is already open.
@@ -72,13 +73,14 @@ The manifest and the tracker must agree before one issue is planned, and four di
 throw with no plan written:
 
 1. A child map the manifest names has no issue titled `Child map <n>: <name>`.
-2. An issue's name differs from the manifest's, so one of the two was renamed alone.
+2. An issue's name differs from the manifest's, so someone renamed one of the two and not the
+   other.
 3. A row names a map that `[map]` does not list.
 4. An open `sweep` issue names a `.jl` file that has no row. Its file moved, or the title names it
    by its bare name. Retitle the issue to name the current path of every file it sweeps, then run
    the triage again. Do not file a second ticket for a file that moved.
 
-A loud refusal is right. A wrong parent is work somebody must undo by hand.
+The refusal is correct. A sub-issue under a wrong parent is work that somebody must undo by hand.
 
 ## After the apply
 
@@ -94,5 +96,5 @@ commit reaches `main`, and `main` is current to the last release.
 
 ## Before it
 
-Run the `sweep-conform` skill first. Steps 1 and 2 — the manifest row and the coverage entry — are
-committed files, and this skill neither reads a missing row into existence nor writes one.
+Run the `sweep-conform` skill first. Steps 1 and 2, the manifest row and the coverage entry, are
+committed files. This skill does not assume a missing row, and it does not write one.

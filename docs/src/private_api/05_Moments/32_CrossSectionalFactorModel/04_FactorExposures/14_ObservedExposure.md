@@ -1,8 +1,19 @@
 ```@meta
-Description = "Observed Exposure, private API of PortfolioOptimisers.jl: currency_level_columns, observed_reads_returns, cross_sectional_factor_partition, …"
+Description = "Observed Exposure, private API of PortfolioOptimisers.jl: FactorPartition, ObservedFactors, ObservedMember, ObservedStack, ObservedBlock, …"
 ```
 
 # Observed Exposure: private API
+
+## Types
+
+```@docs
+FactorPartition
+ObservedFactors
+ObservedMember
+ObservedStack
+ObservedBlock
+AppendedFactorModel
+```
 
 ## Functions
 
@@ -15,6 +26,7 @@ assert_cross_sectional_observed_families
 cross_sectional_observed
 cross_sectional_observed_member
 cross_sectional_observed_rows
+cross_sectional_observed_tensor
 cross_sectional_observed_carry
 cross_sectional_observed_stack
 cross_sectional_local_returns

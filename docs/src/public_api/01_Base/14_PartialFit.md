@@ -9,7 +9,7 @@ An incremental fit adds new observations to an estimate without reading the earl
 ```@docs
 partial_fit!
 partial_fit
-partial_fit(est::Union{<:PortfolioOptimisers.AbstractEstimator, <:StatsBase.CovarianceEstimator}, args...; kwargs...)
+partial_fit(est::Union{PortfolioOptimisers.AbstractEstimator, StatsBase.CovarianceEstimator}, args...; kwargs...)
 merge_states
 PortfolioOptimisers.obs_weights_view(::PortfolioOptimisers.AbstractPartialFitState, ::Any)
 PortfolioOptimisers.assert_mergeable_states

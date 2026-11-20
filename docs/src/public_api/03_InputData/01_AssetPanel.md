@@ -32,7 +32,7 @@ The library has no file format for a panel. [`panel_dataframe`](@ref) converts a
 and you get that field in the layout it has. The `:long` layout gives one row per
 `(observation, asset)` pair where the asset is active. The `:wide` layout gives one row per
 observation and one column per `(panel field column, asset)` pair, and keeps every cell. A
-[`TensorPanelField`](@ref) gives one column per label of its last axis, named `"<field>=<label>"`,
+[`TensorPanelField`](@ref) gives one column per label of its label axis, named `"<field>=<label>"`,
 as in a feature matrix.
 
 ## Types
@@ -49,10 +49,8 @@ TensorPanelField
 
 ```@docs
 panel_field
-panel_feature_matrix
 port_opt_view(::AssetPanel, ::Any)
 panel_field_axes
 panel_field_labels
-panel_field_stack!
 panel_field_view
 ```

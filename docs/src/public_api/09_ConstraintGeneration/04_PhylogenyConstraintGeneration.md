@@ -12,6 +12,8 @@ IntegerPhylogeny
 CentralityConstraint
 phylogeny_constraints
 centrality_constraints
+obs_weights_view(plc::AbstractPhylogenyConstraintEstimator, i)
+obs_weights_view(cc::CentralityConstraint, i)
 ```
 
 ## References

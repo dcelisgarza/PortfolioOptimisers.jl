@@ -3,8 +3,8 @@ The search scores every candidate through the one fold loop, issue #1020, agains
 decision of #871 (ADR 0141).
 
 `search_cross_validation` builds candidate `i` through the grid's lenses and scores it through
-`fit_and_predict(opt_i, rd, gscv.cv; ex = SequentialEx())`, one row per fold, whatever the
-scheme's fit. The map's closing test's second half is the identity: a grid search over an
+`fit_and_predict(opt_i, rd, gscv.cv, cv; ex = SequentialEx())`, one row per fold, whatever the
+scheme's fit. `cv` is the one split of the search (#2123). The map's closing test's second half is the identity: a grid search over an
 online walk-forward reads the matrix of the same search over the batch expanding walk-forward
 and picks the same column, through a JuMP optimiser and a hierarchical one, and the randomised
 search under the same seed inherits it. Around it sit what the route changed in batch (a
@@ -16,7 +16,7 @@ The fixture is the online fold loop's, because the identities are structural.
 =#
 @testset "The search scores every candidate through the one fold loop" begin
     using Test, PortfolioOptimisers, Clarabel, StableRNGs, Statistics, Dates, LinearAlgebra,
-          FLoops, Accessors
+          FLoops, Accessors, Distributions, StatsBase
     po = PortfolioOptimisers
     rng = StableRNG(20260911)
     T, N = 160, 8
@@ -94,9 +94,8 @@ The fixture is the online fold loop's, because the identities are structural.
             cvr = split(cv, rd)
             res = search_cross_validation(mr, gs(cv, jgrid; train_score = true), rd)
             for (i, val) in enumerate(jgrid[1][2]), j in eachindex(cvr.train_idx)
-                pred = po.fit_and_predict(Accessors.set(mr, l1, val), rd;
-                                          train_idx = cvr.train_idx[j],
-                                          test_idx = cvr.test_idx[j])
+                pred = po.fit_and_predict(Accessors.set(mr, l1, val), rd, cvr.train_idx[j],
+                                          cvr.test_idx[j])
                 @test res.test_scores[j, i] == -expected_risk(r, pred)
                 @test res.train_scores[j, i] == -expected_risk(r, pred.res)
             end
@@ -121,12 +120,11 @@ The fixture is the online fold loop's, because the identities are structural.
             loop = po.fit_and_predict(opti, rd, cv)
             @test res.test_scores[:, i] == [-expected_risk(r, pr) for pr in loop.pred]
             # The loop threads fold `j - 1`'s held weights into fold `j`'s term.
-            @test all(j -> loop.pred[j].res.jr.pa.tn.w == loop.pred[j - 1].hw.w,
+            @test all(j -> loop.pred[j].res.jr.jor.tn.w == loop.pred[j - 1].hw.w,
                       2:length(loop.pred))
             hand = [-expected_risk(r,
-                                   po.fit_and_predict(opti, rd;
-                                                      train_idx = cvr.train_idx[j],
-                                                      test_idx = cvr.test_idx[j],
+                                   po.fit_and_predict(opti, rd, cvr.train_idx[j],
+                                                      cvr.test_idx[j];
                                                       wd = SelfFinancingDrift(), hwd = hwd))
                     for j in eachindex(cvr.train_idx)]
             @test res.test_scores[1, i] == hand[1]
@@ -222,7 +220,10 @@ The fixture is the online fold loop's, because the identities are structural.
             @test all(isnan, res.test_scores[:, 3])
             @test res.idx == 1
             @test res.val_grid[res.idx] == (ok,)
-            @test po.finite_candidate_index(HighestMeanScore(), res.test_scores) == 1
+            @test po.finite_candidate_order(nothing, nothing, HighestMeanScore(),
+                                            res.test_scores, 3) ==
+                  ([1], [mean(res.test_scores[:, 1])])
+            @test res.rank_idx == [1]
         end
     end
 
@@ -239,9 +240,8 @@ The fixture is the online fold loop's, because the identities are structural.
         # that fold's own asset subset, and each path is threaded within itself.
         l1 = po.parse_lens("opt.l1")
         for (i, val) in enumerate(jgrid[1][2]), j in eachindex(cvr.train_idx)
-            pred = po.fit_and_predict(Accessors.set(mr, l1, val), rdg;
-                                      train_idx = cvr.train_idx[j],
-                                      test_idx = cvr.test_idx[j], cols = cvr.asset_idx[j])
+            pred = po.fit_and_predict(Accessors.set(mr, l1, val), rdg, cvr.train_idx[j],
+                                      cvr.test_idx[j], cvr.asset_idx[j])
             @test b.test_scores[j, i] == -expected_risk(r, pred)
         end
         @test po.score_rows(cvr) == [findall(==(k), cvr.path_ids) for k in 1:2]
@@ -253,26 +253,39 @@ The fixture is the online fold loop's, because the identities are structural.
                                                asset_idx = cvr.asset_idx[perm],
                                                path_ids = cvr.path_ids)
         @test po.score_rows(shuffled) == [[3, 4, 5, 1, 2], [6, 7, 8, 9, 10]]
-        # An unseeded scheme is pinned once, so every candidate scores the same folds and
-        # the matrix lines up with a split of the pinned scheme.
-        unseeded = MultipleRandomised(batch_cv; subset_size = 5, n_subsets = 2,
-                                      rng = StableRNG(11))
-        pinned = po.pin_draw(unseeded)
-        @test !isnothing(pinned.seed)
-        @test po.pin_draw(pinned) === pinned
-        @test po.pin_draw(batch_cv) === batch_cv
-        res = search_cross_validation(mr,
-                                      gs(MultipleRandomised(batch_cv; subset_size = 5,
-                                                            n_subsets = 2,
-                                                            rng = StableRNG(11)), jgrid),
-                                      rd)
-        cvp = split(pinned, rd)
+        # The search splits an unseeded scheme once (#2123). Every candidate scores the folds
+        # of that one split, the scheme keeps `seed = nothing`, and its `rng` moves by one
+        # split only.
+        unseeded(rng) = MultipleRandomised(batch_cv; subset_size = 5, n_subsets = 2,
+                                           rng = rng)
+        ugs = gs(unseeded(StableRNG(11)), jgrid)
+        res = search_cross_validation(mr, ugs, rd)
+        ref_rng = StableRNG(11)
+        cvp = split(unseeded(ref_rng), rd)
+        @test isnothing(ugs.cv.seed)
+        @test rand(ugs.cv.rng, UInt64) == rand(ref_rng, UInt64)
         for (i, val) in enumerate(jgrid[1][2]), j in eachindex(cvp.train_idx)
-            pred = po.fit_and_predict(Accessors.set(mr, l1, val), rd;
-                                      train_idx = cvp.train_idx[j],
-                                      test_idx = cvp.test_idx[j], cols = cvp.asset_idx[j])
+            pred = po.fit_and_predict(Accessors.set(mr, l1, val), rd, cvp.train_idx[j],
+                                      cvp.test_idx[j], cvp.asset_idx[j])
             @test res.test_scores[j, i] == -expected_risk(r, pred)
         end
+        # The split form of `fit_and_predict` reads the folds it is handed and draws
+        # nothing, and the form with the scheme alone splits once.
+        mri = Accessors.set(mr, l1, jgrid[1][2][1])
+        f_rng = StableRNG(11)
+        fsplit = po.fit_and_predict(mri, rd, unseeded(f_rng), cvp)
+        fdirect = po.fit_and_predict(mri, rd, unseeded(StableRNG(11)))
+        @test [p.res.w for mp in fsplit.pred for p in mp.pred] ==
+              [p.res.w for mp in fdirect.pred for p in mp.pred]
+        @test rand(f_rng, UInt64) == rand(StableRNG(11), UInt64)
+        # A fitted result takes the split too, and gives the predictions of the form with
+        # the scheme alone.
+        fres = optimise(mri, rd)
+        bsplit = split(batch_cv, rd)
+        rsplit = cross_val_predict(fres, rd, batch_cv, bsplit)
+        rdirect = cross_val_predict(fres, rd, batch_cv)
+        @test length(rsplit.pred) == length(bsplit.test_idx)
+        @test [p.rd.X for p in rsplit.pred] == [p.rd.X for p in rdirect.pred]
     end
 
     @testset "8. The Pipeline's search takes the same route in batch and online" begin
@@ -294,6 +307,19 @@ The fixture is the online fold loop's, because the identities are structural.
         pres = search_cross_validation(pipe, gs(mb, grid), rd)
         dres = search_cross_validation(mr, gs(mb, ["opt.l1" => grid[1][2]]), rd)
         @test isapprox(pres.test_scores, dres.test_scores; atol = 1e-8)
+        # An unseeded scheme: the Pipeline's search splits once too, so it scores the folds
+        # that the optimiser's search scores from the same `rng` state (#2123).
+        unseeded(rng) = MultipleRandomised(batch_cv; subset_size = 5, n_subsets = 2,
+                                           rng = rng)
+        ugs = gs(unseeded(StableRNG(11)), grid)
+        ures = search_cross_validation(pipe, ugs, rd)
+        ref_rng = StableRNG(11)
+        split(unseeded(ref_rng), rd)
+        @test rand(ugs.cv.rng, UInt64) == rand(ref_rng, UInt64)
+        udres = search_cross_validation(mr,
+                                        gs(unseeded(StableRNG(11)),
+                                           ["opt.l1" => grid[1][2]]), rd)
+        @test isapprox(ures.test_scores, udres.test_scores; atol = 1e-8)
         # The door takes an Online Scheme since #1022, and picks the batch candidate; test_24f pins
         # the Pipeline's identities.
         ores = search_cross_validation(pipe, gs(online_cv, grid), rd)
@@ -388,6 +414,295 @@ The fixture is the online fold loop's, because the identities are structural.
         @test fres.idx == 2
     end
 
+    @testset "11. The randomised search draws `n_iter` joint trials" begin
+        # Each trial is one point of the space, a joint value of every key, so the count of
+        # candidates is `n_iter`, not `n_iter` per key multiplied over the keys.
+        g3 = ["opt.a" => [1, 2, 3, 4], "opt.b" => [10, 20, 30, 40], "opt.c" => [5, 6, 7, 8]]
+        trials = po.make_p_grid(g3, 3, StableRNG(1))
+        lg, vg = po.lens_val_grid(trials)
+        @test length(trials) == length(vg) == 3
+        full = po.lens_val_grid(g3)[2]
+        @test allunique(vg) && all(in(full), vg)
+        # A space of vectors alone gives distinct points in the order of the grid, so
+        # `n_iter` at the size of the grid or more gives the grid itself.
+        @test issorted([findfirst(==(v), full) for v in vg])
+        @test po.lens_val_grid(po.make_p_grid(g3, 64, StableRNG(1)))[2] == full
+        @test po.lens_val_grid(po.make_p_grid(g3, 100, StableRNG(1)))[2] == full
+        sets = Union{Vector{Pair{String, Vector{Int}}}, Dict{String, Vector{Int}}}[["opt.a" =>
+                                                                                        [1,
+                                                                                         2,
+                                                                                         3],
+                                                                                    "opt.b" =>
+                                                                                        [10,
+                                                                                         20]],
+                                                                                   Dict("opt.c" =>
+                                                                                            [7,
+                                                                                             8])]
+        @test po.lens_val_grid(po.make_p_grid(sets, 8, StableRNG(2)))[2] ==
+              po.lens_val_grid(sets)[2]
+        # Every point of a space of 12 comes in 3 of 12 draws, a quarter of the time.
+        sets12 = [["opt.a" => [1, 2, 3], "opt.b" => [10, 20]], ["opt.c" => collect(1:6)]]
+        R = 4000
+        rng12 = StableRNG(3)
+        cnt = countmap(reduce(vcat,
+                              [po.lens_val_grid(po.make_p_grid(sets12, 3, rng12))[2]
+                               for _ in 1:R]))
+        @test length(cnt) == 12
+        @test all(c -> isapprox(c / R, 0.25; atol = 0.03), values(cnt))
+        # A space past `typemax(Int)`: 32 keys of 5 values give 5^32 points.
+        big_ps = ["k$j" => collect(1:5) .+ 10j for j in 1:32]
+        bt = po.make_p_grid(big_ps, 4, StableRNG(4))
+        @test length(bt) == 4 && allunique(bt)
+        @test all(t -> all(j -> t[j][2][1] in big_ps[j][2], 1:32), bt)
+        bidx = po.sample_grid_positions(StableRNG(5), big(5)^32, 6)
+        @test eltype(bidx) == BigInt && allunique(bidx) && issorted(bidx)
+        @test all(i -> 1 <= i <= big(5)^32, bidx)
+        @test po.sample_grid_positions(StableRNG(5), 12, 12) == 1:12
+        # A distribution makes every trial an independent draw: a set chosen with equal
+        # probability, and one value of each of its keys.
+        mix = Union{Vector{Pair{String, Any}}, Dict{String, Vector{Int}}}[Pair{String, Any}["opt.a" => [1,
+                                                                                                        2,
+                                                                                                        3],
+                                                                                            "opt.x" => Normal(2,
+                                                                                                              3)],
+                                                                          Dict("opt.c" =>
+                                                                                   [7, 8])]
+        mt = po.make_p_grid(mix, 6000, StableRNG(6))
+        @test length(mt) == 6000
+        s1 = filter(t -> length(t) == 2, mt)
+        s2 = filter(t -> length(t) == 1, mt)
+        @test length(s1) + length(s2) == 6000
+        @test all(t -> t[1][1] == "opt.c" && t[1][2][1] in (7, 8), s2)
+        @test isapprox(length(s1) / 6000, 0.5; atol = 0.03)
+        @test isapprox(mean(t[2][2][1] for t in s1), 2; atol = 0.2)
+        @test all(t -> t[1][2][1] in 1:3, s1)
+        mv = po.make_p_grid(Pair{String, Any}["opt.m" => MvNormal(zeros(2), I(2))], 2,
+                            StableRNG(7))
+        @test all(t -> t[1][2][1] isa AbstractVector && length(t[1][2][1]) == 2, mv)
+        # An empty value vector is refused by name, and the trial count meets the cap of
+        # the grid before any draw.
+        for p in (Pair{String, Any}["opt.a" => Float64[], "opt.x" => Normal()],
+                  ["opt.a" => Float64[], "opt.b" => [0.1]])
+            err = try
+                po.make_p_grid(p, 2, StableRNG(1))
+            catch e
+                e
+            end
+            @test err isa IsEmptyError
+            @test occursin("`opt.a`", sprint(showerror, err))
+        end
+        @test_throws DomainError po.make_p_grid(["opt.x" => Normal()], 100_001,
+                                                StableRNG(1))
+        @test_throws DomainError po.make_p_grid(["opt.a" => 1:1000, "opt.b" => 1:1000],
+                                                100_001, StableRNG(1))
+        # The search scores the trials as the grid search scores its grid.
+        cgrid = ["opt.wb" => wbgrid[1][2],
+                 "opt.pe.ce.ce.ce.ce" => [SimpleCovariance(; corrected = true),
+                                          SimpleCovariance(; corrected = false)]]
+        kcv = KFold(; n = 4)
+        gres = search_cross_validation(hrp, gs(kcv, cgrid; ex = SequentialEx()), rd)
+        rs6 = RandomisedSearchCrossValidation(cgrid; cv = kcv, r = r, ex = SequentialEx(),
+                                              n_iter = 6, seed = 1)
+        rres = search_cross_validation(hrp, rs6, rd)
+        @test rres.test_scores == gres.test_scores
+        @test rres.val_grid == gres.val_grid && rres.idx == gres.idx
+        rs3 = RandomisedSearchCrossValidation(cgrid; cv = kcv, r = r, ex = SequentialEx(),
+                                              n_iter = 3, seed = 1)
+        r3 = search_cross_validation(hrp, rs3, rd)
+        cols = [findfirst(==(v), gres.val_grid) for v in r3.val_grid]
+        @test size(r3.test_scores) == (4, 3)
+        @test r3.test_scores == gres.test_scores[:, cols]
+    end
+
+    #=
+    Issue #1937: the search keeps its `n_best` best candidates in rank order, as
+    configurations built from the estimator that it was given, through the per-candidate
+    value `candidate_scores` of the scorer.
+    =#
+    @testset "12. The search keeps its n best candidates in rank order" begin
+        @eval struct OnlyIndexScore <: PortfolioOptimisers.CrossValidationSearchScorer end
+        @eval (::OnlyIndexScore)(X::AbstractMatrix) = argmax(vec(minimum(X; dims = 1)))
+        hms = HighestMeanScore()
+        kcv = KFold(; n = 4)
+        cgrid = ["opt.wb" => wbgrid[1][2],
+                 "opt.pe.ce.ce.ce.ce" => [SimpleCovariance(; corrected = true),
+                                          SimpleCovariance(; corrected = false)]]
+        means(res) = vec(mean(res.test_scores; dims = 1))
+
+        # n_best = 1 is the released Result: the index of the index form, and one kept
+        # candidate, which is `opt` itself.
+        r1 = search_cross_validation(hrp, gs(kcv, cgrid; ex = SequentialEx()), rd)
+        @test r1.idx == hms(r1.test_scores)
+        @test r1.rank_idx == [r1.idx] && r1.ranked[1] === r1.opt
+        @test r1.rank_scores == [means(r1)[r1.idx]]
+        @test isnothing(r1.path_ids)
+
+        # n_best = k keeps the first k of the stable descending order of the column means.
+        r4 = search_cross_validation(hrp, gs(kcv, cgrid; n_best = 4, ex = SequentialEx()),
+                                     rd)
+        @test r4.test_scores == r1.test_scores && r4.opt === r4.ranked[1]
+        @test r4.rank_idx == sortperm(means(r4); rev = true)[1:4]
+        @test r4.rank_scores == means(r4)[r4.rank_idx]
+        @test r4.idx == r1.idx && length(r4.ranked) == 4
+        for (cand, k) in zip(r4.ranked, r4.rank_idx)
+            @test (cand.opt.wb, cand.opt.pe.ce.ce.ce.ce) == r4.val_grid[k]
+        end
+        # n_best larger than the grid keeps the whole grid, with no warning.
+        r9 = search_cross_validation(hrp, gs(kcv, cgrid; n_best = 9, ex = SequentialEx()),
+                                     rd)
+        @test r9.rank_idx == sortperm(means(r9); rev = true)
+
+        # The gap: a joined grid with different keys. Each kept candidate is built from the
+        # base estimator, so a covariance candidate keeps the base weight bounds, where a
+        # candidate built from `opt` carries the bounds of the winner.
+        sets = [Pair{String, Vector}["opt.wb" => wbgrid[1][2]],
+                Pair{String, Vector}["opt.pe.ce.ce.ce.ce" => [SimpleCovariance(;
+                                                                               corrected = false)]]]
+        rj = search_cross_validation(hrp, gs(kcv, sets; n_best = 4, ex = SequentialEx()),
+                                     rd)
+        @test length(rj.ranked) == 4
+        for (cand, k) in zip(rj.ranked, rj.rank_idx)
+            ref = po.search_candidate(hrp, rj.lens_grid[k], rj.val_grid[k])
+            @test cand.opt.wb == ref.opt.wb &&
+                  cand.opt.pe.ce.ce.ce.ce == ref.opt.pe.ce.ce.ce.ce
+        end
+        j = findfirst(==(4), rj.rank_idx)
+        @test rj.ranked[j].opt.wb == hrp.opt.wb
+        # Built from a winner of the first set, candidate 4 would carry its bounds.
+        for k in 2:3
+            win = po.search_candidate(hrp, rj.lens_grid[k], rj.val_grid[k])
+            from_opt = po.search_candidate(win, rj.lens_grid[4], rj.val_grid[4])
+            @test from_opt.opt.wb != rj.ranked[j].opt.wb
+        end
+
+        # A tie keeps grid order, in the order and in the index form.
+        S = [0.5 0.8 0.8 0.25
+             0.7 0.6 0.6 0.25]
+        o, v = po.finite_candidate_order(nothing, nothing, hms, S, 4)
+        @test o == [2, 3, 1, 4] && v == vec(mean(S; dims = 1))[o]
+        @test hms(S) == 2
+        # A failed candidate never enters the order, and the cap is the count of finite
+        # columns.
+        Sf = [NaN 0.5 0.8
+              0.2 0.5 0.8]
+        @test po.finite_candidate_order(nothing, nothing, hms, Sf, 3) ==
+              ([3, 2], [0.8, 0.5])
+        # The index form of HighestMeanScore is argmax of its values.
+        X = [0.5 0.75 0.25; 1.0 0.5 0.25]
+        @test po.candidate_scores(hms, X) == vec(mean(X; dims = 1))
+        @test argmax(po.candidate_scores(hms, X)) == hms(X)
+
+        # Refusals: a count below one at construction. A function that gives an index with
+        # more than one candidate is refused when the search runs, because only its return
+        # shows its form (#2000, ADR 0233). It keeps working at n_best = 1.
+        fsc = X -> argmax(vec(minimum(X; dims = 1)))
+        @test_throws DomainError GridSearchCrossValidation(cgrid; n_best = 0)
+        @test_throws DomainError RandomisedSearchCrossValidation(cgrid; n_best = 0)
+        for est in (GridSearchCrossValidation, RandomisedSearchCrossValidation)
+            @test est(cgrid; scorer = fsc, n_best = 2).n_best == 2
+        end
+        err = try
+            search_cross_validation(hrp,
+                                    gs(kcv, cgrid; scorer = fsc, n_best = 2,
+                                       ex = SequentialEx()), rd)
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError &&
+              occursin("candidate_scores", err.msg) &&
+              occursin("n_best = 2", err.msg)
+        rf = search_cross_validation(hrp, gs(kcv, cgrid; scorer = fsc, ex = SequentialEx()),
+                                     rd)
+        @test rf.idx == fsc(rf.test_scores) && rf.rank_idx == [rf.idx]
+        @test isnothing(rf.rank_scores)
+        # A subtype with the index form alone works at n_best = 1 and is refused at 2.
+        @test isnothing(po.candidate_scores(OnlyIndexScore(), X))
+        ro = search_cross_validation(hrp,
+                                     gs(kcv, cgrid; scorer = OnlyIndexScore(),
+                                        ex = SequentialEx()), rd)
+        @test ro.idx == rf.idx && isnothing(ro.rank_scores)
+        err = try
+            po.finite_candidate_order(nothing, nothing, OnlyIndexScore(), S, 2)
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError &&
+              occursin("OnlyIndexScore", err.msg) &&
+              occursin("candidate_scores", err.msg)
+        # A subtype's method on any matrix type is more specific than the fallback, so it is
+        # never ambiguous with it.
+        @eval struct WorstFoldScore <: PortfolioOptimisers.CrossValidationSearchScorer end
+        @eval function PortfolioOptimisers.candidate_scores(::WorstFoldScore,
+                                                            X::AbstractMatrix)
+            return vec(minimum(X; dims = 1))
+        end
+        @test po.finite_candidate_order(nothing, nothing, WorstFoldScore(), S, 2) ==
+              ([2, 3], [0.6, 0.6])
+        # R31 of #1817: the values must line up with the columns, and NaN has no place in an
+        # order. A short vector picked a wrong candidate at n_best = 1 with no error, a long
+        # one raised a BoundsError, and a NaN gave an order that depends on the sort. An
+        # infinite value keeps its place.
+        @eval struct ShortScore <: PortfolioOptimisers.CrossValidationSearchScorer end
+        @eval PortfolioOptimisers.candidate_scores(::ShortScore, X::AbstractMatrix) = [1.0]
+        @eval struct LongScore <: PortfolioOptimisers.CrossValidationSearchScorer end
+        @eval function PortfolioOptimisers.candidate_scores(::LongScore, X::AbstractMatrix)
+            return fill(1.0, size(X, 2) + 1)
+        end
+        @eval struct NaNScore <: PortfolioOptimisers.CrossValidationSearchScorer end
+        @eval function PortfolioOptimisers.candidate_scores(::NaNScore, X::AbstractMatrix)
+            return [1.0, NaN, 0.5, 0.25]
+        end
+        @eval struct InfScore <: PortfolioOptimisers.CrossValidationSearchScorer end
+        @eval function PortfolioOptimisers.candidate_scores(::InfScore, X::AbstractMatrix)
+            return [1.0, Inf, -Inf, 0.5]
+        end
+        for sc in (ShortScore(), LongScore()), nb in (1, 2)
+            @test_throws DimensionMismatch po.finite_candidate_order(nothing, nothing, sc,
+                                                                     S, nb)
+        end
+        err = try
+            po.finite_candidate_order(nothing, nothing, NaNScore(), S, 2)
+            nothing
+        catch e
+            e
+        end
+        @test err isa IsNonFiniteError && occursin("NaNScore", err.msg)
+        @test po.finite_candidate_order(nothing, nothing, InfScore(), S, 4) ==
+              ([2, 1, 4, 3], [Inf, 1.0, 0.5, -Inf])
+
+        # The Result refuses kept fields that do not agree.
+        @test_throws DimensionMismatch SearchCrossValidationResult(; opt = hrp,
+                                                                   test_scores = S,
+                                                                   train_scores = nothing,
+                                                                   lens_grid = r1.lens_grid,
+                                                                   val_grid = r1.val_grid,
+                                                                   idx = 2, rank_idx = [3])
+
+        # path_ids: the path of each fold under MultipleRandomised, 1:M under a
+        # combinatorial scheme, and the combinatorial arm ranks by the same rule.
+        mcv = MultipleRandomised(IndexWalkForward(60, 30); subset_size = 5, n_subsets = 2,
+                                 seed = 7)
+        rm = search_cross_validation(hrp, gs(mcv, cgrid; n_best = 2, ex = SequentialEx()),
+                                     rd)
+        @test rm.path_ids == split(mcv, rd).path_ids
+        @test rm.rank_idx == sortperm(means(rm); rev = true)[1:2]
+        ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+        rc = search_cross_validation(hrp, gs(ccv, cgrid; n_best = 3), rd)
+        @test rc.path_ids == 1:maximum(split(ccv, rd).path_ids)
+        @test rc.rank_idx == sortperm(means(rc); rev = true)[1:3]
+        @test rc.rank_scores == means(rc)[rc.rank_idx]
+
+        # The randomised search forwards n_best.
+        rr = search_cross_validation(hrp,
+                                     RandomisedSearchCrossValidation(cgrid; cv = kcv, r = r,
+                                                                     ex = SequentialEx(),
+                                                                     n_iter = 6, seed = 1,
+                                                                     n_best = 3), rd)
+        @test rr.rank_idx == r4.rank_idx[1:3] && rr.rank_scores == r4.rank_scores[1:3]
+    end
+
     @testset "A result's own prior scores its weights at the result's mask" begin
         # A fit over a point-in-time window reduces to the Coverage Universe and expands
         # its weights back, so `expected_risk(r, res)` views the weights at the mask
@@ -410,21 +725,688 @@ The fixture is the online fold loop's, because the identities are structural.
         @test expected_risk(r, full) == expected_risk(r, full.w, full.pr)
     end
 
-    @testset "Integer returns score in a floating point matrix" begin
-        # A score is a fraction and a failed fold scores NaN, so an integer element type
-        # of the returns cannot hold it: the matrix takes `float_if_integer` of that type.
-        Xi = rand(StableRNG(2), -3:3, 120, 5)
-        rdi = ReturnsResult(; nx = string.("A", 1:5), X = Xi)
-        rdf = ReturnsResult(; nx = string.("A", 1:5), X = float.(Xi))
-        for scheme in (IndexWalkForward(60, 20),
-                       CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2))
-            g = GridSearchCrossValidation(["fb" => [nothing, nothing]]; cv = scheme,
-                                          r = ConditionalValueatRisk(), train_score = true)
-            resi = search_cross_validation(EqualWeighted(), g, rdi)
-            resf = search_cross_validation(EqualWeighted(), g, rdf)
-            @test eltype(resi.test_scores) === Float64
-            @test resi.test_scores ≈ resf.test_scores
+    @testset "13. A vector of risk measures reduces in each fold through `r_sca` (#1998)" begin
+        # Each score orients each measure before `r_sca` reduces the vector, so a vector
+        # whose measures disagree on orientation has one score, and a higher score is
+        # better. The hand formula negates the measure of which a smaller value is better.
+        rv = [ConditionalValueatRisk(), MeanReturn()]
+        oriented(f, x) = f([-expected_risk(rv[1], x), expected_risk(rv[2], x)])
+        l1 = po.parse_lens("opt.l1")
+        kcv = KFold(; n = 4)
+        kcvr = split(kcv, rd)
+        for (sca, f) in
+            ((SumScalariser(), sum), (MaxScalariser(), maximum), (MedianValue(), median),
+             (minimum, minimum))
+            res = search_cross_validation(mr,
+                                          gs(kcv, jgrid; r = rv, r_sca = sca,
+                                             train_score = true), rd)
+            for (i, val) in enumerate(jgrid[1][2]), j in eachindex(kcvr.train_idx)
+                pred = po.fit_and_predict(Accessors.set(mr, l1, val), rd, kcvr.train_idx[j],
+                                          kcvr.test_idx[j])
+                @test res.test_scores[j, i] == oriented(f, pred)
+                @test res.train_scores[j, i] == oriented(f, pred.res)
+            end
         end
+        # The combinatorial form writes one score per path, and one train score per fold
+        # of each path.
+        ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+        res = search_cross_validation(mr,
+                                      gs(ccv, jgrid; r = rv, r_sca = MaxScalariser(),
+                                         train_score = true, ex = FLoops.SequentialEx()),
+                                      rd)
+        for (i, val) in enumerate(jgrid[1][2])
+            pp = po.fit_and_predict(Accessors.set(mr, l1, val), rd, ccv)
+            @test res.test_scores[:, i] == [oriented(maximum, path) for path in pp.pred]
+            for (q, path) in enumerate(pp.pred)
+                @test res.train_scores[q][:, i] ==
+                      [oriented(maximum, fp.res) for fp in path.pred]
+            end
+        end
+        # For one measure the slot is inert: no number moves, batch or combinatorial.
+        for cv in (kcv, ccv)
+            a = search_cross_validation(mr, gs(cv, jgrid; train_score = true), rd)
+            b = search_cross_validation(mr,
+                                        gs(cv, jgrid; r_sca = MaxScalariser(),
+                                           train_score = true), rd)
+            @test a.test_scores == b.test_scores
+            @test a.train_scores == b.train_scores
+            @test a.idx == b.idx
+        end
+        # The randomised search forwards `r_sca` to the grid search of its trials.
+        rgrid = ["opt.l1" => [0.0002, 0.0005, 0.002, 0.005]]
+        rr = search_cross_validation(mr,
+                                     RandomisedSearchCrossValidation(rgrid; cv = kcv,
+                                                                     r = rv,
+                                                                     r_sca = MaxScalariser(),
+                                                                     n_iter = 2, seed = 3),
+                                     rd)
+        rg = search_cross_validation(mr,
+                                     gs(kcv, [["opt.l1" => [v[1]]] for v in rr.val_grid];
+                                        r = rv, r_sca = MaxScalariser()), rd)
+        @test rr.test_scores == rg.test_scores
+        # The reduction is the field `r_sca`, so both constructors refuse it in `kwargs`.
+        for err in (try
+                        GridSearchCrossValidation(jgrid; kwargs = (; sca = MaxScalariser()))
+                        nothing
+                    catch e
+                        e
+                    end,
+                    try
+                        RandomisedSearchCrossValidation(rgrid; kwargs = (; sca = MaxScalariser()))
+                        nothing
+                    catch e
+                        e
+                    end)
+            @test isa(err, ConflictingArgumentError)
+            @test occursin("r_sca", sprint(showerror, err))
+        end
+        # The form of `oriented_score` for a fitted result: through its prior result, or
+        # over a matrix of training returns, for one measure and for a vector.
+        fit = optimise(mr, rows(rd, kcvr.train_idx[1]))
+        Xt = view(rd.X, kcvr.train_idx[1], :)
+        @test po.oriented_score(nothing, r, fit) == -expected_risk(r, fit)
+        @test po.oriented_score(SumScalariser(), r, fit, Xt) == -expected_risk(r, fit, Xt)
+        @test po.oriented_score(MaxScalariser(), rv, fit) ==
+              max(-expected_risk(rv[1], fit), expected_risk(rv[2], fit))
+        @test po.oriented_score(MedianValue(), rv, fit, Xt) ==
+              median([-expected_risk(rv[1], fit, Xt), expected_risk(rv[2], fit, Xt)])
+        @test po.oriented_score(SumScalariser(), rv, fit, Xt) ==
+              -expected_risk(rv[1], fit, Xt) + expected_risk(rv[2], fit, Xt)
+    end
+
+    #=
+    Issue #2000, ADR 0233: a search orders its candidates with a vector of search scorers.
+    It multiplies the values of each scorer by its scale, and `s_sca` reduces the values of
+    each candidate to one. A function gives what a scorer gives, a vector or an index.
+    =#
+    @testset "14. A vector of search scorers reduces per candidate through `s_sca` (#2000)" begin
+        kcv = KFold(; n = 4)
+        hms = HighestMeanScore()
+        means(S) = vec(mean(S; dims = 1))
+        worst = X -> vec(minimum(X; dims = 1))
+        fidx = X -> argmax(vec(minimum(X; dims = 1)))
+        srch(; kwargs...) = search_cross_validation(hrp,
+                                                    gs(kcv, wbgrid; n_best = 3,
+                                                       ex = SequentialEx(), kwargs...), rd)
+        a = srch()
+        S = a.test_scores
+        # The hand formula: scale each scorer, then reduce the values of each candidate.
+        scored = [2 .* means(S), worst(S)]
+        for (sca, f) in
+            ((nothing, sum), (SumScalariser(), sum), (MaxScalariser(), maximum),
+             (MinScalariser(), minimum), (MeanValue(), mean), (minimum, minimum))
+            res = srch(; scorer = [HighestMeanScore(; scale = 2.0), worst], s_sca = sca)
+            hand = [f(getindex.(scored, j)) for j in axes(S, 2)]
+            @test res.test_scores == S
+            @test res.rank_idx == sortperm(hand; rev = true)
+            @test res.rank_scores ≈ hand[res.rank_idx]
+            @test res.opt === res.ranked[1] && res.idx == res.rank_idx[1]
+        end
+        # A negative scale is a negative weight, so a vector of one scorer at scale -1
+        # reverses the order of its means.
+        rn = srch(; scorer = [HighestMeanScore(; scale = -1.0)])
+        @test rn.rank_idx == sortperm(-means(S); rev = true)
+        @test rn.rank_scores == -means(S)[rn.rank_idx]
+        # One scorer: `s_sca` and the scale are inert, alone or in a vector of one at
+        # scale one. A function that gives the column means does the job of the type.
+        for kw in ((; scorer = HighestMeanScore(; scale = -3.0)),
+                   (; scorer = hms, s_sca = MaxScalariser()), (; scorer = [hms]),
+                   (; scorer = X -> vec(mean(X; dims = 1))))
+            res = srch(; kw...)
+            @test res.rank_idx == a.rank_idx && res.rank_scores == a.rank_scores
+        end
+        # A member that gives an index has no value to combine, so the search refuses it
+        # when it runs, and names the form to give.
+        err = try
+            srch(; scorer = [hms, fidx])
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError &&
+              occursin("cannot join a vector", err.msg) &&
+              occursin("candidate_scores", err.msg)
+        # A member whose values do not line up with the columns is refused before the
+        # reduction, which would broadcast a vector of one value with no error.
+        @test_throws DimensionMismatch po.finite_candidate_order(nothing, nothing,
+                                                                 [hms, X -> [1.0]], S, 1)
+        # A reduction that gives NaN is refused, and the error names `s_sca`.
+        err = try
+            po.finite_candidate_order(nothing, StdValue(), [hms], S, 1)
+            nothing
+        catch e
+            e
+        end
+        @test err isa IsNonFiniteError && occursin("s_sca", err.msg)
+        # A scorer that gives neither a vector nor an integer is refused.
+        err = try
+            po.finite_candidate_order(nothing, nothing, X -> 1.5, S, 1)
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("Float64", err.msg)
+
+        # The constructors: a mixed literal is narrowed, an empty vector and a member that
+        # is not a scorer are refused, and a non-finite scale is refused.
+        for est in (GridSearchCrossValidation, RandomisedSearchCrossValidation)
+            e = est(wbgrid; scorer = Any[hms, worst], s_sca = MaxScalariser())
+            @test eltype(e.scorer) === Union{typeof(worst), typeof(hms)}
+            @test e.s_sca === MaxScalariser()
+            @test isnothing(est(wbgrid).s_sca)
+            @test_throws IsEmptyError est(wbgrid; scorer = Any[])
+            @test_throws ArgumentError est(wbgrid; scorer = Any[hms, 1])
+        end
+        @test_throws IsNonFiniteError HighestMeanScore(; scale = Inf)
+        @test po.scorer_scale(HighestMeanScore(; scale = 2.0)) == 2.0
+        @test po.scorer_scale(hms) == 1.0 && po.scorer_scale(worst) == 1
+
+        # The randomised search forwards `s_sca` to the grid search of its trials.
+        sv = [HighestMeanScore(; scale = 2.0), worst]
+        rr = search_cross_validation(hrp,
+                                     RandomisedSearchCrossValidation(wbgrid; cv = kcv,
+                                                                     r = r, scorer = sv,
+                                                                     s_sca = MaxScalariser(),
+                                                                     n_best = 2, n_iter = 2,
+                                                                     seed = 3), rd)
+        rg = search_cross_validation(hrp,
+                                     gs(kcv, [["opt.wb" => [v[1]]] for v in rr.val_grid];
+                                        scorer = sv, s_sca = MaxScalariser(), n_best = 2),
+                                     rd)
+        @test rr.rank_idx == rg.rank_idx && rr.rank_scores == rg.rank_scores
+    end
+
+    #=
+    Issue #2001, ADR 0234: `EachValue()` in `r_sca` or `s_sca` keeps each value apart, and
+    the search gives one ranking for each value per candidate, in one Result. Each entry is
+    what a search of that value alone gives, with the scale of its measure or scorer.
+    =#
+    @testset "15. `EachValue` gives one ranking for each value per candidate (#2001)" begin
+        kcv = KFold(; n = 4)
+        hms = HighestMeanScore()
+        means(S) = vec(mean(S; dims = 1))
+        worst = X -> vec(minimum(X; dims = 1))
+        fidx = X -> argmax(vec(minimum(X; dims = 1)))
+        rv = [ConditionalValueatRisk(),
+              MeanReturn(; settings = HierarchicalRiskMeasureSettings(; scale = 2.0))]
+        grid = ["opt.wb" => [WeightBounds(; lb = 0.0, ub = 1.0),
+                             WeightBounds(; lb = 0.0, ub = 0.13),
+                             WeightBounds(; lb = 0.1, ub = 1.0),
+                             WeightBounds(; lb = 0.12, ub = 1.0)]]
+        srch(cv = kcv; kwargs...) = search_cross_validation(hrp,
+                                                            gs(cv, grid; n_best = 3,
+                                                               ex = SequentialEx(),
+                                                               kwargs...), rd)
+        # `r_sca`: one matrix per measure, the score of that measure alone times its scale,
+        # and one ranking per matrix. The combinatorial train scores are `[k][p]`.
+        ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+        for cv in (kcv, ccv)
+            ev = srch(cv; r = rv, r_sca = EachValue(), train_score = true)
+            @test ev.test_scores isa Vector{<:Matrix} && length(ev.test_scores) == 2
+            @test size(ev.opt) == size(ev.idx) == size(ev.rank_scores) == (2,)
+            for k in eachindex(rv)
+                one = srch(cv; r = rv[k], train_score = true)
+                s = rv[k].settings.scale
+                @test ev.test_scores[k] == s .* one.test_scores
+                @test ev.train_scores[k] == s .* one.train_scores
+                @test ev.rank_idx[k] == one.rank_idx
+                @test ev.rank_scores[k] == s .* one.rank_scores
+                @test ev.opt[k] === ev.ranked[k][1] && ev.idx[k] == ev.rank_idx[k][1]
+                @test ev.ranked[k] == one.ranked
+            end
+            @test ev.path_ids == srch(cv).path_ids
+        end
+        # `s_sca`: each scorer orders the candidates alone, with its scale, and a scorer that
+        # gives an index keeps its one candidate whatever `n_best` is.
+        sv = [HighestMeanScore(; scale = -1.0), worst, fidx]
+        es = srch(; scorer = sv, s_sca = EachValue())
+        S = es.test_scores
+        @test S isa Matrix && S == srch().test_scores
+        @test es.rank_idx[1] == sortperm(-means(S); rev = true)[1:3]
+        @test es.rank_scores[1] == -means(S)[es.rank_idx[1]]
+        @test es.rank_idx[2] == srch(; scorer = worst).rank_idx
+        @test es.rank_scores[2] == srch(; scorer = worst).rank_scores
+        @test es.rank_idx[3] == [fidx(S)] && isnothing(es.rank_scores[3])
+        @test all(es.opt[l] === es.ranked[l][1] for l in eachindex(sv))
+        # Both: a `K × L` matrix, row `k` for measure `k` and column `l` for scorer `l`.
+        both = srch(; r = rv, r_sca = EachValue(), scorer = sv, s_sca = EachValue())
+        @test size(both.rank_idx) == size(both.opt) == size(both.rank_scores) == (2, 3)
+        # A vector of one scorer under the sum is that scorer alone, with its scale.
+        for l in 1:2
+            byk = srch(; r = rv, r_sca = EachValue(), scorer = sv[l:l])
+            @test both.rank_idx[:, l] == byk.rank_idx
+            @test both.rank_scores[:, l] == byk.rank_scores
+        end
+        @test both.rank_idx[:, 3] == [[fidx(Sk)] for Sk in both.test_scores]
+        @test all(isnothing, both.rank_scores[:, 3])
+        @test all(both.opt[v] === both.ranked[v][1] for v in eachindex(both.opt))
+        # The rule is inert for one measure, and for one scorer. The types decide the shape,
+        # so a vector of one measure gives a vector of one entry.
+        a = srch()
+        for kw in ((; r_sca = EachValue()), (; s_sca = EachValue()),
+                   (; scorer = hms, s_sca = EachValue()))
+            res = srch(; kw...)
+            @test res.test_scores == a.test_scores && res.rank_idx == a.rank_idx
+            @test res.opt === res.ranked[1]
+        end
+        v1 = srch(; r = [r], r_sca = EachValue())
+        @test v1.test_scores == [a.test_scores] && v1.rank_idx == [a.rank_idx]
+
+        # An empty entry: a matrix with no finite column ranks no candidate, and its values
+        # take the form of a full ranking of the same scorer.
+        S1 = [0.1 0.2 0.3; 0.2 0.1 0.4]
+        S2 = fill(NaN, 2, 3)
+        S3 = copy(S1)
+        S3[1, 3] = NaN
+        ri, rs = po.finite_candidate_order(EachValue(), nothing, hms, [S1, S2, S3], 2)
+        @test ri == [[3, 1], Int[], [1, 2]]
+        @test rs[1] ≈ [0.35, 0.15] && rs[2] == Float64[] && rs[3] ≈ [0.15, 0.15]
+        ri, rs = po.finite_candidate_order(EachValue(), nothing, fidx, [S1, S2], 1)
+        @test ri == [[3], Int[]] && rs == [nothing, nothing]
+        ri, rs = po.finite_candidate_order(EachValue(), EachValue(), [hms, fidx], [S1, S2],
+                                           2)
+        @test size(ri) == (2, 2) && ri[1, 1] == [3, 1] && ri[1, 2] == [3]
+        @test isempty(ri[2, 1]) && isempty(ri[2, 2])
+        @test rs[2, 1] == Float64[] && isnothing(rs[2, 2]) && isnothing(rs[1, 2])
+        # Under `EachValue`, a member that gives neither a vector nor an index is refused.
+        err = try
+            po.finite_candidate_order(nothing, EachValue(), [hms, X -> 1.5], S1, 1)
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("Float64", err.msg)
+        # Every entry empty: the search has nothing to keep.
+        err = try
+            po.finite_candidate_order(EachValue(), nothing, hms, [S2, S2], 1)
+            nothing
+        catch e
+            e
+        end
+        @test err isa IsNonFiniteError && occursin("2 risk measures", err.msg)
+        @test_throws IsNonFiniteError po.finite_candidate_order(nothing, EachValue(),
+                                                                [hms, worst], S2, 1)
+
+        # The Result of an empty entry: `nothing` for its winner, and an empty vector of
+        # candidates of the element type of a full one.
+        lg, vg = po.lens_val_grid(grid)
+        opt, idx, ranked = po.ranked_candidates(hrp, lg, vg, [[2, 1], Int[]])
+        @test isnothing(opt[2]) && isnothing(idx[2]) && isempty(ranked[2])
+        @test eltype(ranked[2]) == eltype(ranked[1]) && opt[1] === ranked[1][1]
+        Ss = [S1[:, [1, 2, 3, 3]], fill(NaN, 2, 4)]
+        mk(; kwargs...) = SearchCrossValidationResult(; opt = opt, test_scores = Ss,
+                                                      train_scores = nothing,
+                                                      lens_grid = lg, val_grid = vg,
+                                                      idx = idx, ranked = ranked,
+                                                      rank_idx = [[2, 1], Int[]],
+                                                      rank_scores = [[0.15, 0.15],
+                                                                     Float64[]], kwargs...)
+        @test isnothing(mk().opt[2])
+        # The Result refuses fields that do not agree, entry by entry.
+        @test_throws DimensionMismatch mk(; opt = [ranked[1][2], nothing])
+        @test_throws DimensionMismatch mk(; opt = [opt[1], opt[1]])
+        @test_throws DimensionMismatch mk(; idx = [1, nothing])
+        @test_throws DimensionMismatch mk(; idx = [2, nothing, nothing])
+        @test_throws DimensionMismatch mk(; rank_scores = [[0.15], Float64[]])
+        @test_throws IsEmptyError mk(; opt = [nothing, nothing], idx = [nothing, nothing],
+                                     ranked = [ranked[2], ranked[2]],
+                                     rank_idx = [Int[], Int[]],
+                                     rank_scores = [Float64[], Float64[]])
+        # One value: `opt` is `ranked[1]`.
+        @test_throws DimensionMismatch SearchCrossValidationResult(; opt = ranked[1][2],
+                                                                   test_scores = S1,
+                                                                   train_scores = nothing,
+                                                                   lens_grid = lg,
+                                                                   val_grid = vg, idx = 2,
+                                                                   ranked = ranked[1],
+                                                                   rank_idx = [2, 1])
+
+        # The six methods: the randomised search forwards the rule, and the Pipeline's
+        # search keeps one matrix per measure, batch and combinatorial.
+        rr = search_cross_validation(hrp,
+                                     RandomisedSearchCrossValidation(grid; cv = kcv, r = rv,
+                                                                     r_sca = EachValue(),
+                                                                     scorer = sv,
+                                                                     s_sca = EachValue(),
+                                                                     n_iter = 3, seed = 3,
+                                                                     n_best = 2), rd)
+        rg = search_cross_validation(hrp,
+                                     gs(kcv, [["opt.wb" => [v[1]]] for v in rr.val_grid];
+                                        r = rv, r_sca = EachValue(), scorer = sv,
+                                        s_sca = EachValue(), n_best = 2), rd)
+        @test rr.test_scores == rg.test_scores && rr.rank_idx == rg.rank_idx
+        pipe = Pipeline(; steps = (EmpiricalPrior(), hrp))
+        pgrid = ["steps[2].opt.wb" => grid[1][2]]
+        for cv in (kcv, ccv)
+            pres = search_cross_validation(pipe,
+                                           gs(cv, pgrid; r = rv, r_sca = EachValue(),
+                                              n_best = 3, train_score = true), rd)
+            dres = srch(cv; r = rv, r_sca = EachValue(), train_score = true)
+            @test all(isapprox.(pres.test_scores, dres.test_scores; atol = 1e-10))
+            @test pres.rank_idx == dres.rank_idx
+            @test length(pres.train_scores) == 2
+        end
+
+        # The constructors keep the rule, and the readers that need one value refuse it.
+        for est in (GridSearchCrossValidation, RandomisedSearchCrossValidation)
+            e = est(grid; r = rv, r_sca = EachValue(), scorer = sv, s_sca = EachValue())
+            @test e.r_sca === EachValue() && e.s_sca === EachValue()
+        end
+        @test_throws TypeError NearestQuantilePrediction(; sca = EachValue())
+        @test_throws TypeError FoldRiskScorer(; r = rv, sca = EachValue())
+        # `oriented_score` under the rule gives the value of each measure, times its scale.
+        fit = optimise(hrp, rows(rd, 1:80))
+        @test po.oriented_score(EachValue(), rv, fit) ==
+              [-expected_risk(rv[1], fit), 2 * expected_risk(rv[2], fit)]
+        @test po.oriented_score(EachValue(), r, fit) == -expected_risk(r, fit)
+    end
+
+    #=
+    Issue #2002, ADR 0234: `r_sca = PerCandidate(sca)` combines the measures once per
+    candidate, after the search scorer reduces the folds or the paths of each measure. The
+    search keeps the `K` matrices of `EachValue`, and gives one ranking.
+    =#
+    @testset "16. `PerCandidate` combines the measures after the search scorer (#2002)" begin
+        kcv = KFold(; n = 4)
+        hms = HighestMeanScore()
+        means(S) = vec(mean(S; dims = 1))
+        worst = X -> vec(minimum(X; dims = 1))
+        fidx = X -> argmax(vec(minimum(X; dims = 1)))
+        rv = [ConditionalValueatRisk(),
+              MeanReturn(; settings = HierarchicalRiskMeasureSettings(; scale = 2.0))]
+        grid = ["opt.wb" => [WeightBounds(; lb = 0.0, ub = 1.0),
+                             WeightBounds(; lb = 0.0, ub = 0.13),
+                             WeightBounds(; lb = 0.1, ub = 1.0),
+                             WeightBounds(; lb = 0.12, ub = 1.0)]]
+        srch(cv = kcv; kwargs...) = search_cross_validation(hrp,
+                                                            gs(cv, grid; n_best = 3,
+                                                               ex = SequentialEx(),
+                                                               kwargs...), rd)
+
+        # The table of ADR 0234: one candidate, two measures, three folds.
+        S1 = reshape([3.0, 0.0, 0.0], 3, 1)
+        S2 = reshape([0.0, 2.0, 1.0], 3, 1)
+        @test po.finite_candidate_order(MaxScalariser(), nothing, hms, max.(S1, S2), 1) ==
+              ([1], [2.0])
+        @test po.finite_candidate_order(PerCandidate(MaxScalariser()), nothing, hms,
+                                        [S1, S2], 1) == ([1], [1.0])
+
+        # The search: the matrices of `EachValue`, and one ranking by the combination of
+        # the scorer's value of each measure. Each value holds the scale of its measure.
+        ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+        for cv in (kcv, ccv)
+            ev = srch(cv; r = rv, r_sca = EachValue(), train_score = true)
+            for (sca, f) in
+                ((nothing, sum), (MaxScalariser(), maximum), (MinScalariser(), minimum),
+                 (MeanValue(), mean), (minimum, minimum))
+                pc = srch(cv; r = rv, r_sca = PerCandidate(sca), train_score = true)
+                hand = [f([means(S)[j] for S in ev.test_scores])
+                        for j in axes(ev.test_scores[1], 2)]
+                @test pc.test_scores == ev.test_scores
+                @test pc.train_scores == ev.train_scores
+                @test pc.rank_idx == sortperm(hand; rev = true)[1:3]
+                @test pc.rank_scores ≈ hand[pc.rank_idx]
+                @test pc.opt === pc.ranked[1] && pc.idx == pc.rank_idx[1]
+            end
+        end
+        # The sum agrees with the sum in each fold for a scorer that is linear in the rows.
+        sm = srch(; r = rv)
+        pc = srch(; r = rv, r_sca = PerCandidate())
+        @test sm.test_scores isa Matrix && pc.test_scores isa Vector{<:Matrix}
+        @test pc.rank_idx == sm.rank_idx && pc.rank_scores ≈ sm.rank_scores
+
+        # The order of the stages: the scorer reduces each matrix, `PerCandidate` combines
+        # the measures for each scorer, and then `s_sca` combines the scaled scorers.
+        ev = srch(; r = rv, r_sca = EachValue())
+        Ss = ev.test_scores
+        sv = [HighestMeanScore(; scale = 2.0), worst]
+        byscorer = [[maximum(means(S)[j] for S in Ss) for j in axes(Ss[1], 2)],
+                    [maximum(worst(S)[j] for S in Ss) for j in axes(Ss[1], 2)]]
+        hand = max.(2 .* byscorer[1], byscorer[2])
+        res = srch(; r = rv, r_sca = PerCandidate(MaxScalariser()), scorer = sv,
+                   s_sca = MaxScalariser())
+        @test res.rank_idx == sortperm(hand; rev = true)[1:3]
+        @test res.rank_scores ≈ hand[res.rank_idx]
+        # `s_sca = EachValue()`: one ranking per scorer, each with its scale.
+        es = srch(; r = rv, r_sca = PerCandidate(MaxScalariser()), scorer = sv,
+                  s_sca = EachValue())
+        @test size(es.rank_idx) == size(es.opt) == (2,)
+        @test es.rank_idx[1] == sortperm(2 .* byscorer[1]; rev = true)[1:3]
+        @test es.rank_scores[2] ≈ sort(byscorer[2]; rev = true)[1:3]
+        @test all(es.opt[l] === es.ranked[l][1] for l in 1:2)
+
+        # ADR 0120: a candidate enters only when it is finite in every matrix.
+        A = [0.1 0.2 0.3 NaN; 0.2 0.1 0.4 0.5]
+        B = [0.3 NaN 0.1 0.2; 0.1 0.2 0.0 0.2]
+        @test po.finite_candidate_order(PerCandidate(), nothing, hms, [A, B], 4)[1] ==
+              [3, 1]
+        err = try
+            po.finite_candidate_order(PerCandidate(), nothing, hms, [A[:, [4]], B[:, [2]]],
+                                      1)
+            nothing
+        catch e
+            e
+        end
+        @test err isa IsNonFiniteError && occursin("PerCandidate", err.msg)
+        # A combination that gives NaN is refused, and the error names `r_sca`.
+        err = try
+            po.finite_candidate_order(PerCandidate(StdValue()), nothing, hms, [A], 1)
+            nothing
+        catch e
+            e
+        end
+        @test err isa IsNonFiniteError && occursin("r_sca", err.msg)
+        err = try
+            po.finite_candidate_order(PerCandidate(), nothing,
+                                      X -> Inf .* vec(sum(X; dims = 1)),
+                                      [A[:, 1:2], -A[:, 1:2]], 1)
+            nothing
+        catch e
+            e
+        end
+        @test err isa IsNonFiniteError && occursin("r_sca", err.msg)
+        # A scorer whose values do not line up with the columns is refused before the
+        # combination.
+        @test_throws DimensionMismatch po.finite_candidate_order(PerCandidate(), nothing,
+                                                                 X -> [1.0], [A, B], 1)
+
+        # An index-only scorer gives no value to combine, so the search refuses it when it
+        # runs. For one measure the rule is inert, and the index is kept.
+        err = try
+            srch(; r = rv, r_sca = PerCandidate(), scorer = fidx, n_best = 1)
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError &&
+              occursin("PerCandidate", err.msg) &&
+              occursin("candidate_scores", err.msg)
+        @test_throws ArgumentError srch(; r = rv, r_sca = PerCandidate(),
+                                        scorer = [hms, fidx])
+        a = srch()
+        res = srch(; r_sca = PerCandidate(MaxScalariser()))
+        @test res.test_scores == a.test_scores && res.rank_idx == a.rank_idx
+        res = srch(; r_sca = PerCandidate(), scorer = fidx, n_best = 1)
+        @test res.rank_idx == [fidx(a.test_scores)]
+        # A vector of one measure: the scorer's one value, reduced by `sca`.
+        v1 = srch(; r = [r], r_sca = PerCandidate(MaxScalariser()))
+        @test v1.test_scores == [a.test_scores] && v1.rank_idx == a.rank_idx
+        @test v1.rank_scores == a.rank_scores
+
+        # The randomised search and the Pipeline's search forward the rule.
+        rr = search_cross_validation(hrp,
+                                     RandomisedSearchCrossValidation(grid; cv = kcv, r = rv,
+                                                                     r_sca = PerCandidate(MaxScalariser()),
+                                                                     n_iter = 3, seed = 3,
+                                                                     n_best = 2), rd)
+        rg = search_cross_validation(hrp,
+                                     gs(kcv, [["opt.wb" => [v[1]]] for v in rr.val_grid];
+                                        r = rv, r_sca = PerCandidate(MaxScalariser()),
+                                        n_best = 2), rd)
+        @test rr.test_scores == rg.test_scores && rr.rank_idx == rg.rank_idx
+        pipe = Pipeline(; steps = (EmpiricalPrior(), hrp))
+        pgrid = ["steps[2].opt.wb" => grid[1][2]]
+        for cv in (kcv, ccv)
+            pres = search_cross_validation(pipe,
+                                           gs(cv, pgrid; r = rv,
+                                              r_sca = PerCandidate(MaxScalariser()),
+                                              n_best = 3), rd)
+            dres = srch(cv; r = rv, r_sca = PerCandidate(MaxScalariser()))
+            @test all(isapprox.(pres.test_scores, dres.test_scores; atol = 1e-10))
+            @test pres.rank_idx == dres.rank_idx
+        end
+
+        # The constructors. `r_sca` takes the rule, `s_sca` and the readers that need one
+        # value for each sample refuse it.
+        @test isnothing(PerCandidate().sca) &&
+              PerCandidate(; sca = MaxScalariser()).sca === MaxScalariser()
+        @test PerCandidate(minimum).sca === minimum
+        @test_throws MethodError PerCandidate(1.0)
+        for est in (GridSearchCrossValidation, RandomisedSearchCrossValidation)
+            e = est(grid; r = rv, r_sca = PerCandidate(MaxScalariser()))
+            @test e.r_sca === PerCandidate(MaxScalariser())
+            @test_throws TypeError est(grid; s_sca = PerCandidate())
+        end
+        @test_throws TypeError NearestQuantilePrediction(; sca = PerCandidate())
+        @test_throws TypeError FoldRiskScorer(; r = rv, sca = PerCandidate())
+        # `oriented_score` under the rule gives the value of each measure, times its scale.
+        fit = optimise(hrp, rows(rd, 1:80))
+        @test po.oriented_score(PerCandidate(), rv, fit) ==
+              po.oriented_score(EachValue(), rv, fit)
+        @test po.oriented_score(PerCandidate(), r, fit) == -expected_risk(r, fit)
+    end
+
+    #=
+    Issue #2058: `rank_prediction = true` keeps, in `rank_predictions[j]`, the prediction that
+    the search scored for candidate `ranked[j]`. So the risk of each fold or path of that
+    prediction, with the sign of the search, is column `rank_idx[j]` of `test_scores`.
+    =#
+    @testset "17. `rank_prediction` keeps the prediction of each kept candidate (#2058)" begin
+        kcv = KFold(; n = 4)
+        ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+        mcv = MultipleRandomised(batch_cv; subset_size = 5, n_subsets = 2, seed = 7)
+        grid = ["opt.wb" => [WeightBounds(; lb = 0.0, ub = 1.0),
+                             WeightBounds(; lb = 0.0, ub = 0.13),
+                             WeightBounds(; lb = 0.1, ub = 1.0),
+                             WeightBounds(; lb = 0.12, ub = 1.0)]]
+        pipe = Pipeline(; steps = (EmpiricalPrior(), hrp))
+        pgrid = ["steps[2].opt.wb" => grid[1][2]]
+        # The oriented score of one prediction: `r` is smaller-is-better.
+        sc(p) = -expected_risk(r, p)
+        # A batch scheme: one prediction per fold, in the order of the rows.
+        scores(p::po.MultiPeriodPredictionResult, res) = [sc(q) for q in p.pred]
+        # A population: one row per path under a combinatorial scheme, and under a
+        # `MultipleRandomised` scheme the folds of path `k` fill the rows of path `k`.
+        function scores(p::po.PopulationPredictionResult, res)
+            res.path_ids == 1:length(p.pred) && return [sc(q) for q in p.pred]
+            col = similar(res.test_scores, size(res.test_scores, 1))
+            for (k, path) in enumerate(p.pred)
+                col[res.path_ids .== k] = [sc(q) for q in path.pred]
+            end
+            return col
+        end
+        function check_kept(res)
+            @test length(res.rank_predictions) == length(res.ranked)
+            for (j, k) in enumerate(res.rank_idx)
+                @test scores(res.rank_predictions[j], res) == res.test_scores[:, k]
+            end
+        end
+        srch(base, g, cv; kwargs...) = search_cross_validation(base,
+                                                               gs(cv, g; n_best = 3,
+                                                                  ex = SequentialEx(),
+                                                                  kwargs...), rd)
+        # The six methods: the grid search on an optimiser and on a Pipeline, batch and
+        # combinatorial, and the randomised search on both.
+        for (base, g) in ((hrp, grid), (pipe, pgrid)), cv in (kcv, ccv, mcv)
+            off = srch(base, g, cv)
+            on = srch(base, g, cv; rank_prediction = true)
+            @test isnothing(off.rank_predictions)
+            @test on.test_scores == off.test_scores && on.rank_idx == off.rank_idx
+            @test eltype(on.rank_predictions) <: po.AbstractPredictionResult
+            @test isconcretetype(eltype(on.rank_predictions))
+            check_kept(on)
+            rr = search_cross_validation(base,
+                                         RandomisedSearchCrossValidation(g; cv = cv, r = r,
+                                                                         n_iter = 3,
+                                                                         seed = 3,
+                                                                         n_best = 2,
+                                                                         rank_prediction = true),
+                                         rd)
+            check_kept(rr)
+        end
+        @test isa(srch(hrp, grid, kcv; rank_prediction = true).rank_predictions[1],
+                  po.MultiPeriodPredictionResult)
+        for cv in (ccv, mcv)
+            @test isa(srch(hrp, grid, cv; rank_prediction = true).rank_predictions[1],
+                      po.PopulationPredictionResult)
+        end
+
+        # `EachValue`: one vector for each measure, in the order of `ranked`, and a
+        # candidate that two rankings keep is the same object in both.
+        rv = [ConditionalValueatRisk(),
+              MeanReturn(; settings = HierarchicalRiskMeasureSettings(; scale = 2.0))]
+        osc = [p -> -expected_risk(rv[1], p), p -> 2 * expected_risk(rv[2], p)]
+        ev = srch(hrp, grid, kcv; r = rv, r_sca = EachValue(), n_best = 4,
+                  rank_prediction = true)
+        @test size(ev.rank_predictions) == size(ev.rank_idx) == (2,)
+        for k in eachindex(rv), (j, c) in enumerate(ev.rank_idx[k])
+            @test [osc[k](q) for q in ev.rank_predictions[k][j].pred] ==
+                  ev.test_scores[k][:, c]
+        end
+        # Four candidates under `n_best = 4`: both rankings keep every one.
+        for (j, c) in enumerate(ev.rank_idx[1])
+            @test ev.rank_predictions[1][j] ===
+                  ev.rank_predictions[2][findfirst(==(c), ev.rank_idx[2])]
+        end
+        evp = srch(pipe, pgrid, kcv; r = rv, r_sca = EachValue(), rank_prediction = true)
+        @test size(evp.rank_predictions) == (2,)
+
+        # The helpers: `nothing` keeps nothing, and an empty ranking gives an empty vector
+        # of the element type of a full one.
+        preds = Vector{po.AbstractPredictionResult}(ev.rank_predictions[1][[2, 1]])
+        @test isnothing(po.ranked_predictions(nothing, [1, 2]))
+        @test isnothing(po.ranked_predictions(nothing, [[1], Int[]]))
+        kept = po.ranked_predictions(preds, [[2, 1], Int[]])
+        @test kept[1][1] === preds[2] && isempty(kept[2])
+        @test eltype(kept[2]) == eltype(kept[1]) && isconcretetype(eltype(kept[1]))
+        @test isnothing(po.allocate_search_predictions(gs(kcv, grid), 3))
+        store = po.allocate_search_predictions(gs(kcv, grid; rank_prediction = true), 3)
+        @test store isa Vector{po.AbstractPredictionResult} && length(store) == 3
+
+        # The constructors keep the switch, and the Result refuses a count that does not
+        # agree with `ranked`.
+        for est in (GridSearchCrossValidation, RandomisedSearchCrossValidation)
+            @test !est(grid).rank_prediction
+            @test est(grid; rank_prediction = true).rank_prediction
+        end
+        on = srch(hrp, grid, kcv; rank_prediction = true)
+        mk(; kwargs...) = SearchCrossValidationResult(; opt = on.opt,
+                                                      test_scores = on.test_scores,
+                                                      train_scores = nothing,
+                                                      lens_grid = on.lens_grid,
+                                                      val_grid = on.val_grid, idx = on.idx,
+                                                      ranked = on.ranked,
+                                                      rank_idx = on.rank_idx,
+                                                      rank_scores = on.rank_scores,
+                                                      kwargs...)
+        @test mk(; rank_predictions = on.rank_predictions).rank_predictions ===
+              on.rank_predictions
+        @test isnothing(mk().rank_predictions)
+        @test_throws DimensionMismatch mk(; rank_predictions = on.rank_predictions[1:2])
+        mkv(; kwargs...) = SearchCrossValidationResult(; opt = ev.opt,
+                                                       test_scores = ev.test_scores,
+                                                       train_scores = nothing,
+                                                       lens_grid = ev.lens_grid,
+                                                       val_grid = ev.val_grid, idx = ev.idx,
+                                                       ranked = ev.ranked,
+                                                       rank_idx = ev.rank_idx,
+                                                       rank_scores = ev.rank_scores,
+                                                       kwargs...)
+        @test isnothing(mkv().rank_predictions)
+        @test_throws DimensionMismatch mkv(; rank_predictions = ev.rank_predictions[1:1])
+        @test_throws DimensionMismatch mkv(;
+                                           rank_predictions = [ev.rank_predictions[1],
+                                                               ev.rank_predictions[2][1:2]])
     end
 end
 #=
@@ -452,8 +1434,8 @@ prior, and through a Pipeline.
     pe_vals = [EmpiricalPrior(), EmpiricalPrior(; ce = PortfolioOptimisersCovariance())]
     function scores_of(opt)
         return [-expected_risk(r,
-                               po.fit_and_predict(opt, rd; train_idx = cvr.train_idx[j],
-                                                  test_idx = cvr.test_idx[j]))
+                               po.fit_and_predict(opt, rd, cvr.train_idx[j],
+                                                  cvr.test_idx[j]))
                 for j in eachindex(cvr.train_idx)]
     end
     cases = (("pe.re", InverseVolatility(; pe = FactorPrior()), res_vals,

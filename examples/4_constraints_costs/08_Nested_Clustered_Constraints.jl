@@ -142,7 +142,7 @@ inner and outer bounds of the second portfolio therefore let an asset reach
 `0.35 * 0.62 = 0.217`, which is above the final bound. We plot the three portfolios.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 plot_stacked_bar_composition([res_inner, res_inner_outer, res_nested_overall], rd;
                              xticks = ([1, 2, 3],
                                        ["Inner WB", "Inner+Outer WB", "Overall WB"]))

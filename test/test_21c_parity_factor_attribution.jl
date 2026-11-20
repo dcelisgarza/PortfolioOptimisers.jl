@@ -136,7 +136,7 @@ end
 # The moments of each asset's model return over its active pairs, from the block directly.
 function fa_active_moments(pr, ret, W, T)
     PO = PortfolioOptimisers
-    al = PO.attribution_align(pr.rr, pr, T)
+    al = PO.attribution_align(PO.attribution_block_arrays(pr.rr, pr), T)
     r = ret[al.rows]
     n, N = size(al.eps)
     A = [dot(PO.attribution_slice(al.B, t)[i, :], al.f[t, :]) + al.eps[t, i]
@@ -184,8 +184,7 @@ end
     ind = ["market" => ConstantExposure(),
            "industry" => OneHotExposure(; field = "industry", family = "industry"),
            "style1" => grid_pass("style1"), "style2" => grid_pass("style2")]
-    ve1 = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
-                                            debias = RawStatistic(),
+    ve1 = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(), debias = nothing,
                                             regime_lohi_mult = (0.7, 1.6), min_val = 1e-12,
                                             min_obs = 1)
     lz = KindwiseUnknown(; leverage = ZeroUnknown())
@@ -682,7 +681,7 @@ end
         @test_throws DomainError factor_attribution(wt, Br, f, eps, ret; lag = -1,
                                                     trim = true)
         T = size(f, 1)
-        Bh = stack(fill(Br, T); dims = 1)
+        Bh = stack(fill(Br, T); dims = 3)
         @test isequal(fa_pack(factor_attribution(wt, Bh, f, eps, ret)),
                       fa_pack(factor_attribution(wt, Bh, f, eps, ret; lag = 1)))
         @test !isequal(fa_pack(factor_attribution(wt, Bh, f, eps, ret)), fa_pack(r0))
@@ -693,7 +692,7 @@ end
               length(30:10:T)
         @test_throws DomainError factor_attribution(wt, Br, f, eps, ret; lag = -1)
         @test_throws DimensionMismatch factor_attribution(wt, Br, f, eps[2:end, :], ret)
-        @test_throws DimensionMismatch factor_attribution(wt, Bh[2:end, :, :], f, eps, ret)
+        @test_throws DimensionMismatch factor_attribution(wt, Bh[:, :, 2:end], f, eps, ret)
     end
 
     @testset "A Scenario Cap leaves the realised attribution of a re-based fit (#1422)" begin
@@ -744,11 +743,11 @@ end
 
 @testset "The rule of each kind, helper by helper (#1579)" begin
     @test PO.attribution_unknown_kinds(EntrywiseUnknown()) ===
-          (; unstated = EntrywiseUnknown(), leverage = EntrywiseUnknown())
+          KindwiseUnknown(EntrywiseUnknown(), EntrywiseUnknown())
     @test PO.attribution_unknown_kinds(ZeroUnknown()) ===
-          (; unstated = ZeroUnknown(), leverage = ZeroUnknown())
+          KindwiseUnknown(ZeroUnknown(), ZeroUnknown())
     @test PO.attribution_unknown_kinds(KindwiseUnknown(; leverage = ZeroUnknown())) ===
-          (; unstated = EntrywiseUnknown(), leverage = ZeroUnknown())
+          KindwiseUnknown(EntrywiseUnknown(), ZeroUnknown())
     @test KindwiseUnknown() === KindwiseUnknown(EntrywiseUnknown(), EntrywiseUnknown())
     @test_throws ArgumentError KindwiseUnknown(; unstated = KindwiseUnknown())
     @test_throws ArgumentError KindwiseUnknown(; leverage = KindwiseUnknown())
@@ -771,18 +770,26 @@ end
     # The realised method reads the mask row by row: a weight of zero at the marked row is no
     # holding.
     h1 = BitMatrix([0 0 0; 0 1 0])
-    Bh = permutedims(cat(B, B; dims = 3), (3, 1, 2))
+    Bh = cat(B, B; dims = 3)
     @test isnothing(PO.attribution_leverage_split(EntrywiseUnknown(), h1,
                                                   [0.5 0.5 0.0; 0.5 0.0 0.5], Bh))
     lv = PO.attribution_leverage_split(EntrywiseUnknown(), h1, [0.5 0.0 0.5; 0.5 0.5 0.0],
                                        Bh)
     @test lv.assets == lev && lv.factors == [false, true, false]
+    # Marks that name no asset are refused: a rule that marks nothing answers `nothing`.
+    @test_throws ArgumentError PO.LeverageSplitResult(; assets = falses(3),
+                                                      factors = trues(3))
     @test PO.attribution_marked_assets(h1) == lev
     @test isnothing(PO.attribution_marked_assets(nothing))
 end
 
 @testset "The leverage test of a standard error, helper by helper (#1580)" begin
-    ses = (; sys = 0.5, factor = [0.1, 0.2, NaN], family = nothing)
+    ses = PO.AttributionErrorsResult(; sys = 0.5, factor = [0.1, 0.2, NaN])
+    # The answers agree on what they state: a systematic error with no factor errors, or a
+    # family axis with no factor axis, is refused.
+    @test_throws ArgumentError PO.AttributionErrorsResult(0.5, nothing, nothing)
+    @test_throws ArgumentError PO.AttributionErrorsResult(nothing, nothing, [0.1])
+    @test isnothing(PO.AttributionErrorsResult().family)
     # A rule that reads the plug-in variance, or a block with no mask, runs no more passes.
     nopass(s2) = error("no pass")
     reg = trues(2, 3)
@@ -796,8 +803,8 @@ end
     @test PO.attribution_leverage_errors(EntrywiseUnknown(), h1, regh, ses, nopass) === ses
     # A marked pair of the regression: the first pass reads its indicator, the second every
     # pair of the regression.
-    lev = (; sys = 1.0, factor = [0.0, 1.0, NaN], family = nothing)
-    scl = (; sys = 1.0, factor = [1.0, 1.0, NaN], family = nothing)
+    lev = PO.AttributionErrorsResult(; sys = 1.0, factor = [0.0, 1.0, NaN])
+    scl = PO.AttributionErrorsResult(; sys = 1.0, factor = [1.0, 1.0, NaN])
     stub(s2) = count(s2) == 1 ? lev : scl
     out = PO.attribution_leverage_errors(EntrywiseUnknown(), h1, reg, ses, stub)
     @test isnan(out.sys) && isequal(out.factor, [0.1, NaN, NaN]) && isnothing(out.family)

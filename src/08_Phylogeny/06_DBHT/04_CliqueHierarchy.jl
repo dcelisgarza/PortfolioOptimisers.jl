@@ -1,18 +1,18 @@
 """
     clique3(A::MatNum)
 
-Computes the list of 3-cliques in a Maximal Planar Graph (MPG).
+List the 3-cliques of a Maximal Planar Graph (MPG).
 
-This function identifies all 3-cliques (triangles) in the adjacency matrix `A` of a MPG. It returns the candidate cliques, their edge indices, and a matrix listing all unique 3-cliques. Used internally in DBHT and related phylogenetic clustering algorithms.
+The function finds every 3-clique, a triangle, of the graph that `A` holds. It returns the candidate edges, the third vertices that close a triangle on each candidate edge, and the list of the distinct 3-cliques.
 
 # Algorithm
 
  1. Remove the diagonal of `A` and reduce it to a binary matrix.
  2. Form `A2 = A * A`, whose entry counts the paths of length two between a pair.
- 3. Keep the upper triangle of the entries where `A2` and `A` are both non-zero, giving `P`. A stored entry of `P` is an edge whose two ends share at least one neighbour.
- 4. Read the row and the column index of every stored entry of `P` into the two columns of `E`, one row per candidate edge.
- 5. For each candidate edge, intersect the neighbourhoods of its two ends, giving `K3[n]`, the third vertices that close a triangle on it.
- 6. Sort each triple `(E[n, 1], E[n, 2], K3[n][m])` and keep it when it is new, so a triangle found from each of its three edges is stored once.
+ 3. Keep the upper triangle of the entries where `A2` and `A` are both non-zero, which gives `P`. A stored entry of `P` is an edge whose two ends share at least one neighbour.
+ 4. Read the row and the column index of each stored entry of `P` into the two columns of `E`, one row for each candidate edge.
+ 5. For each candidate edge, intersect the neighbourhoods of its two ends, which gives `K3[n]`, the third vertices that close a triangle on the edge.
+ 6. Sort each triple `(E[n, 1], E[n, 2], K3[n][m])` and keep it when it is new. The function finds a triangle from each of its three edges, and it stores the triangle once.
  7. Sort the triples, and write them as the rows of `clique`.
 
 # Arguments
@@ -21,9 +21,9 @@ This function identifies all 3-cliques (triangles) in the adjacency matrix `A` o
 
 # Returns
 
-  - `K3::Vector{Vector{Int}}`: Vector of vectors, each containing the indices of nodes forming a candidate 3-clique.
-  - `E::Matrix{Int}`: Matrix with nonzero indices and entries of candidate cliques (edge pairs).
-  - `clique::Matrix{Int}`: `Nc×3` matrix. Each row lists the three vertices of a unique 3-clique in the MPG.
+  - `K3::Vector{Vector{Int}}`: `K3[n]` holds the vertices that close a triangle on the candidate edge of row `n` of `E`.
+  - `E::Matrix{Int}`: `Ne×2` matrix of the candidate edges, one edge for each row, with the smaller vertex in the first column.
+  - `clique::Matrix{Int}`: `Nc×3` matrix. Each row lists the three vertices of one 3-clique of the MPG in ascending order, and the rows are in lexicographic order.
 
 # Related
 
@@ -71,32 +71,32 @@ end
 """
     FindDisjoint(Adj::MatNum, Cliq::VecNum)
 
-Finds disjointed cliques in an adjacency matrix.
+Split the vertices of a graph into a 3-clique and the sides that the clique separates.
 
-This function identifies nodes that are not adjacent to a given 3-clique in the adjacency matrix, and classifies all nodes into three groups: members of the clique, nodes in the same connected component as the clique, and nodes in a disjoint component.
+The function cuts the three vertices of `Cliq` out of the graph. It then labels each vertex as a vertex of the clique, a vertex that `IndxNot[1]` can reach, or a vertex that `IndxNot[1]` cannot reach.
 
 # Algorithm
 
  1. Copy `Adj` into `Temp`, and collect in `IndxNot` every vertex that is not one of the three of `Cliq`.
- 2. Zero the rows and the columns of `Temp` at `Cliq`, which cuts the clique out of the graph and separates the two sides it was joining.
- 3. Run [`breadth`](@ref) from `IndxNot[1]`, giving `d`, and mark every vertex `d` left at an infinity with `-1`.
+ 2. Set the rows and the columns of `Temp` at `Cliq` to zero. This cuts the clique out of the graph, and it separates the sides that the clique joins.
+ 3. Run [`breadth`](@ref) from `IndxNot[1]`, which gives `d`, and mark with `-1` each vertex at an infinite distance.
  4. Write `1` into `T` at every vertex marked `-1`, and `2` at every other vertex, so `2` is the side that holds `IndxNot[1]`.
  5. Write `0` into `T` at the three vertices of `Cliq`.
 
 # Arguments
 
   - `Adj`: `N × N` adjacency matrix of the MPG. A non-zero entry is an edge.
-  - `Cliq`: `3×1` vector of node indices forming a 3-clique.
+  - `Cliq`: `3×1` vector of the vertices of a 3-clique.
 
 # Returns
 
-  - `T::Vector{Int}`: `N × 1` vector containing the adjacency number of each node:
+  - `T::Vector{Int}`: `N × 1` vector of the side of each vertex.
 
-      + `0` for nodes in the clique,
-      + `1` for nodes in a disjoint component,
-      + `2` for nodes in the same component as the clique.
+      + `0` for a vertex of the clique.
+      + `1` for a vertex that `IndxNot[1]` cannot reach in the graph without the clique.
+      + `2` for a vertex that `IndxNot[1]` can reach, `IndxNot[1]` included.
 
-  - `IndxNot::Vector{Int}`: `N × 1` vector of nodes with no adjacencies to the clique.
+  - `IndxNot::Vector{Int}`: `(N - 3)×1` vector of every vertex that is not a vertex of `Cliq`, in ascending order.
 
 # Related
 
@@ -128,25 +128,25 @@ end
 """
     BuildHierarchy(M::MatNum)
 
-Builds the predicted parent hierarchy for 3-cliques in a Maximal Planar Graph (MPG).
+Find the parent of each 3-clique of a Maximal Planar Graph (MPG).
 
-This function constructs the parent index vector (`Pred`) for each 3-clique, given the node-to-clique membership matrix `M`. It is a core step in the DBHT (Direct Bubble Hierarchical Tree) clustering pipeline, enabling the construction of the clique hierarchy tree.
+The function builds the parent vector `Pred` from the matrix `M`. Column `n` of `M` marks the vertices of 3-clique `n` and of its interior. The parent of a 3-clique is the 3-clique with the fewest marked vertices whose marks hold every mark of it. [`CliqHierarchyTree2s`](@ref) calls this function, and it builds the clique hierarchy from `Pred`.
 
 # Algorithm
 
  1. For each 3-clique `n`, read `Children`, the vertices that column `n` of `M` marks.
- 2. Sum the rows of `M` over `Children`, and take as `Parents` every clique whose sum equals `length(Children)`. Such a clique holds every vertex of clique `n`, so it is a superset of it. Drop `n` itself from that list.
- 3. Set `Pred[n] = 0` when `Parents` is empty, which makes clique `n` a root.
- 4. Otherwise take the parent of the smallest vertex count, which is the smallest superset.
- 5. Return an empty vector when two parents tie on the smallest count, which reports that no hierarchy was built. The loop stops at that point, so no later clique writes to the empty vector.
+ 2. Sum the rows of `M` over `Children`, and take as `Parents` every clique whose sum equals `length(Children)`. The column of such a clique marks every vertex that column `n` marks, so the clique is a superset of clique `n`. Drop `n` from that list.
+ 3. Set `Pred[n] = 0` when `Parents` is empty, which makes clique `n` a root candidate.
+ 4. Otherwise set `Pred[n]` to the parent with the fewest marked vertices, the smallest superset.
+ 5. When two parents have the same smallest count, return an empty vector. The empty vector tells the caller that the function built no hierarchy, and the loop stops at that point.
 
 # Arguments
 
-  - `M`: `N × Nc` binary matrix of node-to-3-clique memberships, where `M[i, n] = 1` if node `i` belongs to 3-clique `n`.
+  - `M`: `N × Nc` binary matrix. `M[i, n] = 1` when vertex `i` is a vertex of 3-clique `n` or of its interior. Step 3 of [`CliqHierarchyTree2s`](@ref) states which side of the graph is the interior.
 
 # Returns
 
-  - `Pred::Vector{Int}`: `Nc×1` vector of predicted parent indices for each 3-clique. `Pred[n] = 0` indicates a root clique. It is empty when step 5 of the algorithm fired.
+  - `Pred::Vector{Int}`: `Nc×1` vector of the parent of each 3-clique, an index into the columns of `M`. `Pred[n] = 0` marks a root candidate. The vector is empty when step 5 of the algorithm returns.
 
 # Related
 
@@ -180,24 +180,24 @@ end
     AdjCliq(A::MatNum, CliqList::MatNum,
             CliqRoot::VecNum)
 
-Find adjacent cliques to the root candidates in a Maximal Planar Graph (MPG).
+Find the pairs of root candidates of a Maximal Planar Graph (MPG) that share an edge.
 
-This function computes the adjacency matrix among root candidate 3-cliques. Two root candidates are adjacent when they share exactly two vertices. Used internally by [`CliqueRoot`](@ref) with [`EqualRoot`](@ref) to construct a root from the adjacency tree of all root candidates.
+The function computes the adjacency matrix of the root candidates, which are 3-cliques. Two root candidates are adjacent when they share exactly two vertices. The [`EqualRoot`](@ref) method of [`CliqueRoot`](@ref) calls it to join the root candidates to each other.
 
-`A` is read for its size and for nothing else, and no edge of the MPG reaches the answer. Nothing is lost by that. Every row of `CliqList` is a 3-clique of the MPG, so two rows that share two vertices both hold the edge between those two vertices. The count of the shared vertices is therefore the test for adjacency in the graph.
+The function reads only the size of `A`, and no edge of the MPG changes the result. The result loses nothing by that. Every row of `CliqList` is a 3-clique of the MPG, so two rows that share two vertices both hold the edge between those two vertices. Thus the count of the shared vertices is the test for adjacency in the graph.
 
 # Algorithm
 
  1. Clear `Indicator`, then mark in it the three vertices of root candidate `n`.
- 2. Read `Indicator` back at the three vertex columns of every root candidate, giving `Indi`.
+ 2. Read `Indicator` back at the three vertex columns of every root candidate, which gives `Indi`.
  3. Take the root candidates whose row of `Indi` sums to `2`, and set their entries of column `CliqRoot[n]` of `Adj` to one.
  4. Repeat from step 1 for the next candidate. The test of step 3 is symmetric, so `Adj` needs no symmetrisation.
 
 # Arguments
 
-  - `A`: `N × N` adjacency matrix of the MPG. Only `size(A, 1)` is read, which sets the length of `Indicator`.
-  - `CliqList`: `Nc×3` matrix. Each row lists the three vertices of a 3-clique in the MPG.
-  - `CliqRoot`: Vector of indices of root candidate cliques, indexing the rows of `CliqList`.
+  - `A`: `N × N` adjacency matrix of the MPG. The function reads only `size(A, 1)`, which sets the length of `Indicator`.
+  - `CliqList`: `Nc×3` matrix. Each row lists the three vertices of a 3-clique of the MPG.
+  - `CliqRoot`: Vector of the indices of the root candidates, which index the rows of `CliqList`.
 
 # Returns
 
@@ -230,28 +230,28 @@ end
 """
     CliqueRoot(::UniqueRoot, Root::VecNum, Pred::VecNum, Nc::Integer, args...)
 
-Construct the hierarchical adjacency matrix for 3-cliques in a Maximal Planar Graph (MPG) using the unique root selection method.
+Build the adjacency matrix of the clique hierarchy of a Maximal Planar Graph (MPG) with one root.
 
-This method enforces a unique root in the clique hierarchy. If multiple root candidates are present, a synthetic root is created and all root candidates are attached to it. Used internally by [`CliqHierarchyTree2s`](@ref) when the root selection method is [`UniqueRoot`](@ref).
+When the hierarchy has more than one root candidate, this method adds a synthetic root clique and makes it the parent of every root candidate. [`CliqHierarchyTree2s`](@ref) calls it when its `root` is [`UniqueRoot`](@ref).
 
 # Algorithm
 
- 1. When more than one root candidate exists, append a synthetic clique to `Pred` and set the parent of every root candidate to it. `Pred` is mutated in place, so the caller's vector gains that entry.
+ 1. When more than one root candidate exists, append a synthetic clique to `Pred` and set the parent of every root candidate to it. The method changes `Pred` in place, so the vector of the caller gets that entry.
  2. Allocate `H` over `Nc + 1` rows and columns, which is the room the synthetic clique of step 1 needs.
  3. Write `H[n, Pred[n]] = 1` for every clique that has a parent.
  4. Symmetrise `H`.
 
 # Arguments
 
-  - `::UniqueRoot`: Root selection method enforcing a unique root.
-  - `Root`: Vector of indices of root candidate cliques, indexing the entries of `Pred`.
-  - `Pred`: `Nc×1` vector of predicted parent indices for each clique.
+  - `::UniqueRoot`: Root selection method that makes one root.
+  - `Root`: Vector of the indices of the root candidates, which index the entries of `Pred`.
+  - `Pred`: `Nc×1` vector of the parent of each 3-clique, from [`BuildHierarchy`](@ref).
   - `Nc`: Number of 3-cliques.
-  - `args...`: Additional arguments (ignored for this method). [`CliqHierarchyTree2s`](@ref) passes the adjacency matrix and the clique list here, which the [`EqualRoot`](@ref) method reads and this one does not.
+  - `args...`: Positional arguments, which this method ignores. [`CliqHierarchyTree2s`](@ref) passes the adjacency matrix and the clique list here. The [`EqualRoot`](@ref) method reads them, and this method does not.
 
 # Returns
 
-  - `H::SparseMatrixCSC{Int, Int}`: `(Nc + 1)×(Nc + 1)` symmetric adjacency matrix representing the hierarchical tree of 3-cliques. Row and column `Nc + 1` hold the synthetic root, and they are empty when step 1 of the algorithm did not fire.
+  - `H::SparseMatrixCSC{Int, Int}`: `(Nc + 1)×(Nc + 1)` symmetric adjacency matrix of the hierarchy tree of the 3-cliques. Row and column `Nc + 1` hold the synthetic root. They are empty when the hierarchy has one root candidate.
 
 # Related
 
@@ -278,29 +278,29 @@ end
     CliqueRoot(::EqualRoot, Root::VecNum, Pred::VecNum, Nc::Integer,
                A::MatNum, CliqList::MatNum)
 
-Construct the hierarchical adjacency matrix for 3-cliques in a Maximal Planar Graph (MPG) using the equal root selection method.
+Build the adjacency matrix of the clique hierarchy of a Maximal Planar Graph (MPG), with the root candidates joined to each other.
 
-This method creates a root from the adjacency tree of all root candidate cliques, allowing for multiple equally plausible roots in the DBHT hierarchy. It is used internally by [`CliqHierarchyTree2s`](@ref) when the root selection method is [`EqualRoot`](@ref).
+This method adds no root clique. It joins two root candidates when they share two vertices, so the hierarchy keeps every root candidate. [`CliqHierarchyTree2s`](@ref) calls it when its `root` is [`EqualRoot`](@ref).
 
 # Algorithm
 
- 1. When more than one root candidate exists, build the adjacency `Adj` among the candidates with [`AdjCliq`](@ref). One candidate alone has nothing to be joined to, so `Adj` is a zero matrix in that case, which makes step 4 add nothing.
+ 1. When more than one root candidate exists, build the adjacency `Adj` of the candidates with [`AdjCliq`](@ref). One candidate has no other candidate to join, so `Adj` is a zero matrix in that case, and step 4 adds nothing.
  2. Allocate `H` over `Nc` rows and columns. This method adds no synthetic clique, so it needs no extra row.
  3. Write `H[n, Pred[n]] = 1` for every clique that has a parent.
  4. Return a `0 × 0` matrix when `Pred` is empty. Otherwise symmetrise `H` and add `Adj` to it, which joins the root candidates to each other.
 
 # Arguments
 
-  - `::EqualRoot`: Root selection method that creates a root from the adjacency tree of all root candidates.
-  - `Root`: Vector of indices of root candidate cliques, indexing the entries of `Pred`.
-  - `Pred`: `Nc×1` vector of predicted parent indices for each clique.
+  - `::EqualRoot`: Root selection method that joins the root candidates to each other.
+  - `Root`: Vector of the indices of the root candidates, which index the entries of `Pred`.
+  - `Pred`: `Nc×1` vector of the parent of each 3-clique, from [`BuildHierarchy`](@ref).
   - `Nc`: Number of 3-cliques.
-  - `A`: `N × N` adjacency matrix of the MPG. It is forwarded to [`AdjCliq`](@ref), which reads its size alone.
-  - `CliqList`: `Nc×3` matrix. Each row vector lists the three vertices consisting of a 3-clique in the MPG.
+  - `A`: `N × N` adjacency matrix of the MPG. The method passes it to [`AdjCliq`](@ref), which reads only its size.
+  - `CliqList`: `Nc×3` matrix. Each row lists the three vertices of a 3-clique of the MPG.
 
 # Returns
 
-  - `H::SparseMatrixCSC{Int, Int}`: `Nc×Nc` symmetric adjacency matrix representing the hierarchical tree of 3-cliques, or a `0 × 0` matrix when `Pred` is empty.
+  - `H::SparseMatrixCSC{Int, Int}`: `Nc×Nc` symmetric adjacency matrix of the hierarchy of the 3-cliques, or a `0 × 0` matrix when `Pred` is empty.
 
 # Related
 
@@ -334,17 +334,17 @@ end
 """
     CliqHierarchyTree2s(Apm::MatNum, root::DBHTRootMethod = UniqueRoot())
 
-Construct the clique and bubble hierarchy trees for a Maximal Planar Graph (MPG) using the DBHT (Direct Bubble Hierarchical Tree) approach.
+Build the clique hierarchy and the bubble tree of a Maximal Planar Graph (MPG), as the Direct Bubble Hierarchical Tree (DBHT) method needs them.
 
-This function builds the hierarchical structure of 3-cliques (triangles) and bubbles from the adjacency matrix of a planar graph, supporting different root selection strategies via the `root` argument. It is a core routine for DBHT clustering and related phylogenetic analyses.
+The function builds the hierarchy of the 3-cliques and the tree of the bubbles from the adjacency matrix of a planar graph. The `root` argument selects the rule for the root of the clique hierarchy.
 
-`root` is a **positional** argument, and every caller passes it positionally.
+`root` is a positional argument, and every caller passes it as one.
 
 # Algorithm
 
- 1. Reduce `Apm` to the binary adjacency `A`, and list every 3-clique of it with [`clique3`](@ref), giving `CliqList`.
+ 1. Reduce `Apm` to the binary adjacency `A`, and list every 3-clique of it with [`clique3`](@ref), which gives `CliqList`.
  2. For each 3-clique, cut it out of the graph with [`FindDisjoint`](@ref), which splits the vertices into the clique `indx0`, the side `indx1` that the cut separated, and the side `indx2` that stayed connected.
- 3. Take the smaller of the two sides, together with the clique, as the separated set `indx_s`. A tie takes `indx1`, the side the cut separated. Record `length(indx_s) - 3` in `Sb[n]`, and mark the vertices of `indx_s` in column `n` of `M`.
+ 3. Take the smaller of the two sides, together with the clique, as the separated set `indx_s`. A tie takes `indx1`, the side that the cut separated. The smaller side is the interior of the clique in [NHPG](@cite), Definition 2.2, and that definition does not decide a tie. Record `length(indx_s) - 3` in `Sb[n]`, and mark the vertices of `indx_s` in column `n` of `M`.
  4. Build the parent vector `Pred` from `M` with [`BuildHierarchy`](@ref), and read the root candidates `Root` off it.
  5. Build the clique hierarchy `H` with [`CliqueRoot`](@ref), through the branch `root` selects.
  6. When `H` is non-empty, build the bubble hierarchy `H2` and the bubble membership `Mb` with [`BubbleHierarchy`](@ref), reduce `H2` to binary, and trim `Mb` to the rows of `CliqList`.
@@ -352,16 +352,16 @@ This function builds the hierarchical structure of 3-cliques (triangles) and bub
 
 # Arguments
 
-  - `Apm`: `N × N` adjacency matrix of the MPG, where nonzero entries indicate edges. Only the sparsity pattern is read, so a weighted matrix and its binary form give the same answer.
+  - `Apm`: `N × N` adjacency matrix of the MPG. A non-zero entry is an edge. The function reads only the sparsity pattern, so a weighted matrix and its binary form give the same result.
   - `root`: Root selection method for the clique hierarchy.
 
 # Returns
 
-  - `H::SparseMatrixCSC{Int, Int}`: Symmetric adjacency matrix representing the hierarchical tree of 3-cliques. Its size is set by the [`CliqueRoot`](@ref) method that `root` selects.
-  - `H2::SparseMatrixCSC{Int, Int}`: `Nb×Nb` symmetric adjacency matrix representing the bubble hierarchy tree, where `Nb` is the number of bubbles.
-  - `Mb::Matrix{Int}`: Bubble membership matrix for 3-cliques (`Nc×Nb`), where `Mb[n, bi] = 1` indicates 3-clique `n` belongs to bubble `bi`.
-  - `CliqList::Matrix{Int}`: List of 3-cliques (`Nc×3`), each row contains the vertex indices of a 3-clique.
-  - `Sb::Vector{Int}`: `Nc×1` vector indicating the size of the separating set for each 3-clique.
+  - `H::SparseMatrixCSC{Int, Int}`: Symmetric adjacency matrix of the hierarchy of the 3-cliques. The [`CliqueRoot`](@ref) method that `root` selects sets its size.
+  - `H2::SparseMatrixCSC`: `Nb×Nb` symmetric adjacency matrix of the bubble tree with `Bool` entries, where `Nb` is the number of bubbles. It is a `0 × 0` matrix of `Int` when `H` is empty.
+  - `Mb::AbstractMatrix{Int}`: `Nc×Nb` dense bubble membership matrix of the 3-cliques. `Mb[n, bi] = 1` means that 3-clique `n` belongs to bubble `bi`. It is a `0 × 0` sparse matrix when `H` is empty.
+  - `CliqList::Matrix{Int}`: `Nc×3` list of the 3-cliques. Each row holds the three vertices of one 3-clique.
+  - `Sb::Vector{Int}`: `Nc×1` vector of the number of vertices in the interior of each 3-clique. An entry is positive exactly when its 3-clique separates the graph.
 
 # Related
 
@@ -373,7 +373,7 @@ This function builds the hierarchical structure of 3-cliques (triangles) and bub
 
 # References
 
-  - $(ref_dict[:NHPG])
+  - $(ref_dict[:NHPG]) Definition 2.2 for the interior, Definition 3.2 and Corollary 3.6 for `H`, and Definitions 4.3 and 5.1 for the bubbles and `H2`.
 """
 function CliqHierarchyTree2s(Apm::MatNum, root::DBHTRootMethod = UniqueRoot())
     N = size(Apm, 1)::Int

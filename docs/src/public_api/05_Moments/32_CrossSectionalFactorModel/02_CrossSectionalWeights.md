@@ -19,3 +19,10 @@ cs_weights_initial
 cs_weights_refine
 needs_second_pass
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

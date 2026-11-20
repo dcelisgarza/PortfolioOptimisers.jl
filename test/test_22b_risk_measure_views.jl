@@ -12,8 +12,7 @@ include(joinpath(@__DIR__, "test22_setup.jl"))
                                                                                               pdm = nothing))))
 
     resa = optimise(NestedClustered(; cle = clr,
-                                    opti = MeanRisk(; r = Kurtosis(; mu = pr.mu),
-                                                    opt = jopti),
+                                    opti = MeanRisk(; r = Kurtosis(), opt = jopti),
                                     opto = MeanRisk(; r = Kurtosis(), opt = jopto)), rd)
     resb = optimise(NestedClustered(; cle = clr,
                                     opti = MeanRisk(; r = Kurtosis(; kt = pr.kt),

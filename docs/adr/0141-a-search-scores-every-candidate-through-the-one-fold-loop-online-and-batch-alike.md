@@ -164,3 +164,19 @@ ADR 0120 forbids, and neither regime of the oracle does it.
   `Turnover` term, where the oracle keeps the last successful weights. That is the fold loop's,
   batch and online alike, and belongs with the previous-weights map that
   [#1004](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1004) seeds.
+
+## Amendment (2026-11-15)
+
+[#2123](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/2123) removes `pin_draw`. A
+search now splits its scheme once and passes the split to the call of each candidate, through
+`fit_and_predict(opt_i, rd, gscv.cv, cv; ex = SequentialEx())` for an optimiser and
+`cross_val_predict(pipe_i, data, gscv.cv, cv; ex = SequentialEx())` for a `Pipeline`. The fourth
+argument is the split, and its default splits the data, so a caller that passes the scheme alone
+does not change. The scheme stays an argument, because the fold loop reads its evaluation settings
+and its fold predicates.
+
+- Every candidate scores the folds of the one split. So a `MultipleRandomised` with no `seed`
+  draws from its `rng` once, and the search no longer writes a seed into the scheme.
+- A search of `N` candidates splits once, not `1 + N` times. The combinatorial methods split once
+  too.
+- The `WeightMassScorer` of ADR 0225 takes the same route.

@@ -7,3 +7,10 @@ Description = "Phylogeny Matrix, public API of PortfolioOptimisers.jl: phylogeny
 ```@docs
 phylogeny_matrix
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

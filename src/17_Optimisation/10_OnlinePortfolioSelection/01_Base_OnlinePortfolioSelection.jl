@@ -9,8 +9,8 @@ The rule is the only part of the online portfolio selection family that changes 
 
 To implement a new rule, subtype `AbstractOnlinePortfolioSelectionAlgorithm` with the parameters that the rule needs and a `proj` field, and implement the following methods:
 
-  - `online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet) -> Tuple`: The Online Update. It reads the state `st` of the rule, the allocation `w` held during the period, the finite price relative `x` of the period and the rows that the head holds through the period. It returns `(st', w')`, the state of the rule and the allocation for the next period. It may write `st` in place, and it always returns a new vector for `w'`. A first-order rule also implements the seven-argument form, whose last argument is the Gradient Point that an [`ExpertMixture`](@ref) gives it. The generic method of that form drops the point.
-  - `rule_state_seed(alg::AbstractOnlinePortfolioSelectionAlgorithm, w::AbstractVector)`: The state of the rule before the first update, or `nothing` for a rule that keeps no state. `w` is the Start Allocation, and the state takes its length and its element type. The head calls the three-argument form, `rule_state_seed(alg, w, set)`, with its Allocation Set, and the default method of that form drops `set`. A rule that holds allocations of its own over the assets, as the experts of an [`ExpertMixture`](@ref) are, implements the three-argument form and projects them onto `set`.
+  - `online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet, point::Option{<:AbstractVector} = nothing) -> Tuple`: The Online Update. It reads the state `st` of the rule, the allocation `w` held during the period, the finite price relative `x` of the period and the rows that the head holds through the period. It returns `(st', w')`, the state of the rule and the allocation for the next period. It may write `st` in place, and it always returns a new vector for `w'`. The last slot is the Gradient Point that an [`ExpertMixture`](@ref) gives its experts. A first-order rule evaluates its gradient there, and reads `nothing` as its own point. Every other rule ignores the slot, and it still takes it, because the mixture passes it to every expert.
+  - `rule_state_seed(alg::AbstractOnlinePortfolioSelectionAlgorithm, w::AbstractVector, set::Option{<:AbstractAllocationSet} = nothing)`: The state of the rule before the first update, or `nothing` for a rule that keeps no state. `w` is the Start Allocation, and the state takes its length and its element type. The head calls the method with its Allocation Set. A rule whose state reads only `w` ignores the slot. A rule that holds allocations of its own over the assets, as the experts of an [`ExpertMixture`](@ref) are, projects them onto `set`.
   - `rows_needed(alg::AbstractOnlinePortfolioSelectionAlgorithm) -> Union{Nothing, Integer}`: The number of rows that the rule reads at a step. It is `0` for a rule that reads none, and `nothing` for a rule that reads every row folded so far.
   - `projection_geometry(alg::AbstractOnlinePortfolioSelectionAlgorithm) -> AbstractProjectionGeometry`: The geometry in which the head projects the Start Allocation. It is the rule's `proj` field by default.
 
@@ -41,7 +41,8 @@ julia> struct FixedTarget{T1, T2} <: PortfolioOptimisers.AbstractOnlinePortfolio
 
 julia> function PortfolioOptimisers.online_update!(alg::FixedTarget, st, w::AbstractVector,
                                                    x::AbstractVector, rows,
-                                                   set::PortfolioOptimisers.AbstractAllocationSet)
+                                                   set::PortfolioOptimisers.AbstractAllocationSet,
+                                                   ::PortfolioOptimisers.Option{<:AbstractVector} = nothing)
            wh = PortfolioOptimisers.price_adjusted_allocation(w, x)
            return st, PortfolioOptimisers.project(alg.proj, set, alg.q, wh)
        end
@@ -189,7 +190,7 @@ EuclideanProjection()
 
 # References
 
-  - $(ref_dict[:duchi2008])
+  - $(ref_dict[:duchi2008]) Section 3, Equations 3 to 6 and Figure 1.
 """
 struct EuclideanProjection <: AbstractProjectionGeometry end
 """
@@ -235,7 +236,7 @@ EntropicProjection()
 
 # References
 
-  - $(ref_dict[:helmbold1998])
+  - $(ref_dict[:helmbold1998]) Section 3, Equations 3.2 and 3.3.
 """
 struct EntropicProjection <: AbstractProjectionGeometry end
 """
@@ -305,7 +306,7 @@ GramProjection
 
 # References
 
-  - $(ref_dict[:agarwal2006])
+  - $(ref_dict[:agarwal2006]) Section 3, Figure 1 and Theorem 1.
 """
 @concrete struct GramProjection <: AbstractProjectionGeometry
     """
@@ -345,7 +346,7 @@ function gram_geometry(proj::AbstractProjectionGeometry, ::AbstractMatrix)
     return proj
 end
 function gram_geometry(proj::GramProjection, A::AbstractMatrix)
-    return GramProjection(; slv = proj.slv, A = A)
+    return rebuild_struct(proj, (; A = A))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -377,7 +378,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     BoundedAllocationSet(;
-        wb::Option{<:WbE_Wb} = WeightBounds(),
+        wb::Option{<:NameWbE_Wb} = WeightBounds(),
         sets::Option{<:UniverseSets} = nothing
     ) -> BoundedAllocationSet
 
@@ -386,13 +387,14 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`. An `IsNothingError` is thrown otherwise.
+  - `wb` is a [`NameWbE_Wb`](@ref). A bound that reads the returns, such as a [`ScoreWeightBounds`](@ref), would read rows after each Online Update, so the field bound refuses it with a `TypeError`.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `wb`: Recursively viewed via [`port_opt_view`](@ref).
-  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `wb`: Recursively viewed through [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -414,7 +416,7 @@ BoundedAllocationSet
 
 # References
 
-  - $(ref_dict[:duchi2008])
+  - $(ref_dict[:duchi2008]) Section 3, Figure 1.
 """
 @propagatable @concrete struct BoundedAllocationSet <: AbstractAllocationSet
     """
@@ -425,7 +427,7 @@ BoundedAllocationSet
     $(field_dict[:sets])
     """
     @vprop sets
-    function BoundedAllocationSet(wb::Option{<:WbE_Wb}, sets::Option{<:UniverseSets})
+    function BoundedAllocationSet(wb::Option{<:NameWbE_Wb}, sets::Option{<:UniverseSets})
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
@@ -433,16 +435,19 @@ BoundedAllocationSet
         return new{typeof(wb), typeof(sets)}(wb, sets)
     end
 end
-function BoundedAllocationSet(; wb::Option{<:WbE_Wb} = WeightBounds(),
+function BoundedAllocationSet(; wb::Option{<:NameWbE_Wb} = WeightBounds(),
                               sets::Option{<:UniverseSets} = nothing)::BoundedAllocationSet
     return BoundedAllocationSet(wb, sets)
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    resolve_allocation_set(set::BoundedAllocationSet, N::Integer, strict::Bool, datatype::DataType)
+    resolve_allocation_set(set::Nothing, N::Integer, strict::Bool, datatype::DataType)
 
 Resolves the weight bounds of a [`BoundedAllocationSet`](@ref) to vectors over `N` assets.
 
 [`weight_bounds_constraints`](@ref) does the work, with the set's `sets` for a bound that names assets. A [`WeightBoundsEstimator`](@ref) resolves a side that it states as a scalar to that scalar, and the projections read a bound at each asset. So a second call expands the resolved pair to `N` entries. The set that comes back keeps its `sets`.
+
+The empty slot, `nothing`, resolves to the bare simplex over `N` assets, the resolved default `BoundedAllocationSet()`. An [`ExpertMixture`](@ref) that holds no Expert Set reads it.
 
 # Related
 
@@ -455,6 +460,9 @@ function resolve_allocation_set(set::BoundedAllocationSet, N::Integer, strict::B
                                    datatype = datatype)
     wb = weight_bounds_constraints(wb; N = N, datatype = datatype)
     return BoundedAllocationSet(; wb = wb, sets = set.sets)
+end
+function resolve_allocation_set(::Nothing, N::Integer, strict::Bool, datatype::DataType)
+    return resolve_allocation_set(BoundedAllocationSet(), N, strict, datatype)
 end
 function rows_needed(::BoundedAllocationSet)
     return 0
@@ -631,7 +639,7 @@ A root found from the kinks is exact on every input whose kinks floating point c
 
  1. When `isapprox(sum(wn), 1)` holds, return `wn`. The default tolerance of `isapprox` is a relative error of `sqrt(eps)` of the element type, `1.49e-8` for `Float64`.
  2. Otherwise, record a Held Step on the current [`ProjectionStep`](@ref) with [`record_held_step!`](@ref). Its reason names the set, the geometry and the sum, and it has no solver trials.
- 3. Return a copy of `w`, as a failed [`projection_programme`](@ref) does.
+ 3. Return a copy of `w`, as a failed projection programme of [`project`](@ref) does.
 
 # Arguments
 
@@ -1014,7 +1022,7 @@ The exact projection of such a vector lifts every zero entry by ``(1 - s) / N`` 
 
 # References
 
-  - $(ref_dict[:duchi2008])
+  - $(ref_dict[:duchi2008]) Section 3, Equations 3 to 6 and Figure 1.
 """
 function project_simplex(v::AbstractVector)
     s = sum(v)
@@ -1070,8 +1078,7 @@ function budget_rounding(::Type{T}, n::Integer) where {T}
     return (n + 1) * eps(T)
 end
 """
-    online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet)
-    online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet, point::Option{<:AbstractVector})
+    online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet, point::Option{<:AbstractVector} = nothing)
 
 Runs the Online Update, one row of the online portfolio selection recursion, which each rule writes once.
 
@@ -1079,7 +1086,7 @@ The function reads the rule, the state `st` of the rule, the allocation `w` held
 
 Every rule makes the same two steps. It takes an unconstrained step to a raw vector, and it then calls [`project`](@ref) onto the set in its geometry. A rule that reads `w` continues from the allocation it gets, which is the Start Allocation on the first row.
 
-The seven-argument form names the **Gradient Point**. An [`ExpertMixture`](@ref) under [`BlendPoint`](@ref) gives every expert its played blend as `point`. A first-order rule then evaluates its gradient at that point and steps from its own iterate, so every expert reads the one gradient on which the dynamic-regret mixtures state their bounds. The generic method drops the point and runs the six-argument update. So a rule with no gradient ignores the point, and a `nothing` point, which the mixture gives under [`OwnPoint`](@ref), runs the six-argument update for every rule. [`MirrorDescent`](@ref), [`OptimisticStep`](@ref) and [`AdaptiveSubgradient`](@ref) read a given point.
+The last slot is the **Gradient Point**, and each method takes it as a defaulted positional slot, `point::Option{<:AbstractVector} = nothing`. An [`ExpertMixture`](@ref) under [`BlendPoint`](@ref) gives every expert its played blend as `point`. A first-order rule then evaluates its gradient at that point and steps from its own iterate, so every expert reads the one gradient on which the dynamic-regret mixtures state their bounds. A rule with no gradient ignores the slot. A `nothing` point, which the head and the mixture under [`OwnPoint`](@ref) give, is the rule's own point. [`MirrorDescent`](@ref), with or without a predictor, and [`AdaptiveSubgradient`](@ref) read a given point.
 
 # Mathematical definition
 
@@ -1122,11 +1129,6 @@ Where:
   - [`ExpertMixture`](@ref)
 """
 function online_update! end
-function online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st,
-                        w::AbstractVector, x::AbstractVector, rows,
-                        set::AbstractAllocationSet, ::Option{<:AbstractVector})
-    return online_update!(alg, st, w, x, rows, set)
-end
 """
     price_relative(r::Number)
 
@@ -1156,13 +1158,12 @@ function price_relative(r::Number)
     return isfinite(r) ? one(r) + r : one(r)
 end
 """
-    rule_state_seed(::AbstractOnlinePortfolioSelectionAlgorithm, ::AbstractVector)
-    rule_state_seed(alg::AbstractOnlinePortfolioSelectionAlgorithm, w::AbstractVector,
-                    set::Option{<:AbstractAllocationSet})
+    rule_state_seed(::AbstractOnlinePortfolioSelectionAlgorithm, ::AbstractVector,
+                    ::Option{<:AbstractAllocationSet} = nothing)
 
 Returns the state that a rule holds before its first update. The default is `nothing`, for a rule that keeps no state.
 
-The head calls the three-argument form with its Allocation Set, and the default method of that form drops `set`. So a rule whose state reads only the Start Allocation implements the two-argument form. A rule that holds allocations of its own over the assets, as an [`ExpertMixture`](@ref) and a [`FollowTheLeadingHistory`](@ref) hold their experts, implements the three-argument form. It projects each allocation onto `set`, as the head projects its `w0`. When `set` is `nothing`, the method projects nothing.
+The head calls the three-argument form with its Allocation Set, and each method takes `set` as a defaulted positional slot, `set::Option{<:AbstractAllocationSet} = nothing`. A rule whose state reads only the Start Allocation ignores the slot. A rule that holds allocations of its own over the assets, as an [`ExpertMixture`](@ref) and a [`FollowTheLeadingHistory`](@ref) hold their experts, reads it. It projects each allocation onto `set`, as the head projects its `w0`. When `set` is `nothing`, the method projects nothing.
 
 # Related
 
@@ -1170,12 +1171,9 @@ The head calls the three-argument form with its Allocation Set, and the default 
   - [`OnlinePortfolioSelectionState`](@ref)
   - [`project_start`](@ref)
 """
-function rule_state_seed(::AbstractOnlinePortfolioSelectionAlgorithm, ::AbstractVector)
+function rule_state_seed(::AbstractOnlinePortfolioSelectionAlgorithm, ::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
     return nothing
-end
-function rule_state_seed(alg::AbstractOnlinePortfolioSelectionAlgorithm, w::AbstractVector,
-                         ::Option{<:AbstractAllocationSet})
-    return rule_state_seed(alg, w)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1242,6 +1240,121 @@ function rows_needed_max(::Integer, ::Nothing)
 end
 function rows_needed_max(a::Integer, b::Integer)
     return max(a, b)
+end
+"""
+    rule_tree_fields(alg::AbstractOnlinePortfolioSelectionAlgorithm)
+
+Returns the names of the fields of a rule whose type can hold a rule, a vector of rules or an optimisation estimator.
+
+These fields are the rule tree that a schedule can reach. A schedule stands only in an optimiser, and a rule holds an optimiser only as the leader of a [`FollowTheLeader`](@ref). A rule over rules, such as an [`ExpertMixture`](@ref) or a [`FollowTheLeadingHistory`](@ref), holds a leader through its sub-rules. A generated function computes the tuple once for each type of rule, from the field types, as [`time_dependent_candidate_fields`](@ref) does. So a rule that holds no optimiser and no rule gives an empty tuple at compile time, and the walks of [`is_time_dependent`](@ref) and [`update_time_dependent_estimator`](@ref) read none of its fields.
+
+# Related
+
+  - [`AbstractOnlinePortfolioSelectionAlgorithm`](@ref)
+  - [`is_time_dependent`](@ref)
+  - [`update_time_dependent_estimator`](@ref)
+"""
+@generated function rule_tree_fields(::T) where {T <:
+                                                 AbstractOnlinePortfolioSelectionAlgorithm}
+    fns = Tuple(f
+                for f in fieldnames(T)
+                if typeintersect(fieldtype(T, f),
+                                 Union{AbstractOnlinePortfolioSelectionAlgorithm,
+                                       AbstractVector{<:AbstractOnlinePortfolioSelectionAlgorithm},
+                                       OptimisationEstimator}) !== Union{})
+    return :($fns)
+end
+"""
+    is_time_dependent(alg::AbstractOnlinePortfolioSelectionAlgorithm)
+    is_time_dependent(v::AbstractVector{<:AbstractOnlinePortfolioSelectionAlgorithm})
+    assert_time_dependent_fold_count(alg::AbstractOnlinePortfolioSelectionAlgorithm, n::Integer, all_binds::Bool = true)
+    assert_time_dependent_fold_count(v::AbstractVector{<:AbstractOnlinePortfolioSelectionAlgorithm}, n::Integer, all_binds::Bool = true)
+    update_time_dependent_estimator(alg::AbstractOnlinePortfolioSelectionAlgorithm, ctx::TimeDependentContext, all_binds::Bool = true)
+    update_time_dependent_estimator(v::AbstractVector{<:AbstractOnlinePortfolioSelectionAlgorithm}, ctx::TimeDependentContext, all_binds::Bool = true)
+
+Walks the rule tree for the schedules in the optimisers that the rules hold.
+
+A rule is static, but the leader of a [`FollowTheLeader`](@ref) is an optimiser, and a field of the leader can hold a [`TimeDependent`](@ref). The leader solves at each step of the head, and its `optimise` resets every schedule to its fold-less value first. So the fold loop of the head must resolve these schedules at the fold, before the step reads the leader. The [`OnlinePortfolioSelection`](@ref) methods of the three verbs call these methods on `alg`, as a JuMP head calls them on its inner [`JuMPOptimiser`](@ref).
+
+The walk reads the fields of [`rule_tree_fields`](@ref). A field that holds a rule or a vector of rules recurses, and a field that holds an optimiser takes the method of the optimiser. A rule that holds no schedule answers `false`, checks nothing, and comes back as the same object, so the head is not rebuilt for it. The leader has no inner fold loop, so the head's loop is the nearest loop of each schedule in it, and the walk passes `all_binds` on unchanged. The fold-less value needs no walk, because each leader resets its own schedules in its own `optimise`.
+
+# Algorithm
+
+The update of a rule:
+
+ 1. Return `alg` unchanged when [`is_time_dependent`](@ref) is `false` for it.
+ 2. Read the names `fns` of the fields of the rule tree with [`rule_tree_fields`](@ref).
+ 3. Resolve the value of each field in `fns` at `ctx` with [`update_time_dependent_estimator`](@ref).
+ 4. Rebuild `alg` with the resolved values through [`rebuild_struct`](@ref).
+
+The update of a vector of rules returns `v` unchanged when no rule in it holds a schedule. Otherwise it maps the update of a rule over `v`.
+
+# Arguments
+
+  - `alg`: The rule.
+  - `v`: A vector of rules, such as the experts of an [`ExpertMixture`](@ref).
+  - `n`: The number of folds.
+  - `ctx`: The context of the fold.
+  - `all_binds`: As [`update_time_dependent_estimator`](@ref) takes it.
+
+# Validation
+
+  - Each vector schedule in the tree has `n` entries, else a `DimensionMismatch` that names the field is thrown, through [`assert_time_dependent_fold_count`](@ref).
+
+# Returns
+
+  - `flag::Bool`: `true` when an optimiser in the tree holds a schedule.
+  - `alg`: The rule, with each schedule in its tree resolved at the fold. A vector of rules gives a vector.
+
+# Related
+
+  - [`rule_tree_fields`](@ref)
+  - [`OnlinePortfolioSelection`](@ref)
+  - [`online_step_fold`](@ref)
+  - [`TimeDependent`](@ref)
+"""
+function is_time_dependent(alg::AbstractOnlinePortfolioSelectionAlgorithm)
+    return any(f -> is_time_dependent(getfield(alg, f)), rule_tree_fields(alg))
+end
+function is_time_dependent(v::AbstractVector{<:AbstractOnlinePortfolioSelectionAlgorithm})
+    return any(is_time_dependent, v)
+end
+function schedule_reads_previous_weights(alg::AbstractOnlinePortfolioSelectionAlgorithm)::Bool
+    return any(f -> schedule_reads_previous_weights(getfield(alg, f)),
+               rule_tree_fields(alg))
+end
+function schedule_reads_previous_weights(v::AbstractVector{<:AbstractOnlinePortfolioSelectionAlgorithm})::Bool
+    return any(schedule_reads_previous_weights, v)
+end
+function assert_time_dependent_fold_count(alg::AbstractOnlinePortfolioSelectionAlgorithm,
+                                          n::Integer, all_binds::Bool = true)::Nothing
+    for f in rule_tree_fields(alg)
+        assert_time_dependent_fold_count(getfield(alg, f), n, all_binds)
+    end
+    return nothing
+end
+function assert_time_dependent_fold_count(v::AbstractVector{<:AbstractOnlinePortfolioSelectionAlgorithm},
+                                          n::Integer, all_binds::Bool = true)::Nothing
+    for alg in v
+        assert_time_dependent_fold_count(alg, n, all_binds)
+    end
+    return nothing
+end
+function update_time_dependent_estimator(alg::AbstractOnlinePortfolioSelectionAlgorithm,
+                                         ctx::TimeDependentContext, all_binds::Bool = true)
+    if !is_time_dependent(alg)
+        return alg
+    end
+    fns = rule_tree_fields(alg)
+    resolve(f) = update_time_dependent_estimator(getfield(alg, f), ctx, all_binds)
+    return rebuild_struct(alg, NamedTuple{fns}(map(resolve, fns)))
+end
+function update_time_dependent_estimator(v::AbstractVector{<:AbstractOnlinePortfolioSelectionAlgorithm},
+                                         ctx::TimeDependentContext, all_binds::Bool = true)
+    if !is_time_dependent(v)
+        return v
+    end
+    return map(alg -> update_time_dependent_estimator(alg, ctx, all_binds), v)
 end
 """
     rule_state_view(st::Nothing, i, args...)
@@ -1430,7 +1543,8 @@ Records a Held Step on the current [`ProjectionStep`](@ref). Outside a step, it 
 function record_held_step!(reason::AbstractString, trials)
     step = PROJECTION_STEP[]
     if isnothing(step)
-        @warn("Held Step outside an Online Update: $reason")
+        @warn("Held Step outside an Online Update: $reason", maxlog = log_limit(:warn),
+              _id = @log_id())
         return nothing
     end
     push!(step.held, HeldStep(step.ts, reason, trials))
@@ -1458,7 +1572,7 @@ Returns the head's `strict` flag that the current [`ProjectionStep`](@ref) carri
 # Related
 
   - [`ProjectionStep`](@ref)
-  - [`resolve_allocation_set_rows`](@ref)
+  - [`resolve_constraint_block`](@ref)
 """
 function projection_step_strict()
     step = PROJECTION_STEP[]
@@ -1492,7 +1606,7 @@ end
 
 Refuses, when the head is built, a rule and an Allocation Set that cannot work together.
 
-The default admits every pair. A rule that holds an optimisation estimator with no model for a programme set, such as [`FollowTheLeader`](@ref), refuses that set by name. A rule over other rules sends the check to each of them.
+The default admits every pair. A rule that holds an optimisation estimator with no model for a programme set, such as [`FollowTheLeader`](@ref), refuses that set by name. A [`FollowTheLeader`](@ref) whose held estimator, or a member of its fallback chain, is a [`FactorRiskContribution`](@ref) refuses a programme set with a semidefinite phylogeny. A rule over other rules sends the check to each of them.
 
 # Related
 
@@ -1598,6 +1712,30 @@ Keywords correspond to the struct's fields.
     The [`HeldStep`](@ref) record of the last folded row when the step held a projection of that row, or `nothing` when every projection of it met the budget. The return code of the Recursion Result carries it.
     """
     hold
+    function OnlinePortfolioSelectionState(n::Integer, w::AbstractVector, st,
+                                           X::Option{<:ReturnsBufferState},
+                                           nx::Option{<:VecStr}, nb::Option{<:VecStr},
+                                           pnl::Option{<:AssetPanel},
+                                           amsk::Option{<:AbstractVector{<:Bool}},
+                                           ts::Option{<:AbstractVector},
+                                           hold::Option{<:HeldStep})
+        assert_nonneg(n, :n)
+        if !isnothing(nx)
+            @argcheck(length(nx) == length(w),
+                      DimensionMismatch("the pinned names ($(length(nx))) and the allocation ($(length(w))) must have one length"))
+        end
+        if !isnothing(amsk)
+            @argcheck(length(amsk) == length(w),
+                      DimensionMismatch("the active mask ($(length(amsk))) and the allocation ($(length(w))) must have one length"))
+        end
+        if !isnothing(pnl)
+            @argcheck(panel_is_static(pnl),
+                      ArgumentError("an OnlinePortfolioSelectionState pins a static Asset Panel and never a time-varying one: the masks of a time-varying panel are per-observation, so the state keeps the mask of the last row in `amsk` and the rest beside the rows."))
+        end
+        return new{typeof(n), typeof(w), typeof(st), typeof(X), typeof(nx), typeof(nb),
+                   typeof(pnl), typeof(amsk), typeof(ts), typeof(hold)}(n, w, st, X, nx, nb,
+                                                                        pnl, amsk, ts, hold)
+    end
 end
 function OnlinePortfolioSelectionState(; n::Integer = 0, w::AbstractVector, st = nothing,
                                        X::Option{<:ReturnsBufferState} = nothing,
@@ -1607,19 +1745,6 @@ function OnlinePortfolioSelectionState(; n::Integer = 0, w::AbstractVector, st =
                                        amsk::Option{<:AbstractVector{<:Bool}} = nothing,
                                        ts::Option{<:AbstractVector} = nothing,
                                        hold::Option{<:HeldStep} = nothing)::OnlinePortfolioSelectionState
-    assert_nonneg(n, :n)
-    if !isnothing(nx)
-        @argcheck(length(nx) == length(w),
-                  DimensionMismatch("the pinned names ($(length(nx))) and the allocation ($(length(w))) must have one length"))
-    end
-    if !isnothing(amsk)
-        @argcheck(length(amsk) == length(w),
-                  DimensionMismatch("the active mask ($(length(amsk))) and the allocation ($(length(w))) must have one length"))
-    end
-    if !isnothing(pnl)
-        @argcheck(panel_is_static(pnl),
-                  ArgumentError("an OnlinePortfolioSelectionState pins a static Asset Panel and never a time-varying one: the masks of a time-varying panel are per-observation, so the state keeps the mask of the last row in `amsk` and the rest beside the rows."))
-    end
     return OnlinePortfolioSelectionState(n, w, st, X, nx, nb, pnl, amsk, ts, hold)
 end
 """
@@ -1818,7 +1943,7 @@ At a stage boundary the rule returns the Start Allocation for period `t + 1` and
   - [`AbstractLearningRateSchedule`](@ref)
   - [`DoublingTrickRate`](@ref)
 """
-function restart(::Union{<:Real, <:AbstractLearningRateSchedule}, ::Integer)
+function restart(::Union{Real, AbstractLearningRateSchedule}, ::Integer)
     return false
 end
 """
@@ -1832,8 +1957,7 @@ Returns the statistic that the state of a rule holds for its schedule before the
   - [`AbstractLearningRateSchedule`](@ref)
   - [`SelfConfidentRate`](@ref)
 """
-function schedule_state_seed(::Union{<:Real, <:AbstractLearningRateSchedule},
-                             ::AbstractVector)
+function schedule_state_seed(::Union{Real, AbstractLearningRateSchedule}, ::AbstractVector)
     return nothing
 end
 """
@@ -1849,8 +1973,8 @@ For a number, and for a schedule that reads no statistic, it returns `s` unchang
   - [`AbstractLearningRateSchedule`](@ref)
   - [`SelfConfidentRate`](@ref)
 """
-function schedule_update!(::Union{<:Real, <:AbstractLearningRateSchedule}, s,
-                          ::AbstractVector, ::AbstractVector)
+function schedule_update!(::Union{Real, AbstractLearningRateSchedule}, s, ::AbstractVector,
+                          ::AbstractVector)
     return s
 end
 """
@@ -1866,8 +1990,7 @@ It is the rule's own `alpha` under a number and under every schedule that does n
   - [`AbstractLearningRateSchedule`](@ref)
   - [`MirrorDescent`](@ref)
 """
-function mixing_share(::Union{<:Real, <:AbstractLearningRateSchedule}, ::Integer,
-                      alpha::Real)
+function mixing_share(::Union{Real, AbstractLearningRateSchedule}, ::Integer, alpha::Real)
     return alpha
 end
 """
@@ -1883,7 +2006,7 @@ It is `true` for a schedule that replays the period before it returns a rate, as
   - [`AbstractLearningRateSchedule`](@ref)
   - [`schedule_update!`](@ref)
 """
-function reads_period_row(::Union{<:Real, <:AbstractLearningRateSchedule})
+function reads_period_row(::Union{Real, AbstractLearningRateSchedule})
     return false
 end
 """

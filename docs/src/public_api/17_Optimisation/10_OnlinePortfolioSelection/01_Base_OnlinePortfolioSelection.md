@@ -15,7 +15,10 @@ GramProjection
 PortfolioOptimisers.AbstractLearningRateSchedule
 BoundedAllocationSet
 PortfolioOptimisers.resolve_allocation_set
-PortfolioOptimisers.project
+PortfolioOptimisers.project(::PortfolioOptimisers.EuclideanProjection, ::PortfolioOptimisers.BoundedAllocationSet, ::AbstractVector, ::AbstractVector)
+PortfolioOptimisers.project(::PortfolioOptimisers.DiagonalProjection, ::PortfolioOptimisers.BoundedAllocationSet, ::AbstractVector, ::AbstractVector)
+PortfolioOptimisers.project(::PortfolioOptimisers.TsallisProjection, ::PortfolioOptimisers.BoundedAllocationSet, ::AbstractVector, ::AbstractVector)
+PortfolioOptimisers.project(::PortfolioOptimisers.AbstractProjectionGeometry, ::PortfolioOptimisers.ProgrammeAllocationSet, ::AbstractVector, ::AbstractVector)
 PortfolioOptimisers.online_update!
 PortfolioOptimisers.rule_state_seed
 PortfolioOptimisers.projection_geometry

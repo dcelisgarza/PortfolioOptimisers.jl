@@ -178,3 +178,20 @@ gate.
 - No released number moves. `AdaptiveSubgradient` and `DiagonalProjection` are on `dev` alone,
   and the removal of the `proj` keyword is a clean break with no deprecation, as ADR 0167 made
   for `ff`.
+
+## Amendment (2026-11-05)
+
+The maintainer narrowed the exemption of rule 1, *Two methods are dispatch*. The census still
+flags a one-method unit only. But a set of methods that only sends each form of an input on to
+another function, or holds a form that the other function could hold, is a wrapper, and it goes.
+Each form becomes a method of the function that owns the job, and the caller calls that function.
+A wrapper earns its place for two reasons only: a convenience for the user, such as a keyword
+constructor or a preset, or a dispatch problem that a method on the owning function cannot solve,
+such as type piracy or an ambiguity that no narrower signature removes.
+
+The `Nothing`/value pair and the two-family pair of rule 1 stay when they own logic or keep the
+inferred type of the caller concrete, and no owning function can take their forms. #2005 is the
+case that the amendment removes: `ew_ratio_values` and `assert_ew_ratio_side` sent two of their
+four forms each to `descriptor_field_values` and `assert_panel_terms`, so the generic functions
+took all their methods. `.github/instructions/julia-source-code.instructions.md` § *A wrapper is
+for convenience or for a dispatch problem* holds the rule. It has no gate, and it holds by review.

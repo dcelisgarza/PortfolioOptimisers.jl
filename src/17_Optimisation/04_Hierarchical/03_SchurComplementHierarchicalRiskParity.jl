@@ -1,5 +1,5 @@
 """
-    const Sd_Var = Union{<:StandardDeviation, <:Variance}
+    const Sd_Var = Union{StandardDeviation, Variance}
 
 Groups the two risk measures that a Schur complement bundle accepts.
 
@@ -12,7 +12,7 @@ The allocation reads the risk of each half from the augmented covariance block o
   - [`SchurComplementParams`](@ref)
   - [`naive_portfolio_risk`](@ref): Computes the risk of a block under either measure.
 """
-const Sd_Var = Union{<:StandardDeviation, <:Variance}
+const Sd_Var = Union{StandardDeviation, Variance}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -39,8 +39,8 @@ $(DocStringExtensions.FIELDS)
         wb::Option{<:WeightBounds},
         clr::Option{<:AbstractClusteringResult},
         fees::Option{<:Fees},
-        r::Union{<:Sd_Var, <:VecBaseRM},
-        gamma::Union{<:Number, <:VecNum},
+        r::Union{Sd_Var, VecBaseRM},
+        gamma::Union{Number, VecNum},
         retcode::OptimisationReturnCode,
         w::Option{<:VecNum},
         imsk::Option{<:BitVector} = nothing,
@@ -80,7 +80,7 @@ Keywords correspond to the struct's fields.
     """
     $(field_dict[:r_res_schur])
     """
-    r
+    r::Union{Sd_Var, VecBaseRM}
     """
     $(field_dict[:gamma_schur_res])
     """
@@ -105,31 +105,24 @@ Keywords correspond to the struct's fields.
                                                          wb::Option{<:WeightBounds},
                                                          clr::Option{<:AbstractClusteringResult},
                                                          fees::Option{<:Fees},
-                                                         r::Union{<:Sd_Var, <:VecBaseRM},
-                                                         gamma::Union{<:Number, <:VecNum},
+                                                         r::Union{Sd_Var, VecBaseRM},
+                                                         gamma::Union{Number, VecNum},
                                                          retcode::OptimisationReturnCode,
                                                          w::Option{<:VecNum},
                                                          imsk::Option{<:BitVector},
                                                          fb::Option{<:OptE_Opt_FbChain})
-        return new{typeof(pr), typeof(wb), typeof(clr), typeof(fees), typeof(r),
-                   typeof(gamma), typeof(retcode), typeof(w), typeof(imsk), typeof(fb)}(pr,
-                                                                                        wb,
-                                                                                        clr,
-                                                                                        fees,
-                                                                                        r,
-                                                                                        gamma,
-                                                                                        retcode,
-                                                                                        w,
-                                                                                        imsk,
-                                                                                        fb)
+        return new{typeof(pr), typeof(wb), typeof(clr), typeof(fees), typeof(gamma),
+                   typeof(retcode), typeof(w), typeof(imsk), typeof(fb)}(pr, wb, clr, fees,
+                                                                         r, gamma, retcode,
+                                                                         w, imsk, fb)
     end
 end
 function SchurComplementHierarchicalRiskParityResult(; pr::Option{<:AbstractPriorResult},
                                                      wb::Option{<:WeightBounds},
                                                      clr::Option{<:AbstractClusteringResult},
                                                      fees::Option{<:Fees},
-                                                     r::Union{<:Sd_Var, <:VecBaseRM},
-                                                     gamma::Union{<:Number, <:VecNum},
+                                                     r::Union{Sd_Var, VecBaseRM},
+                                                     gamma::Union{Number, VecNum},
                                                      retcode::OptimisationReturnCode,
                                                      w::Option{<:VecNum},
                                                      imsk::Option{<:BitVector} = nothing,
@@ -340,6 +333,8 @@ Collects the risk measure, the interpolation parameter ``\\gamma`` and the two a
 
 [`SchurComplementHierarchicalRiskParity`](@ref) holds one bundle or a vector of bundles. A vector runs one allocation per bundle, and blends the portfolios of the bundles in proportion to the `r.settings.scale` of each bundle.
 
+The parameter ``\\gamma`` in ``[0, 1]`` sets how much of the cross-cluster covariance the augmentation uses. It is the parameter of Section 5 of [cotton2024](@cite), where ``\\gamma = 0`` is the hierarchical recursion, as in Table 2 of that work.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -371,7 +366,7 @@ Keywords correspond to the struct's fields. [`Sd_Var`](@ref) bounds `r`, because
 
 # References
 
-  - $(ref_dict[:cotton2024])
+  - $(ref_dict[:cotton2024]) Section 5, Table 2.
 """
 @concrete struct SchurComplementParams <: AbstractAlgorithm
     """
@@ -427,7 +422,7 @@ A vector of bundles runs one allocation per bundle and blends the portfolios. Th
 """
 const VecScP = AbstractVector{<:SchurComplementParams}
 """
-    const ScP_VecScP = Union{<:SchurComplementParams, <:VecScP}
+    const ScP_VecScP = Union{SchurComplementParams, VecScP}
 
 Groups one Schur complement bundle and a vector of bundles.
 
@@ -438,7 +433,7 @@ The `params` field of the estimator takes either form, so its bound is this alia
   - [`SchurComplementParams`](@ref)
   - [`VecScP`](@ref)
 """
-const ScP_VecScP = Union{<:SchurComplementParams, <:VecScP}
+const ScP_VecScP = Union{SchurComplementParams, VecScP}
 """
     port_opt_view(sp::SchurComplementParams, i, X::MatNum, args...) -> SchurComplementParams
 
@@ -463,9 +458,7 @@ A view of the estimator on a subset of assets calls it, for example when an oute
   - [`SchurComplementHierarchicalRiskParity`](@ref)
 """
 function port_opt_view(sp::SchurComplementParams, i, X::MatNum, args...)
-    r = port_opt_view(sp.r, i, X)
-    return SchurComplementParams(; r = r, gamma = sp.gamma, pdm = sp.pdm, alg = sp.alg,
-                                 flag = sp.flag)
+    return rebuild_struct(sp, (; r = port_opt_view(sp.r, i, X)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -527,6 +520,8 @@ Where:
   - $(math_dict[:rho_naive_sch])
   - $(math_dict[:alpha_split_hier])
 
+``\\mathbf{A}`` is the Schur complement with the parameter ``\\gamma`` of Equation 5.2 of [cotton2024](@cite), and ``\\gamma = 0`` is the hierarchical recursion, as in Table 2 of that work. Equation 4.2 of that work divides ``\\mathbf{A}`` entry by entry by ``\\boldsymbol{b} \\boldsymbol{b}^\\intercal``, where ``\\boldsymbol{b} = \\boldsymbol{1} - \\gamma \\, \\mathbf{\\Sigma}_{12} \\mathbf{\\Sigma}_{22}^{-1} \\boldsymbol{1}`` is Equation 5.3. This type does not. It builds ``\\hat{\\mathbf{\\Sigma}}_{11}`` from ``\\mathbf{R}`` and ``\\mathbf{M}``, which that work does not state. The closing remark of Appendix A of that work says that the code that accompanies it provides an alternative, and this type builds that alternative. The function `pseudo_schur_complement` of version 0.11.17 of that code, the Python package `precise`, computes ``\\mathbf{R}^{-1}\\mathbf{A}`` with the same ``\\mathbf{R}`` and ``\\mathbf{M}``. Its symmetric part equals ``\\hat{\\mathbf{\\Sigma}}_{11}`` to round-off, and that code does not augment a part with a half of one leaf either. The block of Equation 4.2 and this block differ for ``\\gamma > 0``. The risk of a half is the variance of its naive risk parity portfolio, so the allocation at ``\\gamma = 1`` is not the minimum variance portfolio of Table 2 of that work.
+
 The weights are the inverse variances of the augmented block for both measures. So at ``\\gamma = 0`` a [`Variance`](@ref) measure gives the allocation of [`HierarchicalRiskParity`](@ref) under a [`Variance`](@ref) measure. A [`StandardDeviation`](@ref) measure gives a different allocation from [`HierarchicalRiskParity`](@ref) under a [`StandardDeviation`](@ref) measure, because that optimiser takes inverse volatility weights.
 
 A part of two or three leaves has a half ``C_1`` of one leaf, and the recursion augments neither of its halves. The resolved weight bounds clamp ``\\alpha``, as in [`HierarchicalRiskParity`](@ref). ``C_1`` and ``C_2`` receive ``\\alpha`` and ``1 - \\alpha`` of the weight of the part in every case, so the weights sum to one.
@@ -540,7 +535,7 @@ The fit of [`optimise`](@ref) runs these steps.
  3. Resolve the fees `fees` on the full asset universe.
  4. Reduce `pr`, the estimator and `rd` to the investable universe.
  5. Cluster the reduced prior with `opt.cle`, giving `clr`. The leaf order `clr.res.order` is the input of the recursion.
- 6. Resolve the weight bounds `wb` on the investable universe.
+ 6. Resolve the weight bounds `wb` on the investable universe, with one bound per asset on each side.
  7. Run [`schur_complement_weights`](@ref) with `params`, giving the weights `w`, the value `gamma` it ran at, and the resolved measure `r`. When `params` is a vector, run it once per bundle, add the weights of each bundle times the `r.settings.scale` of the bundle into `w`, and divide `w` by its sum.
  8. Check that the recursion produced weights, with [`assert_schur_weights`](@ref).
  9. Apply the weight finaliser `opt.wf` to `w` with `wb`, giving the return code `retcode` and the final weights.
@@ -568,10 +563,10 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref) or [`TDO_
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `opt`: Recursively updated via [`factory`](@ref).
-  - `fb`: Recursively updated via [`factory`](@ref).
+  - `opt`: Recursively updated through [`factory`](@ref).
+  - `fb`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
@@ -697,7 +692,7 @@ SchurComplementHierarchicalRiskParity
 
 # References
 
-  - $(ref_dict[:cotton2024])
+  - $(ref_dict[:cotton2024]) Sections 4 and 5, Equations 4.2, 5.2 and 5.3, and Appendix A.
 """
 @propagatable @concrete struct SchurComplementHierarchicalRiskParity <:
                                ClusteringOptimisationEstimator
@@ -775,7 +770,7 @@ function port_opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum,
                                                  fb = view_child(sh.fb, i, X))
 end
 function non_investable_universe(sh::SchurComplementHierarchicalRiskParity, ni::VecStr)
-    return rebuild_estimator(sh, (; opt = non_investable_universe(sh.opt, ni)))
+    return rebuild_struct(sh, (; opt = non_investable_universe(sh.opt, ni)))
 end
 """
     symmetric_step_up_matrix(n1::Integer, n2::Integer) -> AbstractMatrix
@@ -1013,8 +1008,7 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
     sigma = ismutable(r.sigma) ? copy(r.sigma) : Matrix(r.sigma)
     gamma = isnothing(gamma) ? params.gamma : gamma
     X = pr.X
-    # A split factor is a quotient of two risks, so an integer sample takes float weights.
-    w = ones(float_if_integer(eltype(X)), size(X, 2))
+    w = ones(eltype(X), size(X, 2))
     pdm = params.pdm
     flag = params.flag
     while length(items) > 0
@@ -1153,7 +1147,7 @@ function schur_complement_binary_search(objective::Function, lgamma::Number, hga
     end
     if hgamma - lgamma > tol
         msg = "Binary search did not converge within the specified tolerance: tol => $tol"
-        strict_diagnostic(msg, strict)
+        strict_diagnostic(msg, strict; id = @log_id())
     end
     return lw, lgamma
 end
@@ -1178,7 +1172,7 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
     max_gamma = params.gamma
     r = factory(params.r, pr)
     # The type of the weights, so a failed allocation scores the largest value of that type.
-    T = float_if_integer(eltype(pr.X))
+    T = eltype(pr.X)
     if iszero(max_gamma)
         nm_params = SchurComplementParams(; r = r, gamma = max_gamma, pdm = params.pdm,
                                           alg = NonMonotonicSchurComplement(),
@@ -1258,7 +1252,16 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Fit a Schur complement allocation with one bundle.
 
-[`optimise`](@ref) calls this method. [`SchurComplementHierarchicalRiskParity`](@ref) states its steps under `# Algorithm`. The weights, their bounds and the fee take the type of a quotient of two returns, so an integer returns matrix allocates in floating point and a `Float32` matrix stays in `Float32`.
+[`optimise`](@ref) calls this method. [`SchurComplementHierarchicalRiskParity`](@ref) states its steps under `# Algorithm`. The weights, their bounds and the fee take the element type of the returns, so a `Float32` matrix stays in `Float32`.
+
+Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref), this optimiser takes no `branchorder` keyword. Recursive bisection splits the leaf order of the dendrogram, so that order is the input of the algorithm, and the clustering always runs with the optimal order. `kwargs` absorbs a `branchorder` and the fit ignores it.
+
+# Arguments
+
+  - `sh`: The Schur complement hierarchical risk parity optimiser.
+  - $(arg_dict[:rd]) When `sh.opt.pe` is a prior result, the fit itself does not read `rd`, but the clustering and a fallback can read it.
+  - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
+  - `kwargs`: Absorbed and ignored.
 
 # Related
 
@@ -1267,7 +1270,8 @@ Fit a Schur complement allocation with one bundle.
   - [`_optimise`](@ref)
 """
 function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
-                   rd::ReturnsResult = ReturnsResult(); kwargs...)
+                   rd::ReturnsResult = ReturnsResult(); rmsk::Option{BitVector} = nothing,
+                   kwargs...)
     sh = reset_time_dependent_estimator(sh)
     pr = prior(sh.opt.pe, rd)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`,
@@ -1277,13 +1281,11 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
-    imsk = feature_readable_mask(sh.opt.cle, investable_mask(pr), rd)
-    imsk = graph_reader_mask(sh.opt.cle, imsk, pr, rd, sh.opt.strict)
+    # A fit again after a refusal of the distance reader passes its mask as `rmsk`.
+    imsk = distance_reader_entry_mask(sh.opt.cle, pr, rd, sh.opt.strict; rmsk = rmsk)
     # A split factor is a quotient of two risks, so the weights, their bounds and the fee
-    # take the type of the returns, widened to a float only when it is an integer. An
-    # integer sample then allocates in floating point, and a `Float32` sample stays in
-    # `Float32`.
-    T = float_if_integer(eltype(pr.X))
+    # take the type of the returns. A `Float32` sample stays in `Float32`.
+    T = eltype(pr.X)
     fees = investable_fees_view(fees_constraints(sh.opt.fees, sh.opt.sets;
                                                  strict = sh.opt.strict, datatype = T),
                                 imsk, pr.X)
@@ -1292,15 +1294,29 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     # augmented matrix the Schur complement builds is finite, and the leaf permutation
     # indexes the investable universe. The weights are expanded back in
     # `SchurComplementHierarchicalRiskParityResult`.
-    _, pr, sh, rd = investable_reduction(imsk, pr, sh, rd)
+    sh0, pr0, rd0 = sh, pr, rd
+    _, pr, sh, rd = investable_reduction(pr, sh, rd, imsk)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
-    clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa)
+    # A distance reader that refuses an asset the prior kept raises before it clusters. Fit
+    # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
+    clr = distance_reader_call(clusterise, sh.opt.cle, pr; rd = rd, iv = rd.iv,
+                               ivpa = rd.ivpa)
+    if clr isa DistanceReaderRefusalError
+        return _optimise(rebuild_struct(sh0,
+                                        (; opt = rebuild_struct(sh0.opt, (; pe = pr0)))),
+                         rd0;
+                         rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
+                                                             sh0.opt.strict), kwargs...)
+    end
     assert_clustering_universe(clr, size(X, 2))
     items = [clr.res.order]
-    wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(X, 2),
+    wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; rd = rd, N = size(X, 2),
                                    strict = sh.opt.strict, datatype = T)
+    # The estimator method keeps a scalar or a `nothing` side. The split sums the bounds of
+    # each half, so this call expands such a side to one bound per asset.
+    wb = weight_bounds_constraints(wb; N = size(X, 2), datatype = T)
     w, gamma, r = schur_complement_weights(pr, items, wb, sh.params)
     assert_schur_weights(w, gamma)
     retcode, w = finalise_weight_bounds(sh.opt.wf, wb, w)
@@ -1333,6 +1349,13 @@ Where:
 
 The denominator is the sum of the blended weights, because each ``\\boldsymbol{w}_k`` sums to one.
 
+# Arguments
+
+  - `sh`: The Schur complement hierarchical risk parity optimiser, with a vector of bundles.
+  - $(arg_dict[:rd]) When `sh.opt.pe` is a prior result, the fit itself does not read `rd`, but the clustering and a fallback can read it.
+  - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
+  - `kwargs`: Absorbed and ignored.
+
 # Related
 
   - [`SchurComplementHierarchicalRiskParity`](@ref)
@@ -1340,7 +1363,8 @@ The denominator is the sum of the blended weights, because each ``\\boldsymbol{w
   - [`_optimise`](@ref)
 """
 function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVector},
-                   rd::ReturnsResult = ReturnsResult(); kwargs...)
+                   rd::ReturnsResult = ReturnsResult(); rmsk::Option{BitVector} = nothing,
+                   kwargs...)
     sh = reset_time_dependent_estimator(sh)
     pr = prior(sh.opt.pe, rd)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`,
@@ -1350,13 +1374,11 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
-    imsk = feature_readable_mask(sh.opt.cle, investable_mask(pr), rd)
-    imsk = graph_reader_mask(sh.opt.cle, imsk, pr, rd, sh.opt.strict)
+    # A fit again after a refusal of the distance reader passes its mask as `rmsk`.
+    imsk = distance_reader_entry_mask(sh.opt.cle, pr, rd, sh.opt.strict; rmsk = rmsk)
     # A split factor is a quotient of two risks, so the weights, their bounds and the fee
-    # take the type of the returns, widened to a float only when it is an integer. An
-    # integer sample then allocates in floating point, and a `Float32` sample stays in
-    # `Float32`.
-    T = float_if_integer(eltype(pr.X))
+    # take the type of the returns. A `Float32` sample stays in `Float32`.
+    T = eltype(pr.X)
     fees = investable_fees_view(fees_constraints(sh.opt.fees, sh.opt.sets;
                                                  strict = sh.opt.strict, datatype = T),
                                 imsk, pr.X)
@@ -1365,20 +1387,34 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     # augmented matrix the Schur complement builds is finite, and the leaf permutation
     # indexes the investable universe. The weights are expanded back in
     # `SchurComplementHierarchicalRiskParityResult`.
-    _, pr, sh, rd = investable_reduction(imsk, pr, sh, rd)
+    sh0, pr0, rd0 = sh, pr, rd
+    _, pr, sh, rd = investable_reduction(pr, sh, rd, imsk)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
-    clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa)
+    # A distance reader that refuses an asset the prior kept raises before it clusters. Fit
+    # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
+    clr = distance_reader_call(clusterise, sh.opt.cle, pr; rd = rd, iv = rd.iv,
+                               ivpa = rd.ivpa)
+    if clr isa DistanceReaderRefusalError
+        return _optimise(rebuild_struct(sh0,
+                                        (; opt = rebuild_struct(sh0.opt, (; pe = pr0)))),
+                         rd0;
+                         rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
+                                                             sh0.opt.strict), kwargs...)
+    end
     assert_clustering_universe(clr, size(X, 2))
     items = [clr.res.order]
-    wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(X, 2),
+    wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; rd = rd, N = size(X, 2),
                                    strict = sh.opt.strict, datatype = T)
+    # As in the single-measure method: one bound per asset on each side.
+    wb = weight_bounds_constraints(wb; N = size(X, 2), datatype = T)
     params = sh.params
     # Each bundle returns the `gamma` it ran at, of that bundle's own type. The vector
-    # literal below promotes them to one type.
-    gammas = Vector{Any}(undef, length(params))
-    rs = Vector{Any}(undef, length(params))
+    # literal below promotes them to one type. The two vectors name the families that the
+    # result admits (#1979).
+    gammas = Vector{Number}(undef, length(params))
+    rs = Vector{Sd_Var}(undef, length(params))
     w = zeros(T, size(X, 2))
     for (i, ps) in enumerate(params)
         wi, gamma, ri = schur_complement_weights(pr, items, wb, ps)
@@ -1393,34 +1429,6 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
                                                        gamma = [gammas...],
                                                        retcode = retcode, w = w,
                                                        imsk = imsk, fb = nothing)
-end
-"""
-    optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
-             rd::ReturnsResult; kwargs...) -> SchurComplementHierarchicalRiskParityResult
-
-Run the Schur complement hierarchical risk parity optimisation.
-
-Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref), this optimiser takes no `branchorder` keyword. Recursive bisection splits the leaf order of the dendrogram, so that order is the input of the algorithm, and the clustering always runs with the optimal order. `kwargs` absorbs a `branchorder` and the fit ignores it.
-
-# Arguments
-
-  - `sh`: The Schur complement hierarchical risk parity optimiser.
-  - $(arg_dict[:rd]) When `sh.opt.pe` is a prior result, the fit itself does not read `rd`, but the clustering and a fallback can read it.
-  - `kwargs`: Absorbed and ignored.
-
-# Validation
-
-  - No field in the tree of `sh` holds an [`Online`](@ref). Otherwise [`assert_batch_entry`](@ref) throws an `ArgumentError` that names the field. A plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the online arm of the fold loop.
-
-# Related
-
-  - [`SchurComplementHierarchicalRiskParity`](@ref)
-  - [`SchurComplementHierarchicalRiskParityResult`](@ref)
-"""
-function optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
-                  rd::ReturnsResult; kwargs...)
-    assert_batch_entry(sh, "`optimise`")
-    return shared_series_solve(sh, rd; kwargs...)
 end
 
 export SchurComplementHierarchicalRiskParityResult, SchurComplementParams,

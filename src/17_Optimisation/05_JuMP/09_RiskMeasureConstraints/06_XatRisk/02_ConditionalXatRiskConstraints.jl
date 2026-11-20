@@ -47,8 +47,8 @@ Where:
 # Keyword arguments
 
   - `loss::Bool`: If `true` (default), the measure is applied to the net portfolio returns;
-    if `false`, to their negation. [`set_range_risk_constraints!`](@ref) sets it to `false`
-    to build the gain tail of [`ConditionalValueatRiskRange`](@ref).
+    if `false`, to their negation. The method of `set_risk_constraints!` for a [`RangeRiskMeasure`](@ref)
+    sets it to `false` to build the gain tail of [`ConditionalValueatRiskRange`](@ref).
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
 
 # Returns
@@ -121,7 +121,7 @@ function set_worst_loss_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
                                      opt::RiskConstraintOwner, series, wi, keys::NamedTuple;
                                      prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
-    rows = isnothing(wi) ? eachindex(series) : findall(x -> zero(x) < x, wi)
+    rows = positive_weight_rows(wi, length(series))
     risk = state_set!(model, prefix, keys.var, i, JuMP.@variable(model))
     state_set!(model, prefix, keys.risk, i, risk)
     state_set!(model, prefix, keys.bound, i,
@@ -176,12 +176,8 @@ function set_conditional_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMea
                                             bound = keys.exceedance); prefix = prefix)
     end
     sc = get_constraint_scale(model)
-    var, z = JuMP.@variables(model, begin
-                                 ()
-                                 [1:T], (lower_bound = 0)
-                             end)
-    state_set!(model, prefix, keys.var, i, var)
-    state_set!(model, prefix, keys.z, i, z)
+    var = state_set!(model, prefix, keys.var, i, JuMP.@variable(model))
+    z = state_set!(model, prefix, keys.z, i, JuMP.@variable(model, [1:T], lower_bound = 0))
     risk = if isnothing(wi)
         iat = inv(r.alpha * T)
         JuMP.@expression(model, var + sum(z) * iat)
@@ -196,38 +192,8 @@ function set_conditional_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMea
                                     prefix = prefix)
     return risk
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Add JuMP risk constraints for `ConditionalValueatRiskRange` to `model`.
-
-Delegates to [`set_range_risk_constraints!`](@ref), which builds the loss tail at `alpha` on
-the net portfolio returns and the gain tail at `beta` on their negation, then sums the two
-CVaR expressions.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - $(arg_dict[:ci])
-  - `r::ConditionalValueatRiskRange`: The CVaR range risk measure.
-  - $(arg_dict[:opt_rjumpe])
-  - $(arg_dict[:pr_X])
-
-# Returns
-
-  - `cvar_range_risk`: The combined `loss + gain` risk expression added to the model.
-
-# Related
-
-  - [`ConditionalValueatRiskRange`](@ref)
-  - [`range_tails`](@ref)
-  - [`set_range_risk_constraints!`](@ref)
-"""
-function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatRiskRange,
-                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
-                               prefix::Symbol = Symbol(""), kwargs...)
-    return set_range_risk_constraints!(model, i, r, :cvar_range_risk_, opt, pr, args...;
-                                       prefix = prefix, kwargs...)
+function range_risk_key(::ConditionalValueatRiskRange)
+    return :cvar_range_risk_
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -254,8 +220,8 @@ a nested prefix rather than allowed to collide with those of the loss tail.
 # Keyword arguments
 
   - `loss::Bool`: If `true` (default), the measure is applied to the net portfolio returns;
-    if `false`, to their negation. [`set_range_risk_constraints!`](@ref) sets it to `false`
-    to build the gain tail of
+    if `false`, to their negation. The method of `set_risk_constraints!` for a [`RangeRiskMeasure`](@ref)
+    sets it to `false` to build the gain tail of
     [`DistributionallyRobustConditionalValueatRiskRange`](@ref).
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
 
@@ -349,24 +315,19 @@ function set_dr_conditional_risk_constraints!(model::JuMP.Model, i::Any, r::Risk
     a1 = -one(alpha)
     a2 = -one(alpha) - b1 * inv(alpha)
     b2 = b1 * (one(alpha) - inv(alpha))
-    lb, tau, s, tu, tv, u, v = JuMP.@variables(model, begin
-                                                   ()
-                                                   ()
-                                                   [1:T]
-                                                   [1:T]
-                                                   [1:T]
-                                                   [1:T, 1:N], (lower_bound = 0)
-                                                   [1:T, 1:N], (lower_bound = 0)
-                                               end)
-    state_set!(model, prefix, keys.lb, i, lb)
-    state_set!(model, prefix, keys.tau, i, tau)
-    state_set!(model, prefix, keys.s, i, s)
-    state_set!(model, prefix, keys.tu, i, tu)
-    state_set!(model, prefix, keys.tv, i, tv)
-    state_set!(model, prefix, keys.u, i, u)
-    state_set!(model, prefix, keys.v, i, v)
-    u_cost = vec(sum(u .* ambiguity; dims = 2))
-    v_cost = vec(sum(v .* ambiguity; dims = 2))
+    lb = state_set!(model, prefix, keys.lb, i, JuMP.@variable(model))
+    tau = state_set!(model, prefix, keys.tau, i, JuMP.@variable(model))
+    s = state_set!(model, prefix, keys.s, i, JuMP.@variable(model, [1:T]))
+    tu = state_set!(model, prefix, keys.tu, i, JuMP.@variable(model, [1:T]))
+    tv = state_set!(model, prefix, keys.tv, i, JuMP.@variable(model, [1:T]))
+    u = state_set!(model, prefix, keys.u, i,
+                   JuMP.@variable(model, [1:T, 1:N], lower_bound = 0))
+    v = state_set!(model, prefix, keys.v, i,
+                   JuMP.@variable(model, [1:T, 1:N], lower_bound = 0))
+    # One `dot` for each row. `sum(u .* ambiguity; dims = 2)` reduces with a plain `+` and
+    # copies each partial sum, which cost 781 MiB for each row on 1000 × 100 (#2062).
+    u_cost = [LinearAlgebra.dot(view(ambiguity, t, :), view(u, t, :)) for t in 1:T]
+    v_cost = [LinearAlgebra.dot(view(ambiguity, t, :), view(v, t, :)) for t in 1:T]
     state_set!(model, prefix, keys.cu, i,
                JuMP.@constraint(model, sc * (b1 * tau .+ (a1 * series + u_cost - s)) <= 0))
     state_set!(model, prefix, keys.cv, i,
@@ -395,41 +356,8 @@ function set_dr_conditional_risk_constraints!(model::JuMP.Model, i::Any, r::Risk
                                     prefix = prefix)
     return risk
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Add JuMP risk constraints for `DistributionallyRobustConditionalValueatRiskRange`
-(DR-CVaR range) to `model`.
-
-Delegates to [`set_range_risk_constraints!`](@ref), which builds the loss tail from `alpha`,
-`l_a` and `r_a` on the net portfolio returns, and the gain tail from `beta`, `l_b` and `r_b`
-on their negation, then sums the two robust CVaR expressions. Each tail brings its own
-Wasserstein ambiguity ball.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - $(arg_dict[:ci])
-  - `r::DistributionallyRobustConditionalValueatRiskRange`: The DR-CVaR range risk measure.
-  - $(arg_dict[:opt_rjumpe])
-  - $(arg_dict[:pr_X])
-
-# Returns
-
-  - `drcvar_risk_range`: The combined `loss + gain` risk expression added to the model.
-
-# Related
-
-  - [`DistributionallyRobustConditionalValueatRiskRange`](@ref)
-  - [`range_tails`](@ref)
-  - [`set_range_risk_constraints!`](@ref)
-"""
-function set_risk_constraints!(model::JuMP.Model, i::Any,
-                               r::DistributionallyRobustConditionalValueatRiskRange,
-                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
-                               prefix::Symbol = Symbol(""), kwargs...)
-    return set_range_risk_constraints!(model, i, r, :drcvar_risk_range_, opt, pr, args...;
-                                       prefix = prefix, kwargs...)
+function range_risk_key(::DistributionallyRobustConditionalValueatRiskRange)
+    return :drcvar_range_risk_
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -11,7 +11,7 @@ This file governs the **prose a user reads as a page**. Four corpora carry it.
   line that Literate renders as Markdown, and the `Description` line of a ` ```@meta ` block.
 - **The hand-written Markdown pages** under `docs/src/`, outside `docs/src/contribute/`, which is
   written for a contributor. Their prose is the text of the page.
-- **`README.md`**, the repository front page. It is the one user-facing text at the root; every
+- **`README.md`**, the repository front page. It is the one user-facing text at the root. Every
   other Markdown file there is written for a contributor.
 - **`docs/capability_catalogue.jl`**, from which the docs build renders the Capability Catalogue.
   Its prose is the text of every `Prose`, every `Note`, every `Cap` label, every `Section` title
@@ -45,7 +45,7 @@ word `to`.
 **How to apply it.** Invoke `/unslop` on the file. When the skill cannot be invoked, read its rules
 and apply them by hand. Rewrite the prose, keep the meaning, and end with the skill's self-audit,
 "What makes this obviously AI generated?". A pass changes prose, printed strings and code comments
-alone: every other token of a line of Julia, a `#src` line, an `@ref` link, an `@docs` block and an
+alone. Every other token of a line of Julia, a `#src` line, an `@ref` link, an `@docs` block and an
 admonition's indentation stay as they are, and the numbers a page prints do not move.
 
 ---
@@ -116,8 +116,8 @@ batch run to the bit, by construction."
 This section reads a page a reader runs. A paragraph between two cells says what the next cell
 does, or what the last output shows. It restates neither the code nor the number the cell prints.
 
-A page carries no word band. A page is long because it covers more ground, and the paragraph rule
-is what keeps it from being long because it repeats itself.
+A page carries no word band. A page is long because it covers more ground. The paragraph rule
+stops a page from being long because it repeats itself.
 
 ---
 
@@ -165,7 +165,7 @@ eps = 1.0001 * ladder(N)
 ```
 
 **The mark of a gotcha is `#!` and a space.** Literate renders a `#!` line inside the code cell,
-where a `#` line would end the cell and a `##` line would lose one `#`. Always write the space:
+where a `#` line would end the cell and a `##` line would lose one `#`. Always write the space.
 Literate reads `#!md`, `#!nb` and `#!jl` at the start of a line as filter tokens, and it deletes
 such a line from the output that the token names. A Markdown page writes its gotcha the same way,
 so one mark means one thing on every page.
@@ -191,16 +191,20 @@ The `Description` line of a Literate page and of a hand-written page is written 
 reads it.
 
 **Generated pages.** `docs/src/examples/**`, `docs/src/user_guide/**`,
-`docs/src/capability_catalogue.md` and `docs/src/TypeHierarchy.md` are written by the docs build
-and are not in the tree. Their sources are the Literate files, `docs/capability_catalogue.jl`,
-and the text that `docs/generate_capability_catalogue.jl` and `docs/generate_type_hierarchy.jl`
-write above the catalogue and the trees. A defect in one is fixed at its source.
+`docs/src/capability_catalogue.md` and `docs/src/TypeHierarchy.md` are not in the tree. The docs
+build writes them. Their sources are the Literate files, `docs/capability_catalogue.jl`, and the
+text that `docs/generate_capability_catalogue.jl` and `docs/generate_type_hierarchy.jl` write above
+the catalogue and the trees. Fix a defect in one at its source.
 
-**Markup and code.** A `#src` line, which is an authoring note and not a rendered page, and which
-the process-citation census skips for the same reason. The rest of a line of Julia, once its
-strings and its comment are read. Three markers that look like comments and are markup: Literate's
-`#-` and `#+`, which split a cell, and Documenter's `# hide`. A fenced block that is not code, an
-`@docs` block, an inline code span, an inline LaTeX expression, and the target of a markdown link.
+**Markup and code.** The rule does not read these:
+
+- A `#src` line. It is an authoring note and not a rendered page, and the process-citation census
+  skips it for the same reason.
+- The rest of a line of Julia, after the census reads its strings and its comment.
+- Three markers that look like comments and are markup: Literate's `#-` and `#+`, which split a
+  cell, and Documenter's `# hide`.
+- A fenced block that is not code, an `@docs` block, an inline code span, an inline LaTeX
+  expression, and the target of a markdown link.
 
 **The hero of the landing page.** `docs/src/index.md` opens with a ```` ```@raw html ```` block of
 YAML. The values of its text, tagline, title and details keys render as the hero and the cards of
@@ -214,15 +218,15 @@ no fenced block that is not code. A person reads them.
 [`test/test_72_prose_census.jl`](../../test/test_72_prose_census.jl) reads the prose of all four
 corpora and holds each text to its row in
 [`code_health/prose_baseline.toml`](../../code_health/prose_baseline.toml). A count may fall and
-may not rise. A text whose count stands above its row fails, a text with a count above zero and no
-row fails, and a text whose every count is zero carries no row, so the baseline empties as the
-texts are rewritten. The reader is [`code_health/prose.jl`](../../code_health/prose.jl), which the
+may not rise. A text whose count stands above its row fails. A text with a count above zero and no
+row fails. A text whose every count is zero carries no row, so the baseline empties as the
+rewrites land. The reader is [`code_health/prose.jl`](../../code_health/prose.jl), which the
 census includes rather than copies. The rules the census cannot read hold by review, in the sense
 of [`CODING_STANDARDS.md`](../../CODING_STANDARDS.md).
 
 [`test/test_74_source_citation_census.jl`](../../test/test_74_source_citation_census.jl) reads the
 same four corpora through the same reader, and fails on a text that names a source by "paper",
-"article", "the authors" or an author list with a year. It holds no baseline: every match fails.
+"article", "the authors" or an author list with a year. It holds no baseline, so every match fails.
 
 **Three shapes of text feed one set of counters.** A Literate source gives its `#= … =#` blocks and
 every line that Literate renders as markdown: a bare `#`, or a `#` and a space followed by text,
@@ -273,5 +277,5 @@ julia --project=code_health code_health/prose.jl scan <file>...
 before and after a rewrite. It prints each file's counts and the row the baseline would carry for
 it, and it measures and writes nothing else. Paste that row into the baseline for the files you
 rewrote, and delete the row of a file whose counts all reached zero. Do not run `refresh`, which
-writes the whole file: rewrite tickets run in parallel, and two sessions that each write the whole
+writes the whole file. Rewrite tickets run in parallel, and two sessions that each write the whole
 file lose one of the two writes.

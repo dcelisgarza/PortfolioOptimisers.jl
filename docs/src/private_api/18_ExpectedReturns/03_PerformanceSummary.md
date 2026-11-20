@@ -1,0 +1,30 @@
+```@meta
+Description = "Performance summary, private API of PortfolioOptimisers.jl: assert_performance_summary_fields, excess_statistics, held_path_turnover, WeightStatistics, …"
+```
+
+# Performance summary: private API
+
+```@docs
+PortfolioOptimisers.assert_performance_summary_fields
+PortfolioOptimisers.excess_statistics
+PortfolioOptimisers.held_path_turnover
+PortfolioOptimisers.WeightStatistics
+PortfolioOptimisers.SummaryOptions
+PortfolioOptimisers.SummaryEntry
+PortfolioOptimisers.summarise_entries
+PortfolioOptimisers.performance_summary_columns
+PortfolioOptimisers.summary_measures
+PortfolioOptimisers.summary_benchmark
+PortfolioOptimisers.row_benchmark
+PortfolioOptimisers.series_dates
+PortfolioOptimisers.weight_statistics
+PortfolioOptimisers.mean_weight_statistics
+PortfolioOptimisers.entry_weight_statistics
+PortfolioOptimisers.prediction_weight_statistics
+PortfolioOptimisers.population_path_key
+PortfolioOptimisers.input_entries
+PortfolioOptimisers.entry_list
+PortfolioOptimisers.stack_summaries
+PortfolioOptimisers.summarise_input
+PortfolioOptimisers.candidate_summary
+```

@@ -102,22 +102,24 @@ Pipeline), which the decision tickets of the map can change.
         return all(map(===, u, v)) ? v : u
     end
     function excess_reader(pe::po.AbstractPriorEstimator, ::Any, ::Any)
-        return po.rebuild_estimator(pe, (; x_src = ExcessSource()))
+        return po.rebuild_struct(pe, (; x_src = ExcessSource()))
     end
     function excess_reader(x::Union{<:ClustersEstimator, <:NetworkEstimator,
                                     <:SemiDefinitePhylogenyEstimator,
                                     <:IntegerPhylogenyEstimator, <:CentralityConstraint}, g,
                            ::Any)
-        return po.rebuild_estimator(x, (; x_src = g))
+        return po.rebuild_struct(x, (; x_src = g))
     end
     function excess_reader(re::Union{<:StepwiseRegression, <:DimensionReductionRegression},
                            ::Any, rg)
-        return po.rebuild_estimator(re, (; x_src = rg))
+        return po.rebuild_struct(re, (; x_src = rg))
     end
+    # The graph readers and the exposure rows of a head sit in the slots of its Constraint
+    # Block since #2039 and #2040, so the walk enters the block as it enters a field.
     function excess_reader(x::Union{<:ArithmeticReturn, <:UncertaintySetVariance,
                                     <:po.AbstractUncertaintySetEstimator,
                                     <:ExposureConstraintEstimator, <:FactorSpace,
-                                    <:FactorRiskBudgeting}, g, rg)
+                                    <:FactorRiskBudgeting, <:ConstraintBlock}, g, rg)
         return excess_fields(x, g, rg)
     end
     function excess_fields(x, g, rg)
@@ -125,10 +127,10 @@ Pipeline), which the decision tickets of the map can change.
         vals = map(f -> excess_reader(getfield(x, f), g, rg), fns)
         moved = Tuple(f for (f, v) in zip(fns, vals) if v !== getfield(x, f))
         isempty(moved) && return x
-        return po.rebuild_estimator(x,
-                                    NamedTuple{moved}(Tuple(getindex(vals,
-                                                                     findfirst(==(f), fns))
-                                                            for f in moved)))
+        return po.rebuild_struct(x,
+                                 NamedTuple{moved}(Tuple(getindex(vals,
+                                                                  findfirst(==(f), fns))
+                                                         for f in moved)))
     end
     function excess_head(x, xs::Symbol = :data)
         rg = po.refits_regression(x.pe) ? ExcessSource() : nothing
@@ -1428,6 +1430,13 @@ Pipeline), which the decision tickets of the map can change.
                                          "performance_summary against the benchmark of the prediction" =>
                                              [7.035220273e-5, 0.01240283443,
                                               0.005672268152])
+
+    # `test/run_files.jl --case=<regex>` runs only the cases whose key the regex matches. The one
+    # interpolated name of the test set below is out of reach of `--testset`.
+    if haskey(ENV, "RUN_FILES_CASE")
+        filter!(c -> occursin(Regex(ENV["RUN_FILES_CASE"]), first(c)), cases)
+        @test !isempty(cases)
+    end
 
     @testset "$key" for (key, tol, f) in cases
         pin = pins[replace(key, r"^(online|the default x_src): " => "")]

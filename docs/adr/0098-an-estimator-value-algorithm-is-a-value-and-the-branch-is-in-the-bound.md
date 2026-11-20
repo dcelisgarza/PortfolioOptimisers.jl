@@ -115,3 +115,25 @@ UniformValues())` raises at the constructor, naming the `val` keyword and the va
    abstract type with no subtype and no method. The design of such an algorithm is not settled, so it
    is deferred: when one is written it subtypes the root, takes its own branch, and `EqnType` names
    that branch then.
+
+## Amendment (2026-10-23)
+
+[#1804](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1804) found that the parameter
+of `EstValType` selects the branch of the family and nothing more. Every `EstValType{T}` accepts a
+`MatNum`, so each of the nine value slots accepted a matrix, and its resolver then raised a
+`TypeError`, because the result type holds a `Num_VecNum` only.
+
+The nine slots, and the method of `risk_budget_constraints` for a plain value, now write a new
+alias:
+
+```julia
+const VectorEstValType = Union{<:Num_VecNum, <:PairStrNum, <:MultiEstValType,
+                               <:VectorAbstractEstimatorValueAlgorithm}
+```
+
+The alias names the shape and the branch together, so the keyword constructor refuses a matrix.
+`EstValType` stays as the widest bound of the family. No slot of the library writes it now. A
+slot that resolves a matrix, or a branch added later for another shape, writes `EstValType` with
+that branch. The positional route of each estimator goes through the generic constructor that
+`@concrete` appends, which
+[#264](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/264) owns.

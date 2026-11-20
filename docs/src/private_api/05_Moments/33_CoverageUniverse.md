@@ -1,5 +1,5 @@
 ```@meta
-Description = "Coverage Universe, private API of PortfolioOptimisers.jl: coverage_mask, coverage_mask_source, coverage_sentinel, coverage_reduction, coverage_reduced_pair, …"
+Description = "Coverage Universe, private API of PortfolioOptimisers.jl: coverage_mask, coverage_flags, coverage_mask_source, coverage_sentinel, coverage_reduction, …"
 ```
 
 # Coverage Universe: private API
@@ -14,6 +14,7 @@ A matrix call can give the active mask as the `active_mask` keyword, with no pan
 
 ```@docs
 PortfolioOptimisers.coverage_mask
+PortfolioOptimisers.coverage_flags
 PortfolioOptimisers.coverage_mask_source
 PortfolioOptimisers.coverage_sentinel
 PortfolioOptimisers.coverage_reduction(X::MatNum, pnl::Option{<:AssetPanel})
@@ -30,11 +31,9 @@ PortfolioOptimisers.coverage_pair_index
 PortfolioOptimisers.expand_columns
 PortfolioOptimisers.reduce_columns
 PortfolioOptimisers.expand_rows
-PortfolioOptimisers.expand_vector
 PortfolioOptimisers.expand_moment
 PortfolioOptimisers.expand_count
 PortfolioOptimisers.expand_regression
-PortfolioOptimisers.expand_idiosyncratic_covariance
 ```
 
 ## The check for missing returns
@@ -50,6 +49,8 @@ PortfolioOptimisers.inactive_as_nonfinite
 
 ```@docs
 PortfolioOptimisers.variance_series(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+PortfolioOptimisers.coverage_variance_series
+PortfolioOptimisers.covers_an_asset
 ```
 
 ## The available-case fit
@@ -60,14 +61,11 @@ An estimator with a [`CoveragePolicy`](@ref) fits each asset, or each pair of as
 PortfolioOptimisers.coverage_panel_moment
 PortfolioOptimisers.coverage_panel_moment(f, est, ::Nothing, X::MatNum, pnl::Option{<:AssetPanel}, expand)
 PortfolioOptimisers.coverage_panel_moment(f, est, ::CoveragePolicy, X::MatNum, pnl::Option{<:AssetPanel}, ::Any)
-PortfolioOptimisers.coverage_variance_series
 PortfolioOptimisers.coverage_series_frame
-PortfolioOptimisers.coverage_variance_series(ce::AbstractCovarianceEstimator, ::Nothing, X::MatNum, pnl::Option{<:AssetPanel})
-PortfolioOptimisers.coverage_variance_series(ce::AbstractCovarianceEstimator, ::CoveragePolicy, X::MatNum, pnl::Option{<:AssetPanel})
-PortfolioOptimisers.variance_series(ce::Covariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-PortfolioOptimisers.variance_series(ve::SimpleVariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+PortfolioOptimisers.variance_series(ce::Union{Covariance{<:Any, <:Any, <:Any, <:Any, <:CoveragePolicy}, SimpleVariance{<:Any, <:Any, <:Any, <:CoveragePolicy}}, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 PortfolioOptimisers.coverage_floor
 PortfolioOptimisers.coverage_keyword_reduction
-PortfolioOptimisers.coverage_keyword_mask
+PortfolioOptimisers.coverage_keyword_columns
+PortfolioOptimisers.coverage_keyword_flags
 PortfolioOptimisers.coverage_columns
 ```

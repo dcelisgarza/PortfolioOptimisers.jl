@@ -5,8 +5,10 @@ Add range risk constraints to `model`.
 
 Calls [`set_wr_risk_expression!`](@ref) to obtain the worst-realisation variable, then
 introduces a best-realisation variable `br_risk` with constraint
-`sc * (br_risk .+ net_X) <= 0`, and defines `range_risk = wr_risk - br_risk`. Returns the
-existing expression if already present.
+`sc * (br_risk .+ net_X) <= 0`, and defines `range_risk = wr_risk - br_risk`. A second call
+with the same `prefix` uses the registered expression and builds no rows. The settings of the
+first [`Range`](@ref) take effect, and a second measure logs a warning, because its bound and
+its scale have no effect.
 
 # Mathematical definition
 
@@ -34,17 +36,17 @@ where ``\\mathrm{WR} = -\\min_t \\hat{r}_t`` and ``\\mathrm{BR} = -\\max_t \\hat
 
 # Returns
 
-  - `nothing`.
+  - `range_risk`: The risk expression.
 
 # Related
 
   - [`set_wr_risk_expression!`](@ref)
-  - [`set_risk_bounds_and_expression!`](@ref)
+  - [`set_unindexed_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::Range, opt::RiskConstraintOwner,
                                pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
-    return state_build!(model, prefix, :range_risk) do
+    range_risk = state_build!(model, prefix, :range_risk) do
         sc = get_constraint_scale(model)
         wr_risk = set_wr_risk_expression!(model, pr.X; prefix = prefix)
         net_X = get_net_X(model, prefix)
@@ -52,8 +54,9 @@ function set_risk_constraints!(model::JuMP.Model, ::Any, r::Range, opt::RiskCons
         range_risk = JuMP.@expression(model, wr_risk - br_risk)
         state_set!(model, prefix, :cbr,
                    JuMP.@constraint(model, sc * (br_risk .+ net_X) <= 0))
-        set_risk_bounds_and_expression!(model, opt, range_risk, r.settings, :range_risk;
-                                        prefix = prefix)
         return range_risk
     end
+    set_unindexed_risk_bounds_and_expression!(model, opt, range_risk, r, :range_risk;
+                                              prefix = prefix)
+    return range_risk
 end

@@ -120,6 +120,8 @@ Where:
 
 The root makes the constraint hold with equality at the mean step and at the full rank-one update ``\\Sigma_{t+1}^{-1} = \\Sigma_t^{-1} + \\gamma_{t+1} \\boldsymbol{x}_t \\boldsymbol{x}_t^\\intercal``. The rule then keeps the diagonal of that update. By the Cauchy-Schwarz inequality ``V_t \\geq \\bar{x}_t W_t``, so ``a \\geq 0``. When the constraint holds at the current belief, ``c \\geq 0`` and ``b \\geq 0``, so no root is positive and ``\\lambda_{t+1} = 0``.
 
+The quadratic is Equation 5 of [li2011cwmr](@cite) with ``M_t`` in place of ``\\log M_t``, which [li2013cwmr](@cite) follow.
+
 # Examples
 
 ```jldoctest
@@ -137,7 +139,8 @@ VarianceUpdate()
 
 # References
 
-  - $(ref_dict[:li2013cwmr]) Proposition 4.1 and Appendix A, Equation 11.
+  - $(ref_dict[:li2011cwmr]) Proposition 1 and Appendix A, Equation 5.
+  - $(ref_dict[:li2013cwmr]) Proposition 4.1 and Appendix A, Equation 11. $(ref_dict[:no_original_source])
 """
 struct VarianceUpdate <: AbstractConfidenceUpdate end
 """
@@ -188,6 +191,8 @@ Where:
 
 The root makes the constraint hold with equality at the mean step and at the full rank-one update ``\\Sigma_{t+1}^{-1} = \\Sigma_t^{-1} + \\gamma_{t+1} \\boldsymbol{x}_t \\boldsymbol{x}_t^\\intercal``, and ``\\sqrt{U_t}`` is the standard deviation of that update along ``\\boldsymbol{x}_t``. The rule then keeps the diagonal of that update. The coefficient ``a = (V_t - \\bar{x}_t W_t)(V_t - \\bar{x}_t W_t + \\phi^2 V_t)`` is non-negative. When the constraint holds at the current belief, ``\\epsilon - M_t \\geq \\phi \\sqrt{V_t}``, so ``c \\geq 0`` and ``b \\geq 0``, no root is positive and ``\\lambda_{t+1} = 0``.
 
+The quadratic and ``\\sqrt{U_t}`` are Equation 7 and Proposition 2 of [li2011cwmr](@cite) with ``M_t`` in place of ``\\log M_t``, which [li2013cwmr](@cite) follow.
+
 # Examples
 
 ```jldoctest
@@ -205,7 +210,8 @@ StandardDeviationUpdate()
 
 # References
 
-  - $(ref_dict[:li2013cwmr]) Proposition 4.2 and Appendix B, Equations 14 and 15.
+  - $(ref_dict[:li2011cwmr]) Proposition 2 and Appendix B, Equation 7.
+  - $(ref_dict[:li2013cwmr]) Proposition 4.2 and Appendix B, Equations 14 and 15. $(ref_dict[:no_original_source])
 """
 struct StandardDeviationUpdate <: AbstractConfidenceUpdate end
 """
@@ -462,7 +468,7 @@ ConfidenceWeightedMeanReversion
 # References
 
   - $(ref_dict[:li2011cwmr]) Algorithm 1.
-  - $(ref_dict[:li2013cwmr]) Section 4, Algorithm 2.
+  - $(ref_dict[:li2013cwmr]) Section 4, Algorithm 2. $(ref_dict[:no_original_source])
 """
 @concrete struct ConfidenceWeightedMeanReversion <:
                  AbstractOnlinePortfolioSelectionAlgorithm
@@ -497,13 +503,15 @@ function ConfidenceWeightedMeanReversion(; eps::Real = 0.5, phi::Real = 2,
                                          proj::EuclideanProjection = EuclideanProjection())::ConfidenceWeightedMeanReversion
     return ConfidenceWeightedMeanReversion(eps, phi, formulation, proj)
 end
-function rule_state_seed(::ConfidenceWeightedMeanReversion, w::AbstractVector)
+function rule_state_seed(::ConfidenceWeightedMeanReversion, w::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
     N = length(w)
     return ConfidenceWeightedMeanReversionState(0, fill(one(eltype(w)) / N^2, N))
 end
 function online_update!(alg::ConfidenceWeightedMeanReversion,
                         st::ConfidenceWeightedMeanReversionState, w::AbstractVector,
-                        x::AbstractVector, ::Any, set::AbstractAllocationSet)
+                        x::AbstractVector, ::Any, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
     sigma = st.sigma
     M = LinearAlgebra.dot(w, x)
     V = LinearAlgebra.dot(sigma, x .^ 2)
@@ -611,7 +619,7 @@ AntiCorrelation
 
 # References
 
-  - $(ref_dict[:borodin2004]) Section 3, Equations 2 and 3, and Figure 1.
+  - $(ref_dict[:borodin2004]) Section 4, Equations 2 and 3, and Figure 1.
 """
 @concrete struct AntiCorrelation <: AbstractOnlinePortfolioSelectionAlgorithm
     """
@@ -738,7 +746,8 @@ function wealth_transfer(w::AbstractVector, claim::AbstractMatrix)
     return q
 end
 function online_update!(alg::AntiCorrelation, st, w::AbstractVector, x::AbstractVector,
-                        rows::Option{<:ReturnsResult}, set::AbstractAllocationSet)
+                        rows::Option{<:ReturnsResult}, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
     wn = alg.window
     # The transfers move the wealth held at the end of the period, the paper's `b̂_t`.
     wh = price_adjusted_allocation(w, x)
@@ -860,7 +869,7 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    ExpectationMaximisation(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, proj::EuclideanProjection = EuclideanProjection()) -> ExpectationMaximisation
+    ExpectationMaximisation(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, proj::EuclideanProjection = EuclideanProjection()) -> ExpectationMaximisation
 
 Keywords correspond to the struct's fields.
 
@@ -903,7 +912,7 @@ ExpectationMaximisation
     $(field_dict[:proj])
     """
     proj
-    function ExpectationMaximisation(eta::Union{<:Real, <:AbstractLearningRateSchedule},
+    function ExpectationMaximisation(eta::Union{Real, AbstractLearningRateSchedule},
                                      proj::EuclideanProjection)
         if isa(eta, Real)
             @argcheck(zero(eta) < eta < one(eta), DomainError(eta, "eta must be in (0, 1)"))
@@ -913,12 +922,12 @@ ExpectationMaximisation
         return new{typeof(eta), typeof(proj)}(eta, proj)
     end
 end
-function ExpectationMaximisation(;
-                                 eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05,
+function ExpectationMaximisation(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05,
                                  proj::EuclideanProjection = EuclideanProjection())::ExpectationMaximisation
     return ExpectationMaximisation(eta, proj)
 end
-function rule_state_seed(alg::ExpectationMaximisation, w::AbstractVector)
+function rule_state_seed(alg::ExpectationMaximisation, w::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
     return ExpectationMaximisationState(0, copy(w), schedule_state_seed(alg.eta, w))
 end
 """
@@ -944,12 +953,12 @@ The ceiling is one for a number and for every Learning-Rate Schedule that names 
   - [`SelfConfidentRate`](@ref)
   - [`learning_rate`](@ref)
 """
-function correction_ratio_cap(::Union{<:Real, <:AbstractLearningRateSchedule}, ::Integer)
+function correction_ratio_cap(::Union{Real, AbstractLearningRateSchedule}, ::Integer)
     return 1
 end
 function online_update!(alg::ExpectationMaximisation, st::ExpectationMaximisationState,
                         w::AbstractVector, x::AbstractVector, ::Any,
-                        set::AbstractAllocationSet)
+                        set::AbstractAllocationSet, ::Option{<:AbstractVector} = nothing)
     t = st.n + 1
     if restart(alg.eta, t)
         # The period count survives the restart: the schedule's stages are cumulative.
@@ -1032,8 +1041,8 @@ AggregatingAlgorithm
 
 # References
 
-  - $(ref_dict[:vovkwatkins1998]) Algorithm 1.
-  - $(ref_dict[:cover1991])
+  - $(ref_dict[:vovkwatkins1998]) Algorithm 1. $(ref_dict[:no_original_source])
+  - $(ref_dict[:cover1991]) Equations 1.3 and 1.4.
 """
 @concrete struct AggregatingAlgorithm <: AbstractOnlinePortfolioSelectionAlgorithm
     """
@@ -1054,7 +1063,8 @@ function AggregatingAlgorithm(; eta::Real = 1,
     return AggregatingAlgorithm(eta, proj)
 end
 function online_update!(alg::AggregatingAlgorithm, st, w::AbstractVector, x::AbstractVector,
-                        ::Any, set::AbstractAllocationSet)
+                        ::Any, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
     q = w .* x .^ alg.eta
     return st, project(alg.proj, set, q, price_adjusted_allocation(w, x))
 end
@@ -1182,14 +1192,16 @@ end
 function TopK(; k::Integer = 5, proj::EuclideanProjection = EuclideanProjection())::TopK
     return TopK(k, proj)
 end
-function rule_state_seed(alg::TopK, w::AbstractVector)
+function rule_state_seed(alg::TopK, w::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
     @argcheck(alg.k <= length(w),
               DomainError(alg.k,
                           "k must be at most the number of assets or experts, $(length(w))"))
     return CumulativeWealthState(0, zeros(eltype(w), length(w)), copy(w))
 end
 function online_update!(alg::TopK, st::CumulativeWealthState, w::AbstractVector,
-                        x::AbstractVector, ::Any, set::AbstractAllocationSet)
+                        x::AbstractVector, ::Any, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
     st.G .+= log.(x)
     order = sortperm(st.G; rev = true, alg = Base.Sort.DEFAULT_STABLE)
     top = view(order, 1:(alg.k))
@@ -1223,7 +1235,7 @@ Where:
   - $(math_dict[:t_period])
   - $(math_dict[:N])
 
-[yang2020waeg](@citet) and [yang2022caeg](@citet) take the rate ``1 / \\sqrt{t + 1}`` with no constant. At a fixed rate ``\\eta`` in place of ``1 / \\sqrt{t + 1}``, the weights are those of [`AggregatingAlgorithm`](@ref). Over experts with log returns in ``[-L, 0]``, Lemma 1 of [yang2020waeg](@cite) puts the cumulative log wealth of the mixture within ``\\sqrt{T} \\left( \\log K + L^2 \\right)`` of the best of ``K`` experts under a uniform prior. A common scale of the price relatives of a period moves every log return by the same amount, so the bound holds for every sequence whose worst price relative in a period is at least ``e^{-L}`` times its best. The average log growth rate of the mixture then tends to that of the best expert.
+[yang2020waeg](@citet) and [yang2022caeg](@citet) take the rate ``1 / \\sqrt{t + 1}`` with no constant. At a fixed rate ``\\eta`` in place of ``1 / \\sqrt{t + 1}``, the weights are those of [`AggregatingAlgorithm`](@ref). Over experts with log returns in ``[-L, 0]``, Lemma 11 of [kalnishkanvyugin2008](@cite), stated as Lemma 1 of [yang2020waeg](@cite) for returns, puts the cumulative log wealth of the mixture within ``\\sqrt{T} \\left( \\log K + L^2 \\right)`` of the best of ``K`` experts under a uniform prior. A common scale of the price relatives of a period moves every log return by the same amount, so the bound holds for every sequence whose worst price relative in a period is at least ``e^{-L}`` times its best. The average log growth rate of the mixture then tends to that of the best expert.
 
 # Algorithm
 
@@ -1259,9 +1271,9 @@ WeakAggregatingAlgorithm
 
 # References
 
-  - $(ref_dict[:kalnishkanvyugin2008])
-  - $(ref_dict[:yang2020waeg]) Section 3.3, Algorithm 2 and Lemma 1, and Equations 9 and 11.
-  - $(ref_dict[:yang2022caeg]) Equation 10 and Algorithm 1.
+  - $(ref_dict[:kalnishkanvyugin2008]) Section 5.1 and Lemma 11.
+  - $(ref_dict[:yang2020waeg]) Section 3.3, Equation 5, Algorithm 2 and Lemma 1, and Equations 9 and 11.
+  - $(ref_dict[:yang2022caeg]) Equations 8 and 10, and Algorithm 1.
 """
 @concrete struct WeakAggregatingAlgorithm <: AbstractOnlinePortfolioSelectionAlgorithm
     """
@@ -1276,12 +1288,13 @@ function WeakAggregatingAlgorithm(;
                                   proj::EntropicProjection = EntropicProjection())::WeakAggregatingAlgorithm
     return WeakAggregatingAlgorithm(proj)
 end
-function rule_state_seed(::WeakAggregatingAlgorithm, w::AbstractVector)
+function rule_state_seed(::WeakAggregatingAlgorithm, w::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
     return CumulativeWealthState(0, zeros(eltype(w), length(w)), copy(w))
 end
 function online_update!(alg::WeakAggregatingAlgorithm, st::CumulativeWealthState,
                         w::AbstractVector, x::AbstractVector, ::Any,
-                        set::AbstractAllocationSet)
+                        set::AbstractAllocationSet, ::Option{<:AbstractVector} = nothing)
     st.G .+= log.(x)
     n = st.n + 1
     # The exponent is shifted by its maximum, which the normalisation undoes, so a long run
@@ -1338,7 +1351,7 @@ julia> length(mix.experts), mix.alg
 # References
 
   - $(ref_dict[:yang2020waeg]) Section 4, Algorithm 3 and Section 5.4.
-  - $(ref_dict[:yang2022caeg]) Section 6.2.1.
+  - $(ref_dict[:yang2022caeg]) Section 4, Algorithm 1 and Section 6.2.1.
 """
 function AggregatingExponentialGradient(; etas::AbstractVector{<:Real} = 0.01:0.01:0.2,
                                         eset::Option{<:BoundedAllocationSet} = nothing,

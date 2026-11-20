@@ -63,8 +63,8 @@ function PortfolioOptimisers.plot_portfolio_cumulative_returns(res::Optimisation
                                                                  compound = compound,
                                                                  kwargs...)
 end
-function PortfolioOptimisers.plot_portfolio_cumulative_returns(pred::Union{<:PredictionResult,
-                                                                           <:MultiPeriodPredictionResult};
+function PortfolioOptimisers.plot_portfolio_cumulative_returns(pred::Union{PredictionResult,
+                                                                           MultiPeriodPredictionResult};
                                                                compound::Bool = false,
                                                                kwargs...)
     rd = isa(pred, PredictionResult) ? pred.rd : pred.mrd
@@ -73,14 +73,22 @@ function PortfolioOptimisers.plot_portfolio_cumulative_returns(pred::Union{<:Pre
                                                                  compound = compound,
                                                                  kwargs...)
 end
+# `plot!(plt, q)` with a whole figure `q` adds no series to `plt`, so the population copies
+# the curves of each member, labelled by the key of the member. Each curve takes `kwargs` as
+# the curve of a path does, so a series attribute such as `linewidth` reaches every member.
 function PortfolioOptimisers.plot_portfolio_cumulative_returns(pred::PopulationPredictionResult;
                                                                compound::Bool = false,
                                                                kwargs...)
-    plt = plot(; kwargs...)
-    for p in pred.pred
-        plot!(plt,
-              PortfolioOptimisers.plot_portfolio_cumulative_returns(p; compound = compound,
-                                                                    kwargs...))
+    label = "$(compound ? "Compound" : "Simple") Cumulative Returns"
+    plt = plot(; title = "Portfolio", xlabel = "Date", ylabel = label, legend = true,
+               kwargs...)
+    for (k, p) in enumerate(pred.pred)
+        q = PortfolioOptimisers.plot_portfolio_cumulative_returns(p; compound = compound)
+        key = string(PortfolioOptimisers.population_path_key(p, k))
+        for s in q.series_list
+            lbl = length(q.series_list) == 1 ? key : "$(key), $(s[:label])"
+            plot!(plt, s[:x], s[:y]; kwargs..., label = lbl)
+        end
     end
     return plt
 end

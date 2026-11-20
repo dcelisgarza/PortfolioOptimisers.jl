@@ -12,7 +12,6 @@ assert_feature_readable
 unreadable_message
 asset_major
 active_collapse
-active_weights
 pair_distance
 stack_metric
 stack_rescale

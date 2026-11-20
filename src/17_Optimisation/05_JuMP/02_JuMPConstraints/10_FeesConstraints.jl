@@ -34,7 +34,7 @@ Where:
   - [`set_liquidation_fees!`](@ref)
   - [`Fees`](@ref)
 """
-function add_to_fees!(model::JuMP.Model, expr::Union{<:Number, <:JuMP.AbstractJuMPScalar})
+function add_to_fees!(model::JuMP.Model, expr::Union{Number, JuMP.AbstractJuMPScalar})
     if !shared_has(model, :fees)
         # A number takes no later term in place, so the first term starts an affine
         # expression, whatever its own type.
@@ -84,7 +84,7 @@ Where:
   - [`add_fees_to_ret!`](@ref)
 """
 function add_to_one_time_fees!(model::JuMP.Model,
-                               expr::Union{<:Number, <:JuMP.AbstractJuMPScalar})
+                               expr::Union{Number, JuMP.AbstractJuMPScalar})
     if !shared_has(model, :one_time_fees)
         # A number takes no later term in place, so the first term starts an affine
         # expression, whatever its own type.
@@ -99,11 +99,11 @@ function add_to_one_time_fees!(model::JuMP.Model,
 end
 """
     set_turnover_fees!(model::JuMP.Model, tn::Turnover)
-    set_turnover_fees!(args...)
+    set_turnover_fees!(model::JuMP.Model, ::Nothing)
 
 Add the turnover fee to the per period fee of the JuMP model.
 
-The fee charges the rate of each asset on the distance of its weight from the reference weight of `tn`. The model holds each distance in an epigraph variable, so the charge is linear. The reference weight is multiplied by `k`, so under [`MaximumRatio`](@ref) the fee acts on the homogenised weights ``k \\boldsymbol{w}`` and scales with them. The method on `args...` does nothing, and it runs when the fee states no turnover term.
+The fee charges the rate of each asset on the distance of its weight from the reference weight of `tn`. The model holds each distance in an epigraph variable, so the charge is linear. The reference weight is multiplied by `k`, so under [`MaximumRatio`](@ref) the fee acts on the homogenised weights ``k \\boldsymbol{w}`` and scales with them. The method on `nothing` does nothing, and it runs when the fee states no turnover term. Any other type or arity is a `MethodError`.
 
 # Mathematical definition
 
@@ -172,7 +172,7 @@ $(val_dict[:relax])
   - [`Turnover`](@ref)
   - [`Fees`](@ref)
 """
-function set_turnover_fees!(args...)
+function set_turnover_fees!(::JuMP.Model, ::Nothing)
     return nothing
 end
 function set_turnover_fees!(model::JuMP.Model, tn::Turnover)
@@ -183,10 +183,8 @@ function set_turnover_fees!(model::JuMP.Model, tn::Turnover)
     wt = tn.w
     val = tn.val
     JuMP.@variable(model, t_ftn[1:N])
-    JuMP.@expressions(model, begin
-                          x_ftn, w - wt * k
-                          ftn, dot_scalar(val, t_ftn)
-                      end)
+    JuMP.@expression(model, x_ftn, w - wt * k)
+    JuMP.@expression(model, ftn, dot_scalar(val, t_ftn))
     JuMP.@constraint(model, cftn[i = 1:N],
                      [sc * t_ftn[i]; sc * x_ftn[i]] in JuMP.MOI.NormOneCone(2))
     add_to_fees!(model, ftn)
@@ -342,11 +340,11 @@ function set_fixed_liquidation_fees!(model::JuMP.Model, flq::Turnover, kwargs::N
 end
 """
     set_non_fixed_fees!(model::JuMP.Model, fees::Fees)
-    set_non_fixed_fees!(args...)
+    set_non_fixed_fees!(model::JuMP.Model, ::Nothing)
 
 Add every fee of `fees` that needs no binary to the JuMP model.
 
-These are the proportional fees `l` and `s`, the turnover fee `tn`, and the two liquidation charges `lq` and `flq`. The fixed fees `fl` and `fs` need a binary for each asset, so the MIP builder charges them through [`set_fixed_fees!`](@ref) before this builder runs. The method on `args...` does nothing, and it runs when the optimisation states no fee.
+These are the proportional fees `l` and `s`, the turnover fee `tn`, and the two liquidation charges `lq` and `flq`. The fixed fees `fl` and `fs` need a binary for each asset, so the MIP builder charges them through [`set_fixed_fees!`](@ref) before this builder runs. The method on `nothing` does nothing, and it runs when the optimisation states no fee. Any other type or arity is a `MethodError`.
 
 # Algorithm
 
@@ -377,16 +375,16 @@ These are the proportional fees `l` and `s`, the turnover fee `tn`, and the two 
   - [`set_fixed_fees!`](@ref)
   - [`Fees`](@ref)
 """
-function set_non_fixed_fees!(args...)
+function set_non_fixed_fees!(::JuMP.Model, ::Nothing)
     return nothing
 end
 """
     set_long_non_fixed_fees!(model::JuMP.Model, fl::Num_VecNum)
-    set_long_non_fixed_fees!(args...)
+    set_long_non_fixed_fees!(model::JuMP.Model, ::Nothing)
 
 Add the proportional fee of the long positions to the per period fee of the JuMP model.
 
-The fee charges the model's long part `lw`, and not the weights. `lw` holds the homogenised long part, so under [`MaximumRatio`](@ref) the fee scales with the weights. The method on `args...` does nothing, and it runs when the fee states no `l`.
+The fee charges the model's long part `lw`, and not the weights. `lw` holds the homogenised long part, so under [`MaximumRatio`](@ref) the fee scales with the weights. The method on `nothing` does nothing, and it runs when the fee states no `l`. Any other type or arity is a `MethodError`.
 
 # Mathematical definition
 
@@ -443,16 +441,16 @@ $(val_dict[:relax])
   - [`PartsBoundWeights`](@ref)
   - [`Fees`](@ref)
 """
-function set_long_non_fixed_fees!(args...)
+function set_long_non_fixed_fees!(::JuMP.Model, ::Nothing)
     return nothing
 end
 """
     set_short_non_fixed_fees!(model::JuMP.Model, fs::Num_VecNum)
-    set_short_non_fixed_fees!(args...)
+    set_short_non_fixed_fees!(model::JuMP.Model, ::Nothing)
 
 Add the proportional fee of the short positions to the per period fee of the JuMP model.
 
-The fee charges the model's short part `sw`, and not the weights. A long-only model registers no `sw`, and then the method does nothing. The method on `args...` does nothing, and it runs when the fee states no `s`.
+The fee charges the model's short part `sw`, and not the weights. A long-only model registers no `sw`, and then the method does nothing. The method on `nothing` does nothing, and it runs when the fee states no `s`. Any other type or arity is a `MethodError`.
 
 # Mathematical definition
 
@@ -510,7 +508,7 @@ $(val_dict[:relax])
   - [`set_proportional_fees!`](@ref)
   - [`Fees`](@ref)
 """
-function set_short_non_fixed_fees!(args...)
+function set_short_non_fixed_fees!(::JuMP.Model, ::Nothing)
     return nothing
 end
 function set_long_non_fixed_fees!(model::JuMP.Model, fl::Num_VecNum)
@@ -630,10 +628,8 @@ function set_proportional_fees!(model::JuMP.Model, fl::Num_VecNum, fs::Num_VecNu
     sc = get_constraint_scale(model)
     N = length(w)
     JuMP.@variable(model, t_fp[1:N])
-    JuMP.@constraints(model, begin
-                          cfp_l, sc * (fl ⊙ w - t_fp) <= 0
-                          cfp_s, sc * (fs ⊙ w + t_fp) >= 0
-                      end)
+    JuMP.@constraint(model, cfp_l, sc * (fl ⊙ w - t_fp) <= 0)
+    JuMP.@constraint(model, cfp_s, sc * (fs ⊙ w + t_fp) >= 0)
     JuMP.@expression(model, fp, sum(t_fp))
     add_to_fees!(model, fp)
     return nothing
@@ -713,7 +709,7 @@ Where:
   - [`FirstObservationFees`](@ref)
 """
 function charge_one_time_fees(model::JuMP.Model, net, one_time, ::Number,
-                              ::Union{Nothing, <:FirstObservationFees})
+                              ::Union{Nothing, FirstObservationFees})
     # One entry is charged, so one entry is touched. Writing the charge as a selector vector
     # times `one_time` would build two arrays and put a zero multiple of the fee into every
     # other observation's expression, which the model then carries for nothing. `net` is
@@ -744,7 +740,7 @@ Add the fixed fees of the held positions to the one-off fee of the JuMP model.
 
 A fixed fee charges each position that the portfolio holds, whatever its size. So it cannot be written against the weights, and it reads the held binaries of `ind`. That is the reason a MIP builder calls it.
 
-The fee charges the gate of each binary, which is the binary times `k`, and not the binary. Under [`MaximumRatio`](@ref) the weights are the homogenised ``k \\boldsymbol{w}`` and `k` is a variable, so the fee scales with the weights, as every other fee does, and the weights do not depend on `ohf`. When `k` is a constant, or the long-short asset space runs on a unit budget, the gate is the binary itself. [`HeldIndicators`](@ref) has no short side, so it charges `ffl` alone.
+The fee charges the gate of each binary, which is the binary times `k`, and not the binary. Under [`MaximumRatio`](@ref) the weights are the homogenised ``k \\boldsymbol{w}`` and `k` is a variable, so the fee scales with the weights, as every other fee does, and the weights do not depend on `ohf`. When `k` is a constant, or the long-short asset space runs on a unit budget, the gate is the binary itself. [`HeldIndicators`](@ref) has no short side, so it charges `ffl` alone. Each method writes the charge of `ffl` in the same form from the gate of its bundle, so the two methods agree on the long side.
 
 # Mathematical definition
 
@@ -805,27 +801,26 @@ Where:
 function set_fixed_fees!(model::JuMP.Model, sp::AbstractMIPSpace, ind::HeldIndicators,
                          ffl::Option{<:Num_VecNum}, ::Option{<:Num_VecNum}, ffl_flag::Bool,
                          ::Bool)
-    return set_fixed_fees!(model, sp, (held(ind), nothing), ffl, nothing, ffl_flag, false)
-end
-function set_fixed_fees!(model::JuMP.Model, sp::AbstractMIPSpace, ind::LongShortIndicators,
-                         ffl::Option{<:Num_VecNum}, ffs::Option{<:Num_VecNum},
-                         ffl_flag::Bool, ffs_flag::Bool)
-    return set_fixed_fees!(model, sp, (long_gate(ind), short_gate(ind)), ffl, ffs, ffl_flag,
-                           ffs_flag)
-end
-function set_fixed_fees!(model::JuMP.Model, sp::AbstractMIPSpace, gates::Tuple,
-                         ffl::Option{<:Num_VecNum}, ffs::Option{<:Num_VecNum},
-                         ffl_flag::Bool, ffs_flag::Bool)
-    lg, sg = gates
     # The gate is the binary times `k`, so the fee scales with the homogenised weights as
     # every other fee does. A charge on the bare binary would not scale, and under a ratio
     # objective the weights would then depend on `ohf`.
     if ffl_flag
-        ffl = model[mip_key(sp, :ffl)] = JuMP.@expression(model, dot_scalar(ffl, lg))
+        ffl = model[mip_key(sp, :ffl)] = JuMP.@expression(model, dot_scalar(ffl, held(ind)))
+        add_to_one_time_fees!(model, ffl)
+    end
+    return nothing
+end
+function set_fixed_fees!(model::JuMP.Model, sp::AbstractMIPSpace, ind::LongShortIndicators,
+                         ffl::Option{<:Num_VecNum}, ffs::Option{<:Num_VecNum},
+                         ffl_flag::Bool, ffs_flag::Bool)
+    if ffl_flag
+        ffl = model[mip_key(sp, :ffl)] = JuMP.@expression(model,
+                                                          dot_scalar(ffl, long_gate(ind)))
         add_to_one_time_fees!(model, ffl)
     end
     if ffs_flag
-        ffs = model[mip_key(sp, :ffs)] = JuMP.@expression(model, dot_scalar(ffs, sg))
+        ffs = model[mip_key(sp, :ffs)] = JuMP.@expression(model,
+                                                          dot_scalar(ffs, short_gate(ind)))
         add_to_one_time_fees!(model, ffs)
     end
     return nothing

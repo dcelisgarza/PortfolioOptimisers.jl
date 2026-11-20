@@ -14,6 +14,7 @@ DataBenchmarkTracking
 TrackingError
 factory(tr::WeightsTracking, w::VecNum)
 tracking_benchmark
+obs_weights_view(tr::ReturnsTracking, i)
 needs_previous_weights(tr::TrackingError)
 ```
 

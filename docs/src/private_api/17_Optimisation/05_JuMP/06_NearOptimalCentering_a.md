@@ -12,6 +12,7 @@ near_optimal_centering_risks
 near_optimal_centering_setup
 frontier_return_terms
 return_term_ends
+barrier_weight_bounds
 set_near_optimal_centering_constraints!
 set_near_optimal_objective_function!
 solve_noc!

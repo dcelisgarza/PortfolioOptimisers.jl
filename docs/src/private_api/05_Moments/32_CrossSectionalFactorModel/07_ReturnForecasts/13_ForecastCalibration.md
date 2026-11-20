@@ -1,8 +1,14 @@
 ```@meta
-Description = "Forecast Calibration, private API of PortfolioOptimisers.jl: forecast_calibration_pairs, forecast_calibration_slope, forecast_calibration_edges, …"
+Description = "Forecast Calibration, private API of PortfolioOptimisers.jl: PooledMoments, forecast_calibration_pairs, forecast_calibration_slope, …"
 ```
 
 # Forecast Calibration: private API
+
+## Types
+
+```@docs
+PooledMoments
+```
 
 ## Functions
 

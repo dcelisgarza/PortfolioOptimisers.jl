@@ -34,7 +34,10 @@ const SHARED_STATE = Set{Symbol}([# Pure functions of the prior `pr`: identical 
                                   # falls on. A nested build charges the same fee as its
                                   # parent, so all three are shared rather than prefixed.
                                   :one_time_fees, :fee_fa, :decomposition_contract,
-                                  :mip_indicators, :ss,
+                                  # The big-M constant of every MIP builder. The bundle of
+                                  # MIP bits is not here: it belongs to the weights, so it
+                                  # goes under their owner, `weights_prefix`, as `W` does.
+                                  :ss,
                                   # Weight shaping: outer level only. A nested build shifts
                                   # the weights through its own prefixed `:w`; it does not
                                   # reshape the long/short parts. `:w_gross_ub` bounds the
@@ -351,7 +354,7 @@ end
 
 Compose the Model State prefix that a nested build passes down to its own builders.
 
-It gives a prefix and not a key, so no entry of the nested build can take the key of an entry of the enclosing build. `tag` names the kind of nesting (`:tr_iv_`, `:tr_dv_`, `:tr_ir_`, `:tr_dr_`, `:gain_`). The method with `i` adds the measure index and a closing `_`, so `nested_prefix(:a_, :tr_dr_, 3)` is `:a_tr_dr_3_`. The index keeps a tracking measure inside a tracking measure free of collisions.
+It gives a prefix and not a key, so no entry of the nested build can take the key of an entry of the enclosing build. `tag` names the kind of nesting (`:tr_iv_`, `:tr_dv_`, `:tr_ir_`, `:tr_dr_`, `:gain_`, and `:blk_` for a later block of a JuMP head, [`later_constraint_blocks`](@ref)). The method with `i` adds the measure index and a closing `_`, so `nested_prefix(:a_, :tr_dr_, 3)` is `:a_tr_dr_3_`. The index keeps a tracking measure inside a tracking measure free of collisions.
 
 # Related
 

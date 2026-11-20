@@ -1,13 +1,10 @@
 ```@meta
-Description = "Multiple randomised, private API of PortfolioOptimisers.jl: SubsetSizeEstimator, NumberSubsetsEstimator, WindowSizeEstimator, SubsetSizeEC, NumberSubsetsEC, …"
+Description = "Multiple randomised, private API of PortfolioOptimisers.jl: SubsetSizeEC, NumberSubsetsEC, WindowSizeEC, SubsetSizeE, NumberSubsetsE, WindowSizeE, MRCVR, …"
 ```
 
 # Multiple randomised: private API
 
 ```@docs
-SubsetSizeEstimator
-NumberSubsetsEstimator
-WindowSizeEstimator
 SubsetSizeEC
 NumberSubsetsEC
 WindowSizeEC

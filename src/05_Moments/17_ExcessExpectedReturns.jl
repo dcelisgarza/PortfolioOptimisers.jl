@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Subtracts a risk-free rate from the expected returns that a nested estimator computes.
 
-The nested estimator does all the work. This type only shifts its result, so it composes with every other expected returns estimator.
+The nested estimator `me` computes the expected returns, and this type subtracts `rf` from each element of its result. `me` can hold any expected returns estimator.
 
 # Fields
 
@@ -24,15 +24,15 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `me`: Recursively updated via [`factory`](@ref).
+  - `me`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `me`: Recursively viewed via [`port_opt_view`](@ref).
+  - `me`: Recursively viewed through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -46,13 +46,11 @@ ExcessExpectedReturns
 
 # Related
 
-  - [`AbstractShrunkExpectedReturnsEstimator`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
 """
-@propagatable @concrete struct ExcessExpectedReturns <:
-                               AbstractShrunkExpectedReturnsEstimator
+@propagatable @concrete struct ExcessExpectedReturns <: AbstractExpectedReturnsEstimator
     """
     $(field_dict[:me])
     """
@@ -76,7 +74,7 @@ end
 
 Compute excess expected returns by subtracting the risk-free rate.
 
-This method applies the nested estimator `me.me` to the data, and subtracts the risk-free rate `me.rf` from every element of the result. The rate is the one stored on the estimator. It is not read from the data and it is not read from a keyword.
+This method applies the nested estimator `me.me` to the data, and subtracts the risk-free rate `me.rf` from every element of the result. The method reads the rate from the estimator alone, and never from the data or from a keyword.
 
 # Mathematical definition
 
@@ -88,17 +86,17 @@ This method applies the nested estimator `me.me` to the data, and subtracts the 
 
 Where:
 
-  - ``\\hat{\\boldsymbol{\\mu}}_{\\text{excess}}``: ``N \\times 1`` vector of excess expected returns.
-  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` vector of estimated expected returns.
-  - ``r_f``: Risk-free rate.
-  - ``\\boldsymbol{1}``: ``N \\times 1`` vector of ones.
+  - ``\\hat{\\boldsymbol{\\mu}}_{\\text{excess}}``: The ``N \\times 1`` vector of excess expected returns.
+  - ``\\hat{\\boldsymbol{\\mu}}``: The ``N \\times 1`` vector of expected returns that `me.me` estimates.
+  - ``r_f``: The risk-free rate `me.rf`.
+  - ``\\boldsymbol{1}``: The ``N \\times 1`` vector of ones.
 
 # Arguments
 
-  - `me`: Excess expected returns estimator.
-  - `X`: Data matrix (observations × assets).
+  - `me`: The excess expected returns estimator.
+  - `X`: The data matrix, `observations × assets`.
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the mean estimator.
+  - `kwargs...`: More keyword arguments, which the method passes to the nested estimator `me.me`.
 
 # Validation
 
@@ -106,7 +104,7 @@ Where:
 
 # Returns
 
-  - `mu::ArrNum`: Excess expected returns. The shape is the shape that `me.me` returns, because the subtraction is elementwise.
+  - `mu::ArrNum`: The excess expected returns. The subtraction is elementwise, so the result has the shape of the result of `me.me`.
 
 # Examples
 
@@ -127,6 +125,9 @@ julia> mean(me, X)
 function Statistics.mean(me::ExcessExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
     assert_dims(dims)
     return Statistics.mean(me.me, X; dims = dims, kwargs...) .- me.rf
+end
+function effective_observation_count(me::ExcessExpectedReturns, X::MatNum; kwargs...)
+    return effective_observation_count(me.me, X; kwargs...)
 end
 
 export ExcessExpectedReturns

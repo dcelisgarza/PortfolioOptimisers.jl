@@ -11,11 +11,11 @@ Abstract supertype for all budget constraint estimators.
 """
 abstract type BudgetConstraintEstimator <: JuMPConstraintEstimator end
 """
-    const Num_BgtCE = Union{<:Number, <:BudgetConstraintEstimator}
+    const Num_BgtCE = Union{Number, BudgetConstraintEstimator}
 
 Union of scalar budget values and [`BudgetConstraintEstimator`](@ref) instances.
 """
-const Num_BgtCE = Union{<:Number, <:BudgetConstraintEstimator}
+const Num_BgtCE = Union{Number, BudgetConstraintEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -31,6 +31,8 @@ abstract type BudgetEstimator <: BudgetConstraintEstimator end
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for estimators that specify transaction cost budgets.
+
+Each member holds a reference portfolio `w` and a `fixed` flag. [`factory`](@ref factory(bgt::BudgetCosts, w::VecNum)) and [`needs_previous_weights`](@ref needs_previous_weights(bgt::BudgetCostEstimator)) read both.
 
 # Related
 
@@ -100,28 +102,31 @@ function BudgetRange(; lb::Option{<:Number} = 1.0, ub::Option{<:Number} = 1.0)
     return BudgetRange(lb, ub)
 end
 """
-    const Num_BgtRg = Union{<:Number, <:BudgetRange}
+    const Num_BgtRg = Union{Number, BudgetEstimator}
 
 Alias for a scalar budget value or budget range.
 
-Matches either a plain number (fixed budget, e.g. `1.0`) or a [`BudgetRange`](@ref) (interval budget constraint). Used for dispatch in budget constraint generation.
+Matches either a plain number (fixed budget, e.g. `1.0`) or a [`BudgetEstimator`](@ref), such as a [`BudgetRange`](@ref) (interval budget constraint). Used for dispatch in budget constraint generation.
 
 # Related
 
+  - [`BudgetEstimator`](@ref)
   - [`BudgetRange`](@ref)
   - [`set_long_short_budget_constraints!`](@ref)
 """
-const Num_BgtRg = Union{<:Number, <:BudgetRange}
+const Num_BgtRg = Union{Number, BudgetEstimator}
 """
-    set_budget_constraints!(args...)
-    set_budget_constraints!(model::JuMP.Model, val::Number, w::VecNum)
-    set_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, w::VecNum)
-    set_budget_constraints!(model::JuMP.Model, bgt::BudgetCosts, w::VecNum)
-    set_budget_constraints!(model::JuMP.Model, bgt::BudgetMarketImpact, w::VecNum)
+    set_budget_constraints!(model::JuMP.Model, ::Nothing, w::VecNum; prefix::Symbol = Symbol(""))
+    set_budget_constraints!(model::JuMP.Model, val::Number, w::VecNum; prefix::Symbol = Symbol(""))
+    set_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, w::VecNum; prefix::Symbol = Symbol(""))
+    set_budget_constraints!(model::JuMP.Model, bgt::BudgetCosts, w::VecNum; prefix::Symbol = Symbol(""))
+    set_budget_constraints!(model::JuMP.Model, bgt::BudgetMarketImpact, w::VecNum; prefix::Symbol = Symbol(""))
 
 Add budget constraints to the JuMP optimisation model.
 
-The fall-through method does nothing. The concrete methods add the appropriate portfolio budget constraint based on the type of budget specification provided.
+The method on `nothing` adds no row. The other methods add the portfolio budget constraint that the type of the budget states. Any other type or arity is a `MethodError`.
+
+A number and a [`BudgetRange`](@ref) register their rows under `prefix`, the namespace of the block whose owner states the budget. A budget that pays costs registers its trade variables, its cost expression and its rows in the shared Model State, because they measure the trade of the one weight vector. The rows are `wp_ub` and `wn_ub`, the bounds of the trades, `cost_bgt_trade`, the trade of the weights from the reference, and for [`BudgetMarketImpact`](@ref) the power cones `wip_pcone` and `win_pcone`. So it goes on the first block of a model, the block of its owner, and refuses a non-empty `prefix`.
 
 # Mathematical definition
 
@@ -179,8 +184,13 @@ model stays convex. [`BudgetMarketImpact`](@ref) states the full system.
 
   - $(arg_dict[:model])
   - `val::Number`: Fixed budget scalar.
-  - `bgt`: Budget constraint specification ([`BudgetRange`](@ref), [`BudgetCosts`](@ref), or [`BudgetMarketImpact`](@ref)).
+  - `bgt`: Budget constraint specification ([`BudgetRange`](@ref), [`BudgetCosts`](@ref), or [`BudgetMarketImpact`](@ref)), or `nothing` for no budget.
   - `w`: Portfolio weight vector.
+  - $(arg_dict[:prefix_kw])
+
+# Validation
+
+  - A [`BudgetCosts`](@ref) or a [`BudgetMarketImpact`](@ref) under a non-empty `prefix`. An `ArgumentError` is thrown.
 
 # Returns
 
@@ -193,7 +203,8 @@ model stays convex. [`BudgetMarketImpact`](@ref) states the full system.
   - [`BudgetMarketImpact`](@ref)
   - [`set_weight_constraints!`](@ref)
 """
-function set_budget_constraints!(args...)
+function set_budget_constraints!(::JuMP.Model, ::Nothing, ::VecNum;
+                                 prefix::Symbol = Symbol(""))
     return nothing
 end
 """
@@ -202,14 +213,22 @@ $(DocStringExtensions.TYPEDEF)
 Charges the portfolio budget for transaction costs that grow linearly with the traded volume.
 
 Models the cost of the bid-ask spread, of slippage, of a borrowing charge, or of a management
-fee. The cost is charged **against the budget**: the weights and their costs must together
-meet `bgt`, so a portfolio that trades more may hold less.
+fee. The cost is charged **against the budget**: the weights and their costs together must not
+exceed `bgt`, so a portfolio that trades more may hold less. The part of the budget that the
+weights and their costs do not use is cash.
+
+The rows are Equations 1 to 3 of [pogue1969](@cite) with one linear segment on each side of the trade. Exhibit 3 of that work charges the cost against the cash of the revised portfolio, as the first row charges it against the budget.
+
+**The budget row is a ceiling, not an equality.** Equation 2.6 of [boyd2017](@cite) states the self-financing condition as an equality, and Section 4.7 of that work relaxes it to an inequality, because the equality is not convex. Equation 9.15 of [cajas2025](@cite) and Equation 6.2 of [mosek2023c](@cite) keep the equality on the two parts of the trade, and Section 6.1 of [mosek2023c](@cite) states that the equality keeps one of the two parts at zero. It does not: nothing makes ``\\boldsymbol{w}_p`` and ``\\boldsymbol{w}_n`` complementary, so the equality charges a cost for a buy and a sale of one asset together, and so holds cash that it reports as cost. The ceiling admits exactly the weights whose cost fits the budget, at every solution of a convex programme. A floor on the weights and their costs is not convex either, so the floor of a [`BudgetRange`](@ref) bounds the invested weights alone.
+
+**`xbgt = true` pins the budget exactly**, as the `xbgt` of [`JuMPOptimiser`](@ref) pins the long and short parts. One binary for each asset keeps the buy or the sale of the asset at zero, so the charge is the cost of the trade, and a floor that holds the cost is exact. A scalar `bgt` then pins `sum(w)` plus the cost, and the floor of a [`BudgetRange`](@ref) holds the cost. [`set_cost_budget_mip_constraints!`](@ref) writes these rows, and the problem needs a mixed-integer solver. [`BudgetMarketImpact`](@ref) has no such option.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\boldsymbol{1}^\\intercal \\boldsymbol{w} + \\boldsymbol{v}_p^\\intercal \\boldsymbol{w}_p + \\boldsymbol{v}_n^\\intercal \\boldsymbol{w}_n &\\in [k\\,\\mathrm{lb},\\; k\\,\\mathrm{ub}]\\,, \\\\
+\\boldsymbol{1}^\\intercal \\boldsymbol{w} + \\boldsymbol{v}_p^\\intercal \\boldsymbol{w}_p + \\boldsymbol{v}_n^\\intercal \\boldsymbol{w}_n &\\leq k\\,\\mathrm{ub}\\,, \\\\
+\\boldsymbol{1}^\\intercal \\boldsymbol{w} &\\geq k\\,\\mathrm{lb}\\,, \\\\
 \\boldsymbol{w} - k\\,\\boldsymbol{w}_0 &= \\boldsymbol{w}_p - \\boldsymbol{w}_n\\,, \\\\
 \\boldsymbol{w}_p &\\leq k\\,\\boldsymbol{u}_p\\,, \\\\
 \\boldsymbol{w}_n &\\leq k\\,\\boldsymbol{u}_n\\,, \\\\
@@ -221,28 +240,39 @@ Where:
 
   - $(math_dict[:w_port])
   - $(math_dict[:k_budget])
-  - ``\\boldsymbol{w}_0``: Reference portfolio the trade starts from (`w`).
+  - ``\\boldsymbol{w}_0``: Reference portfolio the trade starts from (`w`). [`factory`](@ref factory(bgt::BudgetCosts, w::VecNum)) replaces it with the weights of the previous fold or step, unless `fixed` is `true`.
   - ``\\boldsymbol{w}_p``, ``\\boldsymbol{w}_n``: Positive and negative weight increments.
   - ``\\boldsymbol{v}_p``, ``\\boldsymbol{v}_n``: Cost coefficient vectors for positive and negative changes.
   - ``\\boldsymbol{u}_p``, ``\\boldsymbol{u}_n``: Upper limits on the positive and negative increments.
-  - ``\\mathrm{lb}``, ``\\mathrm{ub}``: Lower and upper budget bounds. A scalar `bgt` pins them together.
+  - ``\\mathrm{ub}``: Ceiling of the weights and their costs. A scalar `bgt` gives it, and a [`BudgetRange`](@ref) gives its `ub`. A `ub` of `nothing` writes no ceiling.
+  - ``\\mathrm{lb}``: Floor of the invested weights, the `lb` of a [`BudgetRange`](@ref). A scalar `bgt`, and a `lb` of `nothing`, write no floor.
 
-Every row is homogeneous in ``(\\boldsymbol{w}, k)``. Under [`MaximumRatio`](@ref), the start portfolio ``\\boldsymbol{w}_0``, the caps and the budget therefore scale with ``k``, and the weights do not depend on `ohf`. Every other objective fixes ``k = 1``.
+The rows above are those of `xbgt = false`. With `xbgt = true`, the floor holds the cost, ``\\boldsymbol{1}^\\intercal \\boldsymbol{w} + \\boldsymbol{v}_p^\\intercal \\boldsymbol{w}_p + \\boldsymbol{v}_n^\\intercal \\boldsymbol{w}_n \\geq k\\,\\mathrm{lb}``, a scalar `bgt` is also its ``\\mathrm{lb}``, and [`set_cost_budget_mip_constraints!`](@ref) states the complementarity rows.
 
-A pinned `bgt = 1.0` and a [`MaximumReturn`](@ref) objective reproduce the identity to
-**7.1e-9** on a five-asset sample: `sum(w) + 0.01 * sum(abs.(w - w0))` lands on
-**0.999999992894044**.
+Every row is homogeneous in ``(\\boldsymbol{w}, k)``. Under [`MaximumRatio`](@ref), the start portfolio ``\\boldsymbol{w}_0``, the caps and the budget therefore scale with ``k``, and the weights do not depend on `ohf` while the ceiling binds. Where it does not bind, `ohf` sets the share of cash, see the warning below. Every other objective fixes ``k = 1``.
+
+A `bgt = 1.0` and a [`MaximumReturn`](@ref) objective meet the ceiling to **1.5e-8** on a
+five-asset sample with a positive mean: `sum(w) + 0.01 * sum(abs.(w - w0))` lands on
+**0.9999999851855913**.
 
 !!! warning
 
-    ``\\boldsymbol{w}_p`` and ``\\boldsymbol{w}_n`` are not forced to be complementary, so the
-    relaxation is exact only while the objective prefers a **larger** invested budget. Under
-    [`MinimumRisk`](@ref) it does not: a larger cost shrinks
-    ``\\boldsymbol{1}^\\intercal \\boldsymbol{w}`` and so shrinks the risk, and the solver inflates
-    both increments to their `up` and `un` caps. On the sample above, minimising the variance
-    gives `sum(w) = 0.9514` with a charged cost of **0.0486** against a traded cost of
-    **0.0014**. Give the return term a lower bound through `settings.lb`, exactly as the source
-    formulation does, whenever the objective minimises a risk measure.
+    The programme holds cash wherever cash serves the objective better than an asset, and the
+    ceiling alone does not stop it. Under [`MinimumRisk`](@ref), a scalar `bgt` sells the book to
+    cash: on the sample above, minimising the variance gives `sum(w) = 0.0045`. Give a floor on
+    the invested weights to bound the cash: `bgt = BudgetRange(; lb = 0.95, ub = 1.0)` gives
+    `sum(w) = 0.95` on the same sample. Or write `xbgt = true` to hold no cash, under a
+    mixed-integer solver. Under [`MaximumRatio`](@ref) with `rf = 0`, cash does
+    not change the ratio, so the share of cash is not unique and `ohf` sets it: on the same
+    sample the ratio agrees to 1e-6 from `ohf = 1e-3` to `ohf = 0.3`, and `sum(w)` plus the
+    cost is 0.70 at `ohf = 1e-3`, 0.71 at the default and 0.95 at `ohf = 0.3`. A positive `rf`
+    makes cash lower the ratio, so the ceiling binds.
+
+!!! note
+
+    Where the ceiling does not bind, ``\\boldsymbol{w}_p`` and ``\\boldsymbol{w}_n`` can both be
+    positive. The weights stay exact, but the value of `cost_bgt_expr` can then exceed the cost
+    of the trade. Compute the cost from the weights.
 
 # Fields
 
@@ -256,7 +286,9 @@ $(DocStringExtensions.FIELDS)
         vp::Num_VecNum = 1.0,
         vn::Num_VecNum = 1.0,
         up::Num_VecNum = 1.0,
-        un::Num_VecNum = 1.0
+        un::Num_VecNum = 1.0,
+        fixed::Bool = false,
+        xbgt::Bool = false
     ) -> BudgetCosts
 
 Keywords correspond to the struct's fields.
@@ -271,13 +303,13 @@ Keywords correspond to the struct's fields.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `vp`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `vn`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `up`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `un`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `w`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `vp`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `vn`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `up`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `un`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 # Related
 
@@ -289,7 +321,10 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.1, equations 9.14 and 9.15.
+  - $(ref_dict[:pogue1969]) Pages 11 and 12, Equations 1 to 3, and page 29, Exhibit 3.
+  - $(ref_dict[:boyd2017]) Section 2.5, Equation 2.6, and Section 4.7.
+  - $(ref_dict[:cajas2025]) Section 9.1, Equations 9.14 and 9.15, and Listing 9.8.
+  - $(ref_dict[:mosek2023c]) Section 6.1, Equation 6.2.
 """
 @propagatable @concrete struct BudgetCosts <: BudgetCostEstimator
     """
@@ -316,8 +351,16 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
     $(field_dict[:un_cost])
     """
     @vprop un
+    """
+    $(field_dict[:fixed])
+    """
+    fixed
+    """
+    $(field_dict[:xbgt_cost])
+    """
+    xbgt
     function BudgetCosts(bgt::Num_BgtRg, w::VecNum, vp::Num_VecNum, vn::Num_VecNum,
-                         up::Num_VecNum, un::Num_VecNum)
+                         up::Num_VecNum, un::Num_VecNum, fixed::Bool, xbgt::Bool)
         @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
         if isa(vp, VecNum)
             @argcheck(!isempty(vp), IsEmptyError("vp cannot be empty"))
@@ -347,17 +390,14 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
         else
             @argcheck(un >= zero(un), DomainError(un, "un must be >= 0"))
         end
-        return new{typeof(bgt), typeof(w), typeof(vp), typeof(vn), typeof(up), typeof(un)}(bgt,
-                                                                                           w,
-                                                                                           vp,
-                                                                                           vn,
-                                                                                           up,
-                                                                                           un)
+        return new{typeof(bgt), typeof(w), typeof(vp), typeof(vn), typeof(up), typeof(un),
+                   typeof(fixed), typeof(xbgt)}(bgt, w, vp, vn, up, un, fixed, xbgt)
     end
 end
 function BudgetCosts(; bgt::Num_BgtRg = 1.0, w::VecNum, vp::Num_VecNum = 1.0,
-                     vn::Num_VecNum = 1.0, up::Num_VecNum = 1.0, un::Num_VecNum = 1.0)
-    return BudgetCosts(bgt, w, vp, vn, up, un)
+                     vn::Num_VecNum = 1.0, up::Num_VecNum = 1.0, un::Num_VecNum = 1.0,
+                     fixed::Bool = false, xbgt::Bool = false)
+    return BudgetCosts(bgt, w, vp, vn, up, un, fixed, xbgt)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -368,11 +408,16 @@ Extends [`BudgetCosts`](@ref) with a power cone, so the charge grows as the trad
 raised to ``1/\\mathrm{beta}``. Unlike a linear cost, the charge is **also subtracted from the
 return expression** of every term whose `settings.mic` is `true`.
 
+Section 6.3 of [mosek2023c](@cite) states this cost, charges it against the budget, and writes it as a power cone. That work names page 452 of [grinoldkahn1999](@cite) as the source of the power law. No copy of that work was found. [cajas2025](@cite) splits the trade into its two signs, as the rows below do.
+
+**The budget row is a ceiling, as for [`BudgetCosts`](@ref).** Section 6.3 of [mosek2023c](@cite) states that its equality lets the solver treat the charge as a riskless asset and throw money away, and it adds a risk-free security to stop that. A ceiling is that security at a zero rate: the part of the budget that the weights and their costs do not use is cash. Section 4.7 of [boyd2017](@cite) relaxes the self-financing equality to the same inequality. The floor of a [`BudgetRange`](@ref) bounds the invested weights alone.
+
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\boldsymbol{1}^\\intercal \\boldsymbol{w} + \\boldsymbol{v}_p^\\intercal \\boldsymbol{\\iota}_p + \\boldsymbol{v}_n^\\intercal \\boldsymbol{\\iota}_n &\\in [k\\,\\mathrm{lb},\\; k\\,\\mathrm{ub}]\\,, \\\\
+\\boldsymbol{1}^\\intercal \\boldsymbol{w} + \\boldsymbol{v}_p^\\intercal \\boldsymbol{\\iota}_p + \\boldsymbol{v}_n^\\intercal \\boldsymbol{\\iota}_n &\\leq k\\,\\mathrm{ub}\\,, \\\\
+\\boldsymbol{1}^\\intercal \\boldsymbol{w} &\\geq k\\,\\mathrm{lb}\\,, \\\\
 (\\iota_{p,i},\\; k,\\; w_{p,i}) &\\in \\mathcal{K}_{\\mathrm{pow}}^\\beta \\quad \\forall i = 1,\\dots,N\\,, \\\\
 (\\iota_{n,i},\\; k,\\; w_{n,i}) &\\in \\mathcal{K}_{\\mathrm{pow}}^\\beta \\quad \\forall i = 1,\\dots,N\\,, \\\\
 \\boldsymbol{w} - k\\,\\boldsymbol{w}_0 &= \\boldsymbol{w}_p - \\boldsymbol{w}_n\\,, \\\\
@@ -387,13 +432,14 @@ Where:
   - $(math_dict[:w_port])
   - $(math_dict[:k_budget])
   - $(math_dict[:N])
-  - ``\\boldsymbol{w}_0``: Reference portfolio the trade starts from (`w`).
+  - ``\\boldsymbol{w}_0``: Reference portfolio the trade starts from (`w`). [`factory`](@ref factory(bgt::BudgetCosts, w::VecNum)) replaces it with the weights of the previous fold or step, unless `fixed` is `true`.
   - ``\\boldsymbol{w}_p``, ``\\boldsymbol{w}_n``: Positive and negative weight increments.
   - ``\\boldsymbol{\\iota}_p``, ``\\boldsymbol{\\iota}_n``: Auxiliary variables the power cone bounds below by ``w_p^{1/\\beta}`` and ``w_n^{1/\\beta}``.
   - ``\\boldsymbol{v}_p``, ``\\boldsymbol{v}_n``: Market impact cost coefficients for positive and negative trades.
   - ``\\boldsymbol{u}_p``, ``\\boldsymbol{u}_n``: Upper limits on the positive and negative increments.
   - ``\\mathcal{K}_{\\mathrm{pow}}^\\beta``: Three-dimensional power cone of exponent ``\\beta``.
-  - ``\\mathrm{lb}``, ``\\mathrm{ub}``: Lower and upper budget bounds. A scalar `bgt` pins them together.
+  - ``\\mathrm{ub}``: Ceiling of the weights and their costs. A scalar `bgt` gives it, and a [`BudgetRange`](@ref) gives its `ub`. A `ub` of `nothing` writes no ceiling.
+  - ``\\mathrm{lb}``: Floor of the invested weights, the `lb` of a [`BudgetRange`](@ref). A scalar `bgt`, and a `lb` of `nothing`, write no floor.
 
 Every row is homogeneous in ``(\\boldsymbol{w}, k)``. Under [`MaximumRatio`](@ref), the start portfolio ``\\boldsymbol{w}_0``, the caps and the budget therefore scale with ``k``, and the weights do not depend on `ohf`. Every other objective fixes ``k = 1``.
 
@@ -401,21 +447,28 @@ Every row is homogeneous in ``(\\boldsymbol{w}, k)``. Under [`MaximumRatio`](@re
 
     **`beta` is the reciprocal of the power law's exponent.** The cone gives
     ``\\iota_i \\geq w_i^{1/\\beta}``, so the default `beta = 2/3` charges the volume raised to
-    **3/2**, the value the empirical literature reports. The cone needs `0 < beta < 1`; the
+    **3/2**. Equation 1 of [toth2011](@cite) is the square-root law of the price impact, and
+    the cost is the impact times the traded volume, so it grows as the volume raised to 3/2.
+    The cone needs `0 < beta < 1`; the
     constructor refuses both endpoints, because a solver reports `SLOW_PROGRESS` on either.
 
-A pinned `bgt = 1.0` and a [`MaximumReturn`](@ref) objective reproduce the identity to
-**9.4e-10** on a five-asset sample: `sum(w) + 0.01 * sum(abs.(w - w0) .^ 1.5)` lands on
-**0.9999999990596528**.
+A `bgt = 1.0` and a [`MaximumReturn`](@ref) objective meet the ceiling to **5.7e-8** on a
+five-asset sample with a positive mean: `sum(w) + 0.01 * sum(abs.(w - w0) .^ 1.5)` lands on
+**0.999999942738817**.
 
 !!! warning
 
-    The auxiliary variables carry no upper bound, so the charge is exact only while the
-    objective prefers a **larger** invested budget. Under [`MinimumRisk`](@ref) the solver
-    treats them as riskless assets and concentrates the whole budget in them: on the sample
-    above, minimising the variance gives `sum(w) = 0.0051`. Give the return term a lower bound
-    through `settings.lb`, exactly as the source formulation instructs, whenever the objective
-    minimises a risk measure.
+    The programme holds cash wherever cash serves the objective better than an asset, and the
+    ceiling alone does not stop it. Under [`MinimumRisk`](@ref), a scalar `bgt` sells the book to
+    cash: on the sample above, minimising the variance gives `sum(w) = 0.0047`. Give a floor on
+    the invested weights to bound the cash, such as `bgt = BudgetRange(; lb = 0.95, ub = 1.0)`.
+
+!!! note
+
+    The auxiliary variables carry no upper bound, so where the ceiling does not bind they can
+    exceed ``w_p^{1/\\beta}`` and ``w_n^{1/\\beta}``. The weights stay exact, but the value of
+    `cost_bgt_expr`, and the return term that subtracts it, can then charge more than the trade
+    costs. Compute the cost from the weights.
 
 # Fields
 
@@ -430,7 +483,8 @@ $(DocStringExtensions.FIELDS)
         vn::Num_VecNum = 1.0,
         up::Num_VecNum = 1.0,
         un::Num_VecNum = 1.0,
-        beta::Number = 2/3
+        beta::Number = 2/3,
+        fixed::Bool = false
     ) -> BudgetMarketImpact
 
 Keywords correspond to the struct's fields.
@@ -446,13 +500,13 @@ Keywords correspond to the struct's fields.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `vp`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `vn`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `up`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `un`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `w`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `vp`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `vn`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `up`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `un`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 # Related
 
@@ -464,9 +518,11 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.3, equations 9.22 and 9.23.
+  - $(ref_dict[:mosek2023c]) Section 6.3, Equations 6.4 to 6.6. $(ref_dict[:no_original_source])
   - $(ref_dict[:grinoldkahn1999])
-  - $(ref_dict[:toth2011])
+  - $(ref_dict[:toth2011]) Section 1, Equation 1.
+  - $(ref_dict[:cajas2025]) Section 9.3, Equations 9.22 and 9.23.
+  - $(ref_dict[:boyd2017]) Section 4.7.
 """
 @propagatable @concrete struct BudgetMarketImpact <: BudgetCostEstimator
     """
@@ -497,8 +553,12 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
     $(field_dict[:beta_mic])
     """
     beta
+    """
+    $(field_dict[:fixed])
+    """
+    fixed
     function BudgetMarketImpact(bgt::Num_BgtRg, w::VecNum, vp::Num_VecNum, vn::Num_VecNum,
-                                up::Num_VecNum, un::Num_VecNum, beta::Number)
+                                up::Num_VecNum, un::Num_VecNum, beta::Number, fixed::Bool)
         @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
         if isa(vp, VecNum)
             @argcheck(!isempty(vp), IsEmptyError("vp cannot be empty"))
@@ -532,43 +592,166 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
                   DomainError(beta,
                               "beta must satisfy 0 < beta < 1; the power cone is degenerate at both endpoints, and a solver reports SLOW_PROGRESS. The realised power law exponent is 1/beta, so beta = 2/3 charges the volume raised to 3/2"))
         return new{typeof(bgt), typeof(w), typeof(vp), typeof(vn), typeof(up), typeof(un),
-                   typeof(beta)}(bgt, w, vp, vn, up, un, beta)
+                   typeof(beta), typeof(fixed)}(bgt, w, vp, vn, up, un, beta, fixed)
     end
 end
 function BudgetMarketImpact(; bgt::Num_BgtRg = 1.0, w::VecNum, vp::Num_VecNum = 1.0,
                             vn::Num_VecNum = 1.0, up::Num_VecNum = 1.0,
-                            un::Num_VecNum = 1.0, beta::Number = 2 / 3)
-    return BudgetMarketImpact(bgt, w, vp, vn, up, un, beta)
-end
-function set_budget_constraints!(model::JuMP.Model, val::Number, w::VecNum)
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    JuMP.@constraint(model, bgt, sc * (sum(w) - k * val) == 0)
-    return nothing
-end
-function set_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, w::VecNum)
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    lb = bgt.lb
-    ub = bgt.ub
-    if !isnothing(lb)
-        JuMP.@constraint(model, bgt_lb, sc * (sum(w) - k * lb) >= 0)
-    end
-    if !isnothing(ub)
-        JuMP.@constraint(model, bgt_ub, sc * (sum(w) - k * ub) <= 0)
-    end
-    return nothing
+                            un::Num_VecNum = 1.0, beta::Number = 2 / 3, fixed::Bool = false)
+    return BudgetMarketImpact(bgt, w, vp, vn, up, un, beta, fixed)
 end
 """
-    set_long_short_budget_constraints!(args...)
+    factory(bgt::BudgetCosts, w::VecNum)
+    factory(bgt::BudgetMarketImpact, w::VecNum)
 
-Set budget constraints for long and short portfolio positions in the JuMP model.
+Replace the reference portfolio of a cost budget with the weights `w`, unless its `fixed` field is `true`.
 
-Various overloads handle different budget types (fixed, range), dispatching on the presence or absence of long/short budget configurations.
+A [`BudgetCosts`](@ref) and a [`BudgetMarketImpact`](@ref) charge the cost of the move from their reference `w` against the budget. A fold of a walk-forward, or a step of an online rule, trades from the weights that it holds, and [`factory(opt::JuMPOptimiser, w::AbstractVector)`](@ref) passes these weights to the `bgt` of the optimiser. So the charged cost is the cost of the trade of the fold, as for a [`Turnover`](@ref) on `tn` or on `fees`. A `fixed` estimator keeps the reference that it was built with.
+
+A number, a [`BudgetRange`](@ref) and `nothing` hold no reference, so they take the leaf method of [`factory`](@ref), which returns them unchanged. A [`TimeDependent`](@ref) schedule applies `factory` to each entry.
+
+# Algorithm
+
+ 1. If `bgt.fixed` is `true`, return `bgt` unchanged.
+ 2. Else rebuild `bgt` through its keyword constructor with `w` as the reference portfolio. Every other field keeps its value.
 
 # Arguments
 
-  - `args...`: JuMP model and budget parameters.
+  - `bgt`: The net budget of a [`JuMPOptimiser`](@ref).
+  - `w`: The weights that the fold or the step trades from.
+
+# Validation
+
+  - Step 2 calls the keyword constructor, so it checks `w` as the constructor does.
+
+# Returns
+
+  - `bgt`: `bgt` unchanged in step 1. Else a new estimator of the same type with `w` as its reference.
+
+# Examples
+
+```jldoctest
+julia> bgt = BudgetCosts(; w = [0.2, 0.3, 0.5], vp = 0.01, vn = 0.01);
+
+julia> factory(bgt, [0.1, 0.4, 0.5]).w
+3-element Vector{Float64}:
+ 0.1
+ 0.4
+ 0.5
+
+julia> bgt = BudgetCosts(; w = [0.2, 0.3, 0.5], vp = 0.01, vn = 0.01, fixed = true);
+
+julia> factory(bgt, [0.1, 0.4, 0.5]).w
+3-element Vector{Float64}:
+ 0.2
+ 0.3
+ 0.5
+```
+
+# Related
+
+  - [`BudgetCosts`](@ref)
+  - [`BudgetMarketImpact`](@ref)
+  - [`needs_previous_weights(bgt::BudgetCostEstimator)`](@ref)
+  - [`factory(tn::TurnoverEstimator, w::VecNum)`](@ref): Reads the `fixed` flag in the same way.
+"""
+function factory(bgt::BudgetCosts, w::VecNum)::BudgetCosts
+    return bgt.fixed ? bgt : rebuild_struct(bgt, (; w = w))
+end
+# `@propagatable` writes `factory(x::BudgetMarketImpact, args...)`, so this method names the
+# concrete type to be the more specific one.
+function factory(bgt::BudgetMarketImpact, w::VecNum)::BudgetMarketImpact
+    return bgt.fixed ? bgt : rebuild_struct(bgt, (; w = w))
+end
+"""
+    needs_previous_weights(bgt::BudgetCostEstimator) -> Bool
+    needs_previous_weights(bgt::Number) -> Bool
+
+Tell whether a net budget reads the weights of the previous fold or step.
+
+A cost budget that is not `fixed` measures its cost from the weights that [`factory`](@ref factory(bgt::BudgetCosts, w::VecNum)) gives it, so it needs them. A `fixed` cost budget and a number need none. So a walk-forward that holds a cost budget that is not `fixed` runs its folds in order, as one that holds a [`Turnover`](@ref) does.
+
+# Algorithm
+
+ 1. On a [`BudgetCostEstimator`](@ref), return `!bgt.fixed`.
+ 2. On a number, return `false`.
+
+# Arguments
+
+  - `bgt`: The net budget of a [`JuMPOptimiser`](@ref).
+
+# Returns
+
+  - `Bool`: `true` if `bgt` needs the previous weights, else `false`.
+
+# Related
+
+  - [`factory(bgt::BudgetCosts, w::VecNum)`](@ref)
+  - [`needs_previous_weights(tn::TnE_Tn)`](@ref): Reads the same `fixed` flag.
+"""
+function needs_previous_weights(bgt::BudgetCostEstimator)::Bool
+    return !bgt.fixed
+end
+function needs_previous_weights(::Number)::Bool
+    return false
+end
+function set_budget_constraints!(model::JuMP.Model, val::Number, w::VecNum;
+                                 prefix::Symbol = Symbol(""))
+    budget_row!(model, prefix, :bgt, val, ==, w)
+    return nothing
+end
+function set_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, w::VecNum;
+                                 prefix::Symbol = Symbol(""))
+    budget_row!(model, prefix, :bgt_lb, bgt.lb, >=, w)
+    budget_row!(model, prefix, :bgt_ub, bgt.ub, <=, w)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Check that a budget that pays costs goes on the first block of a model.
+
+A [`BudgetCosts`](@ref) or a [`BudgetMarketImpact`](@ref) registers the trade variables `wp` and `wn` and the expression `cost_bgt_expr` in the shared Model State, so a second one in the same model collides with the first. The net budget belongs to the owner of the model, whose block is the first, under the empty prefix.
+
+# Arguments
+
+  - `bgt`: The budget that pays costs.
+  - `prefix`: The Model State namespace of the block.
+
+# Validation
+
+  - `prefix` is empty. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_budget_constraints!`](@ref)
+  - [`set_block_constraints!`](@ref)
+"""
+function assert_cost_budget_prefix(bgt::BudgetCostEstimator, prefix::Symbol)::Nothing
+    @argcheck(prefix == Symbol(""),
+              ArgumentError("a `$(nameof(typeof(bgt)))` net budget registers its trade variables in the shared Model State, so it goes on the first block of a model, the block of its owner. The block under the prefix `$prefix` must take `bgt = nothing`."))
+    return nothing
+end
+"""
+    set_long_short_budget_constraints!(model::JuMP.Model, bgt::Option{<:Num_BgtRg}, sbgt::Option{<:Num_BgtRg}; prefix::Symbol = Symbol(""))
+    set_long_short_budget_constraints!(model::JuMP.Model, bgt::Option{<:BudgetCostEstimator}, ::Nothing; prefix::Symbol = Symbol(""))
+
+Set budget constraints for long and short portfolio positions in the JuMP model.
+
+One method for each pair of a net budget `bgt` and a short budget `sbgt`, a number or a [`BudgetRange`](@ref), with `nothing` in at most one slot. The rows go under `prefix`, the namespace of the block, and they read the parts that [`weight_parts!`](@ref) gives the block. The net budget is the budget of the owner of the block, so the block of a set passes `nothing`.
+
+The method with no short budget and no net budget, or with a [`BudgetCostEstimator`](@ref) net budget, adds no row. A cost budget forbids a short budget, so it never meets one here. Any other type or arity is a `MethodError`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `bgt`: The net budget, or `nothing`.
+  - `sbgt`: The short budget, or `nothing`.
+  - $(arg_dict[:prefix_kw])
 
 # Returns
 
@@ -578,8 +761,10 @@ Various overloads handle different budget types (fixed, range), dispatching on t
 
   - [`BudgetRange`](@ref)
   - [`set_cost_budget_constraints!`](@ref)
+  - [`weight_parts!`](@ref)
 """
-function set_long_short_budget_constraints!(args...)
+function set_long_short_budget_constraints!(::JuMP.Model, ::Option{<:BudgetCostEstimator},
+                                            ::Nothing; prefix::Symbol = Symbol(""))
     return nothing
 end
 """
@@ -587,9 +772,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Assert that a gross budget is admissible alongside the net and short budgets.
 
-`bgt` and `sbgt` constrain the net and gross exposures only *together*: pinning both gives `1'w == bgt` and `norm(w, 1) == bgt + 2 * sbgt`. `gbgt` exists for the combination they cannot reach — gross pinned with net free — so it is rejected when they already determine the gross exposure, and when the weight bounds forbid short positions (whereupon gross and net coincide and `bgt` already owns the constraint).
+`bgt` and `sbgt` constrain the net and gross exposures only *together*. When both are numbers, the long budget is `sum(lw) == bgt + sbgt` and the short budget is `sum(sw) == sbgt`, so the gross budget `sum(lw) + sum(sw)` is `bgt + 2 * sbgt`, the row that `gbgt` writes. The realised gross exposure `norm(w, 1)` equals it when `xbgt` is `true`, and it can be smaller when `xbgt` is `false`. `gbgt` exists for the combination they cannot reach — gross pinned with net free — so it is rejected when they already determine the gross exposure, and when the weight bounds forbid short positions (whereupon gross and net coincide and `bgt` already owns the constraint). A gross budget whose upper end lies below the magnitude of the net budget is rejected too, see [`assert_gross_budget_reaches_net`](@ref).
 
 Only the statically-decidable contradictions are caught. Ranges may still conflict at solve time, surfacing as infeasibility, and a [`WeightBoundsEstimator`](@ref) is not resolved until then. [`TimeDependent`](@ref) schedules are reached through [`assert_time_dependent_substitution`](@ref).
+
+A [`ProgrammeAllocationSet`](@ref) and the held optimiser of a [`FollowTheLeader`](@ref) rule pass `bgt = 1`, the budget of one that the online head owns.
 
 # Related
 
@@ -597,33 +784,135 @@ Only the statically-decidable contradictions are caught. Ranges may still confli
   - [`set_gross_budget_constraints!`](@ref)
   - [`set_long_short_budget_constraints!`](@ref)
   - [`gross_budget_bounds_msg`](@ref)
+  - [`assert_gross_budget_reaches_net`](@ref)
 """
 function assert_gross_budget_admissible(bgt, sbgt, gbgt, wb)::Nothing
     @argcheck(!(isa(bgt, Number) && isa(sbgt, Number)),
-              ArgumentError("gross budget (gbgt) is over-determined: net budget (bgt = $bgt) and short budget (sbgt = $sbgt) already pin the gross exposure at bgt + 2 * sbgt = $(bgt + 2 * sbgt). Give at most two of bgt, sbgt and gbgt — gbgt exists for the case bgt and sbgt cannot express, a pinned gross exposure with a free net exposure (bgt = nothing)."))
+              ArgumentError("gross budget (gbgt) is over-determined: net budget (bgt = $bgt) and short budget (sbgt = $sbgt) already pin the gross budget at bgt + 2 * sbgt = $(bgt + 2 * sbgt). Give at most two of bgt, sbgt and gbgt. gbgt exists for the case that bgt and sbgt cannot express, a pinned gross budget with a free net exposure (bgt = nothing)."))
     if isa(wb, WeightBounds)
         @argcheck(w_neg_flag(wb.lb) || w_neg_flag(wb.ub),
                   ArgumentError(gross_budget_bounds_msg(wb.lb, wb.ub)))
     end
+    assert_gross_budget_reaches_net(bgt, gbgt)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that the gross budget `gbgt` can reach the magnitude of the net budget `bgt`.
+
+The gross row reads the long and short parts of the weights, and each part bounds its side of the weight, `lw_i >= max(w_i, 0)` and `sw_i >= max(-w_i, 0)`. This holds under both decomposition contracts. So the gross exposure is at least the magnitude of the net exposure, and a gross budget whose upper end lies below the least magnitude that the net budget admits leaves no feasible weights. The bound holds at every `k`, because both rows scale with it.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\sum_i lw_i + \\sum_i sw_i &\\geq \\sum_i \\lvert w_i \\rvert \\geq \\Bigl\\lvert \\sum_i w_i \\Bigr\\rvert\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``lw_i``, ``sw_i``: The long and short parts of weight ``i``.
+  - $(math_dict[:w_port])
+
+# Validation
+
+  - The upper end of `gbgt` is non-negative. An `ArgumentError` is thrown otherwise.
+  - The upper end of `gbgt` is at least [`net_budget_floor`](@ref) of `bgt`. An `ArgumentError` is thrown otherwise.
+
+A `gbgt` with no upper end, a `bgt` whose interval holds zero, `nothing`, a [`BudgetCostEstimator`](@ref) and a [`TimeDependent`](@ref) schedule state no static floor or ceiling, so they pass.
+
+# Related
+
+  - [`assert_gross_budget_admissible`](@ref)
+  - [`net_budget_floor`](@ref)
+  - [`set_gross_budget_constraints!`](@ref)
+"""
+function assert_gross_budget_reaches_net(bgt, gbgt)::Nothing
+    hi = gross_budget_ceiling(gbgt)
+    if isnothing(hi)
+        return nothing
+    end
+    @argcheck(zero(hi) <= hi,
+              ArgumentError("gross budget (gbgt) has the upper end $hi, below zero: the gross exposure sum(lw) + sum(sw) is at least norm(w, 1), so it is never negative."))
+    lo = net_budget_floor(bgt)
+    if !isnothing(lo)
+        @argcheck(lo <= hi,
+                  ArgumentError("gross budget (gbgt) has the upper end $hi, below $lo, the least magnitude of the net budget (bgt = $bgt): the gross exposure sum(lw) + sum(sw) is at least norm(w, 1), which is at least abs(sum(w)), so no weights meet both budgets. Raise gbgt to at least $lo, or let bgt admit a smaller magnitude."))
+    end
+    return nothing
+end
+"""
+    net_budget_floor(bgt::Number)
+    net_budget_floor(bgt::BudgetRange)
+    net_budget_floor(bgt::Option{<:UnresolvedValue})
+
+Returns the least magnitude `abs(sum(w))` that the net budget `bgt` admits, or `nothing` when it states no positive floor.
+
+A number admits its own magnitude. A [`BudgetRange`](@ref) admits the distance from zero to its interval: its lower bound when that is positive, the negative of its upper bound when that is negative, and no floor when the interval holds zero. `nothing`, a [`BudgetCostEstimator`](@ref) and a [`TimeDependent`](@ref) schedule are the other values that reach it, and they state no floor. Any other type is a `MethodError`.
+
+# Related
+
+  - [`assert_gross_budget_reaches_net`](@ref)
+"""
+function net_budget_floor(bgt::Number)
+    return abs(bgt)
+end
+function net_budget_floor(bgt::BudgetRange)
+    lb = bgt.lb
+    ub = bgt.ub
+    return if !isnothing(lb) && lb > zero(lb)
+        lb
+    elseif !isnothing(ub) && ub < zero(ub)
+        -ub
+    else
+        nothing
+    end
+end
+function net_budget_floor(::Option{<:UnresolvedValue})
+    return nothing
+end
+"""
+    gross_budget_ceiling(gbgt::Number)
+    gross_budget_ceiling(gbgt::BudgetRange)
+    gross_budget_ceiling(gbgt::Option{<:UnresolvedValue})
+
+Returns the upper end of the gross budget `gbgt`, or `nothing` when it states none.
+
+A number is its own upper end, and a [`BudgetRange`](@ref) has its `ub`. `nothing`, a [`BudgetCostEstimator`](@ref) and a [`TimeDependent`](@ref) schedule are the other values that reach it, and they state none. Any other type is a `MethodError`.
+
+# Related
+
+  - [`assert_gross_budget_reaches_net`](@ref)
+"""
+function gross_budget_ceiling(gbgt::Number)
+    return gbgt
+end
+function gross_budget_ceiling(gbgt::BudgetRange)
+    return gbgt.ub
+end
+function gross_budget_ceiling(::Option{<:UnresolvedValue})
     return nothing
 end
 # No gross budget, or a schedule that `assert_time_dependent_substitution` reaches, has
 # nothing to assert here.
-function assert_gross_budget_admissible(::Any, ::Any, ::Union{Nothing, <:TimeDependent},
+function assert_gross_budget_admissible(::Any, ::Any, ::Union{Nothing, TimeDependent},
                                         ::Any)::Nothing
     return nothing
 end
 """
-    set_gross_budget_constraints!(model::JuMP.Model, gbgt::Option{<:Num_BgtRg})
+    set_gross_budget_constraints!(model::JuMP.Model, gbgt::Option{<:Num_BgtRg}; prefix::Symbol = Symbol(""))
 
 Constrain the gross exposure (leverage) `sum(lw) + sum(sw)`, independently of the net exposure.
 
-A number pins it; a [`BudgetRange`](@ref) bounds it on either side. Whether the constraint pins the *realised* gross exposure `norm(w, 1)` or merely bounds it depends on `xbgt` — see [`short_mip_threshold_constraints`](@ref).
+A number pins it; a [`BudgetRange`](@ref) bounds it on either side, and `nothing` adds no row. Any other type or arity is a `MethodError`. Whether the constraint pins the *realised* gross exposure `norm(w, 1)` or merely bounds it depends on `xbgt` — see [`short_mip_threshold_constraints`](@ref). The rows go under `prefix`, the namespace of the block, and they read the parts that [`weight_parts!`](@ref) gives the block.
 
 # Arguments
 
   - `model::JuMP.Model`: JuMP optimisation model.
   - `gbgt`: Gross budget specification, or `nothing` for no constraint.
+  - $(arg_dict[:prefix_kw])
 
 # Returns
 
@@ -635,168 +924,200 @@ A number pins it; a [`BudgetRange`](@ref) bounds it on either side. Whether the 
   - [`assert_gross_budget_admissible`](@ref)
   - [`set_long_short_budget_constraints!`](@ref)
 """
-function set_gross_budget_constraints!(args...)
+function set_gross_budget_constraints!(::JuMP.Model, ::Nothing; prefix::Symbol = Symbol(""))
     return nothing
 end
-function set_gross_budget_constraints!(model::JuMP.Model, gbgt::Number)
-    lw = shared_get(model, :lw)
-    sw = shared_get(model, :sw)
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    JuMP.@constraint(model, gbgt, sc * (sum(lw) + sum(sw) - k * gbgt) == 0)
+function set_gross_budget_constraints!(model::JuMP.Model, gbgt::Number;
+                                       prefix::Symbol = Symbol(""))
+    lw, sw = weight_parts!(model, prefix)
+    budget_row!(model, prefix, :gbgt, gbgt, ==, lw, sw)
     return nothing
 end
-function set_gross_budget_constraints!(model::JuMP.Model, gbgt::BudgetRange)
-    lw = shared_get(model, :lw)
-    sw = shared_get(model, :sw)
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    lb = gbgt.lb
-    if !isnothing(lb)
-        JuMP.@constraint(model, gbgt_lb, sc * (sum(lw) + sum(sw) - k * lb) >= 0)
-    end
-    ub = gbgt.ub
-    if !isnothing(ub)
-        JuMP.@constraint(model, gbgt_ub, sc * (sum(lw) + sum(sw) - k * ub) <= 0)
-    end
+function set_gross_budget_constraints!(model::JuMP.Model, gbgt::BudgetRange;
+                                       prefix::Symbol = Symbol(""))
+    lw, sw = weight_parts!(model, prefix)
+    budget_row!(model, prefix, :gbgt_lb, gbgt.lb, >=, lw, sw)
+    budget_row!(model, prefix, :gbgt_ub, gbgt.ub, <=, lw, sw)
     return nothing
 end
-function set_long_short_budget_constraints!(model::JuMP.Model, bgt::Number, ::Nothing)
-    lw = shared_get(model, :lw)
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    JuMP.@constraint(model, lbgt, sc * (sum(lw) - k * bgt) == 0)
+function set_long_short_budget_constraints!(model::JuMP.Model, bgt::Number, ::Nothing;
+                                            prefix::Symbol = Symbol(""))
+    lw, _ = weight_parts!(model, prefix)
+    budget_row!(model, prefix, :lbgt, bgt, ==, lw)
     return nothing
 end
-function set_long_short_budget_constraints!(model::JuMP.Model, ::Nothing, sbgt::Number)
-    sw = shared_get(model, :sw)
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    JuMP.@constraint(model, sbgt, sc * (sum(sw) - k * sbgt) == 0)
+function set_long_short_budget_constraints!(model::JuMP.Model, ::Nothing, sbgt::Number;
+                                            prefix::Symbol = Symbol(""))
+    _, sw = weight_parts!(model, prefix)
+    budget_row!(model, prefix, :sbgt, sbgt, ==, sw)
     return nothing
 end
-function set_long_short_budget_constraints!(model::JuMP.Model, bgt::Number, sbgt::Number)
-    lw = shared_get(model, :lw)
-    sw = shared_get(model, :sw)
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    JuMP.@constraints(model, begin
-                          lbgt, sc * (sum(lw) - k * (bgt + sbgt)) == 0
-                          sbgt, sc * (sum(sw) - k * sbgt) == 0
-                      end)
+function set_long_short_budget_constraints!(model::JuMP.Model, bgt::Number, sbgt::Number;
+                                            prefix::Symbol = Symbol(""))
+    lw, sw = weight_parts!(model, prefix)
+    budget_row!(model, prefix, :lbgt, bgt + sbgt, ==, lw)
+    budget_row!(model, prefix, :sbgt, sbgt, ==, sw)
     return nothing
 end
-function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, ::Nothing)
-    lw = shared_get(model, :lw)
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    lb = bgt.lb
-    if !isnothing(lb)
-        JuMP.@constraint(model, lbgt_lb, sc * (sum(lw) - k * lb) >= 0)
-    end
-    ub = bgt.ub
-    if !isnothing(ub)
-        JuMP.@constraint(model, lbgt_ub, sc * (sum(lw) - k * ub) <= 0)
-    end
+function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, ::Nothing;
+                                            prefix::Symbol = Symbol(""))
+    lw, _ = weight_parts!(model, prefix)
+    budget_row!(model, prefix, :lbgt_lb, bgt.lb, >=, lw)
+    budget_row!(model, prefix, :lbgt_ub, bgt.ub, <=, lw)
     return nothing
 end
-function set_long_short_budget_constraints!(model::JuMP.Model, ::Nothing, sbgt::BudgetRange)
-    sw = shared_get(model, :sw)
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    lb = sbgt.lb
-    if !isnothing(lb)
-        JuMP.@constraint(model, sbgt_lb, sc * (sum(sw) - k * lb) >= 0)
-    end
-    ub = sbgt.ub
-    if !isnothing(ub)
-        JuMP.@constraint(model, sbgt_ub, sc * (sum(sw) - k * ub) <= 0)
-    end
+function set_long_short_budget_constraints!(model::JuMP.Model, ::Nothing, sbgt::BudgetRange;
+                                            prefix::Symbol = Symbol(""))
+    _, sw = weight_parts!(model, prefix)
+    budget_row!(model, prefix, :sbgt_lb, sbgt.lb, >=, sw)
+    budget_row!(model, prefix, :sbgt_ub, sbgt.ub, <=, sw)
     return nothing
 end
 function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange,
-                                            sbgt::Number)
-    lw = shared_get(model, :lw)
-    sw = shared_get(model, :sw)
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    lb = bgt.lb
-    if !isnothing(lb)
-        JuMP.@constraint(model, lbgt_lb, sc * (sum(lw) - k * (lb + sbgt)) >= 0)
-    end
-    ub = bgt.ub
-    if !isnothing(ub)
-        JuMP.@constraint(model, lbgt_ub, sc * (sum(lw) - k * (ub + sbgt)) <= 0)
-    end
-    JuMP.@constraint(model, sbgt, sc * (sum(sw) - k * sbgt) == 0)
+                                            sbgt::Number; prefix::Symbol = Symbol(""))
+    lw, sw = weight_parts!(model, prefix)
+    budget_row!(model, prefix, :lbgt_lb, offset_bound(bgt.lb, sbgt), >=, lw)
+    budget_row!(model, prefix, :lbgt_ub, offset_bound(bgt.ub, sbgt), <=, lw)
+    budget_row!(model, prefix, :sbgt, sbgt, ==, sw)
     return nothing
 end
 function set_long_short_budget_constraints!(model::JuMP.Model, bgt::Number,
-                                            sbgt::BudgetRange)
-    lw = shared_get(model, :lw)
-    sw = shared_get(model, :sw)
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    lb = sbgt.lb
-    if !isnothing(lb)
-        JuMP.@constraints(model, begin
-                              lbgt_lb, sc * (sum(lw) - k * (lb + bgt)) >= 0
-                              sbgt_lb, sc * (sum(sw) - k * lb) >= 0
-                          end)
-    end
-    ub = sbgt.ub
-    if !isnothing(ub)
-        JuMP.@constraints(model, begin
-                              lbgt_ub, sc * (sum(lw) - k * (ub + bgt)) <= 0
-                              sbgt_ub, sc * (sum(sw) - k * ub) <= 0
-                          end)
-    end
+                                            sbgt::BudgetRange; prefix::Symbol = Symbol(""))
+    lw, sw = weight_parts!(model, prefix)
+    budget_row!(model, prefix, :lbgt_lb, offset_bound(sbgt.lb, bgt), >=, lw)
+    budget_row!(model, prefix, :sbgt_lb, sbgt.lb, >=, sw)
+    budget_row!(model, prefix, :lbgt_ub, offset_bound(sbgt.ub, bgt), <=, lw)
+    budget_row!(model, prefix, :sbgt_ub, sbgt.ub, <=, sw)
     return nothing
 end
 function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange,
-                                            sbgt::BudgetRange)
-    lw = shared_get(model, :lw)
-    sw = shared_get(model, :sw)
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    lb = bgt.lb
-    slb = sbgt.lb
-    lb_flag = isnothing(lb)
-    slb_flag = isnothing(slb)
-    if !lb_flag && !slb_flag
-        JuMP.@constraints(model, begin
-                              lbgt_lb, sc * (sum(lw) - k * (lb + slb)) >= 0
-                              sbgt_lb, sc * (sum(sw) - k * slb) >= 0
-                          end)
-    elseif !lb_flag && slb_flag
-        JuMP.@constraint(model, lbgt_lb, sc * (sum(lw) - k * lb) >= 0)
-    elseif lb_flag && !slb_flag
-        JuMP.@constraint(model, sbgt_lb, sc * (sum(sw) - k * slb) >= 0)
-    end
-    ub = bgt.ub
-    sub = sbgt.ub
-    ub_flag = isnothing(ub)
-    sub_flag = isnothing(sub)
-    if !ub_flag && !sub_flag
-        JuMP.@constraints(model, begin
-                              lbgt_ub, sc * (sum(lw) - k * (ub + sub)) <= 0
-                              sbgt_ub, sc * (sum(sw) - k * sub) <= 0
-                          end)
-    elseif !ub_flag && sub_flag
-        JuMP.@constraint(model, lbgt_ub, sc * (sum(lw) - k * ub) <= 0)
-    elseif ub_flag && !sub_flag
-        JuMP.@constraint(model, sbgt_ub, sc * (sum(sw) - k * sub) <= 0)
-    end
+                                            sbgt::BudgetRange; prefix::Symbol = Symbol(""))
+    lw, sw = weight_parts!(model, prefix)
+    # A bound of the long part needs the bound of the net budget, and it adds the bound of
+    # the short budget on the same side when there is one.
+    budget_row!(model, prefix, :lbgt_lb, offset_bound(bgt.lb, sbgt.lb), >=, lw)
+    budget_row!(model, prefix, :sbgt_lb, sbgt.lb, >=, sw)
+    budget_row!(model, prefix, :lbgt_ub, offset_bound(bgt.ub, sbgt.ub), <=, lw)
+    budget_row!(model, prefix, :sbgt_ub, sbgt.ub, <=, sw)
     return nothing
 end
 """
-    set_cost_budget_constraints!(model, vp, vn, val_or_bgt, w, cp, cn)
+    budget_row!(model::JuMP.Model, prefix::Symbol, name::Symbol, v::Nothing, sense, xs...)
+    budget_row!(model::JuMP.Model, prefix::Symbol, name::Symbol, v::Number, sense, x::AbstractVector)
+    budget_row!(model::JuMP.Model, prefix::Symbol, name::Symbol, v::Number, sense, lw::AbstractVector, sw::AbstractVector)
+
+Add one budget row on the sum of one vector or of two, `sc * (sum(x) - k * v)` against zero, under `prefix` and `name`.
+
+`sense` is `==`, `>=` or `<=`, the comparison of the row with zero, and the method states it as the MOI set `EqualTo`, `GreaterThan` or `LessThan` at zero. That set gives the row that the comparison gives. A bound `v = nothing` states no side, so the method adds no row. Every number and [`BudgetRange`](@ref) budget writes its rows through this function, so each such row of a block goes into the namespace of the block. A budget that pays costs writes its rows in the shared Model State and refuses a prefix, [`assert_cost_budget_prefix`](@ref).
+
+The method takes the vectors and not their sum, so the whole expression goes inside one `JuMP.@constraint`, which builds it in place. A sum built outside the macro allocates each partial expression. On 50 assets, the gross row built from `s = sum(lw) + sum(sw)` and `e = sc * (s - k * v)` outside the macro allocated 50168 bytes, and the same row inside the macro allocated 38568 bytes.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `prefix`: The Model State namespace of the block.
+  - `name`: The name of the row.
+  - `v`: The budget, a number, or `nothing` for no row.
+  - `sense`: The comparison with zero.
+  - `x`, or `lw` and `sw`: The vector whose sum the budget bounds, or the two vectors whose sums it bounds together.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_budget_constraints!`](@ref)
+  - [`set_long_short_budget_constraints!`](@ref)
+  - [`set_gross_budget_constraints!`](@ref)
+"""
+function budget_row!(::JuMP.Model, ::Symbol, ::Symbol, ::Nothing, ::Any,
+                     ::AbstractVector...)::Nothing
+    return nothing
+end
+function budget_row!(model::JuMP.Model, prefix::Symbol, name::Symbol, v::Number, sense,
+                     x::AbstractVector)::Nothing
+    k = get_k(model)
+    sc = get_constraint_scale(model)
+    set = budget_row_set(model, sense)
+    state_set!(model, prefix, name, JuMP.@constraint(model, sc * (sum(x) - k * v) in set))
+    return nothing
+end
+function budget_row!(model::JuMP.Model, prefix::Symbol, name::Symbol, v::Number, sense,
+                     lw::AbstractVector, sw::AbstractVector)::Nothing
+    k = get_k(model)
+    sc = get_constraint_scale(model)
+    set = budget_row_set(model, sense)
+    state_set!(model, prefix, name,
+               JuMP.@constraint(model, sc * (sum(lw) + sum(sw) - k * v) in set))
+    return nothing
+end
+"""
+    budget_row_set(model::JuMP.Model, ::typeof(==))
+    budget_row_set(model::JuMP.Model, ::typeof(>=))
+    budget_row_set(model::JuMP.Model, ::typeof(<=))
+
+Return the MOI set at zero, in the value type of `model`, that a comparison of a budget row with zero states.
+
+# Returns
+
+  - `MOI.EqualTo`, `MOI.GreaterThan` or `MOI.LessThan` at zero.
+
+# Related
+
+  - [`budget_row!`](@ref)
+"""
+function budget_row_set(model::JuMP.Model, ::typeof(==))
+    return JuMP.MOI.EqualTo(zero(JuMP.value_type(typeof(model))))
+end
+function budget_row_set(model::JuMP.Model, ::typeof(>=))
+    return JuMP.MOI.GreaterThan(zero(JuMP.value_type(typeof(model))))
+end
+function budget_row_set(model::JuMP.Model, ::typeof(<=))
+    return JuMP.MOI.LessThan(zero(JuMP.value_type(typeof(model))))
+end
+"""
+    offset_bound(b::Nothing, s)
+    offset_bound(b::Number, s::Nothing)
+    offset_bound(b::Number, s::Number)
+
+Return the bound `b` of the long part of the weights, offset by the short budget `s` on the same side.
+
+The long part holds the net budget plus the short budget, `sum(lw) = sum(w) + sum(sw)`. So a side of the long part is the side of the net budget plus the side of the short budget. A missing side of the net budget gives no row, and a missing side of the short budget adds nothing.
+
+# Returns
+
+  - `nothing` when `b` is `nothing`, `b` when `s` is `nothing`, and `b + s` otherwise.
+
+# Related
+
+  - [`set_long_short_budget_constraints!`](@ref)
+"""
+function offset_bound(::Nothing, ::Any)::Nothing
+    return nothing
+end
+function offset_bound(b::Number, ::Nothing)::Number
+    return b
+end
+function offset_bound(b::Number, s::Number)::Number
+    return b + s
+end
+"""
+    set_cost_budget_constraints!(model, vp, vn, val_or_bgt, w, cp, cn, xbgt)
 
 Charge the trading costs against the portfolio budget.
 
-Registers the `cost_bgt_expr` expression and the constraint that the weights and their costs
-must together meet the budget. Two overloads handle the two budget shapes: a fixed value pins
-the sum, and a [`BudgetRange`](@ref) bounds it on either side.
+Registers the `cost_bgt_expr` expression and the rows of the budget. Two overloads handle the
+two budget shapes. A fixed value writes the ceiling `cost_bgt`, under which the weights and
+their costs together must stay. A [`BudgetRange`](@ref) writes that ceiling at its `ub` as
+`cost_bgt_ub`, and a floor of the invested weights alone at its `lb` as `cost_bgt_lb`.
+
+No row is an equality, and no floor holds the cost. The parts of the trade are not
+complementary, so a row that the cost must reach lets the solver buy and sell one asset together,
+charge the cost of both, and hold that charge as cash. A ceiling admits exactly the weights whose
+cost fits the budget. [`BudgetCosts`](@ref) gives the sources. With `xbgt = true` the floor is
+left out here, and [`set_cost_budget_mip_constraints!`](@ref) adds a floor that holds the cost,
+under a complementary split.
 
 The **charged quantity** is a positional argument, not a field read from the model, because
 the two cost families charge different quantities. [`BudgetCosts`](@ref) charges the raw
@@ -813,6 +1134,7 @@ vectors.
   - `w`: Portfolio weight vector.
   - `cp`: The positive-side quantity the coefficients charge.
   - `cn`: The negative-side quantity the coefficients charge.
+  - `xbgt`: The `xbgt` of a [`BudgetCosts`](@ref), and `false` for a [`BudgetMarketImpact`](@ref). When `true`, no floor is written here.
 
 # Returns
 
@@ -826,48 +1148,50 @@ vectors.
   - [`set_long_short_budget_constraints!`](@ref)
 """
 function set_cost_budget_constraints!(model::JuMP.Model, vp::Num_VecNum, vn::Num_VecNum,
-                                      val::Number, w::VecNum, cp::VecNum, cn::VecNum)
+                                      val::Number, w::VecNum, cp::VecNum, cn::VecNum,
+                                      ::Bool)
     k = get_k(model)
     sc = get_constraint_scale(model)
     JuMP.@expression(model, cost_bgt_expr, dot_scalar(vp, cp) + dot_scalar(vn, cn))
-    JuMP.@constraint(model, cost_bgt, sc * (sum(w) + cost_bgt_expr - k * val) == 0)
+    JuMP.@constraint(model, cost_bgt, sc * (sum(w) + cost_bgt_expr - k * val) <= 0)
     return nothing
 end
 function set_cost_budget_constraints!(model::JuMP.Model, vp::Num_VecNum, vn::Num_VecNum,
-                                      bgt::BudgetRange, w::VecNum, cp::VecNum, cn::VecNum)
+                                      bgt::BudgetRange, w::VecNum, cp::VecNum, cn::VecNum,
+                                      xbgt::Bool)
     k = get_k(model)
     sc = get_constraint_scale(model)
     lb = bgt.lb
     ub = bgt.ub
     JuMP.@expression(model, cost_bgt_expr, dot_scalar(vp, cp) + dot_scalar(vn, cn))
-    if !isnothing(lb)
-        JuMP.@constraint(model, cost_bgt_lb, sc * (sum(w) + cost_bgt_expr - k * lb) >= 0)
+    if !isnothing(lb) && !xbgt
+        JuMP.@constraint(model, cost_bgt_lb, sc * (sum(w) - k * lb) >= 0)
     end
     if !isnothing(ub)
         JuMP.@constraint(model, cost_bgt_ub, sc * (sum(w) + cost_bgt_expr - k * ub) <= 0)
     end
     return nothing
 end
-function set_budget_constraints!(model::JuMP.Model, bgt::BudgetCosts, w::VecNum)
+function set_budget_constraints!(model::JuMP.Model, bgt::BudgetCosts, w::VecNum;
+                                 prefix::Symbol = Symbol(""))
+    assert_cost_budget_prefix(bgt, prefix)
     wb = bgt.w
     up = bgt.up
     un = bgt.un
     k = get_k(model)
     sc = get_constraint_scale(model)
     N = length(w)
-    JuMP.@variables(model, begin
-                        wp[1:N], (lower_bound = 0)
-                        wn[1:N], (lower_bound = 0)
-                    end)
-    JuMP.@constraints(model, begin
-                          sc * (wp ⊖ up * k) <= 0
-                          sc * (wn ⊖ un * k) <= 0
-                          sc * (w - wb * k - wp + wn) == 0
-                      end)
-    set_cost_budget_constraints!(model, bgt.vp, bgt.vn, bgt.bgt, w, wp, wn)
+    JuMP.@variable(model, wp[1:N], lower_bound = 0)
+    JuMP.@variable(model, wn[1:N], lower_bound = 0)
+    JuMP.@constraint(model, wp_ub, sc * (wp ⊖ up * k) <= 0)
+    JuMP.@constraint(model, wn_ub, sc * (wn ⊖ un * k) <= 0)
+    JuMP.@constraint(model, cost_bgt_trade, sc * (w - wb * k - wp + wn) == 0)
+    set_cost_budget_constraints!(model, bgt.vp, bgt.vn, bgt.bgt, w, wp, wn, bgt.xbgt)
     return nothing
 end
-function set_budget_constraints!(model::JuMP.Model, bgt::BudgetMarketImpact, w::VecNum)
+function set_budget_constraints!(model::JuMP.Model, bgt::BudgetMarketImpact, w::VecNum;
+                                 prefix::Symbol = Symbol(""))
+    assert_cost_budget_prefix(bgt, prefix)
     wb = bgt.w
     up = bgt.up
     un = bgt.un
@@ -875,24 +1199,135 @@ function set_budget_constraints!(model::JuMP.Model, bgt::BudgetMarketImpact, w::
     beta = bgt.beta
     sc = get_constraint_scale(model)
     N = length(w)
-    JuMP.@variables(model, begin
-                        wp[1:N], (lower_bound = 0)
-                        wn[1:N], (lower_bound = 0)
-                        wip[1:N]
-                        win[1:N]
-                    end)
-    JuMP.@constraints(model,
-                      begin
-                          sc * (wp ⊖ up * k) <= 0
-                          sc * (wn ⊖ un * k) <= 0
-                          sc * (w - wb * k - wp + wn) == 0
-                          [i = 1:N],
-                          [sc * wip[i], sc * k, sc * wp[i]] in JuMP.MOI.PowerCone(beta)
-                          [i = 1:N],
-                          [sc * win[i], sc * k, sc * wn[i]] in JuMP.MOI.PowerCone(beta)
-                      end)
-    set_cost_budget_constraints!(model, bgt.vp, bgt.vn, bgt.bgt, w, wip, win)
+    JuMP.@variable(model, wp[1:N], lower_bound = 0)
+    JuMP.@variable(model, wn[1:N], lower_bound = 0)
+    JuMP.@variable(model, wip[1:N])
+    JuMP.@variable(model, win[1:N])
+    JuMP.@constraint(model, wp_ub, sc * (wp ⊖ up * k) <= 0)
+    JuMP.@constraint(model, wn_ub, sc * (wn ⊖ un * k) <= 0)
+    JuMP.@constraint(model, cost_bgt_trade, sc * (w - wb * k - wp + wn) == 0)
+    JuMP.@constraint(model, wip_pcone[i = 1:N],
+                     [sc * wip[i], sc * k, sc * wp[i]] in JuMP.MOI.PowerCone(beta))
+    JuMP.@constraint(model, win_pcone[i = 1:N],
+                     [sc * win[i], sc * k, sc * wn[i]] in JuMP.MOI.PowerCone(beta))
+    set_cost_budget_constraints!(model, bgt.vp, bgt.vn, bgt.bgt, w, wip, win, false)
     return nothing
+end
+"""
+    set_cost_budget_mip_constraints!(model::JuMP.Model, bgt::BudgetCosts, wb::WeightBounds, ss::Option{<:Number})
+    set_cost_budget_mip_constraints!(model::JuMP.Model, bgt::Option{<:Num_BgtRg}, wb::WeightBounds, ss::Option{<:Number})
+    set_cost_budget_mip_constraints!(model::JuMP.Model, bgt::BudgetMarketImpact, wb::WeightBounds, ss::Option{<:Number})
+
+Pin a [`BudgetCosts`](@ref) budget whose `xbgt` is `true`: keep one part of the trade of each asset at zero, and add the floor that holds the cost.
+
+The budget builder [`set_budget_constraints!`](@ref) writes the ceiling of the weights and their costs. A ceiling is exact under any split of the trade, and a floor that holds the cost is exact only under a complementary split. So this builder adds one binary ``z_i`` for each asset, keeps the buy under ``z_i`` and the sale under ``1 - z_i``, and then adds the floor. A scalar `bgt` gets its floor at `bgt`, so the ceiling and the floor pin the weights and their costs. It runs in the MIP step of [`set_block_constraints!`](@ref), which holds the big-M `ss` and the weight bounds. A model that skips that step states the convex form of the budget, [`convex_budget`](@ref).
+
+The method on a number, on a [`BudgetRange`](@ref), on `nothing` and on a [`BudgetMarketImpact`](@ref) adds no row, and so does a [`BudgetCosts`](@ref) whose `xbgt` is `false`. A [`BudgetMarketImpact`](@ref) has no exact form: the cone variables can exceed ``w_p^{1/\\beta}`` and ``w_n^{1/\\beta}``, and an upper bound on a convex power is not convex.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{w}_p &\\leq \\boldsymbol{u}_p \\odot \\boldsymbol{g}\\,, \\\\
+\\boldsymbol{w}_n &\\leq \\boldsymbol{u}_n \\odot (k - \\boldsymbol{g})\\,, \\\\
+\\boldsymbol{1}^\\intercal \\boldsymbol{w} + \\boldsymbol{v}_p^\\intercal \\boldsymbol{w}_p + \\boldsymbol{v}_n^\\intercal \\boldsymbol{w}_n &\\geq k\\,\\mathrm{lb}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:k_budget])
+  - ``\\boldsymbol{w}_p``, ``\\boldsymbol{w}_n``, ``\\boldsymbol{v}_p``, ``\\boldsymbol{v}_n``, ``\\boldsymbol{u}_p``, ``\\boldsymbol{u}_n``: As in [`BudgetCosts`](@ref).
+  - ``\\boldsymbol{g}``: The gate ``k\\,\\boldsymbol{z}`` of the binaries ``\\boldsymbol{z}``. When ``k`` is a number it is that product. Else it is a variable with ``0 \\leq g_i \\leq k``, ``g_i \\leq s\\,z_i`` and ``g_i \\geq k - s\\,(1 - z_i)``, with ``s`` the big-M of [`set_mip_ss_expr!`](@ref), as [`declare_mip_indicators!`](@ref) gates its bits.
+  - ``\\mathrm{lb}``: The scalar `bgt`, or the `lb` of a [`BudgetRange`](@ref). A `lb` of `nothing` adds no floor.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `bgt`: The net budget of the owner of the block.
+  - $(arg_dict[:wb_arg])
+  - $(arg_dict[:ss_arg])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`BudgetCosts`](@ref)
+  - [`set_cost_budget_constraints!`](@ref)
+  - [`set_block_constraints!`](@ref)
+  - [`set_exact_budget_constraints!`](@ref): Pins the long and short parts of the weights in the same way.
+"""
+function set_cost_budget_mip_constraints!(::JuMP.Model, ::Option{<:Num_BgtRg},
+                                          ::WeightBounds, ::Option{<:Number})::Nothing
+    return nothing
+end
+function set_cost_budget_mip_constraints!(::JuMP.Model, ::BudgetMarketImpact,
+                                          ::WeightBounds, ::Option{<:Number})::Nothing
+    return nothing
+end
+function set_cost_budget_mip_constraints!(model::JuMP.Model, bgt::BudgetCosts,
+                                          wb::WeightBounds, ss::Option{<:Number})::Nothing
+    if !bgt.xbgt
+        return nothing
+    end
+    k = get_k(model)
+    sc = get_constraint_scale(model)
+    wp = shared_get(model, :wp)
+    wn = shared_get(model, :wn)
+    N = length(wp)
+    JuMP.@variable(model, cost_bgt_z[1:N], binary = true)
+    if isa(k, Number)
+        JuMP.@expression(model, cost_bgt_g, k * cost_bgt_z)
+    else
+        s = set_mip_ss_expr!(model, ss, wb)
+        JuMP.@variable(model, cost_bgt_g[1:N], lower_bound = 0)
+        JuMP.@constraint(model, cost_bgt_g_ub, sc * (cost_bgt_g .- k) <= 0)
+        JuMP.@constraint(model, cost_bgt_gz_ub, sc * (cost_bgt_g - s * cost_bgt_z) <= 0)
+        JuMP.@constraint(model, cost_bgt_gz_lb,
+                         sc * ((cost_bgt_g + s * (1 .- cost_bgt_z)) .- k) >= 0)
+    end
+    JuMP.@constraint(model, cost_bgt_wp_xbgt, sc * (wp ⊖ bgt.up ⊙ cost_bgt_g) <= 0)
+    JuMP.@constraint(model, cost_bgt_wn_xbgt, sc * (wn ⊖ bgt.un ⊙ (k .- cost_bgt_g)) <= 0)
+    lb = isa(bgt.bgt, Number) ? bgt.bgt : bgt.bgt.lb
+    if !isnothing(lb)
+        JuMP.@constraint(model, cost_bgt_lb,
+                         sc *
+                         (sum(get_w(model)) + shared_get(model, :cost_bgt_expr) - k * lb) >=
+                         0)
+    end
+    return nothing
+end
+"""
+    convex_budget(bgt::Option{<:Union{Num_BgtRg, BudgetMarketImpact}})
+    convex_budget(bgt::BudgetCosts)
+
+Return the net budget `bgt` in the form that a model with no MIP step states: a [`BudgetCosts`](@ref) with `xbgt = false`. A number, a [`BudgetRange`](@ref), a [`BudgetMarketImpact`](@ref) and `nothing` have no MIP form, so they come back as they are. Any other type is a `MethodError`.
+
+A [`BudgetCosts`](@ref) with `xbgt = true` leaves out the floor of its [`BudgetRange`](@ref) in [`set_cost_budget_constraints!`](@ref), because [`set_cost_budget_mip_constraints!`](@ref) adds the floor that holds the cost, in the MIP step of [`set_block_constraints!`](@ref). The centring model of [`UnconstrainedNearOptimalCentering`](@ref) runs no MIP step, so with that budget it would hold no floor at all. The convex form keeps the floor `sum(w) >= k lb` of the invested weights. The cost is not negative, so a portfolio on that floor also meets the floor that holds the cost. A scalar `bgt` keeps its ceiling in both forms.
+
+# Arguments
+
+  - `bgt`: The net budget of the optimiser.
+
+# Returns
+
+  - `bgt`, or a copy of a [`BudgetCosts`](@ref) with `xbgt = false`.
+
+# Related
+
+  - [`BudgetCosts`](@ref)
+  - [`set_cost_budget_constraints!`](@ref)
+  - [`set_cost_budget_mip_constraints!`](@ref)
+  - [`UnconstrainedNearOptimalCentering`](@ref)
+"""
+function convex_budget(bgt::Option{<:Union{Num_BgtRg, BudgetMarketImpact}})
+    return bgt
+end
+function convex_budget(bgt::BudgetCosts)::BudgetCosts
+    return rebuild_struct(bgt, (; xbgt = false))
 end
 
 """
@@ -941,6 +1376,15 @@ gives `lw_i == sw_i == 0`, hence `w_i == 0`.
 Under [`WeightsFromParts`](@ref) the pair alone is enough and the slack-closing constraints are
 not emitted: `w = lw - sw` is an identity, so `sw_i = 0` already leaves `lw_i == w_i`.
 
+A [`HeldIndicators`](@ref) bundle takes the [`WeightsFromParts`](@ref) method alone. The held
+builder pins the decomposition only for that head, because [`run_mip_builder!`](@ref) gives an
+explicit `xbgt` on a model with a short side to the sign or the long-short builder. A held bundle
+under any other contract is a `MethodError`. So the [`PartsBoundWeights`](@ref) method takes the
+two bundles that carry binaries: [`LongShortIndicators`](@ref) and [`SignIndicators`](@ref).
+
+The contract `dc` defaults to [`decomposition_contract`](@ref) of `model`, so a call with five
+arguments reads the contract off the model.
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -963,7 +1407,7 @@ not emitted: `w = lw - sw` is an identity, so `sw_i = 0` already leaves `lw_i ==
 """
 function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
                                        ind::AbstractMIPIndicators, wx::VecNum, ss,
-                                       ::WeightsFromParts)
+                                       ::WeightsFromParts = decomposition_contract(model))
     lw = shared_get(model, :lw)
     sw = shared_get(model, :sw)
     sc = get_constraint_scale(model)
@@ -975,8 +1419,8 @@ function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
     return nothing
 end
 function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
-                                       ind::AbstractMIPIndicators, wx::VecNum, ss,
-                                       ::PartsBoundWeights)
+                                       ind::Union{LongShortIndicators, SignIndicators},
+                                       wx::VecNum, ss, ::PartsBoundWeights)
     lw = shared_get(model, :lw)
     sw = shared_get(model, :sw)
     sc = get_constraint_scale(model)
@@ -994,11 +1438,6 @@ function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
                                                              ss * (1 .- short_bin(ind))) <=
                                                        0)
     return nothing
-end
-function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
-                                       ind::AbstractMIPIndicators, wx::VecNum, ss)
-    return set_exact_budget_constraints!(model, sp, ind, wx, ss,
-                                         decomposition_contract(model))
 end
 
 export BudgetRange, BudgetCosts, BudgetMarketImpact

@@ -1,15 +1,15 @@
 """
-    set_initial_w!(args...)
     set_initial_w!(w::VecNum, wi::VecNum)
+    set_initial_w!(w::VecNum, ::Option{<:VecVecNum})
 
 Set the start values of the weight variables of the JuMP model.
 
-The method for two vectors sets the start value of each weight variable to the matching entry of `wi`. Every other argument, `nothing` or a vector of weight vectors among them, reaches the method that does nothing.
+The method for two vectors sets the start value of each weight variable to the matching entry of `wi`. `nothing` sets no start value. A vector of weight vectors, the anchors of a [`NearOptimalCentering`](@ref) sweep, sets no start value either. Any other type or arity is a `MethodError`.
 
 # Arguments
 
   - `w::VecNum`: Vector of JuMP weight variables.
-  - `wi::VecNum`: Vector of start values.
+  - `wi`: Vector of start values, `nothing`, or a vector of weight vectors.
 
 # Validation
 
@@ -24,7 +24,7 @@ The method for two vectors sets the start value of each weight variable to the m
   - [`set_w!`](@ref)
   - [`JuMPOptimiser`](@ref)
 """
-function set_initial_w!(args...)
+function set_initial_w!(::VecNum, ::Option{<:VecVecNum})
     return nothing
 end
 function set_initial_w!(w::VecNum, wi::VecNum)
@@ -119,8 +119,8 @@ A solution is acceptable when JuMP reports it solved and feasible under the `che
      2. Set the attributes of the solver from its `settings`.
      3. Solve. When that raises, record the error and go to the next solver.
      4. Check the solution with `JuMP.assert_is_solved_and_feasible`, and read the weights. When every weight is finite and one weight is not zero, stop the loop.
-     5. Otherwise record the settings, the error of the check if there is one, and the solution summary under the name of the solver.
- 2. When a solver stopped the loop, the return code is an [`OptimisationSuccess`](@ref). Otherwise it is an [`OptimisationFailure`](@ref), and a warning points to its `res`.
+     5. Otherwise record the settings, the error of the check if there is one, the termination status and the solution summary under the name of the solver.
+ 2. When a solver stopped the loop, the return code is an [`OptimisationSuccess`](@ref). Otherwise it is an [`OptimisationFailure`](@ref). A warning from [`failed_solve_msg`](@ref) gives one line for each failed stage of each solver, and states in words a status that makes the problem infeasible or unbounded. It points to `res` for the full data.
  3. Read the weights with [`process_model`](@ref).
 
 # Returns
@@ -137,7 +137,8 @@ A solution is acceptable when JuMP reports it solved and feasible under the `che
 """
 function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
                               datatype::DataType = Float64)
-    trials = Dict()
+    # A solver has a `Sym_Str` name, and each trial is a dictionary of its stages (#1979).
+    trials = Dict{Sym_Str, AbstractDict{Symbol}}()
     success = false
     for solver in opt.opt.slv
         try
@@ -153,6 +154,8 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
             trials[solver.name] = Dict(:optimize! => err)
             continue
         end
+        # `Any` is the last resort (#1979): a trial holds values of unrelated types, the
+        # settings, an exception, a termination status and a solution summary.
         trial = Dict{Symbol, Any}(:settings => solver.settings)
         try
             JuMP.assert_is_solved_and_feasible(model; solver.check_sol...)
@@ -166,13 +169,16 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
         catch err
             trial[:assert_is_solved_and_feasible] = err
         end
+        trial[:termination_status] = JuMP.termination_status(model)
         trial[:err] = JuMP.solution_summary(model)
         trials[solver.name] = trial
     end
     retcode = if success
         OptimisationSuccess(; res = trials)
     else
-        @warn("Failed to solve optimisation problem.\nCheck `result.retcode.res` on the returned result for per-solver diagnostics.")
+        @warn(failed_solve_msg(trials) *
+              "\nCheck `result.retcode.res` on the returned result for per-solver diagnostics.",
+              maxlog = log_limit(:warn), _id = @log_id(Set(keys(trials))))
         OptimisationFailure(; res = trials)
     end
     return retcode, process_model(model, retcode)

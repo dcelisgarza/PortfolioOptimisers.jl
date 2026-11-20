@@ -134,3 +134,11 @@ one case the existing cases cannot see.
   whole of it.
 - A carrier of a different window with the same length as the block is not detected. That is the
   contract every same-axis read in the family already had, and the oracle's own.
+
+## Amendment (2026-11-04, #1973)
+
+**The exposure history and the score stack hold their observations last.** Where the options above
+name an `observations × assets × factors` copy, read `assets × factors × observations`. The
+decision does not change: the cut of the scores to the rows of the block now cuts their last axis.
+[ADR 0230](0230-every-rank-3-array-holds-its-observations-on-its-last-axis.md) states the rule and
+its reason.

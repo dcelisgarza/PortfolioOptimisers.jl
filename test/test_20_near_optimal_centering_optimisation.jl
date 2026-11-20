@@ -499,7 +499,6 @@
             PortfolioOptimisers.set_model_observations!(model, size(sopt.pe.X, 1))
             PortfolioOptimisers.set_maximum_ratio_factor_variables!(model, MinimumRisk())
             PortfolioOptimisers.set_w!(model, sopt.pe.X, setup.w_opt)
-            PortfolioOptimisers.set_weight_constraints!(model, sopt.wb, sopt)
             PortfolioOptimisers.assemble_near_optimal_centering_model!(UnconstrainedNearOptimalCentering(),
                                                                        model, noc, setup,
                                                                        rd)
@@ -539,7 +538,6 @@
             PortfolioOptimisers.set_model_observations!(model, size(sopt.pe.X, 1))
             PortfolioOptimisers.set_maximum_ratio_factor_variables!(model, MinimumRisk())
             PortfolioOptimisers.set_w!(model, sopt.pe.X, setup.w_opt)
-            PortfolioOptimisers.set_weight_constraints!(model, sopt.wb, sopt)
             PortfolioOptimisers.assemble_near_optimal_centering_model!(UnconstrainedNearOptimalCentering(),
                                                                        model, noc, setup,
                                                                        rd)

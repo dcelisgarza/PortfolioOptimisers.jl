@@ -1,8 +1,15 @@
 ```@meta
-Description = "Forecast Portfolios, public API of PortfolioOptimisers.jl: forecast_portfolio, forecast_quantile_spread."
+Description = "Forecast Portfolios, public API of PortfolioOptimisers.jl: ForecastPortfolioResult, ForecastQuantileSpreadResult, forecast_portfolio, …"
 ```
 
 # [Forecast Portfolios](@id api-forecast-portfolios)
+
+## Types
+
+```@docs
+ForecastPortfolioResult
+ForecastQuantileSpreadResult
+```
 
 ## Functions
 

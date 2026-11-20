@@ -105,8 +105,9 @@
 #let user_guide = link(user_guide_link)[user guide]
 #let api = link(api_link)[API]
 #let coverage = link(codecov)[coverage]
-#let jump = link("https://github.com/jump-dev/JuMP.jl")[JuMP.jl]
+#let jump = link("https://jump.dev/JuMP.jl/stable/")[JuMP.jl]
 #let statsbase = link("https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator")[StatsBase.jl]
+#let distances = link("https://docs.juliahub.com/General/Distances/stable/")[Distances.jl]
 
 // Modify some arguments, which can be overwritten in the template call
 #page-args.insert("numbering", "1/1")
@@ -150,7 +151,7 @@ There also exist myriad optimisation methods, pre-filtering, distribution and mo
 
 #figure(
   // placement: auto,
-  caption: [Concrete estimator and algorithm types per family, counted from the library's own type tree; the Result types they return are not counted. The 20 optimisers are 6 naïve, 5 #jump based, 4 clustering, 2 ensemble, 2 finite allocators, and 1 hindsight comparator. One of the naïve optimisers holds any of the 22 online portfolio selection rules, and 24 named constructors fix a rule to its published form. Composition multiplies them: any covariance estimator feeds any distance, any distance feeds any clustering or network algorithm, and any of those feeds any optimiser that asks for one.],
+  caption: [Concrete estimator and algorithm types per family, counted from the library's own type tree; the Result types they return are not counted. The 20 optimisers are 6 naïve, 5 #jump based, 4 clustering, 2 ensemble, 2 finite allocators, and 1 hindsight comparator. One of the naïve optimisers holds any of the 21 online portfolio selection rules, and 24 named constructors fix a rule to its published form. Composition multiplies them: any covariance estimator feeds any distance, any distance feeds any clustering or network algorithm, and any of those feeds any optimiser that asks for one.],
   table(
     columns: (0.5fr, 0.2fr, 2.3fr),
     align: (left + top, center + top, left + top),
@@ -178,7 +179,7 @@ There also exist myriad optimisation methods, pre-filtering, distribution and mo
     [Weight bounds, three budget forms, linear equations, thresholds, risk budgets, factor exposure, two phylogeny forms, centrality, fees, turnover, two allocation sets of an online rule, and L2 or Lp weight penalties. Custom constraints and objectives are an abstract type to subtype, so they are not counted],
     [Optimisers], [20],
     [Equal weighted, inverse volatility, online portfolio selection, best constant rebalanced portfolio, mean risk, near optimal centering, risk budgeting, HRP, HERC, Schur, nested clustering, stacking, discrete allocation],
-    [Online portfolio selection rules], [22],
+    [Online portfolio selection rules], [21],
     [Buy and hold, constant rebalancing, mirror descent, Newton step, passive aggressive and confidence weighted mean reversion, pattern matching, expert mixtures],
     [Cross-validation and tuning], [8],
     [K-fold, combinatorial, walk-forward by index or by date, hindsight split, multiple randomised, grid and randomised search. Every sequential scheme can also step online],
@@ -302,7 +303,7 @@ The same panel holds the features of the assets, such as a market capitalisation
 
 == Moments
 
-#po comes with a large number of moment estimation and prior statistics methods. It leverages #statsbase's covariance estimator definitions and API to allow interoperability with the Julia ecosystem, for example shrinkage is supported by composing with #link("https://github.com/mateuszbaran/CovarianceEstimation.jl")[CovarianceEstimation.jl]. They are highly composable with each other, as well as with different priors, and uncertainty sets.
+#po comes with a large number of moment estimation and prior statistics methods. It leverages #statsbase's covariance estimator definitions and API to allow interoperability with the Julia ecosystem, for example shrinkage is supported by composing with #link("https://mateuszbaran.github.io/CovarianceEstimation.jl/stable/")[CovarianceEstimation.jl]. They are highly composable with each other, as well as with different priors, and uncertainty sets.
 
 - Full or downside co-moments.
 - Weighted, unweighted.
@@ -412,7 +413,7 @@ The library comes equipped with a pipeline framework that can run an entire stra
 
 Every sequential scheme also has an online form, in which each fold updates one estimator with its new observations instead of refitting it, and a finished run can be resumed over a longer history. A hindsight split trains each fold on the row it tests, which yields the per-row comparators of dynamic regret. A fold can also be scored on the weights a fund actually holds, which drift with the returns of their assets between trades, and those held weights can be passed on to the next fold.
 
-The hyperparameter tuning framework is built on top of the cross-validation framework. Users address the steps of a pipeline by index or by name, and the fields to tune by name. Grid search takes grids of values, and random search takes grids, distributions from #link("https://github.com/JuliaStats/Distributions.jl")[Distributions.jl] @distributionsjl, or both.
+The hyperparameter tuning framework is built on top of the cross-validation framework. Users address the steps of a pipeline by index or by name, and the fields to tune by name. Grid search takes grids of values, and random search takes grids, distributions from #link("https://juliastats.org/Distributions.jl/stable/")[Distributions.jl] @distributionsjl, or both.
 
 == Evaluation and attribution
 
@@ -433,7 +434,7 @@ The postprocessing stage scores what the processing stage produced. The forecast
 + Compositional design. This lets us build complex objects from simpler ones, enables code reuse, and aids in extensibility.
 + Defensive programming. This lets us catch errors as early as possible, and provides a clear and consistent interface to the user.
 
-With the exception of covariance estimators, which are defined in #statsbase, every type in the library is a subtype of one of three types:
+With the exception of the covariance estimators, which subtype the covariance estimator of #statsbase, one distance, which subtypes a metric of #distances, and the error types, every public type in the library is a subtype of one of three types:
 
 + `AbstractEstimator`: these contain all the parameters needed to estimate a particular quantity, and are consumed by the functions that perform the estimation. They are the user-level vocabulary, they nest within each other, and they build more complex estimators.
 + `AbstractResult`: many estimators return more than one quantity, and those are returned in a result type. Estimators are configuration; results are data.
@@ -451,7 +452,7 @@ There are several planned features that have not yet been implemented. These inc
 
 = High standards of quality in the age of AI
 
-The library has an extensive and growing test suite that as of now has 98% #coverage. It has a fully documented public and private #api, very comprehensive #examples and #user_guide, and an entire toolchain dedicated to automatically finding and reporting regressions, type instabilities, missing documentation, code smells, and other potential issues that unequivocally improve code quality and maintainability as the library evolves. These tools are run both when code is committed---serving as a measure of immediate quality control---but also as part of weekly continuous integration checks which serve to improve the overall code quality and maintainability of the existing codebase. These tools are deterministic in their reporting, so they do not require an AI to interpret, analyse or fix their findings, however we have found frontier models to be particularly good at fixing these measurable, interpretable results.
+The library has an extensive and growing test suite that as of now has 99% #coverage. It has a fully documented public and private #api, very comprehensive #examples and #user_guide, and an entire toolchain dedicated to automatically finding and reporting regressions, type instabilities, missing documentation, code smells, and other potential issues that unequivocally improve code quality and maintainability as the library evolves. These tools are run both when code is committed---serving as a measure of immediate quality control---but also as part of weekly continuous integration checks which serve to improve the overall code quality and maintainability of the existing codebase. These tools are deterministic in their reporting, so they do not require an AI to interpret, analyse or fix their findings, however we have found frontier models to be particularly good at fixing these measurable, interpretable results.
 
 Even before AI tools became as prevalent and---for frontier models---unambiguously beneficial as they are today, the library defined high standards of quality. These have been greatly expanded and reinforced with automated checks and continuous integration, ensuring that both human and AI contributions maintain the library's high standards. There are also entire workflows that use AI tools to assist in code review; improve testing and documentation; add new features; find and fix bugs; improve the user experience by simplifying interfaces, improving logging and error messages; and overall doing the menial and boring maintenance refactors that unlock new possibilities and fix latent issues before they manifest.
 
@@ -459,7 +460,7 @@ By being so thorough with our standards and automatic checks, we have found grea
 
 = Availability
 
-#po is registered under an MIT license in the Julia General registry, so `Pkg.add("PortfolioOptimisers")` is all that is needed. The listings in this paper are executed when it is built, so the paper is checked by the same standard as the rest of the project. The library is under active development, the issue tracker keeps ideas and roadmaps for new features, maintenance tasks, bug reports, and more. Contributions are very much appreciated and welcome.
+#po is registered under an EUPL-1.2 license in the Julia General registry, so `Pkg.add("PortfolioOptimisers")` is all that is needed. The listings in this paper are executed when it is built, so the paper is checked by the same standard as the rest of the project. The library is under active development, the issue tracker keeps ideas and roadmaps for new features, maintenance tasks, bug reports, and more. Contributions are very much appreciated and welcome.
 
 We hope readers will find in #po an interesting, valuable, and trustworthy tool for their needs.
 

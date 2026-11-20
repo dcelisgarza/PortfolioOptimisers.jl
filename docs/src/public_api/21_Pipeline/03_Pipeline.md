@@ -12,7 +12,7 @@ PipelineResult
 fit(pipe::Pipeline, data::Prices_RR)
 StatsAPI.predict(res::PipelineResult, data::AbstractPricesResult, test_idx = Colon(), cols = Colon())
 fit_predict(pipe::Pipeline, data::Prices_RR)
-port_opt_view(::Pipeline, args...; kwargs...)
+port_opt_view(::AbstractPipelineEstimator, args...; kwargs...)
 implicit_constraint_target
 ```
 

@@ -167,7 +167,40 @@ function idio_predicted_volatility(vs::MatNum)
     return s
 end
 """
-    idio_row_moments(z::MatNum, t::Integer)
+$(DocStringExtensions.TYPEDEF)
+
+Holds the count and the three central moments of one cross-section of standardised idiosyncratic returns.
+
+This type is an implementation detail and is not intended for direct use. [`idio_row_moments`](@ref) makes it, and [`idio_calibration`](@ref), [`idio_kurtosis`](@ref) and [`idio_skewness`](@ref) read it. The three moments are numbers of one type, so a record names them where a plain tuple would let a swap pass silently.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`idio_row_moments`](@ref)
+"""
+@concrete struct RowMoments
+    """
+    `n`: Number of assets at which the standardised return is finite.
+    """
+    n
+    """
+    `m2`: Second central moment, or `NaN` when `n` is zero.
+    """
+    m2
+    """
+    `m3`: Third central moment, or `NaN` when `n` is zero.
+    """
+    m3
+    """
+    `m4`: Fourth central moment, or `NaN` when `n` is zero.
+    """
+    m4
+end
+"""
+    idio_row_moments(z::MatNum, t::Integer) -> RowMoments
 
 Return the count and the three central moments of one cross-section of standardised idiosyncratic returns.
 
@@ -206,19 +239,17 @@ A cross-section whose finite entries are all equal has ``m_{pt} = 0`` for every 
 
 # Returns
 
-  - `n::Int`: Number of assets at which the standardised return is finite.
-  - `m2::Real`: Second central moment, or `NaN` when `n` is zero.
-  - `m3::Real`: Third central moment, or `NaN` when `n` is zero.
-  - `m4::Real`: Fourth central moment, or `NaN` when `n` is zero.
+  - `m::RowMoments`: The count `n` and the moments `m2`, `m3` and `m4`, as [`RowMoments`](@ref) states them. `n` is an `Int`, and each moment is `NaN` when `n` is zero.
 
 # Related
 
+  - [`RowMoments`](@ref)
   - [`idio_calibration`](@ref)
   - [`idio_kurtosis`](@ref)
   - [`idio_skewness`](@ref)
 """
-function idio_row_moments(z::MatNum, t::Integer)
-    Tf = float_if_integer(real(eltype(z)))
+function idio_row_moments(z::MatNum, t::Integer)::RowMoments
+    Tf = real(eltype(z))
     N = size(z, 2)
     n = 0
     s = zero(Tf)
@@ -235,7 +266,7 @@ function idio_row_moments(z::MatNum, t::Integer)
         end
     end
     if n == 0
-        return (; n = n, m2 = Tf(NaN), m3 = Tf(NaN), m4 = Tf(NaN))
+        return RowMoments(n, Tf(NaN), Tf(NaN), Tf(NaN))
     end
     m = clamp(s / n, lo, hi)
     m2 = zero(Tf)
@@ -251,7 +282,7 @@ function idio_row_moments(z::MatNum, t::Integer)
             m4 += d2 * d2
         end
     end
-    return (; n = n, m2 = m2 / n, m3 = m3 / n, m4 = m4 / n)
+    return RowMoments(n, m2 / n, m3 / n, m4 / n)
 end
 """
     idio_calibration(z::MatNum) -> Vector{<:Real}
@@ -307,7 +338,7 @@ The deviation is the sample one, so it divides by ``n_{t} - 1``. It is not defin
   - [`CrossSectionalFactorModel`](@ref)
 """
 function idio_calibration(z::MatNum)
-    Tf = typeof(sqrt(one(float_if_integer(real(eltype(z))))))
+    Tf = typeof(sqrt(one(real(eltype(z)))))
     T = size(z, 1)
     c = Vector{Tf}(undef, T)
     for t in 1:T
@@ -382,7 +413,7 @@ The rate is not defined for ``n_{t} = 0``. An entry that is not finite enters ne
   - [`CrossSectionalFactorModel`](@ref)
 """
 function idio_tail_rate(z::MatNum; threshold::Real = 3)
-    Tf = float_if_integer(real(eltype(z)))
+    Tf = real(eltype(z))
     T, N = size(z)
     r = Vector{Tf}(undef, T)
     for t in 1:T
@@ -432,7 +463,7 @@ Where:
   - $(math_dict[:F_t_idio])
   - $(math_dict[:z_ti_idio])
 
-It is the bias-corrected sample excess kurtosis, the estimator ``G_{2}`` of Joanes and Gill. It is not defined for ``n_{t} < 4``, or for a constant cross-section, where ``m_{2t} = 0``.
+It is the bias-corrected sample excess kurtosis, the estimator ``G_{2}`` of [joanesgill1998](@cite). It equals ``k_{4} / k_{2}^{2}``, the fourth k-statistic over the square of the second, and the sample moment ``m_{4t} / m_{2t}^{2} - 3`` is the estimator ``g_{2}`` of the same work. It is not defined for ``n_{t} < 4``, or for a constant cross-section, where ``m_{2t} = 0``.
 
 # Arguments
 
@@ -462,10 +493,10 @@ It is the bias-corrected sample excess kurtosis, the estimator ``G_{2}`` of Joan
 
 # References
 
-  - $(ref_dict[:joanesgill1998])
+  - $(ref_dict[:joanesgill1998]) Pages 183 to 189. $(ref_dict[:no_original_source])
 """
 function idio_kurtosis(z::MatNum)
-    Tf = float_if_integer(real(eltype(z)))
+    Tf = real(eltype(z))
     T = size(z, 1)
     k = Vector{Tf}(undef, T)
     for t in 1:T
@@ -513,7 +544,7 @@ Where:
   - $(math_dict[:F_t_idio])
   - $(math_dict[:z_ti_idio])
 
-It is the bias-corrected sample skewness, the estimator ``G_{1}`` of Joanes and Gill. It is not defined for ``n_{t} < 3``, or for a constant cross-section, where ``m_{2t} = 0``.
+It is the bias-corrected sample skewness, the estimator ``G_{1}`` of [joanesgill1998](@cite). It equals ``k_{3} / k_{2}^{3/2}``, the third k-statistic over the second to the power ``3/2``, and the sample moment ratio ``m_{3t} / m_{2t}^{3/2}`` is the estimator ``g_{1}`` of the same work. It is not defined for ``n_{t} < 3``, or for a constant cross-section, where ``m_{2t} = 0``.
 
 # Arguments
 
@@ -543,10 +574,10 @@ It is the bias-corrected sample skewness, the estimator ``G_{1}`` of Joanes and 
 
 # References
 
-  - $(ref_dict[:joanesgill1998])
+  - $(ref_dict[:joanesgill1998]) Pages 183 to 189. $(ref_dict[:no_original_source])
 """
 function idio_skewness(z::MatNum)
-    Tf = typeof(sqrt(one(float_if_integer(real(eltype(z))))))
+    Tf = typeof(sqrt(one(real(eltype(z)))))
     T = size(z, 1)
     s = Vector{Tf}(undef, T)
     for t in 1:T
@@ -793,7 +824,7 @@ The mean is not defined for an empty ``\\mathcal{A}``.
   - [`idio_nan_median`](@ref)
 """
 function idio_nan_mean(v::VecNum)
-    Tf = float_if_integer(real(eltype(v)))
+    Tf = real(eltype(v))
     s = zero(Tf)
     n = 0
     for x in v
@@ -841,7 +872,7 @@ The median is not defined for an empty ``\\mathcal{A}``.
   - [`idio_nan_mean`](@ref)
 """
 function idio_nan_median(v::VecNum)
-    Tf = float_if_integer(real(eltype(v)))
+    Tf = real(eltype(v))
     f = Vector{Tf}(undef, 0)
     sizehint!(f, length(v))
     for x in v
@@ -852,10 +883,84 @@ function idio_nan_median(v::VecNum)
     return isempty(f) ? Tf(NaN) : Tf(Statistics.median(f))
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The five time-aggregated numbers of the calibration of a cross-sectional fit.
+
+[`idio_calibration_summary`](@ref) returns it. Each number aggregates one of the calibration series over the observations that had enough assets to answer, and it is `NaN` when no observation did. A caller reads the fields by name, as `s.mean_cs_std` or `(; mean_kurtosis) = s`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    IdioCalibrationSummaryResult(mean_cs_std::Real, median_cs_std::Real,
+                                 mean_kurtosis::Real, mean_skewness::Real,
+                                 mean_tail_rate::Real)
+    IdioCalibrationSummaryResult(; mean_cs_std::Real, median_cs_std::Real,
+                                 mean_kurtosis::Real, mean_skewness::Real,
+                                 mean_tail_rate::Real)
+
+The positional constructor checks the values. The keyword constructor takes each field by name, with no default, and calls it.
+
+## Validation
+
+  - `mean_cs_std` and `median_cs_std` are each `NaN` or not negative. Otherwise, the constructor raises a `DomainError`.
+  - `mean_tail_rate` is `NaN` or in ``[0, 1]``. Otherwise, the constructor raises a `DomainError`.
+
+# Related
+
+  - [`idio_calibration_summary`](@ref)
+  - [`idio_calibration`](@ref)
+  - [`idio_tail_rate`](@ref)
+"""
+@concrete struct IdioCalibrationSummaryResult <: AbstractResult
+    """
+    Mean of the calibration series of [`idio_calibration`](@ref). Its reference under the normal law is `1`.
+    """
+    mean_cs_std
+    """
+    Median of the calibration series. Its reference under the normal law is `1`.
+    """
+    median_cs_std
+    """
+    Mean of the excess kurtosis series of [`idio_kurtosis`](@ref). Its reference under the normal law is `0`.
+    """
+    mean_kurtosis
+    """
+    Mean of the skewness series of [`idio_skewness`](@ref). Its reference under the normal law is `0`.
+    """
+    mean_skewness
+    """
+    Mean of the tail rate series of [`idio_tail_rate`](@ref). Its reference under the normal law is ``2 \\Phi(-c)`` at the threshold ``c``.
+    """
+    mean_tail_rate
+    function IdioCalibrationSummaryResult(mean_cs_std::Real, median_cs_std::Real,
+                                          mean_kurtosis::Real, mean_skewness::Real,
+                                          mean_tail_rate::Real)
+        assert_nan_or_nonneg(mean_cs_std, :mean_cs_std)
+        assert_nan_or_nonneg(median_cs_std, :median_cs_std)
+        assert_nan_or_closed_unit_interval(mean_tail_rate, :mean_tail_rate)
+        return new{typeof(mean_cs_std), typeof(median_cs_std), typeof(mean_kurtosis),
+                   typeof(mean_skewness), typeof(mean_tail_rate)}(mean_cs_std,
+                                                                  median_cs_std,
+                                                                  mean_kurtosis,
+                                                                  mean_skewness,
+                                                                  mean_tail_rate)
+    end
+end
+function IdioCalibrationSummaryResult(; mean_cs_std::Real, median_cs_std::Real,
+                                      mean_kurtosis::Real, mean_skewness::Real,
+                                      mean_tail_rate::Real)::IdioCalibrationSummaryResult
+    return IdioCalibrationSummaryResult(mean_cs_std, median_cs_std, mean_kurtosis,
+                                        mean_skewness, mean_tail_rate)
+end
+"""
     idio_calibration_summary(eps::MatNum, vs::MatNum; threshold::Real = 3,
-                             ahead::Bool = true)
+                             ahead::Bool = true) -> IdioCalibrationSummaryResult
     idio_calibration_summary(csfm::CrossSectionalFactorModel; threshold::Real = 3,
-                             ahead::Bool = true)
+                             ahead::Bool = true) -> IdioCalibrationSummaryResult
 
 Return the five time-aggregated numbers of the calibration of a cross-sectional fit.
 
@@ -886,14 +991,17 @@ Under the normal law the expected values are `1`, `1`, `0`, `0` and ``2 \\Phi(-c
 
 # Returns
 
-  - `mean_cs_std::Real`: Mean of the calibration series.
-  - `median_cs_std::Real`: Median of the calibration series.
-  - `mean_kurtosis::Real`: Mean of the excess kurtosis series.
-  - `mean_skewness::Real`: Mean of the skewness series.
-  - `mean_tail_rate::Real`: Mean of the tail rate series.
+  - `s::IdioCalibrationSummaryResult`: The five numbers below. Earlier releases returned a `NamedTuple` of the same fields.
+
+      + `mean_cs_std::Real`: Mean of the calibration series.
+      + `median_cs_std::Real`: Median of the calibration series.
+      + `mean_kurtosis::Real`: Mean of the excess kurtosis series.
+      + `mean_skewness::Real`: Mean of the skewness series.
+      + `mean_tail_rate::Real`: Mean of the tail rate series.
 
 # Related
 
+  - [`IdioCalibrationSummaryResult`](@ref)
   - [`idio_calibration`](@ref)
   - [`idio_kurtosis`](@ref)
   - [`idio_skewness`](@ref)
@@ -901,16 +1009,17 @@ Under the normal law the expected values are `1`, `1`, `0`, `0` and ``2 \\Phi(-c
   - [`CrossSectionalFactorModel`](@ref)
 """
 function idio_calibration_summary(eps::MatNum, vs::MatNum; threshold::Real = 3,
-                                  ahead::Bool = true)
+                                  ahead::Bool = true)::IdioCalibrationSummaryResult
     z = standardised_idio_returns(eps, vs; ahead = ahead)
     cs = idio_calibration(z)
-    return (; mean_cs_std = idio_nan_mean(cs), median_cs_std = idio_nan_median(cs),
-            mean_kurtosis = idio_nan_mean(idio_kurtosis(z)),
-            mean_skewness = idio_nan_mean(idio_skewness(z)),
-            mean_tail_rate = idio_nan_mean(idio_tail_rate(z; threshold = threshold)))
+    return IdioCalibrationSummaryResult(idio_nan_mean(cs), idio_nan_median(cs),
+                                        idio_nan_mean(idio_kurtosis(z)),
+                                        idio_nan_mean(idio_skewness(z)),
+                                        idio_nan_mean(idio_tail_rate(z;
+                                                                     threshold = threshold)))
 end
 function idio_calibration_summary(csfm::CrossSectionalFactorModel; threshold::Real = 3,
-                                  ahead::Bool = true)
+                                  ahead::Bool = true)::IdioCalibrationSummaryResult
     ep, vh = idio_diagnostic_data(csfm)
     return idio_calibration_summary(ep, vh; threshold = threshold, ahead = ahead)
 end
@@ -964,4 +1073,5 @@ function idio_diagnostic_data(csr::CrossSectionalRegression, vs::MatNum)
 end
 
 export standardised_idio_returns, idio_calibration, idio_tail_rate, idio_kurtosis,
-       idio_skewness, idio_vol_ic, idio_vol_residual_dependence, idio_calibration_summary
+       idio_skewness, idio_vol_ic, idio_vol_residual_dependence, idio_calibration_summary,
+       IdioCalibrationSummaryResult

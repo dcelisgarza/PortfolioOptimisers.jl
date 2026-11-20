@@ -232,8 +232,8 @@ function CombinatorialCrossValidationResult(; train_idx::VecVecInt, test_idx::Ve
     return CombinatorialCrossValidationResult(train_idx, test_idx, path_ids)
 end
 """
-    const CombCVER = Union{<:CombinatorialCrossValidation,
-                           <:CombinatorialCrossValidationResult}
+    const CombCVER = Union{CombinatorialCrossValidation,
+                           CombinatorialCrossValidationResult}
 
 Alias for a combinatorial cross-validation estimator or result.
 
@@ -244,15 +244,12 @@ Matches either a [`CombinatorialCrossValidation`](@ref) estimator or a [`Combina
   - [`CombinatorialCrossValidation`](@ref)
   - [`CombinatorialCrossValidationResult`](@ref)
 """
-const CombCVER = Union{<:CombinatorialCrossValidation, <:CombinatorialCrossValidationResult}
+const CombCVER = Union{CombinatorialCrossValidation, CombinatorialCrossValidationResult}
 function n_splits(n_folds::Integer, n_test_folds::Integer)
     return binomial(n_folds, n_test_folds)
 end
-function n_splits(ccv::CombinatorialCrossValidation)
+function n_splits(ccv::CombinatorialCrossValidation, ::Option{<:Prices_RR} = nothing)
     return n_splits(ccv.n_folds, ccv.n_test_folds)
-end
-function n_splits(ccv::CombinatorialCrossValidation, ::Prices_RR)
-    return n_splits(ccv)
 end
 """
     n_test_paths(n_folds, n_test_folds)
@@ -632,9 +629,9 @@ function sort_predictions(res::CombinatorialCrossValidationResult,
     return [MultiPeriodPredictionResult(; pred = pred, id = i)
             for (i, pred) in enumerate(sorted_preds)]
 end
-function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::CombCVER; cols = :,
-                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
-    cv_res = split(cv, rd)
+function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::CombCVER,
+                         cv_res::CombinatorialCrossValidationResult = split(cv, rd);
+                         cols = :, ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
     (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)
@@ -645,17 +642,16 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::CombCVER; cols = :
     predictions, _ = fold_loop(opt, length(train_idx), ex, Vector{PredictionResult};
                                rd = rd, train_idx = train_idx, test_idx = test_idx, cv = cv
                                ) do fold
-        return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
-                               test_idx = fold.test, cols = cols, wd = wd, hwd = hwd,
-                               fa = fa, store_weight_path = store_weight_path,
+        return fit_and_predict(fold.est, fold.rd, fold.train, fold.test, cols; wd = wd,
+                               hwd = hwd, fa = fa, store_weight_path = store_weight_path,
                                strict = strict, w_prev = fold.w_prev)
     end
     return PopulationPredictionResult(; pred = sort_predictions(cv_res, predictions))
 end
 function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                         cv::CombCVER;
+                         cv::CombCVER,
+                         cv_res::CombinatorialCrossValidationResult = split(cv, rd);
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
-    cv_res = split(cv, rd)
     test_idx = cv_res.test_idx
     assert_unshuffled_folds(cv, cv_res.train_idx)
     (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)
@@ -672,11 +668,11 @@ end
 
 Read the evaluation switches of a [`CombinatorialCrossValidation`](@ref).
 
-The folds of this scheme are not a timeline, so it carries no Previous-Weights Source and the tuple names `nothing` for it. There is no previous fold whose weights a fold of this scheme could inherit.
+The folds of this scheme are not a timeline, so it carries no Previous-Weights Source and the record holds `nothing` for it. There is no previous fold whose weights a fold of this scheme could inherit.
 
 # Returns
 
-  - `(; wd, pws, fa, store_weight_path, strict)`: The Weight Drift, the Previous-Weights Source, the Fee Clock of the fold's realised series, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
+  - `fe::FoldEvaluation`: The Weight Drift, the Previous-Weights Source, the Fee Clock of the fold's realised series, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
 
 # Related
 
@@ -686,8 +682,7 @@ The folds of this scheme are not a timeline, so it carries no Previous-Weights S
   - [`override_fee_amortisation`](@ref)
 """
 function fold_evaluation(cv::CombinatorialCrossValidation)
-    return (; wd = cv.wd, pws = nothing, fa = cv.fa,
-            store_weight_path = cv.store_weight_path, strict = cv.strict)
+    return FoldEvaluation(cv.wd, nothing, cv.fa, cv.store_weight_path, cv.strict)
 end
 export CombinatorialCrossValidation, CombinatorialCrossValidationResult,
        optimal_number_folds

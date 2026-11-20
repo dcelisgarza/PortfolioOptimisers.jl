@@ -84,7 +84,7 @@ end
 
 Accumulate the signed weighted Descriptor scores and the surviving absolute weight of a composite, in place.
 
-It is [`composite_accumulate!`](@ref) with two changes. The weights are signed, so the numerator takes the signed product and the denominator takes the absolute weight. It also reads the Descriptors as the third axis of one score array, so it forms no slice of that array.
+It is [`composite_accumulate!`](@ref) with two changes. The weights are signed, so the numerator takes the signed product and the denominator takes the absolute weight. It also reads the Descriptors as the second axis of one score array, so it forms no slice of that array.
 
 A Descriptor whose score is not finite on a cell adds to neither sum there. The composite of that cell thus renormalises over the Descriptors that remain.
 
@@ -92,7 +92,7 @@ A Descriptor whose score is not finite on a cell adds to neither sum there. The 
 
   - `num`: Weighted score sum, `observations × assets`, changed in place.
   - `den`: Surviving absolute weight sum, `observations × assets`, changed in place.
-  - `S`: The Descriptor scores, `observations × assets × descriptors`.
+  - `S`: The Descriptor scores, `assets × descriptors × observations`.
   - `wv`: The signed Descriptor weights, one per Descriptor.
 
 # Returns
@@ -109,11 +109,11 @@ A Descriptor whose score is not finite on a cell adds to neither sum there. The 
 function signed_composite_accumulate!(num::AbstractMatrix{<:Real},
                                       den::AbstractMatrix{<:Real}, S::Arr3Num,
                                       wv::VecNum)::Nothing
-    for k in axes(S, 3)
+    for k in axes(S, 2)
         w = wv[k]
         a = abs(w)
         for idx in CartesianIndices(num)
-            s = S[idx, k]
+            s = S[idx[2], k, idx[1]]
             if isfinite(s)
                 num[idx] += w * s
                 den[idx] += a
@@ -195,6 +195,7 @@ FixedWeightedReturnForecast
                │           cre ┼ CrossSectionalLinearRegression
                │               │         alg ┼ PseudoInverseFallback()
                │               │   intercept ┼ Bool: true
+               │               │    leverage ┼ Bool: true
                │               │          ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
                │       outlier ┼ CrossSectionalWinsoriser
                │               │    low ┼ Float64: 0.01
@@ -303,7 +304,8 @@ function FixedWeightedReturnForecastResult(; mu::VecNum, hist::MatNum,
 end
 """
     return_forecast(rfe::FixedWeightedReturnForecast, rd::ReturnsResult,
-                    csfm::CrossSectionalFactorModel) -> FixedWeightedReturnForecastResult
+                    csfm::CrossSectionalFactorModel,
+                    cre::Nothing = nothing) -> FixedWeightedReturnForecastResult
 
 Compute the Return Forecast of a fixed signed combination of Descriptor scores.
 
@@ -318,6 +320,7 @@ Compute the Return Forecast of a fixed signed combination of Descriptor scores.
   - `rfe`: Fixed weighted Return Forecast Estimator.
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
   - `csfm`: The fitted factor-model block. Its histories set the rows of the block. The member reads its exposure history only under a Neutralisation, and its idiosyncratic variance history only under [`IdiosyncraticSharpeUnit`](@ref).
+  - `cre`: No regression. The member fits no calibration, so it reads none, as [`return_forecast`](@ref) states.
 
 # Validation
 
@@ -363,15 +366,43 @@ julia> rf.hist
   - [`forecast_return_units`](@ref)
 """
 function return_forecast(rfe::FixedWeightedReturnForecast, rd::ReturnsResult,
-                         csfm::CrossSectionalFactorModel)::FixedWeightedReturnForecastResult
+                         csfm::CrossSectionalFactorModel,
+                         ::Nothing = nothing)::FixedWeightedReturnForecastResult
     rows = return_forecast_rows(rd, csfm)
-    P = map(A -> return_forecast_cut(A, rows), descriptor_panel_scores(rfe.scores, rd))
-    (; hist, fs) = return_forecast_step(rfe, P, csfm, nothing)
+    P0 = descriptor_panel_scores(rfe.scores, rd)
+    (; hist, fs) = return_forecast_step(rfe, return_forecast_cut(P0, rows), csfm, nothing)
     return return_forecast_result(rfe, hist, fs)
 end
 """
-    return_forecast_step(rfe::FixedWeightedReturnForecast, P::NamedTuple,
-                         csfm::CrossSectionalFactorModel, fs::Nothing) -> NamedTuple
+$(DocStringExtensions.TYPEDEF)
+
+Holds the Return Forecast history of a step of a Return Forecast, with the fold state that the step ends in.
+
+This type is an implementation detail and is not intended for direct use. Each method of [`return_forecast_step`](@ref) makes it. The batch fit and the carry fold of a [`CrossSectionalFactorPrior`](@ref) read it, and pass `fs` to [`return_forecast_result`](@ref).
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`return_forecast_step`](@ref)
+  - [`return_forecast_result`](@ref)
+"""
+@concrete struct ForecastStepHistory
+    """
+    `hist`: The Return Forecast history, `observations × assets`, on the rows of the step.
+    """
+    hist
+    """
+    `fs`: The fold state after the step, an [`EWNormalEquations`](@ref) or a [`TargetRecursion`](@ref), or `nothing` for a member that carries none.
+    """
+    fs
+end
+"""
+    return_forecast_step(rfe::FixedWeightedReturnForecast, P::PanelScores,
+                         csfm::CrossSectionalFactorModel, fs::Nothing,
+                         cre::Nothing = nothing) -> ForecastStepHistory
 
 Compute the Return Forecast history of a fixed signed combination of Descriptor scores, on the rows of a block.
 
@@ -389,9 +420,10 @@ A row of the history reads the scores, the exposures, the regression weights and
 # Arguments
 
   - `rfe`: Fixed weighted Return Forecast Estimator.
-  - `P`: The scores, the weights and the group labels of the rows of the block, `(; S, w, g)`, as [`descriptor_panel_scores`](@ref) states them. The function can change `P.S` in place.
+  - `P`: The scores, the weights and the group labels of the rows of the block, as [`descriptor_panel_scores`](@ref) makes the [`PanelScores`](@ref). The function can change `P.S` in place.
   - `csfm`: The factor-model block of the rows of `P`. The member reads its exposure history only under a Neutralisation, and its idiosyncratic variance history only under [`IdiosyncraticSharpeUnit`](@ref).
   - `fs`: The fold state, always `nothing`.
+  - `cre`: No regression, as for [`return_forecast`](@ref).
 
 # Validation
 
@@ -399,30 +431,36 @@ A row of the history reads the scores, the exposures, the regression weights and
 
 # Returns
 
-  - `hist::MatNum`: The Return Forecast history, `observations × assets`, on the rows of `P`.
-  - `fs::Nothing`: The fold state, `nothing`.
+  - `r::ForecastStepHistory`: The history and the fold state.
+
+      + `hist::MatNum`: The Return Forecast history, `observations × assets`, on the rows of `P`.
+      + `fs::Nothing`: The fold state, `nothing`.
 
 # Related
 
+  - [`ForecastStepHistory`](@ref)
+  - [`PanelScores`](@ref)
   - [`return_forecast`](@ref)
   - [`return_forecast_result`](@ref)
   - [`folds_forecast_rows`](@ref)
   - [`signed_composite_accumulate!`](@ref)
   - [`composite_finalise!`](@ref)
 """
-function return_forecast_step(rfe::FixedWeightedReturnForecast, P::NamedTuple,
-                              csfm::CrossSectionalFactorModel, ::Nothing)::NamedTuple
+function return_forecast_step(rfe::FixedWeightedReturnForecast, P::PanelScores,
+                              csfm::CrossSectionalFactorModel, ::Nothing,
+                              ::Nothing = nothing)::ForecastStepHistory
     ds = rfe.scores
-    Sb = descriptor_neutralised_scores(ds, P, csfm, axes(P.S, 1))
-    K = size(Sb, 3)
+    Sb = descriptor_neutralised_scores(ds, P, csfm, axes(P.S, 3))
+    K = size(Sb, 2)
     wv = signed_composite_weights(rfe.weights, K)
     Tf = promote_type(eltype(Sb), eltype(wv))
-    num = zeros(Tf, size(Sb, 1), size(Sb, 2))
-    den = zeros(Tf, size(Sb, 1), size(Sb, 2))
+    num = zeros(Tf, size(Sb, 3), size(Sb, 1))
+    den = zeros(Tf, size(Sb, 3), size(Sb, 1))
     signed_composite_accumulate!(num, den, Sb, wv)
     composite_finalise!(num, den, rfe.min_coverage)
-    Z = K > 1 ? exposure_transform(ds.scoring, num, P.w, P.g) : num
-    return (; hist = forecast_return_units(rfe.unit, rfe.scale * Z, csfm.vs), fs = nothing)
+    Z = K > 1 ? cross_sectional_transform(ds.scoring, num; w = P.w, groups = P.g) : num
+    return ForecastStepHistory(forecast_return_units(rfe.unit, rfe.scale * Z, csfm.vs),
+                               nothing)
 end
 """
     return_forecast_result(rfe::FixedWeightedReturnForecast, hist::MatNum,

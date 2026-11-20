@@ -9,6 +9,6 @@ CustomExpectedReturnsValueAlgorithm
 CustomValueExpectedReturns
 mean(me::CustomValueExpectedReturns{<:Number}, X::MatNum; dims::Int = 1, kwargs...)
 mean(me::CustomValueExpectedReturns{<:VecNum}, X::MatNum; dims::Int = 1, kwargs...)
-mean(me::CustomValueExpectedReturns{<:Union{<:Function, <:CustomExpectedReturnsValueAlgorithm}}, X::MatNum; dims::Int = 1, kwargs...)
+mean(me::CustomValueExpectedReturns{<:Union{Function, CustomExpectedReturnsValueAlgorithm}}, X::MatNum; dims::Int = 1, kwargs...)
 port_opt_view(me::CustomValueExpectedReturns{<:VecNum}, i, args...)
 ```

@@ -21,7 +21,7 @@ using Clarabel, JuMP
 const PO = PortfolioOptimisers
 
 # A significance rule that reports what it was handed, so the resolver's argument order is
-# asserted rather than assumed. `n / T` is the shape `ScenarioCount` will ship under #582.
+# asserted rather than assumed. `n / T` is the shape that a `CountOf` in the slot gives.
 struct ProbeScenarioCount{T} <: PO.AbstractSignificanceCalibrationAlgorithm
     n::T
 end
@@ -135,7 +135,7 @@ const CTX = ProbeContext()
     @test !Base.isexported(PortfolioOptimisers, :AbstractCalibrationAlgorithm)
     @test !Base.isexported(PortfolioOptimisers, :AbstractSignificanceCalibrationAlgorithm)
     @test !Base.isexported(PortfolioOptimisers, :AbstractDeformationCalibrationAlgorithm)
-    @test Base.isexported(PortfolioOptimisers, :ScenarioCount)
+    @test Base.isexported(PortfolioOptimisers, :CountOf)
     @test Base.isexported(PortfolioOptimisers, :EntropyBudget)
 
     # The seven rules, their root, and the verb that put them on are all gone.
@@ -208,16 +208,15 @@ end
     # The one dual-use slot admits both families, and the route refuses the one that has no
     # reading on it.
     @test isa(LpRegularisation(; val = ConcentrationRadius()).val, ConcentrationRadius)
-    @test isa(LpRegularisation(; val = EffectiveAssetFloor()).val, EffectiveAssetFloor)
+    @test LpRegularisation(; val = FractionOf(0.5)).val === FractionOf(0.5)
     @test isa(L2Regularisation(; val = ConcentrationRadius()).val, ConcentrationRadius)
 
     # An optimiser norm slot stores its rule on the same terms, under the time-dependent
     # wrapper.
     oslv = Solver(; name = :probe, solver = nothing)
-    opt = JuMPOptimiser(; slv = oslv, l1 = ConcentrationRadius(),
-                        l2c = EffectiveAssetFloor())
+    opt = JuMPOptimiser(; slv = oslv, l1 = ConcentrationRadius(), l2c = FractionOf(0.5))
     @test isa(opt.l1, ConcentrationRadius)
-    @test isa(opt.l2c, EffectiveAssetFloor)
+    @test opt.l2c === FractionOf(0.5)
     @test isnothing(JuMPOptimiser(; slv = oslv).l1)
 
     # The wrong family is refused by the keyword constructor's bound.
@@ -380,7 +379,8 @@ end
          (OrderedWeightsArray(; w = owacvar),
           "OrderedWeightsArrayConditionalValueatRisk.alpha"),
          (OrderedWeightsArrayRange(; w1 = owacvar,
-                                   w2 = OrderedWeightsArrayConditionalValueatRisk()),
+                                   w2 = reverse ∘
+                                        OrderedWeightsArrayConditionalValueatRisk()),
           "OrderedWeightsArrayConditionalValueatRisk.alpha"))
         msg = refusal(r)
         @test occursin("Calibration Rule", msg)
@@ -398,34 +398,35 @@ end
     ranges = (ValueatRiskRange(), ConditionalValueatRiskRange(),
               DistributionallyRobustConditionalValueatRiskRange(),
               EntropicValueatRiskRange(), RelativisticValueatRiskRange(),
-              PowerNormValueatRiskRange(), OrderedWeightsArrayConditionalValueatRiskRange(),
-              OrderedWeightsArrayTailGiniRange())
+              PowerNormValueatRiskRange())
     for r in ranges
         @test r.alpha === 0.05
         @test r.beta === 0.05
     end
 
-    # A stated number reaches the head slot, where six of the eight held a literal of their
-    # own. The head slot of a Range measure is now the tail slot's occupant in all eight.
+    # A stated number reaches the head slot, where each of the six held a literal of its own.
+    # The head slot of a Range measure is now the tail slot's occupant in all six.
     @test ValueatRiskRange(; alpha = 0.01).beta === 0.01
     @test ConditionalValueatRiskRange(; alpha = 0.01).beta === 0.01
     @test DistributionallyRobustConditionalValueatRiskRange(; alpha = 0.01).beta === 0.01
     @test EntropicValueatRiskRange(; alpha = 0.01).beta === 0.01
     @test RelativisticValueatRiskRange(; alpha = 0.01).beta === 0.01
     @test PowerNormValueatRiskRange(; alpha = 0.01).beta === 0.01
-    @test OrderedWeightsArrayConditionalValueatRiskRange(; alpha = 0.01).beta === 0.01
-    @test OrderedWeightsArrayTailGiniRange(; alpha = 0.01).beta === 0.01
 
-    # A stated tail RULE crosses unchanged to the head slot, in all eight.
+    # A stated tail RULE crosses unchanged to the head slot, in all six.
     for r in (ValueatRiskRange(; alpha = sig), ConditionalValueatRiskRange(; alpha = sig),
               DistributionallyRobustConditionalValueatRiskRange(; alpha = sig),
               EntropicValueatRiskRange(; alpha = sig),
               RelativisticValueatRiskRange(; alpha = sig),
-              PowerNormValueatRiskRange(; alpha = sig),
-              OrderedWeightsArrayConditionalValueatRiskRange(; alpha = sig),
-              OrderedWeightsArrayTailGiniRange(; alpha = sig))
+              PowerNormValueatRiskRange(; alpha = sig))
         @test r.beta === RULE
     end
+    # The OWA range has no `beta`. With no `w2` it mirrors `w1`, so the gain tail holds the
+    # same rule.
+    @test OrderedWeightsArrayRange(;
+                                   w1 = OrderedWeightsArrayConditionalValueatRisk(;
+                                                                                  alpha = sig)).w2.inner.alpha ===
+          RULE
 
     # The deformation mirror has a caller in `src/`, and this is it. The gain-side pair of
     # the relativistic Range measure defaults to the loss-side pair, both halves of it.
@@ -434,9 +435,9 @@ end
     @test RelativisticValueatRiskRange(; kappa_a = 0.5).kappa_b === 0.5
 
     # The two norm orders take the same rule. They stay numbers, so they mirror by plain
-    # assignment, the way `beta_i` mirrors `alpha_i`.
+    # assignment, the way `beta_i` mirrors `alpha_i` in `OWA_TG_RG`.
     @test PowerNormValueatRiskRange(; pa = 3.0).pb === 3.0
-    @test OrderedWeightsArrayTailGiniRange(; alpha_i = 1e-3).beta_i === 1e-3
+    @test OWA_TG_RG(; alpha_i = 1e-3).w2.inner.alpha_i === 1e-3
 
     # An ambiguity rule names no end of the distribution, so neither ambiguity slot of the
     # range defaults from the other, and both keep the numbers they declare.
@@ -599,13 +600,12 @@ end
 
     opt = JuMPOptimiser(; slv = slv, pe = pr)
     mr = MeanRisk(; r = r, opt = opt)
-    attrs = PO.processed_jump_optimiser_attributes(mr.opt, rd)
+    attrs = PO.resolve_jump_optimiser(mr.opt, rd)
     model = JuMP.Model()
     PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
     PO.set_model_observations!(model, size(attrs.pr.X, 1))
     PO.set_maximum_ratio_factor_variables!(model, mr.obj)
     PO.set_w!(model, attrs.pr.X, mr.wi)
-    PO.set_weight_constraints!(model, attrs.wb, mr.opt)
     SLV_SEEN[] = nothing
     BUILT_ALPHA[] = nothing
     PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj)
@@ -620,13 +620,12 @@ end
     # A vector of measures takes the same route, and the second overload threads the same
     # solver.
     mrv = MeanRisk(; r = [SolverProbe(; alpha = rule)], opt = opt)
-    attrsv = PO.processed_jump_optimiser_attributes(mrv.opt, rd)
+    attrsv = PO.resolve_jump_optimiser(mrv.opt, rd)
     modelv = JuMP.Model()
     PO.set_model_scales!(modelv, mrv.opt.sc, mrv.opt.so)
     PO.set_model_observations!(modelv, size(attrsv.pr.X, 1))
     PO.set_maximum_ratio_factor_variables!(modelv, mrv.obj)
     PO.set_w!(modelv, attrsv.pr.X, mrv.wi)
-    PO.set_weight_constraints!(modelv, attrsv.wb, mrv.opt)
     SLV_SEEN[] = nothing
     PO.assemble_jump_model!(modelv, mrv, mrv.opt, attrsv, rd, mrv.r, mrv.obj)
     @test SLV_SEEN[].slv === slv
@@ -635,13 +634,12 @@ end
     # the weights beside it.
     own = Solver(; name = :own, solver = Clarabel.Optimizer)
     mro = MeanRisk(; r = SolverProbe(; slv = own, alpha = rule), opt = opt)
-    attrso = PO.processed_jump_optimiser_attributes(mro.opt, rd)
+    attrso = PO.resolve_jump_optimiser(mro.opt, rd)
     modelo = JuMP.Model()
     PO.set_model_scales!(modelo, mro.opt.sc, mro.opt.so)
     PO.set_model_observations!(modelo, size(attrso.pr.X, 1))
     PO.set_maximum_ratio_factor_variables!(modelo, mro.obj)
     PO.set_w!(modelo, attrso.pr.X, mro.wi)
-    PO.set_weight_constraints!(modelo, attrso.wb, mro.opt)
     SLV_SEEN[] = nothing
     PO.assemble_jump_model!(modelo, mro, mro.opt, attrso, rd, mro.r, mro.obj)
     @test SLV_SEEN[].slv === own
@@ -955,7 +953,7 @@ end
     # different quantities. ADR 0097 settles why the keys stay apart; the pairing is what
     # ties each of them back to the declaration that owns the slot.
     rrole = RateRadius(; c = 0.2)
-    crole = EffectiveAssetFloor(; fraction = 0.5)
+    crole = FractionOf(0.5)
 
     l2 = factory(L2Regularisation(; val = rrole), pr)
     @test isa(l2.val, Number)
@@ -986,7 +984,7 @@ Five **Calibration Rules** stand in the `alg` field of a rule type, and each one
 quantity of the slot its rule addresses. `test_09f_calibration_slot.jl` covers the mechanism
 that carries them; this file covers the rules themselves.
 
-`ScenarioCount` and `RateSignificance` compute a significance level, and `EntropyBudget`,
+A `CountOf` in a significance slot and `RateSignificance` compute a significance level, and `EntropyBudget`,
 `HillTailDecay` and `RadialTailDecay` compute a Kaniadakis deformation parameter. The first
 reads the effective observation weights, the second reads the raw row count, and the last
 three read the probability of their own slot's end off the `CalibrationContext`.
@@ -1029,7 +1027,7 @@ const PR120 = prior(EmpiricalPrior(), randn(RNG, 120, 4))
 
 @testset "Calibration rules: the five rules join the two families" begin
     # Each rule subtypes the family whose quantity it computes, and no rule subtypes both.
-    @test ScenarioCount <: PO.AbstractSignificanceCalibrationAlgorithm
+    @test PO.is_calibration_rule(CountOf(25))
     @test RateSignificance <: PO.AbstractSignificanceCalibrationAlgorithm
     @test EntropyBudget <: PO.AbstractDeformationCalibrationAlgorithm
     @test HillTailDecay <: PO.AbstractDeformationCalibrationAlgorithm
@@ -1037,22 +1035,21 @@ const PR120 = prior(EmpiricalPrior(), randn(RNG, 120, 4))
     @test !(EntropyBudget <: PO.AbstractSignificanceCalibrationAlgorithm)
     @test !(HillTailDecay <: PO.AbstractSignificanceCalibrationAlgorithm)
     @test !(RadialTailDecay <: PO.AbstractSignificanceCalibrationAlgorithm)
-    @test !(ScenarioCount <: PO.AbstractDeformationCalibrationAlgorithm)
+    @test PO.is_calibration_rule(FractionOf(0.5))
 
     # The family is what the slot bound checks, so each rule is admitted by one bound only.
-    @test isa(ScenarioCount(; n = 25), PO.Num_SigCal)
+    @test isa(CountOf(25), PO.Num_SigCal)
     @test isa(RateSignificance(), PO.Num_SigCal)
     @test isa(EntropyBudget(; target = -1.3), PO.Num_DefCal)
     @test isa(HillTailDecay(), PO.Num_DefCal)
     @test isa(RadialTailDecay(), PO.Num_DefCal)
-    @test !isa(ScenarioCount(; n = 25), PO.Num_DefCal)
+    @test !isa(CountOf(25), PO.Num_DefCal)
     @test !isa(EntropyBudget(; target = -1.3), PO.Num_SigCal)
     @test !isa(HillTailDecay(), PO.Num_SigCal)
     @test !isa(RadialTailDecay(), PO.Num_SigCal)
 
     # A slot stores the rule the caller wrote, and both ends of a Range measure take it.
-    @test ConditionalValueatRisk(; alpha = ScenarioCount(; n = 25)).alpha ==
-          ScenarioCount(; n = 25)
+    @test ConditionalValueatRisk(; alpha = CountOf(25)).alpha == CountOf(25)
     @test ConditionalValueatRiskRange(; alpha = RateSignificance()).beta ==
           RateSignificance()
     @test RelativisticValueatRisk(; kappa = EntropyBudget(; target = -1.3)).kappa ==
@@ -1063,13 +1060,13 @@ const PR120 = prior(EmpiricalPrior(), randn(RNG, 120, 4))
 
     # The wrong family is refused at construction, by the slot's own bound.
     @test_throws TypeError ConditionalValueatRisk(; alpha = EntropyBudget(; target = -1))
-    @test_throws TypeError RelativisticValueatRisk(; kappa = ScenarioCount(; n = 25))
+    @test_throws TypeError RelativisticValueatRisk(; kappa = CountOf(25))
     @test_throws TypeError ConditionalValueatRisk(; alpha = HillTailDecay())
     @test_throws TypeError ConditionalValueatRisk(; alpha = RadialTailDecay())
 
     # The five rules are caller-facing, because a caller states one directly.
     exported = names(PortfolioOptimisers)
-    @test :ScenarioCount in exported
+    @test :CountOf in exported && :FractionOf in exported && !(:ScenarioCount in exported)
     @test :RateSignificance in exported
     @test :EntropyBudget in exported
     @test :HillTailDecay in exported
@@ -1077,7 +1074,7 @@ const PR120 = prior(EmpiricalPrior(), randn(RNG, 120, 4))
 
     # The positional inner constructor is the route a rebuild takes. Each rule holds its
     # own parameters and nothing of the site's, so the five constructors are short.
-    @test ScenarioCount(25).n == 25
+    @test CountOf(25).val == 25
     @test RateSignificance(2).c == 2
     @test EntropyBudget(-1.3).target == -1.3
     @test HillTailDecay(12).kmin == 12
@@ -1092,11 +1089,16 @@ const PR120 = prior(EmpiricalPrior(), randn(RNG, 120, 4))
     @test isa(CalibrationContext().series, ReturnsSeries)
     @test isnothing(CalibrationContext().alpha)
     @test isnothing(CalibrationContext().p)
-    @test isa(CalibrationContext(-1, AbsoluteDrawdownSeries(), 2, nothing).series,
+    @test isa(CalibrationContext(-1, AbsoluteDrawdownSeries(), 2, nothing, nothing).series,
               AbsoluteDrawdownSeries)
     # `cs` belongs to the Cross-Sectional Factor Prior, so a site that names none leaves it
     # unset.
     @test isnothing(CalibrationContext().cs)
+    # `n` belongs to a site that prices its own rows (#1833), so a site that names none
+    # prices the moments, and a radius rule reads `effective_sample_size`.
+    @test isnothing(CalibrationContext().n)
+    @test CalibrationContext(; n = 250).n == 250
+    @test_throws TypeError CalibrationContext(; n = "a")
 
     # `kmin` is a count of order statistics, so a rule that states none is refused at
     # construction. It is a check on the rule's OWN parameter, and not on the parameter the
@@ -1105,13 +1107,13 @@ const PR120 = prior(EmpiricalPrior(), randn(RNG, 120, 4))
     @test_throws DomainError RadialTailDecay(; kmin = 0)
 
     # The same rule holds for the scalar of every other rule, so all eleven refuse a value
-    # that no sample can make sensible. `ScenarioCount.n` is a count of observations and
+    # that no sample can make sensible. `CountOf.val` is a count of observations and
     # `RateSignificance.c` is a rate coefficient, so both are positive and finite.
     # `EntropyBudget.target` may take either sign, because the band it must land in follows
     # the sample, so only the finiteness is a question the constructor can answer.
-    @test_throws DomainError ScenarioCount(; n = 0)
-    @test_throws DomainError ScenarioCount(; n = -1)
-    @test_throws DomainError ScenarioCount(; n = Inf)
+    @test_throws DomainError CountOf(0)
+    @test_throws DomainError CountOf(-1)
+    @test_throws MethodError CountOf(Inf)
     @test_throws DomainError RateSignificance(; c = 0)
     @test_throws DomainError RateSignificance(; c = -1.0)
     @test_throws DomainError RateSignificance(; c = Inf)
@@ -1124,13 +1126,15 @@ const PR120 = prior(EmpiricalPrior(), randn(RNG, 120, 4))
     @test_throws DomainError RateRadius(; c = -1.0)
 end
 
-@testset "Calibration rules: `ScenarioCount` fixes the count, not the probability" begin
-    rule = ScenarioCount(; n = 15)
+@testset "Calibration rules: `alpha = CountOf(n)` fixes the count, not the probability" begin
+    rule = CountOf(15)
 
     # The tail holds `n` observations, so `alpha * T` is the count the caller stated and
     # `ceil(alpha * T)` returns it whatever `T` is.
-    a60 = rule(:alpha, PR60, nothing, nothing, CalibrationContext())
-    a120 = rule(:alpha, PR120, nothing, nothing, CalibrationContext())
+    a60 = PO.resolve_calibration_slot(rule, :alpha, PR60, nothing, nothing,
+                                      CalibrationContext())
+    a120 = PO.resolve_calibration_slot(rule, :alpha, PR120, nothing, nothing,
+                                       CalibrationContext())
     @test a60 == 15 / 60
     @test a120 == 15 / 120
     @test ceil(a60 * 60) == 15
@@ -1142,29 +1146,32 @@ end
 
     # The key does not change the count, so a tail slot and a head slot that carry one rule
     # resolve to one number.
-    @test rule(:beta, PR60, nothing, nothing, CalibrationContext()) == a60
+    @test PO.resolve_calibration_slot(rule, :beta, PR60, nothing, nothing,
+                                      CalibrationContext()) == a60
 
     # Uniform weights carry the same information as the unweighted sample, so Kish's
     # effective sample size is the row count and the answer does not move.
-    @test rule(:alpha, PR60, pweights(fill(1 / 60, 60)), nothing, CalibrationContext()) ≈
-          a60
+    @test PO.resolve_calibration_slot(rule, :alpha, PR60, pweights(fill(1 / 60, 60)),
+                                      nothing, CalibrationContext()) ≈ a60
 
     # Uneven weights carry less, so the effective sample is shorter and the tail must take a
     # larger share of it to hold the same 15 observations.
     uneven = pweights([fill(3.0, 30); fill(1.0, 30)])
-    aw = rule(:alpha, PR60, uneven, nothing, CalibrationContext())
+    aw = PO.resolve_calibration_slot(rule, :alpha, PR60, uneven, nothing,
+                                     CalibrationContext())
     @test aw ≈ 15 / (sum(uneven)^2 / sum(abs2, uneven))
     @test aw > a60
 
     # The solver reaches the rule and this one ignores it, which is the fourth argument's
     # whole contract here.
-    @test rule(:alpha, PR60, nothing, Solver(; name = :probe, solver = nothing),
-               CalibrationContext()) == a60
+    @test PO.resolve_calibration_slot(rule, :alpha, PR60, nothing,
+                                      Solver(; name = :probe, solver = nothing),
+                                      CalibrationContext()) == a60
 
     # The rule carries no range check, so a count larger than the sample returns a value the
     # slot owner refuses rather than one the rule refuses.
-    @test ScenarioCount(; n = 90)(:alpha, PR60, nothing, nothing, CalibrationContext()) ==
-          1.5
+    @test PO.resolve_calibration_slot(CountOf(90), :alpha, PR60, nothing, nothing,
+                                      CalibrationContext()) == 1.5
 end
 
 @testset "Calibration rules: `RateSignificance` falls with the square root of `T`" begin
@@ -1186,10 +1193,16 @@ end
     @test RateSignificance(; c = 2)(:alpha, PR60, nothing, nothing, CalibrationContext()) ==
           2 * a60
 
-    # The rule reads the RAW row count, so the weights do not move it. That is the stated
-    # difference from `ScenarioCount`: a rate speaks of the length of the record.
-    @test rule(:alpha, PR60, pweights([fill(3.0, 30); fill(1.0, 30)]), nothing,
-               CalibrationContext()) == a60
+    # The tail holds `c * sqrt(T)` scenarios only when `T` counts the scenarios the measure
+    # prices, so the rule reads the count that a `CountOf` reads: Kish's count of the weights
+    # when the measure states weights (#1908).
+    w60 = pweights([fill(3.0, 30); fill(1.0, 30)])
+    kish60 = sum(w60)^2 / sum(abs2, w60)
+    @test kish60 < 60
+    @test rule(:alpha, PR60, w60, nothing, CalibrationContext()) == inv(sqrt(kish60))
+    @test rule(:alpha, PR60, w60, nothing, CalibrationContext()) /
+          PO.resolve_calibration_slot(CountOf(1), :alpha, PR60, w60, nothing,
+                                      CalibrationContext()) ≈ sqrt(kish60)
 
     # The key does not change the rate either.
     @test rule(:beta, PR60, nothing, nothing, CalibrationContext()) == a60
@@ -1313,7 +1326,7 @@ end
 
     # No significance rule reads a sibling, so the whole family answers the same number
     # under a context that names one and under the default.
-    rule = ScenarioCount(; n = 25)
+    rule = CountOf(25)
     @test PO.resolve_calibration_slot(rule, :alpha, PR60, nothing, nothing, ctx) ==
           PO.resolve_calibration_slot(rule, :alpha, PR60, nothing, nothing)
 end
@@ -1321,7 +1334,7 @@ end
 @testset "Calibration rules: the resolver runs each rule" begin
     # This is the shape #583's per-type method writes. A significance slot resolves on its
     # own; the deformation slot takes the number the significance slot produced.
-    slot = ScenarioCount(; n = 3)
+    slot = CountOf(3)
     alpha = PO.resolve_calibration_slot(slot, :alpha, PR60, nothing)
     @test alpha == 3 / 60
 
@@ -1412,9 +1425,8 @@ const PRSKEW = prior(EmpiricalPrior(), XSKEW)
     @test rule(:kappa, scaled, nothing, nothing, CalibrationContext(; alpha = 0.01)) == k4
 
     # A tail index is a statement about the shape of a series rather than about the count of
-    # observations behind it, so the rule ignores the observation weights. `ScenarioCount`
-    # reads Kish's effective sample size and `RateSignificance` reads the raw row count;
-    # this rule reads neither.
+    # observations behind it, so the rule ignores the observation weights. A `CountOf`
+    # and `RateSignificance` read Kish's effective sample size; this rule reads no count.
     @test rule(:kappa, PRT4, pweights([fill(3.0, 500); fill(1.0, 500)]), nothing,
                CalibrationContext(; alpha = 0.01)) == k4
 
@@ -1691,6 +1703,28 @@ end
     @test PO.whitening_factor(both) === both.chol
     @test PO.whitening_factor(PRMVT4) == cholesky(PRMVT4.sigma).U
     @test size(PO.whitening_factor(tall)) == (8, 8)
+
+    # A SQUARE `chol` need not be triangular, and then its diagonal says nothing about its
+    # rank. The `R` factor of its QR factorisation is a triangular factor of the same
+    # matrix. So a symmetric square root whitens like the Cholesky factor of `sigma`, and a
+    # permutation, whose diagonal holds zeros, is a factor of the identity and is accepted.
+    symroot = LowOrderPrior(; X = PRMVT4.X, mu = PRMVT4.mu, sigma = other,
+                            chol = Matrix(sqrt(Symmetric(other))))
+    @test istriu(PO.whitening_factor(symroot))
+    @test rule(:kappa, symroot, nothing, nothing, CalibrationContext(; alpha = 0.05)) ≈
+          rule(:kappa, stated, nothing, nothing, CalibrationContext(; alpha = 0.05))
+    perm = Matrix(1.0I, 8, 8)[:, [2; 1; 3:8]]
+    swapped = LowOrderPrior(; X = PRMVT4.X, mu = PRMVT4.mu, sigma = Matrix(1.0I, 8, 8),
+                            chol = perm)
+    @test PO.whitening_factor(swapped)' * PO.whitening_factor(swapped) ≈ I
+    @test rule(:kappa, swapped, nothing, nothing, CalibrationContext(; alpha = 0.05)) ≈
+          rule(:kappa, identity_sigma, nothing, nothing, CalibrationContext(; alpha = 0.05))
+    # A singular square factor with no zero on its diagonal is refused with the rank
+    # message, and is not solved against.
+    singular = LowOrderPrior(; X = PRMVT4.X[:, 1:4], mu = zeros(4),
+                             sigma = Matrix(1.0I, 4, 4),
+                             chol = [1.0 1.0 0 0; 1.0 1.0 0 0; 0 0 1 0; 0 0 0 1])
+    @test_throws DomainError PO.whitening_factor(singular)
 end
 
 @testset "Calibration rules: `RadialTailDecay` answers one number for both ends" begin
@@ -2000,7 +2034,6 @@ end
     # the reading the norm order takes too, and the significance level with it.
     @test !hasfield(HillTailDecay, :series)
     @test !hasfield(RadialTailDecay, :series)
-    @test !hasfield(EffectiveAssetFloor, :p)
 
     # The default is `ReturnsSeries`, which is what `calibration_series` answers for every
     # owner that names no other.
@@ -2342,8 +2375,10 @@ end
     rule_types = filter(T -> parentmodule(T) === PortfolioOptimisers,
                         PO.traverse_concrete_subtypes(PO.AbstractCalibrationAlgorithm))
     rule_names = Set(nameof.(rule_types))
+    # Issue #2013 removed `ScenarioCount` and `EffectiveAssetFloor`, so fourteen became
+    # twelve.
     @test ("the rules this census reads", length(rule_names)) ==
-          ("the rules this census reads", 14)
+          ("the rules this census reads", 12)
 
     stated = Set(n for n in rule_names if any(w -> endswith(string(n), w), quantity_words))
     named = Set(keys(earns_the_quantity))
@@ -2358,22 +2393,24 @@ end
     @test ("list entries that no rule carries", stale) ==
           ("list entries that no rule carries", Symbol[])
 
-    # The other eight name a method and stop there, which is the default the rule states.
+    # The other six name a method and stop there, which is the default the rule states.
+    # Issue #2013 removed `ScenarioCount` and `EffectiveAssetFloor`: a `CountOf` or a
+    # `FractionOf` in the slot states what they computed.
     @test ("rules named for the method alone",
            sort!(collect(setdiff(rule_names, stated)))) ==
           ("rules named for the method alone",
-           [:EffectiveAssetFloor, :EntropyBudget, :ForecastCalibrationSlope, :HillTailDecay,
-            :PrecisionBlend, :RadialTailDecay, :ScenarioCount, :TailTermParity])
+           [:EntropyBudget, :ForecastCalibrationSlope, :HillTailDecay, :PrecisionBlend,
+            :RadialTailDecay, :TailTermParity])
 end
 
-@testset "Calibration rules: twelve construct bare, and two name the quantity they refuse" begin
+@testset "Calibration rules: eleven construct bare, and one names the quantity it refuses" begin
     #=
-    A caller who meets nine rules that construct bare learns that a rule constructs bare.
-    Two cannot, because the keyword each takes is the whole content of the rule, and a
+    A caller who meets eleven rules that construct bare learns that a rule constructs bare.
+    One cannot, because the keyword it takes is the whole content of the rule, and a
     mandatory keyword then fails with an `UndefKeywordError` that names the keyword and
-    nothing else -- no quantity, no reason, no value to start from. The keyword of each of
-    the two stands at `nothing` instead, and the `@argcheck` that refuses it says all
-    three. ADR 0095 owns the rule.
+    nothing else -- no quantity, no reason, no value to start from. Its keyword stands at
+    `nothing` instead, and the `@argcheck` that refuses it says all three. ADR 0095 owns
+    the rule. `ScenarioCount`, the second such rule, left with issue #2013.
 
     A zero-argument method carrying the message was written first and does not work: Julia
     generates that method for a keyword constructor itself, and overwriting it is an ERROR
@@ -2382,12 +2419,11 @@ end
     =#
     for R in
         (RateSignificance, HillTailDecay, RadialTailDecay, ConcentrationRadius, RateRadius,
-         DimensionalRateRadius, DualNormRadius, TailTermParity, EffectiveAssetFloor,
-         PrecisionBlend, SteinShrinkage, ForecastCalibrationSlope)
+         DimensionalRateRadius, DualNormRadius, TailTermParity, PrecisionBlend,
+         SteinShrinkage, ForecastCalibrationSlope)
         @test isa(R(), R)
     end
 
-    @test_throws ArgumentError ScenarioCount()
     @test_throws ArgumentError EntropyBudget()
 
     function refusal_text(f)
@@ -2401,12 +2437,6 @@ end
 
     # The message names the quantity, the reason there is no default, a value to start
     # from, and the rule of the same family that does construct bare.
-    scmsg = refusal_text(ScenarioCount)
-    @test occursin("number of observations the tail is to hold", scmsg)
-    @test occursin("no count suits every sample", scmsg)
-    @test occursin("ScenarioCount(; n = 15)", scmsg)
-    @test occursin("RateSignificance", scmsg)
-
     ebmsg = refusal_text(EntropyBudget)
     @test occursin("value of the Kaniadakis logarithm", ebmsg)
     @test occursin("moves with the sample", ebmsg)
@@ -2415,28 +2445,24 @@ end
 
     # The sentinel widens the keyword to `Option{<:Number}` and nothing further, so a value
     # that is neither a number nor `nothing` is refused where it always was.
-    @test ScenarioCount(; n = 15).n == 15
     @test EntropyBudget(; target = -1.3).target == -1.3
-    @test_throws TypeError ScenarioCount(; n = "a")
     @test_throws TypeError EntropyBudget(; target = "a")
 
     # A caller who states the sentinel by hand meets the same refusal, so the keyword
     # route never puts it in the field.
-    @test_throws ArgumentError ScenarioCount(; n = nothing)
     @test_throws ArgumentError EntropyBudget(; target = nothing)
 
     # The POSITIONAL route is not refused, and that is not this decision's doing: the
     # constructor `ConcreteStructs.@concrete` emits is broader than the hand-written inner
     # one on every type in the library, so it bypasses the inner `::Number` as it bypasses
     # every other bound. Issue #264 carries the hole and ADR 0095's Consequences record it.
-    @test ScenarioCount(15).n == 15
     @test EntropyBudget(-1.3).target == -1.3
 end
 
-@testset "Calibration rules: a Scenario Cap states its count in `ens`, and the count readers take it (#1015)" begin
+@testset "Calibration rules: a Scenario Cap states its count in `eoc`, and the count readers take it (#1015, #1893)" begin
     # ADR 0138. `EmpiricalPrior(; max_scenarios = w)` fits the moments over every observation
     # and carries the last `w` rows, so a count read off the shape would price `w`
-    # observations for moments fitted over `t`. The result states `t` in `ens` exactly when
+    # observations for moments fitted over `t`. The result states `t` in `eoc` exactly when
     # the cap cuts, and `effective_sample_size` reads it before the shape.
     X1015 = randn(StableRNG(1015), 1250, 5) ./ 100
     pu = prior(EmpiricalPrior(), X1015)
@@ -2444,28 +2470,30 @@ end
     ctx = CalibrationContext()
 
     @testset "The cap states the count, in batch and after t folds, and only when it cuts" begin
-        @test isnothing(pu.ens)
-        @test pc.ens == 1250
+        @test pu.eoc == (nothing, nothing)
+        @test pc.eoc == (1250, 1250)
+        @test isnothing(pc.ens)
         @test size(pc.X, 1) == 250
         # A cap at or above the number of observations cuts nothing and states nothing.
-        @test isnothing(prior(EmpiricalPrior(; max_scenarios = 1250), X1015).ens)
-        @test isnothing(prior(EmpiricalPrior(; max_scenarios = 5000), X1015).ens)
+        @test prior(EmpiricalPrior(; max_scenarios = 1250), X1015).eoc == (nothing, nothing)
+        @test prior(EmpiricalPrior(; max_scenarios = 5000), X1015).eoc == (nothing, nothing)
         # The folded read-out states the same count off the same rows.
         o = EmpiricalPrior(; max_scenarios = 250)
         for i in 1:1250
             o = partial_fit!(o, X1015[i, :])
         end
         pf = prior(o)
-        @test pf.ens == 1250
+        @test pf.eoc == (1250, 1250)
         @test size(pf.X, 1) == 250
         @test pf.mu ≈ pc.mu
         # The horizon arm states it too.
-        @test prior(EmpiricalPrior(; horizon = 21, max_scenarios = 250), X1015).ens == 1250
-        @test isnothing(prior(EmpiricalPrior(; horizon = 21), X1015).ens)
-        # The verb itself: `nothing` when nothing is cut.
-        @test isnothing(PO.scenario_ens(nothing, X1015))
-        @test isnothing(PO.scenario_ens(1250, X1015))
-        @test PO.scenario_ens(1249, X1015) == 1250
+        @test prior(EmpiricalPrior(; horizon = 21, max_scenarios = 250), X1015).eoc ==
+              (1250, 1250)
+        @test prior(EmpiricalPrior(; horizon = 21), X1015).eoc == (nothing, nothing)
+        # The verb itself: `nothing` when the count equals the rows carried.
+        pe0 = EmpiricalPrior()
+        @test PO.scenario_moment_counts(pe0, X1015, 1250) == (nothing, nothing)
+        @test PO.scenario_moment_counts(pe0, X1015, 250) == (1250, 1250)
     end
 
     @testset "The count readers price t, not the rows carried" begin
@@ -2473,42 +2501,140 @@ end
         @test PO.effective_sample_size(pu, nothing) == 1250
         @test PO.effective_sample_size(pc, nothing) == 1250
         @test PO.effective_sample_size(pc, StatsBase.pweights(ones(250))) == 250
-        # `ScenarioCount` and the two rate rules read the count behind the moments.
-        @test ScenarioCount(; n = 25)(:alpha, pc, nothing, nothing, ctx) == 25 / 1250
-        @test RateSignificance()(:alpha, pc, nothing, nothing, ctx) ==
-              RateSignificance()(:alpha, pu, nothing, nothing, ctx)
+        # A radius at a site that states no count prices the error of the moments, so it
+        # reads the count behind them.
         @test RateRadius()(:k, pc, nothing, nothing, ctx) ==
               RateRadius()(:k, pu, nothing, nothing, ctx)
+        # A `CountOf`, `RateSignificance` and `EntropyBudget` price the scenarios the
+        # measure holds, which are the rows carried. A tail of `n / ens` would hold `n / 5`
+        # of the 250 rows, a rate read at 1250 would hold `sqrt(5)` times fewer than
+        # `c * sqrt(250)` (#1908), and the measure pays `kappa_log(inv(alpha * T), kappa)` at
+        # the `T` of its own rows.
+        @test PO.resolve_calibration_slot(CountOf(25), :alpha, pc, nothing, nothing, ctx) ==
+              25 / 250
+        @test RateSignificance()(:alpha, pc, nothing, nothing, ctx) == inv(sqrt(250))
+        @test RateSignificance()(:alpha, pc, nothing, nothing, ctx) * 250 ≈ sqrt(250)
         actx = CalibrationContext(; alpha = 0.05)
-        @test EntropyBudget(; target = -10.0)(:kappa, pc, nothing, nothing, actx) ==
-              EntropyBudget(; target = -10.0)(:kappa, pu, nothing, nothing, actx)
-        # The normal set's `T` reads `ens`, so its box over the capped prior is the box
+        kappa = EntropyBudget(; target = -5.0)(:kappa, pc, nothing, nothing, actx)
+        @test PO.kappa_log(inv(0.05 * 250), kappa) ≈ -5.0
+        @test kappa == EntropyBudget(; target = -5.0)(:kappa,
+                                                      prior(EmpiricalPrior(), X1015[1001:end, :]),
+                                                      nothing, nothing, actx)
+        # The normal set's `T` reads `eoc`, so its box over the capped prior is the box
         # over the uncapped one: the ellipsoid is not `√5 ≈ 2.24` times too wide.
         ue = NormalUncertaintySet(; pe = nothing)
-        @test PO.choose_scaling_parameter(ue, pc) == 1250
+        @test PO.choose_scaling_parameter(ue, pc, 1) == 1250
         @test mu_ucs(ue, pc).ub == mu_ucs(ue, pu).ub
         # The bootstrap can resample nothing but the rows carried, so it reads the cap.
         ab = ARCHUncertaintySet(; pe = nothing, seed = 3, n_sim = 20)
         @test mu_ucs(ab, pc).ub != mu_ucs(ab, pu).ub
     end
 
-    @testset "An `ens` bound to a weighting is a diagnostic of it, and is not the stated count" begin
-        # An entropy-pooling prior writes `exp(entropy(w))` beside `w`. A rule handed the
-        # weights reads Kish's count of them, as before; a rule that reads the raw row
-        # count still does, because a diagnostic of weights it ignores is not a count it
-        # reads. Neither released number moves.
+    @testset "An `ens` or an `eoc` bound to a weighting is not the stated count of a rule with no weights" begin
+        # An entropy-pooling prior writes `exp(entropy(w))` beside `w`, and the counts of the
+        # moments that `w` weights in `eoc`. A rule handed the weights reads Kish's count of
+        # them, as before; a read with no weights takes the row count, because a count of
+        # weights it ignores is not a count it reads.
         w = StatsBase.pweights(vcat(fill(0.5, 60), fill(1.5, 60)))
-        pw = LowOrderPrior(; X = pu.X[1:120, :], mu = pu.mu, sigma = pu.sigma, w = w,
-                           ens = exp(StatsBase.entropy(w / sum(w))))
         kish = sum(w)^2 / sum(abs2, w)
+        pw = LowOrderPrior(; X = pu.X[1:120, :], mu = pu.mu, sigma = pu.sigma, w = w,
+                           ens = exp(StatsBase.entropy(w / sum(w))), eoc = (kish, kish))
         @test PO.effective_sample_size(pw, pw.w) == kish
         @test PO.effective_sample_size(pw, nothing) == 120
-        @test ScenarioCount(; n = 25)(:alpha, pw, pw.w, nothing, ctx) == 25 / kish
-        @test RateSignificance()(:alpha, pw, pw.w, nothing, ctx) ==
-              RateSignificance()(:alpha, pu, nothing, nothing, ctx) * sqrt(1250 / 120)
-        # The normal set reads `pr.ens` as it always did.
-        @test PO.choose_scaling_parameter(NormalUncertaintySet(; pe = nothing), pw) ==
-              pw.ens
+        @test PO.resolve_calibration_slot(CountOf(25), :alpha, pw, pw.w, nothing, ctx) ==
+              25 / kish
+        @test RateSignificance()(:alpha, pw, pw.w, nothing, ctx) == inv(sqrt(kish))
+        @test RateRadius()(:k, pw, pw.w, nothing, ctx) == inv(sqrt(kish))
+        # The normal set reads the count of the moments in `eoc`, the Kish count of `w`,
+        # and not the perplexity in `ens` (#1893).
+        @test PO.choose_scaling_parameter(NormalUncertaintySet(; pe = nothing), pw, 1) ==
+              kish
+        @test kish < pw.ens
+    end
+
+    @testset "A weighted estimator states its count, and a rule with no weights reads the smaller one (#1893)" begin
+        # An exponentially weighted covariance is worth fewer observations than its rows.
+        # The prior states the count of each moment, and a rule that reads no weights
+        # prices the smaller of the two, because it does not know which moment it prices.
+        ew = PortfolioOptimisersCovariance(; ce = ExpWeightedCovariance())
+        pe = prior(EmpiricalPrior(; ce = ew), X1015)
+        T_s = PO.effective_observation_count(ew, X1015)
+        @test T_s < 1250
+        @test pe.eoc == (nothing, T_s)
+        @test PO.effective_sample_size(pe, nothing) == T_s
+        @test PO.choose_scaling_parameter(NormalUncertaintySet(; pe = nothing), pe, 1) ==
+              1250
+        @test PO.choose_scaling_parameter(NormalUncertaintySet(; pe = nothing), pe, 2) ==
+              T_s
+        pm = prior(EmpiricalPrior(; ce = ew, me = ExpWeightedExpectedReturns()), X1015)
+        T_m = PO.effective_observation_count(ExpWeightedExpectedReturns(), X1015)
+        @test pm.eoc == (T_m, T_s)
+        @test PO.effective_sample_size(pm, nothing) == min(T_m, T_s)
+    end
+
+    @testset "A robust measure prices the rows of its ball, and a penalty prices the moments (#1833)" begin
+        # A distributionally robust measure centres its Wasserstein ball on the empirical
+        # measure of the rows that its programme holds, so the site states the count of
+        # those rows in `n`. A regularisation slot states no count, so its radius still
+        # prices the error of `pr.mu`, which the cap fits over all 1250 observations.
+        n250 = CalibrationContext(; n = 250)
+        # The count of the rows is the row count, else Kish's count of the weights.
+        @test PO.scenario_sample_size(pc, nothing) == 250
+        @test PO.scenario_sample_size(pu, nothing) == 1250
+        wc = StatsBase.pweights(vcat(fill(0.5, 125), fill(1.5, 125)))
+        kc = sum(wc)^2 / sum(abs2, wc)
+        @test PO.scenario_sample_size(pc, wc) == kc
+        # A stated count replaces `effective_sample_size`, so on the capped prior the ball
+        # widens by the rate of each rule at the ratio `1250 / 250` of the two counts.
+        for (rule, ratio) in ((ConcentrationRadius(), sqrt(5)), (RateRadius(), sqrt(5)),
+                              (DimensionalRateRadius(), 5^(1 / 5)), (DualNormRadius(), sqrt(5)))
+            @test rule(:r, pc, nothing, nothing, n250) /
+                  rule(:r, pc, nothing, nothing, ctx) ≈ ratio
+            # With no cap the two counts agree, so no number without a cap moves.
+            @test rule(:r, pu, nothing, nothing, CalibrationContext(; n = 1250)) ==
+                  rule(:r, pu, nothing, nothing, ctx)
+        end
+        # Each of the three robust measures states the count of its rows, on every radius
+        # slot, and the drawdown measure states it beside its drawdown marker.
+        drc = DistributionallyRobustConditionalValueatRisk(; r = ConcentrationRadius())
+        @test PO.resolve_deferred_quantities(drc, pc).r ==
+              ConcentrationRadius()(:r, pc, nothing, nothing, n250)
+        drr = DistributionallyRobustConditionalValueatRiskRange(;
+                                                                r_a = DimensionalRateRadius(),
+                                                                r_b = DimensionalRateRadius())
+        rr = PO.resolve_deferred_quantities(drr, pc)
+        @test rr.r_a == rr.r_b == DimensionalRateRadius()(:r_a, pc, nothing, nothing, n250)
+        dcd = DistributionallyRobustConditionalDrawdownatRisk(; r = DualNormRadius())
+        @test PO.resolve_deferred_quantities(dcd, pc).r ==
+              DualNormRadius()(:r, pc, nothing, nothing,
+                               CalibrationContext(; series = AbsoluteDrawdownSeries(),
+                                                  n = 250))
+        # The weights of the measure weight the empirical measure of its rows, so the count
+        # is Kish's count of them.
+        drw = DistributionallyRobustConditionalValueatRisk(; r = ConcentrationRadius(),
+                                                           w = wc)
+        @test PO.resolve_deferred_quantities(drw, pc).r ==
+              ConcentrationRadius()(:r, pc, wc, nothing, CalibrationContext(; n = kc))
+        # `RateRadius` is a rate of the same concentration, so it reads the same count
+        # (#1908). The capped prior and the uncapped prior over the same 250 rows centre one
+        # ball, so they give one radius.
+        pl = prior(EmpiricalPrior(), X1015[1001:end, :])
+        drr1 = DistributionallyRobustConditionalValueatRisk(; r = RateRadius())
+        @test PO.resolve_deferred_quantities(drr1, pc).r ==
+              PO.resolve_deferred_quantities(drr1, pl).r ==
+              inv(sqrt(250))
+        drwr = DistributionallyRobustConditionalValueatRisk(; r = RateRadius(), w = wc)
+        @test PO.resolve_deferred_quantities(drwr, pc).r == inv(sqrt(kc))
+        # The `JuMPOptimiser` sites of `l1` and `linf` hand over the default context, so
+        # their radius prices the count in `eoc`, and the capped prior gives the radius of the
+        # uncapped one.
+        for key in (:l1, :linf)
+            @test PO.resolve_calibration_slot(DualNormRadius(), key, pc, pc.w) ≈
+                  PO.resolve_calibration_slot(DualNormRadius(), key, pu, pu.w)
+            @test PO.resolve_calibration_slot(RateRadius(), key, pc, pc.w) ==
+                  PO.resolve_calibration_slot(RateRadius(), key, pu, pu.w) ==
+                  inv(sqrt(1250))
+        end
     end
 end
 
@@ -2673,7 +2799,7 @@ end
     @test isa(probe_tail_weight, PO.Num_AmbTwtCal)
     @test !isa(rrule, PO.Num_AmbTwtCal)
     @test !isa(TailTermParity(), PO.Num_AmbRadCal)
-    @test !isa(ScenarioCount(; n = 25), PO.Num_AmbRadCal)
+    @test !isa(CountOf(25), PO.Num_AmbRadCal)
     @test !isa(rrule, PO.Num_SigCal)
     @test !isa(rrule, PO.Num_DefCal)
 
@@ -2756,10 +2882,13 @@ end
     @test RateRadius().c == 1
     @test RateRadius()(:r, PR60_H, nothing, nothing, CalibrationContext()) ≈ inv(sqrt(60))
 
-    # The rule reads the raw row count, so stated weights change nothing. That is the one
-    # place it parts company with `ConcentrationRadius`.
-    @test alg(:r, PR60_H, WTS, nothing, CalibrationContext()) ==
-          alg(:r, PR60_H, nothing, nothing, CalibrationContext())
+    # The rule reads the count of `ConcentrationRadius` (#1908): Kish's count of stated
+    # weights, and the count that the site states in `n` before either.
+    kish = sum(WTS)^2 / sum(abs2, WTS)
+    @test kish < 60
+    @test alg(:r, PR60_H, WTS, nothing, CalibrationContext()) == 0.2 / sqrt(kish)
+    @test alg(:r, PR60_H, WTS, nothing, CalibrationContext(; n = 25)) == 0.2 / sqrt(25)
+    @test alg(:r, PR60_H, nothing, nothing, CalibrationContext(; n = 25)) == 0.2 / sqrt(25)
 
     # The key and the solver never select the value.
     @test alg(:r_b, PR60_H, nothing, Solver(; solver = nothing), CalibrationContext()) ==
@@ -2819,7 +2948,7 @@ end
           alg(:val, PR60_2, nothing, nothing, CalibrationContext())
 
     # Stated weights move `T` to Kish's effective sample size, on the same terms as
-    # `ConcentrationRadius` and unlike `RateRadius`. This rule is a concentration
+    # `ConcentrationRadius` and `RateRadius`. This rule is a concentration
     # statement, so it prices the record that Kish's count measures.
     kish = sum(WTS)^2 / sum(abs2, WTS)
     @test kish < 60
@@ -2896,7 +3025,7 @@ end
               CalibrationContext(; alpha = 0.05)) == l
 
     # Both scales are sample statistics rather than counts, so stated weights move them.
-    # That is where the rule parts company with `RateRadius`, which reads a raw row count.
+    # That is where the rule parts company with `RateRadius`, which reads only a count.
     mw = -sum(j -> dot(view(XDAY, :, j), WDAY), axes(XDAY, 2)) / (4 * sum(WDAY))
     cw = mean(j -> ConditionalValueatRisk(; alpha = 0.05, w = WDAY)(view(XDAY, :, j)),
               axes(XDAY, 2))
@@ -3151,9 +3280,7 @@ end
     @test_throws TypeError DistributionallyRobustConditionalDrawdownatRisk(; l = rrole)
 
     # A significance rule is refused too: it belongs to neither family.
-    @test_throws TypeError DistributionallyRobustConditionalValueatRisk(;
-                                                                        r = ScenarioCount(;
-                                                                                          n = 3))
+    @test_throws TypeError DistributionallyRobustConditionalValueatRisk(; r = CountOf(3))
 
     # --- the value-level entry point refuses a rule ------------------------------------
     # `expected_risk` given a bare returns matrix has no prior result to resolve against,
@@ -3260,13 +3387,12 @@ end
     # Assembly resolves all four against the optimisation's own prior result, so the
     # coefficient the model carries is the calibrated number and not the rule.
     mr = MeanRisk(; r = Variance(), opt = opt)
-    attrs = PO.processed_jump_optimiser_attributes(mr.opt, rd)
+    attrs = PO.resolve_jump_optimiser(mr.opt, rd)
     model = JuMP.Model()
     PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
     PO.set_model_observations!(model, size(attrs.pr.X, 1))
     PO.set_maximum_ratio_factor_variables!(model, mr.obj)
     PO.set_w!(model, attrs.pr.X, mr.wi)
-    PO.set_weight_constraints!(model, attrs.wb, mr.opt)
     PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj)
     @test JuMP.coefficient(model[:l1], model[:t_l1]) ≈ r_num
     @test JuMP.coefficient(model[:linf], model[:t_linf]) ≈ r_num
@@ -3275,13 +3401,12 @@ end
     # caller who names one.
     optn = JuMPOptimiser(; slv = slv, pe = PR60_H, l1 = r_num)
     mrn = MeanRisk(; r = Variance(), opt = optn)
-    attrsn = PO.processed_jump_optimiser_attributes(mrn.opt, rd)
+    attrsn = PO.resolve_jump_optimiser(mrn.opt, rd)
     modeln = JuMP.Model()
     PO.set_model_scales!(modeln, mrn.opt.sc, mrn.opt.so)
     PO.set_model_observations!(modeln, size(attrsn.pr.X, 1))
     PO.set_maximum_ratio_factor_variables!(modeln, mrn.obj)
     PO.set_w!(modeln, attrsn.pr.X, mrn.wi)
-    PO.set_weight_constraints!(modeln, attrsn.wb, mrn.opt)
     PO.assemble_jump_model!(modeln, mrn, mrn.opt, attrsn, rd, mrn.r, mrn.obj)
     @test JuMP.coefficient(modeln[:l1], modeln[:t_l1]) ≈ r_num
 
@@ -3569,13 +3694,12 @@ end
     # One rule, stated on both coefficients of one optimiser.
     opt = JuMPOptimiser(; slv = slv, pe = PR60_H, l1 = rule, linf = rule)
     mr = MeanRisk(; r = Variance(), opt = opt)
-    attrs = PO.processed_jump_optimiser_attributes(mr.opt, rd)
+    attrs = PO.resolve_jump_optimiser(mr.opt, rd)
     model = JuMP.Model()
     PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
     PO.set_model_observations!(model, size(attrs.pr.X, 1))
     PO.set_maximum_ratio_factor_variables!(model, mr.obj)
     PO.set_w!(model, attrs.pr.X, mr.wi)
-    PO.set_weight_constraints!(model, attrs.wb, mr.opt)
     PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj)
 
     c_l1 = JuMP.coefficient(model[:l1], model[:t_l1])
@@ -3939,8 +4063,8 @@ struct CalibrationNoWeights <: PortfolioOptimisers.DynamicAbstractWeights end
     @test ConcentrationRadius(; confidence = 0.95, scale = 0.5)(:r, PR60_H, WTS, nothing,
                                                                 CalibrationContext()) ≈
           0.5 * sqrt(q / kish)
-    @test ScenarioCount(; n = 6)(:alpha, PR60_H, WTS, nothing, CalibrationContext()) ≈
-          6 / kish
+    @test PO.resolve_calibration_slot(CountOf(6), :alpha, PR60_H, WTS, nothing,
+                                      CalibrationContext()) ≈ 6 / kish
     @test DimensionalRateRadius(; confidence = 0.95, scale = 0.5)(:r, PR60_H, WTS, nothing,
                                                                   CalibrationContext()) ≈
           0.5 * (log(inv(0.05)) / kish)^inv(4)
@@ -3954,8 +4078,8 @@ struct CalibrationNoWeights <: PortfolioOptimisers.DynamicAbstractWeights end
     dyn = CalibrationEWeights()
     dyn_kish = sum(WTS)^2 / sum(abs2, WTS)
     @test PO.effective_sample_size(PR60_H, dyn) ≈ dyn_kish
-    @test ScenarioCount(; n = 6)(:alpha, PR60_H, dyn, nothing, CalibrationContext()) ≈
-          6 / dyn_kish
+    @test PO.resolve_calibration_slot(CountOf(6), :alpha, PR60_H, dyn, nothing,
+                                      CalibrationContext()) ≈ 6 / dyn_kish
     @test ConcentrationRadius(; confidence = 0.95, scale = 0.5)(:r, PR60_H, dyn, nothing,
                                                                 CalibrationContext()) ≈
           0.5 * sqrt(q / dyn_kish)
@@ -3972,9 +4096,10 @@ struct CalibrationNoWeights <: PortfolioOptimisers.DynamicAbstractWeights end
     # the four copies raised a bare `MethodError` off `sum`.
     none = CalibrationNoWeights()
     @test_throws PO.ObservationWeightsError PO.effective_sample_size(PR60_H, none)
-    @test_throws PO.ObservationWeightsError ScenarioCount(; n = 6)(:alpha, PR60_H, none,
-                                                                   nothing,
-                                                                   CalibrationContext())
+    @test_throws PO.ObservationWeightsError PO.resolve_calibration_slot(CountOf(6), :alpha,
+                                                                        PR60_H, none,
+                                                                        nothing,
+                                                                        CalibrationContext())
     @test_throws PO.ObservationWeightsError ConcentrationRadius(; confidence = 0.95,
                                                                 scale = 0.5)(:r, PR60_H,
                                                                              none, nothing,
@@ -3989,7 +4114,8 @@ struct CalibrationNoWeights <: PortfolioOptimisers.DynamicAbstractWeights end
                                                                                 nothing,
                                                                                 CalibrationContext())
     err = try
-        ScenarioCount(; n = 6)(:alpha, PR60_H, none, nothing, CalibrationContext())
+        PO.resolve_calibration_slot(CountOf(6), :alpha, PR60_H, none, nothing,
+                                    CalibrationContext())
     catch e
         e
     end
@@ -4010,13 +4136,12 @@ the calibrated path alone: a stated number takes the fallback method and meets n
     rd = ReturnsResult(; nx = string.(1:4), X = X60_H)
     function assemble_with(opt)
         mr = MeanRisk(; r = Variance(), opt = opt)
-        attrs = PO.processed_jump_optimiser_attributes(mr.opt, rd)
+        attrs = PO.resolve_jump_optimiser(mr.opt, rd)
         model = JuMP.Model()
         PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
         PO.set_model_observations!(model, size(attrs.pr.X, 1))
         PO.set_maximum_ratio_factor_variables!(model, mr.obj)
         PO.set_w!(model, attrs.pr.X, mr.wi)
-        PO.set_weight_constraints!(model, attrs.wb, mr.opt)
         PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj)
         return model
     end
@@ -4138,7 +4263,7 @@ end
     # #641 withdrew the rule that used to place a rule in a ceiling slot, so nothing
     # stands between the caller and the rule.
     @test !isdefined(PortfolioOptimisers, :NormCeilingCalibration)
-    @test EffectiveAssetFloor <: PO.AbstractNormCeilingCalibrationAlgorithm
+    @test isa(FractionOf(0.5), PO.Num_NormCeilCal)
 
     # The abstract type is not exported: an export is public API, and the convention is
     # that an abstract type is not one. It is `public`, which `names` also lists, so the
@@ -4146,16 +4271,17 @@ end
     @test !Base.isexported(PortfolioOptimisers, :AbstractNormCeilingCalibrationAlgorithm)
 
     # The rule is exported, on the same terms as the radius family's.
-    @test :EffectiveAssetFloor ∈ names(PortfolioOptimisers)
+    @test :FractionOf ∈ names(PortfolioOptimisers) &&
+          !(:EffectiveAssetFloor ∈ names(PortfolioOptimisers))
 
     # A ceiling names no end of a distribution, so no ceiling slot defaults from another:
     # each of the three states its own occupant.
     slv = Solver(; name = :probe, solver = nothing)
-    @test isnothing(JuMPOptimiser(; slv = slv, l2c = EffectiveAssetFloor()).linfc)
+    @test isnothing(JuMPOptimiser(; slv = slv, l2c = FractionOf(0.5)).linfc)
 end
 
 @testset "Norm ceiling calibration: the bounds refuse the wrong family" begin
-    crule = EffectiveAssetFloor()
+    crule = FractionOf(0.5)
     rrule = RateRadius(; c = 0.2)
 
     # The slot bound pairs `Number` with ONE rule family and a plain function, so the
@@ -4181,67 +4307,93 @@ end
     @test_throws TypeError LpRegularisation(; val = probe_ceiling)
 end
 
-@testset "Norm ceiling calibration: EffectiveAssetFloor reads the universe" begin
-    # `fraction` is checked, and it is a fraction rather than a count.
-    @test EffectiveAssetFloor().fraction == 0.5
-    @test !hasfield(EffectiveAssetFloor, :p)
-    @test_throws DomainError EffectiveAssetFloor(; fraction = 0)
-    @test_throws DomainError EffectiveAssetFloor(; fraction = -0.1)
-    @test_throws DomainError EffectiveAssetFloor(; fraction = 1.5)
-    @test_throws DomainError EffectiveAssetFloor(; fraction = Inf)
-    @test EffectiveAssetFloor(; fraction = 1).fraction == 1
+@testset "Norm ceiling calibration: a `CountOf` or a `FractionOf` reads the universe" begin
+    # `val` is checked, and it is a fraction rather than a count.
+    @test FractionOf(0.5).val == 0.5
+    @test_throws DomainError FractionOf(0)
+    @test_throws DomainError FractionOf(-0.1)
+    @test_throws DomainError FractionOf(1.5)
+    @test_throws DomainError FractionOf(Inf)
+    @test FractionOf(1).val == 1
 
     # The ceiling guard names the quantity, the value and the range, rather than printing
     # the source expression it was written from.
     msg = try
-        EffectiveAssetFloor(; fraction = 1.5)
+        FractionOf(1.5)
         ""
     catch e
         sprint(showerror, e)
     end
-    @test occursin("EffectiveAssetFloor.fraction", msg)
+    @test occursin("FractionOf.val", msg)
     @test occursin("1.5", msg)
     @test occursin("(0, 1]", msg)
-    @test !occursin("one(fraction)", msg)
+    @test !occursin("one(val)", msg)
 
     # A norm order below 1 is not a norm order. The order lives in the context now, so
     # the rule that reads it is what refuses one.
-    @test_throws DomainError EffectiveAssetFloor(; fraction = 0.5)(:l2c, PR60_N, nothing,
-                                                                   nothing,
-                                                                   CalibrationContext(;
-                                                                                      p = 0.5))
-    @test EffectiveAssetFloor(; fraction = 0.5)(:lpc, PR60_N, nothing, nothing,
-                                                CalibrationContext(; p = 3)) ≈ 2^(1 / 3 - 1)
+    @test_throws DomainError PO.resolve_calibration_slot(FractionOf(0.5), :l2c, PR60_N,
+                                                         nothing, nothing,
+                                                         CalibrationContext(; p = 0.5))
+    @test PO.resolve_calibration_slot(FractionOf(0.5), :lpc, PR60_N, nothing, nothing,
+                                      CalibrationContext(; p = 3)) ≈ 2^(1 / 3 - 1)
 
     # The prior carries four assets, so half of the universe is two effective assets. The
     # ceiling is the order-`p` effective-asset reading the constraint's own docstring
     # states: `m^(1/p - 1)` for a finite order, and `1/m` for the infinite one.
-    f2 = EffectiveAssetFloor(; fraction = 0.5)
-    f3 = EffectiveAssetFloor(; fraction = 0.5)
-    fi = EffectiveAssetFloor(; fraction = 0.5)
-    @test f2(:l2c, PR60_N, PR60_N.w, nothing, CalibrationContext(; p = 2)) ≈ 2^(-1 / 2)
-    @test f3(:lpc, PR60_N, PR60_N.w, nothing, CalibrationContext(; p = 3)) ≈ 2^(1 / 3 - 1)
-    @test fi(:linfc, PR60_N, PR60_N.w, nothing, CalibrationContext(; p = Inf)) ≈ 1 / 2
+    f2 = FractionOf(0.5)
+    f3 = FractionOf(0.5)
+    fi = FractionOf(0.5)
+    @test PO.resolve_calibration_slot(f2, :l2c, PR60_N, PR60_N.w, nothing,
+                                      CalibrationContext(; p = 2)) ≈ 2^(-1 / 2)
+    @test PO.resolve_calibration_slot(f3, :lpc, PR60_N, PR60_N.w, nothing,
+                                      CalibrationContext(; p = 3)) ≈ 2^(1 / 3 - 1)
+    @test PO.resolve_calibration_slot(fi, :linfc, PR60_N, PR60_N.w, nothing,
+                                      CalibrationContext(; p = Inf)) ≈ 1 / 2
 
     # The whole universe is the whole universe, so an equally weighted portfolio is the
     # only point the 2-norm ceiling admits.
-    @test EffectiveAssetFloor(; fraction = 1)(:l2c, PR60_N, nothing, nothing,
-                                              CalibrationContext(; p = 2)) ≈ 1 / 2
+    @test PO.resolve_calibration_slot(FractionOf(1), :l2c, PR60_N, nothing, nothing,
+                                      CalibrationContext(; p = 2)) ≈ 1 / 2
 
     # The floor moves with the universe rather than with a count the caller pinned. That is
     # the whole reason a rule beats a number.
     pr2 = prior(EmpiricalPrior(), randn(RNG_N, 60, 9))
-    @test f2(:l2c, pr2, nothing, nothing, CalibrationContext(; p = 2)) ≈ (0.5 * 9)^(-1 / 2)
+    @test PO.resolve_calibration_slot(f2, :l2c, pr2, nothing, nothing,
+                                      CalibrationContext(; p = 2)) ≈ (0.5 * 9)^(-1 / 2)
 
     # A universe count is not a sample count, so the rule ignores the observation weights.
     wts = pweights(range(; start = 1, stop = 2, length = 60))
-    @test f2(:l2c, PR60_N, wts, nothing, CalibrationContext(; p = 2)) ==
-          f2(:l2c, PR60_N, nothing, nothing, CalibrationContext(; p = 2))
+    @test PO.resolve_calibration_slot(f2, :l2c, PR60_N, wts, nothing,
+                                      CalibrationContext(; p = 2)) ==
+          PO.resolve_calibration_slot(f2, :l2c, PR60_N, nothing, nothing,
+                                      CalibrationContext(; p = 2))
 
-    # The order belongs to the constraint. A rule resolved against a context that names
-    # no order says which field it wanted.
-    @test_throws ArgumentError EffectiveAssetFloor()(:l2c, PR60_N, nothing, nothing,
-                                                     CalibrationContext())
+    # Issue #2013: the order belongs to the constraint, and it also names the family of the
+    # pair. A context that names no order is a significance site, so the fraction there is
+    # the level itself, and a count is that many scenarios of the sample.
+    @test PO.resolve_calibration_slot(FractionOf(0.5), :l2c, PR60_N, nothing, nothing,
+                                      CalibrationContext()) == 0.5
+    @test PO.resolve_calibration_slot(CountOf(6), :alpha, PR60_N, nothing, nothing,
+                                      CalibrationContext()) == 6 / 60
+
+    # A count states the floor itself: two of the four assets is half the universe.
+    @test PO.resolve_calibration_slot(CountOf(2), :l2c, PR60_N, nothing, nothing,
+                                      CalibrationContext(; p = 2)) ≈ 2^(-1 / 2)
+    @test PO.resolve_calibration_slot(CountOf(4), :linfc, PR60_N, nothing, nothing,
+                                      CalibrationContext(; p = Inf)) ≈ 1 / 4
+    # A floor above the universe names a portfolio that no constraint admits.
+    err = try
+        PO.resolve_calibration_slot(CountOf(5), :l2c, PR60_N, nothing, nothing,
+                                    CalibrationContext(; p = 2))
+        nothing
+    catch e
+        e
+    end
+    @test isa(err, DomainError)
+    @test occursin("`l2c` keeps a floor of 5 effective assets", sprint(showerror, err))
+    @test_throws DomainError PO.resolve_calibration_slot(CountOf(2), :l2c, PR60_N, nothing,
+                                                         nothing,
+                                                         CalibrationContext(; p = 0.5))
 end
 
 #=
@@ -4272,8 +4424,9 @@ to the infinite arm.
     #    `m = 2` here and `pr9` below carries nine.
     pr9 = prior(EmpiricalPrior(), randn(RNG_N, 60, 9))
     for p in (1.5, 2.0, 3.0, Inf)
-        alg = EffectiveAssetFloor(; fraction = 1 / 3)
-        val = alg(:lpc, pr9, nothing, nothing, CalibrationContext(; p = p))
+        alg = FractionOf(1 / 3)
+        val = PO.resolve_calibration_slot(alg, :lpc, pr9, nothing, nothing,
+                                          CalibrationContext(; p = p))
         @test ena(fill(1 / 3, 3), p) ≈ 3
         @test LinearAlgebra.norm(fill(1 / 3, 3), p) ≈ val
         @test LinearAlgebra.norm(fill(1 / 2, 2), p) > val
@@ -4283,35 +4436,35 @@ to the infinite arm.
     # 3. The infinite arm is the LIMIT of the finite one rather than a second reading, so
     #    the ceiling moves towards `1/m` as the order grows instead of away from it.
     m = 2
-    fi = EffectiveAssetFloor(; fraction = 0.5)(:linfc, PR60_N, nothing, nothing,
-                                               CalibrationContext(; p = Inf))
+    fi = PO.resolve_calibration_slot(FractionOf(0.5), :linfc, PR60_N, nothing, nothing,
+                                     CalibrationContext(; p = Inf))
     @test fi ≈ inv(m)
     prev = Inf
     for p in (2.0, 5.0, 20.0, 100.0, 1000.0)
-        val = EffectiveAssetFloor(; fraction = 0.5)(:lpc, PR60_N, nothing, nothing,
-                                                    CalibrationContext(; p = p))
+        val = PO.resolve_calibration_slot(FractionOf(0.5), :lpc, PR60_N, nothing, nothing,
+                                          CalibrationContext(; p = p))
         @test val > fi
         @test val < prev
         prev = val
     end
-    far = EffectiveAssetFloor(; fraction = 0.5)(:lpc, PR60_N, nothing, nothing,
-                                                CalibrationContext(; p = 1e6))
+    far = PO.resolve_calibration_slot(FractionOf(0.5), :lpc, PR60_N, nothing, nothing,
+                                      CalibrationContext(; p = 1e6))
     @test isapprox(far, fi; rtol = 1e-5)
 
     # At `p = 2` the two readings are one number, which is why the defect survived the
     # first draft: every test of the family stood at that order.
-    @test EffectiveAssetFloor(; fraction = 0.5)(:l2c, PR60_N, nothing, nothing,
-                                                CalibrationContext(; p = 2)) ≈ 2^(-1 / 2)
+    @test PO.resolve_calibration_slot(FractionOf(0.5), :l2c, PR60_N, nothing, nothing,
+                                      CalibrationContext(; p = 2)) ≈ 2^(-1 / 2)
     @test 2^(1 / 2 - 1) ≈ 2^(-1 / 2)
 
     # A 1-norm ceiling is one, which is the budget itself: the 1-norm of a fully invested
     # long-only portfolio is one whatever it holds, so no floor on it binds.
-    @test EffectiveAssetFloor(; fraction = 0.5)(:lpc, PR60_N, nothing, nothing,
-                                                CalibrationContext(; p = 1)) ≈ 1
+    @test PO.resolve_calibration_slot(FractionOf(0.5), :lpc, PR60_N, nothing, nothing,
+                                      CalibrationContext(; p = 1)) ≈ 1
 end
 
 @testset "Norm ceiling calibration: the context carries the constraint's order" begin
-    crule = EffectiveAssetFloor(; fraction = 0.5)
+    crule = FractionOf(0.5)
     ctx3 = CalibrationContext(; p = 3)
 
     # A stated number ignores the context, and so does a caller's own plain function that
@@ -4322,15 +4475,16 @@ end
     # The order reaches the rule through the context, and the rule itself never moves:
     # the resolver calls it and hands the context on.
     @test PO.resolve_calibration_slot(crule, :lpc, PR60_N, nothing, nothing, ctx3) ≈
-          crule(:lpc, PR60_N, nothing, nothing, ctx3)
-    @test crule.fraction == 0.5
-    @test !hasfield(EffectiveAssetFloor, :p)
+          PO.resolve_calibration_slot(crule, :lpc, PR60_N, nothing, nothing, ctx3)
+    @test crule.val == 0.5
 
     # No rule carries an order of its own, so the site's order is the only one there is.
     # One rule therefore serves the three sites, and each reads it at its own order.
-    eaf = EffectiveAssetFloor(; fraction = 0.5)
-    @test eaf(:l2c, PR60_N, nothing, nothing, CalibrationContext(; p = 2)) !=
-          eaf(:linfc, PR60_N, nothing, nothing, CalibrationContext(; p = Inf))
+    eaf = FractionOf(0.5)
+    @test PO.resolve_calibration_slot(eaf, :l2c, PR60_N, nothing, nothing,
+                                      CalibrationContext(; p = 2)) !=
+          PO.resolve_calibration_slot(eaf, :linfc, PR60_N, nothing, nothing,
+                                      CalibrationContext(; p = Inf))
 
     # Resolving against the context is the whole of the channel, and the key and the order
     # both reach the rule.
@@ -4343,13 +4497,12 @@ end
 end
 
 @testset "Norm ceiling calibration: the LpRegularisation route settles the reading" begin
-    crule = EffectiveAssetFloor(; fraction = 0.5)
+    crule = FractionOf(0.5)
     rrule = RateRadius(; c = 0.2)
 
     # One term, one bound, two readings. The constructor admits both rules because it
     # cannot know which field the term is about to land in.
-    @test isa(LpRegularisation(; p = 3, val = crule).val,
-              PO.AbstractNormCeilingCalibrationAlgorithm)
+    @test LpRegularisation(; p = 3, val = crule).val === crule
     @test isa(LpRegularisation(; p = 3, val = rrule).val,
               PO.AbstractAmbiguityRadiusCalibrationAlgorithm)
 
@@ -4363,6 +4516,11 @@ end
                                                                                    val = crule))
     @test_throws ArgumentError PO.assert_penalty_coefficient_role([LpRegularisation(;
                                                                                     val = crule)])
+    # The family of ceiling rules has no member in the library since #2013 removed
+    # `EffectiveAssetFloor`, so a rule of a user is the one that reaches this refusal.
+    @test_throws ArgumentError PO.assert_penalty_coefficient_role(ProbeCeilingValue(0.5))
+    @test_throws ArgumentError PO.assert_penalty_coefficient_role(LpRegularisation(;
+                                                                                   val = ProbeCeilingValue(0.5)))
 
     # A radius has no reading as a ceiling, so the constraint route refuses it.
     @test isnothing(PO.assert_norm_ceiling_role(1e-3))
@@ -4395,7 +4553,7 @@ end
 end
 
 @testset "Norm ceiling calibration: JuMPOptimiser refuses the wrong rule per field" begin
-    crule = EffectiveAssetFloor()
+    crule = FractionOf(0.5)
     rrule = RateRadius(; c = 0.2)
 
     # `l2c` and `linfc` are bounded to the ceiling rule alone, so a radius is refused by the
@@ -4431,16 +4589,15 @@ end
 end
 
 @testset "Norm ceiling calibration: assembly reaches the stated number" begin
-    crule = EffectiveAssetFloor(; fraction = 0.5)
+    crule = FractionOf(0.5)
     function build(opt)
         mr = MeanRisk(; r = Variance(), opt = opt)
-        attrs = PO.processed_jump_optimiser_attributes(mr.opt, RD60)
+        attrs = PO.resolve_jump_optimiser(mr.opt, RD60)
         model = JuMP.Model()
         PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
         PO.set_model_observations!(model, size(attrs.pr.X, 1))
         PO.set_maximum_ratio_factor_variables!(model, mr.obj)
         PO.set_w!(model, attrs.pr.X, mr.wi)
-        PO.set_weight_constraints!(model, attrs.wb, mr.opt)
         PO.assemble_jump_model!(model, mr, mr.opt, attrs, RD60, mr.r, mr.obj)
         return model
     end
@@ -4483,7 +4640,7 @@ selection runs in `update_time_dependent_fields`, before any prior is fitted, an
 calibration resolution runs at assembly, against the prior of the period that was selected.
 =#
 @testset "Norm ceiling calibration: the schedule selects, then the rule runs" begin
-    crule = EffectiveAssetFloor(; fraction = 0.5)
+    crule = FractionOf(0.5)
     td = TimeDependent([crule, 0.6]; default = 0.6)
     @test isa(td, PO.TD_Option{<:PO.Num_NormCeilCal})
 
@@ -4522,7 +4679,7 @@ the exception on that one slot: a second slot of the same shape would be a secon
 and ADR 0095 grants none.
 =#
 @testset "Sweep #618: the two role guards on LpRegularisation" begin
-    crule = EffectiveAssetFloor(; fraction = 0.5)
+    crule = FractionOf(0.5)
     rrule = RateRadius(; c = 0.2)
     root = pkgdir(PortfolioOptimisers)
     srcfiles = String[]
@@ -4570,25 +4727,24 @@ and ADR 0095 grants none.
           [joinpath("src", "17_Optimisation", "05_JuMP", "02_JuMPConstraints",
                     "12_RegularisationConstraints.jl")]
 
-    # -- Both entry points, and no third path. Each builder is called from two sites, the
-    # optimiser's and the programme Allocation Set's (ADR 0159), and each site wraps the
-    # term in its own route's verb, so no term reaches a builder unchecked. The optimiser
-    # wraps at the call. The set wraps in `resolve_allocation_set_rows`, which binds the
-    # wrapped term to the name its call passes; its `::Nothing` arm runs when no slot reads
-    # the head's rows, so the term it passes is already a value. A definition line and a
-    # docstring signature both carry `::`, so the filter keeps the calls alone.
+    # -- One resolution site, and no second path. Each builder is called from one site, the
+    # block builder `set_block_constraints!`, which the optimiser and the programme
+    # Allocation Set both call (#2044). It reads the term of the Resolved Constraint Block,
+    # and stage 2 of the block, `resolve_constraint_block`, is the one site that wraps the
+    # term in its route's verb (#2042). So no term reaches a builder unchecked. The `::Nothing` arm of stage 2 runs when no slot reads the rows, so the term
+    # it keeps is already a value. A definition line and a docstring signature both carry
+    # `::`, so the filter keeps the calls alone.
     calls(tok) = [strip(l) for f in srcfiles
                   for l in eachline(f) if occursin(tok, l) && !occursin("::", l)]
     lp_calls = calls("set_lp_regularisation!(model")
     lpc_calls = calls("set_weight_norm_p_constraints!(model")
-    @test length(lp_calls) == 2
-    @test length(lpc_calls) == 2
-    @test count(l -> occursin("factory(opt.lp,", l), lp_calls) == 1
-    @test count(l -> occursin("norm_ceiling_factory(opt.lpc,", l), lpc_calls) == 1
-    @test count(==("set_lp_regularisation!(model, lp)"), lp_calls) == 1
-    @test count(==("set_weight_norm_p_constraints!(model, lpc)"), lpc_calls) == 1
-    @test length(calls("lp = factory(set.lp,")) == 1
-    @test length(calls("lpc = norm_ceiling_factory(set.lpc,")) == 1
+    @test length(lp_calls) == 1
+    @test length(lpc_calls) == 1
+    @test all(l -> occursin("cbr.lp", l), lp_calls)
+    @test all(l -> occursin("cbr.lpc", l), lpc_calls)
+    @test length(calls("lp = factory(cbe.lp,")) == 1
+    @test length(calls("lpc = norm_ceiling_factory(cbe.lpc,")) == 1
+    @test isempty(calls("factory(opt.lp")) && isempty(calls("factory(set.lp"))
 
     # -- The `TimeDependent` case. The constructor calls the two guards with no wrapper
     # check, because a schedule is not a term and meets the permissive fallback. It is the
@@ -4722,13 +4878,12 @@ path alone: a stated ceiling takes the fallback method and meets no check.
 @testset "Norm ceiling calibration: a calibrated ceiling meets the stated ceiling's check" begin
     function assemble_with(opt)
         mr = MeanRisk(; r = Variance(), opt = opt)
-        attrs = PO.processed_jump_optimiser_attributes(mr.opt, RD60)
+        attrs = PO.resolve_jump_optimiser(mr.opt, RD60)
         model = JuMP.Model()
         PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
         PO.set_model_observations!(model, size(attrs.pr.X, 1))
         PO.set_maximum_ratio_factor_variables!(model, mr.obj)
         PO.set_w!(model, attrs.pr.X, mr.wi)
-        PO.set_weight_constraints!(model, attrs.wb, mr.opt)
         PO.assemble_jump_model!(model, mr, mr.opt, attrs, RD60, mr.r, mr.obj)
         return model
     end
@@ -4795,17 +4950,18 @@ end
 
 #=
 A **significance level** is the tail probability a risk measure prices, and a **deformation
-parameter** is the shape the relativistic family reads that tail under. Forty slots across
-twenty-seven types hold one or the other, and each of them takes a **Calibration Rule** in
-place of the number.
+parameter** is the shape the relativistic family reads that tail under. Thirty-six slots across
+twenty-five types hold one or the other, and each of them takes a **Calibration Rule** in
+place of the number. Issue #583 surveyed forty slots across twenty-seven types, and #1896
+removed the two fused OWA range builders with their four slots.
 
 `test_09f_calibration_slot.jl` covers the mechanism, `test_09f_calibration_slot.jl` covers
 the three rules, and `test_09f_calibration_slot.jl` covers the ambiguity families. This
-file covers the forty slots of issue #583 and the resolution written beside each of them.
+file covers the slots of issue #583 and the resolution written beside each of them.
 
-Three of the forty-three surveyed slots do NOT widen. `alpha_i` on `OrderedWeightsArrayTailGini`
-and on its Range twin, and `beta_i` on the Range twin, are the starting points of the inner
-tail-Gini integration. They are not quantities to estimate, so they keep `::Number`.
+One surveyed slot does NOT widen. `alpha_i` on `OrderedWeightsArrayTailGini` is the starting
+point of the inner tail-Gini integration. It is not a quantity to estimate, so it keeps
+`::Number`.
 
 The joint `0 < alpha_i < alpha < 1` bound is the whole of the ordering validation. Only
 `alpha` moves, so a rule that returns a value at or below the stated `alpha_i` is refused
@@ -4838,7 +4994,7 @@ end
 # One rule serves both ends of its family, because the slot is what names the end. The four
 # names below are therefore two rules under two spellings each, and each spelling names the
 # end the reader is looking at.
-sig_tail(n = 3) = ScenarioCount(; n = n)
+sig_tail(n = 3) = CountOf(n)
 const sig_head = sig_tail
 def_tail(t = -1.2) = EntropyBudget(; target = t)
 const def_head = def_tail
@@ -4887,10 +5043,6 @@ const CENSUS = [(; T = ValueatRisk, tail = (:alpha,), head = (), dtail = (), dhe
                  head = (), dtail = (), dhead = ()),
                 (; T = OrderedWeightsArrayTailGini, tail = (:alpha,), head = (), dtail = (),
                  dhead = ()),
-                (; T = OrderedWeightsArrayConditionalValueatRiskRange, tail = (:alpha,),
-                 head = (:beta,), dtail = (), dhead = ()),
-                (; T = OrderedWeightsArrayTailGiniRange, tail = (:alpha,), head = (:beta,),
-                 dtail = (), dhead = ()),
                 (; T = PowerNormValueatRisk, tail = (:alpha,), head = (), dtail = (),
                  dhead = ()),
                 (; T = PowerNormValueatRiskRange, tail = (:alpha,), head = (:beta,),
@@ -4915,17 +5067,18 @@ const ORDERED = [ValueatRisk, ValueatRiskRange,
 
 kw(slot, val) = NamedTuple{(slot,)}((val,))
 
-@testset "Significance calibration: the census is twenty-seven types and forty slots" begin
-    # The counts #352 surveyed, re-derived from the rows above rather than restated.
-    @test length(CENSUS) == 27
-    @test sum(row -> length(row.tail), CENSUS) == 27
-    @test sum(row -> length(row.head), CENSUS) == 8
+@testset "Significance calibration: the census is twenty-five types and thirty-six slots" begin
+    # The counts #352 surveyed, re-derived from the rows above rather than restated. #1896
+    # removed the two fused OWA range builders, a tail and a head slot each.
+    @test length(CENSUS) == 25
+    @test sum(row -> length(row.tail), CENSUS) == 25
+    @test sum(row -> length(row.head), CENSUS) == 6
     @test sum(row -> length(row.dtail), CENSUS) == 4
     @test sum(row -> length(row.dhead), CENSUS) == 1
     @test sum(row -> length(row.tail) +
                      length(row.head) +
                      length(row.dtail) +
-                     length(row.dhead), CENSUS) == 40
+                     length(row.dhead), CENSUS) == 36
 
     for row in CENSUS
         slots = (row.tail..., row.head..., row.dtail..., row.dhead...)
@@ -4948,13 +5101,10 @@ kw(slot, val) = NamedTuple{(slot,)}((val,))
         @test own == (row.T in ORDERED)
     end
 
-    # The three inner starting points do NOT widen, so no rule may stand in them.
+    # The inner starting point does NOT widen, so no rule may stand in it.
     @test_throws TypeError OrderedWeightsArrayTailGini(; alpha_i = sig_tail())
-    @test_throws TypeError OrderedWeightsArrayTailGiniRange(; alpha_i = sig_tail())
-    @test_throws TypeError OrderedWeightsArrayTailGiniRange(; beta_i = sig_head())
-    # They are not declared either, so nothing recurses into them.
+    # It is not declared either, so nothing recurses into it.
     @test PO.calibration_slots(OrderedWeightsArrayTailGini()) == (; alpha = 0.05)
-    @test keys(PO.calibration_slots(OrderedWeightsArrayTailGiniRange())) == (:alpha, :beta)
 end
 
 @testset "Significance calibration: each slot's bound refuses the other family" begin
@@ -4980,12 +5130,12 @@ end
 end
 
 @testset "Significance calibration: the resolution of every slot" begin
-    # `ScenarioCount(n = 4)` at `T = 120` gives `alpha = 1/30`, which is neither the library
+    # `CountOf(4)` at `T = 120` gives `alpha = 1/30`, which is neither the library
     # default nor the value the same rule gives at `T = 60`. So a number that matches it can
     # only have come from the rule and from this sample.
     want = 4 / 120
-    rules = (; tail = ScenarioCount(; n = 4), head = ScenarioCount(; n = 4),
-             dtail = def_tail(-1.6), dhead = def_head(-1.6))
+    rules = (; tail = CountOf(4), head = CountOf(4), dtail = def_tail(-1.6),
+             dhead = def_head(-1.6))
     for row in CENSUS
         pairs_ = ((:tail, row.tail), (:head, row.head), (:dtail, row.dtail),
                   (:dhead, row.dhead))
@@ -5049,7 +5199,7 @@ end
     # resolver of their own. A per-type resolver is more specific than the derived
     # recursion, so it must carry the child itself or the formulation stops resolving.
     ce = PortfolioOptimisersCovariance()
-    rule = ScenarioCount(; n = 4)
+    rule = CountOf(4)
     v = PO.resolve_deferred_quantities(ValueatRisk(; alpha = rule,
                                                    alg = DistributionValueatRisk(;
                                                                                  sigma = ce)),
@@ -5057,8 +5207,7 @@ end
     @test v.alpha ≈ 4 / 120
     @test v.alg.sigma ≈ PR120_S.sigma
 
-    vr = PO.resolve_deferred_quantities(ValueatRiskRange(; alpha = rule,
-                                                         beta = ScenarioCount(; n = 6),
+    vr = PO.resolve_deferred_quantities(ValueatRiskRange(; alpha = rule, beta = CountOf(6),
                                                          alg = DistributionValueatRisk(;
                                                                                        sigma = ce)),
                                         PR120_S)
@@ -5143,21 +5292,21 @@ end
 end
 
 @testset "Significance calibration: the ordered-weights builders and their containers" begin
-    rule = ScenarioCount(; n = 4)
+    rule = CountOf(4)
 
-    # `beta = alpha` is the default on the two Range types: a number crosses unchanged, and
-    # so does a rule, because the slot is what names the end.
-    cr = OrderedWeightsArrayConditionalValueatRiskRange(; alpha = rule)
-    @test cr.beta === rule
-    tg = OrderedWeightsArrayTailGiniRange(; alpha = rule)
-    @test tg.beta === rule
-    # `beta_i = alpha_i` is untouched, because neither side widens.
-    @test tg.beta_i == tg.alpha_i
-    # A stated number still defaults across, so no existing default moved.
-    @test OrderedWeightsArrayConditionalValueatRiskRange(; alpha = 0.07).beta == 0.07
-    # A caller who states `beta` gets their own occupant.
-    @test OrderedWeightsArrayConditionalValueatRiskRange(; alpha = rule, beta = 0.09).beta ==
-          0.09
+    # With no `w2`, the Range container mirrors `w1`: the gain tail is the reversal of the
+    # same builder, so a rule crosses unchanged, because the slot is what names the end.
+    cr = OrderedWeightsArrayRange(;
+                                  w1 = OrderedWeightsArrayConditionalValueatRisk(;
+                                                                                 alpha = rule))
+    @test cr.w2.inner === cr.w1
+    @test cr.w2.inner.alpha === rule
+    # A caller who states `w2` gets their own occupant.
+    own = OrderedWeightsArrayRange(; w1 = cr.w1,
+                                   w2 = reverse ∘
+                                        OrderedWeightsArrayConditionalValueatRisk(;
+                                                                                  alpha = 0.09))
+    @test own.w2.inner.alpha == 0.09
 
     # A builder carries no observation weights of its own, so the rule reads `pr.w`.
     b = PO.resolve_deferred_quantities(OrderedWeightsArrayConditionalValueatRisk(;
@@ -5181,11 +5330,10 @@ end
     vec = OrderedWeightsArray(; w = owa_gmd(120))
     @test PO.factory(vec, PR120_S) === vec
 
-    # The Range container wraps `w2` as `reverse ∘ w2`, so the builder a rule sits in is the
-    # composition's inner half. Without a method for the composition the gain-side rule
-    # would never resolve while the loss-side one did.
-    rg = OrderedWeightsArrayRange(; w1 = OrderedWeightsArrayTailGini(; alpha = rule),
-                                  w2 = OrderedWeightsArrayTailGini(; alpha = rule))
+    # The Range container stores a missing `w2` as `reverse ∘ w1`, so the builder a rule sits
+    # in is the composition's inner half. Without a method for the composition the gain-side
+    # rule would never resolve while the loss-side one did.
+    rg = OrderedWeightsArrayRange(; w1 = OrderedWeightsArrayTailGini(; alpha = rule))
     @test isa(rg.w2, ComposedFunction)
     @test PO.calibration_slots(rg) == (; w1 = rg.w1, w2 = rg.w2)
     @test PO.calibration_slots(rg.w2) == (; inner = rg.w2.inner)
@@ -5193,9 +5341,16 @@ end
     @test org.w1.alpha ≈ 4 / 120
     @test isa(org.w2, ComposedFunction)
     @test org.w2.inner.alpha ≈ 4 / 120
-    # `rev` is stored as a done flag, so the positional rebuild reverses nothing twice.
-    @test org.rev === true
+    # The stored `w2` is never `nothing`, so the positional rebuild reverses nothing twice.
+    @test !hasfield(typeof(org), :rev)
     @test org.w2(120) ≈ reverse(org.w1(120))
+    # A reversed builder that the caller states resolves the same way, on its own end only.
+    rg2 = OrderedWeightsArrayRange(; w1 = OrderedWeightsArrayTailGini(),
+                                   w2 = reverse ∘
+                                        OrderedWeightsArrayTailGini(; alpha = rule))
+    org2 = PO.factory(rg2, PR120_S)
+    @test org2.w1 === rg2.w1
+    @test org2.w2.inner.alpha ≈ 4 / 120
 
     # The resolved container evaluates, and it reports the number a caller who states the
     # calibrated `alpha` themselves gets.
@@ -5221,12 +5376,13 @@ end
     # An `alpha_i` outside the unit interval is still refused at construction, so the rule
     # branch checks the inner bound on its own rather than skipping it.
     @test_throws DomainError OrderedWeightsArrayTailGini(; alpha_i = 1.5, alpha = rule)
-    @test_throws DomainError OrderedWeightsArrayTailGiniRange(; beta_i = 1.5, alpha = rule)
 
-    # The Range twin refuses on whichever end breaks the pair.
-    lateb = OrderedWeightsArrayTailGiniRange(; alpha_i = 1e-4, alpha = rule, beta_i = 0.04,
-                                             beta = sig_head(3))
-    @test PO.resolve_deferred_quantities(lateb, PR60_S).beta ≈ 0.05
+    # A Range container refuses on whichever end breaks the pair.
+    lateb = OrderedWeightsArrayRange(; w1 = OrderedWeightsArrayTailGini(; alpha = rule),
+                                     w2 = reverse ∘
+                                          OrderedWeightsArrayTailGini(; alpha_i = 0.04,
+                                                                      alpha = sig_head(3)))
+    @test PO.resolve_deferred_quantities(lateb, PR60_S).w2.inner.alpha ≈ 0.05
     @test_throws DomainError PO.resolve_deferred_quantities(lateb, PR120_S)
 
     # A stated pair keeps the check it always had.
@@ -5245,7 +5401,7 @@ end
     end
     @test isa(err, ArgumentError)
     @test occursin("ConditionalValueatRisk.alpha", err.msg)
-    @test occursin("ScenarioCount", err.msg)
+    @test occursin("CountOf", err.msg)
     @test occursin("factory", err.msg)
 
     # The refusal recurses into a container's children, so a rule inside a weight builder is
@@ -5319,14 +5475,14 @@ end
 
     # Each fold holds a plain number, not the rule, so the resolution really ran per fold.
     alphas = [p.res.r.alpha for p in res.pred]
-    Ts = [size(p.res.pa.pr.X, 1) for p in res.pred]
+    Ts = [size(p.res.jor.pr.X, 1) for p in res.pred]
     @test Ts == [60, 90]
     @test all(isa.(alphas, Number))
     @test alphas ≈ [3 / 60, 3 / 90]
     @test alphas[1] != alphas[2]
 
     # The count the tail holds is the count the rule states, at both fold lengths. That is
-    # the whole point of `ScenarioCount`: a stated probability would leave `3` scenarios in
+    # the whole point of a `CountOf` in the slot: a stated probability would leave `3` scenarios in
     # the first fold and `4.5` in the second.
     @test [ceil(Int, a * T) for (a, T) in zip(alphas, Ts)] == [3, 3]
     @test ceil(Int, 0.05 * Ts[2]) != 3
@@ -5343,21 +5499,41 @@ end
 
 @testset "Significance calibration: the rebuild keeps every field the rule did not move" begin
     # The rebuild is derived from the type, so a field the resolution never names survives
-    # it. The two Range builders carry four such fields between them, and each was retyped
-    # by hand at the rebuild before the channel went through `rebuild_with_slots`.
+    # it. Each tail-Gini builder carries two such fields, and the Range container carries its
+    # settings and its formulation beside the two builders.
     rule = sig_tail(3)
-    tg = OrderedWeightsArrayTailGiniRange(; alpha_i = 1e-4, alpha = rule, beta_i = 2e-4,
-                                          beta = sig_head(3), a_sim = 77, b_sim = 88)
+    st = RiskMeasureSettings(; scale = 2.0)
+    tg = OrderedWeightsArrayRange(; settings = st,
+                                  w1 = OrderedWeightsArrayTailGini(; alpha_i = 1e-4,
+                                                                   alpha = rule,
+                                                                   a_sim = 77),
+                                  w2 = reverse ∘
+                                       OrderedWeightsArrayTailGini(; alpha_i = 2e-4,
+                                                                   alpha = sig_head(3),
+                                                                   a_sim = 88),
+                                  alg = ExactOrderedWeightsArray())
     out = PO.resolve_deferred_quantities(tg, PR60_S)
-    @test out.alpha ≈ 0.05
-    @test out.beta ≈ 0.05
-    @test out.alpha_i === tg.alpha_i
-    @test out.beta_i === tg.beta_i
-    @test out.a_sim === tg.a_sim
-    @test out.b_sim === tg.b_sim
+    @test out.w1.alpha ≈ 0.05
+    @test out.w2.inner.alpha ≈ 0.05
+    @test out.w1.alpha_i === tg.w1.alpha_i
+    @test out.w2.inner.alpha_i === tg.w2.inner.alpha_i
+    @test out.w1.a_sim === tg.w1.a_sim
+    @test out.w2.inner.a_sim === tg.w2.inner.a_sim
+    @test out.settings === tg.settings
+    @test out.alg === tg.alg
 
     # A measure whose slots all resolved to themselves is the object the caller passed in,
     # so the common case allocates nothing.
-    stated = OrderedWeightsArrayTailGiniRange(; alpha = 0.05, beta = 0.05)
+    stated = OrderedWeightsArrayRange(; w1 = OrderedWeightsArrayTailGini(; alpha = 0.05))
     @test PO.resolve_deferred_quantities(stated, PR60_S) === stated
+end
+
+@testset "A regularisation term resolves no calibration slot of its own (#1912)" begin
+    PO = PortfolioOptimisers
+    rdr = ReturnsResult(; nx = ["a", "b"], X = [0.1 -0.2; -0.1 0.2; 0.05 0.1; 0.02 0.0])
+    prr = prior(EmpiricalPrior(), rdr)
+    for reg in (L2Regularisation(; val = 0.1), LpRegularisation(; p = 3, val = 0.1))
+        @test PO.resolve_calibration_slots(reg, prr) == (;)
+        @test PO.resolve_calibration_slots(reg, prr, nothing) == (;)
+    end
 end

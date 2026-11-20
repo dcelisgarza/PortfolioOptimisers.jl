@@ -39,8 +39,8 @@ function forecast_history_block(csfm::CrossSectionalFactorModel,
     vs = csfm.vs
     rw = csfm.rw
     bw = csfm.bw
-    Mb = isnothing(Ms) ? nothing : Ms[1:tb, :, :]
-    return CrossSectionalFactorModel(; M = isnothing(Mb) ? csfm.M : Mb[end, :, :],
+    Mb = isnothing(Ms) ? nothing : Ms[:, :, 1:tb]
+    return CrossSectionalFactorModel(; M = isnothing(Mb) ? csfm.M : Mb[:, :, end],
                                      b = csfm.b,
                                      csr = if isnothing(csr)
                                          nothing
@@ -48,6 +48,8 @@ function forecast_history_block(csfm::CrossSectionalFactorModel,
                                          CrossSectionalRegression(; f = csr.f[1:tb, :],
                                                                   eps = csr.eps[1:tb, :],
                                                                   n = csr.n[1:tb],
+                                                                  edof = nothing_scalar_array_getindex(csr.edof,
+                                                                                                       1:tb),
                                                                   b = if isnothing(csr.b)
                                                                       nothing
                                                                   else

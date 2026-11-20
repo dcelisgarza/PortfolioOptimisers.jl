@@ -44,16 +44,14 @@ jobs:
     if: github.repository == 'dcelisgarza/PortfolioOptimisers.jl'
     runs-on: ubuntu-latest
     steps:
-      # The job measures `dev`, because `dev` is where the work lands and where the committed
-      # baseline is current. The workflow file itself must reach `main` for the schedule to fire at
-      # all, which is GitHub's rule and not a choice here.
+      # The job measures `main`, the default branch, because each feature lands there through its
+      # own pull request, and there the committed baseline is current (ADR 0240).
       #
       # `fetch-depth: 0` is REQUIRED, not a precaution. ADR 0078's refile clause reads a file's
       # baseline row at the last commit before an issue closed, and a shallow clone reaches no such
       # commit, so the job would silently never refile.
       - uses: actions/checkout@v7
         with:
-          ref: dev
           fetch-depth: 0
       - name: Read the Julia pin from the Manifest
         id: pin

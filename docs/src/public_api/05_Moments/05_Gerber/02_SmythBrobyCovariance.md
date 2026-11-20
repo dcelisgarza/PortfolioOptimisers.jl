@@ -1,10 +1,11 @@
 ```@meta
-Description = "Smyth-Broby Covariance, public API of PortfolioOptimisers.jl: SmythBroby0, SmythBroby1, SmythBroby2, SmythBrobyGerber0, SmythBrobyGerber1, …"
+Description = "Smyth-Broby Covariance, public API of PortfolioOptimisers.jl: BaseSmythBrobyCovariance, SmythBroby0, SmythBroby1, SmythBroby2, SmythBrobyGerber0, …"
 ```
 
 # Smyth-Broby Covariance
 
 ```@docs
+BaseSmythBrobyCovariance
 SmythBroby0
 SmythBroby1
 SmythBroby2

@@ -114,7 +114,7 @@ pretty_table(DataFrame(["Assets" => rd.nx, "Empirical" => pr_emp.mu, "Opinion A"
              title = "Expected returns of the empirical prior, each opinion and the pooled consensus")
 
 # The expected returns of the pooled consensus.
-using StatsPlots, GraphRecipes
+using StatsPlots
 plot_mu(pr_op, rd.nx)
 
 #=

@@ -79,20 +79,29 @@ assets is what keeps the JuMP families cheap.
         cvr = split(online_cv, rd_T)
         @test po.returns_result(o.opt).X == rows(rd_T, 1:last(cvr.train_idx[end])).X
         @test po.held_timestamps(o.opt) == ts[1:last(cvr.train_idx[end])]
+        # #1939: the Result does not carry the type of its estimator, so the Results of
+        # online runs over different optimisers, and of a batch run, have one type, and
+        # every verb on them compiles one time. `Resume` carries the type instead.
+        oh = cross_val_predict(hrp, rd_T, online_cv)
+        @test typeof(oh) === typeof(o) === typeof(b)
+        @test fieldtype(typeof(o), :opt) === Union{Nothing, po.AbstractEstimator}
+        @test Resume(o).opt === o.opt
+        @test isa(Resume(o), po.OptimiserResume)
+        @test isa(Resume(oh), po.OptimiserResume)
+        @test !isa(Resume(o), po.PipelineResume)
         # The loop returns the estimator beside the predictions, and `nothing` from the
         # batch arms.
         preds, est = po.fold_loop(mr, length(cvr.train_idx), FLoops.SequentialEx();
                                   rd = rd_T, train_idx = cvr.train_idx,
                                   test_idx = cvr.test_idx, cv = online_cv) do fold
-            return po.fit_and_predict(fold.est, fold.rd; test_idx = fold.test)
+            return po.fit_and_predict(fold.est, fold.rd, nothing, fold.test)
         end
         @test length(preds) == length(cvr.train_idx)
         @test isa(est, MeanRisk)
         preds, est = po.fold_loop(mr, length(cvr.train_idx), FLoops.SequentialEx();
                                   rd = rd_T, train_idx = cvr.train_idx,
                                   test_idx = cvr.test_idx, cv = batch_cv) do fold
-            return po.fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
-                                      test_idx = fold.test)
+            return po.fit_and_predict(fold.est, fold.rd, fold.train, fold.test)
         end
         @test isnothing(est)
     end
@@ -115,7 +124,7 @@ assets is what keeps the JuMP families cheap.
         # resumed fold's turnover target is the old run's last weights.
         old = cross_val_predict(tn, rd_T, online_cv)
         new = cross_val_predict(Resume(old), rd, online_cv)
-        @test new.pred[1].res.jr.pa.tn.w == old.pred[end].res.w
+        @test new.pred[1].res.jr.jor.tn.w == old.pred[end].res.w
         # And the resumed arm announces nothing: a `Resume` is declared by name.
         @test_logs cross_val_predict(Resume(old), rd, online_cv)
     end
@@ -154,7 +163,7 @@ assets is what keeps the JuMP families cheap.
         same_weights(vcat(old, new), one, tn)
         @test all(isapprox(a.hw.w, b.hw.w; atol = 1e-5)
                   for (a, b) in zip(vcat(old, new).pred, one.pred))
-        @test new.pred[1].res.jr.pa.tn.w == old.pred[end].hw.w
+        @test new.pred[1].res.jr.jor.tn.w == old.pred[end].hw.w
     end
 
     @testset "A Result is a value: resumed twice, and a resume resumed" begin
@@ -220,9 +229,9 @@ assets is what keeps the JuMP families cheap.
         mid_failed = MultiPeriodPredictionResult(; pred = [failed], id = nothing,
                                                  opt = mid.opt)
         alone = cross_val_predict(Resume(mid_failed), rd, online_cv)
-        @test alone.pred[1].res.jr.pa.tn.w == fill(inv(N), N)
+        @test alone.pred[1].res.jr.jor.tn.w == fill(inv(N), N)
         stacked = cross_val_predict(Resume(vcat(old, mid_failed)), rd, online_cv)
-        @test stacked.pred[1].res.jr.pa.tn.w == old.pred[end].res.w
+        @test stacked.pred[1].res.jr.jor.tn.w == old.pred[end].res.w
     end
 
     @testset "A deployment step in the value form leaves the Result resumable" begin
@@ -408,7 +417,7 @@ assets is what keeps the JuMP families cheap.
         # carrier under the fold route and under the refit route alike.
         P = 100 .* exp.(cumsum(X; dims = 1))
         pr = price_ingestion(PriceIngestion(), TimeSeries.TimeArray(ts, P, nx))
-        pr_T = po.pipeline_data_view(pr, 1:T0)
+        pr_T = po.port_opt_view(pr, 1:T0, :)
         ppipe = Pipeline(; steps = (PricesToReturns(), EmpiricalPrior(), mr))
         for est in (ppipe, po.Online(ppipe))
             old = cross_val_predict(est, pr_T, online_cv)

@@ -14,7 +14,7 @@ Two callers use it. [`Resume`](@ref) calls it once at entry, so the Result it ho
  2. Call `copy_states` on every estimator-valued field of `est` ([`estimator_fields`](@ref)), giving `repl`.
  3. Set `moved` when an entry of `repl` is not the object (`!==`) that `est` holds in that field.
  4. Return `est` when `cache` is `nothing` and `moved` is false.
- 5. Otherwise rebuild `est` through [`rebuild_estimator`](@ref) from `repl`, and from `cache` too when it is not `nothing`.
+ 5. Otherwise rebuild `est` through [`rebuild_struct`](@ref) from `repl`, and from `cache` too when it is not `nothing`.
 
 # Arguments
 
@@ -30,10 +30,10 @@ Two callers use it. [`Resume`](@ref) calls it once at entry, so the Result it ho
   - [`partial_fit`](@ref)
   - [`online_entry_state`](@ref)
   - [`estimator_fields`](@ref)
-  - [`rebuild_estimator`](@ref)
+  - [`rebuild_struct`](@ref)
   - [`AbstractPartialFitState`](@ref)
 """
-function copy_states(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
+function copy_states(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
     T = typeof(est)
     # The field tuple is read by index, which names nothing, so an estimator without a
     # `cache` field reads as one carrying nothing.
@@ -45,7 +45,7 @@ function copy_states(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstim
     if isnothing(cache) && !moved
         return est
     end
-    return rebuild_estimator(est, isnothing(cache) ? repl : merge(repl, (; cache = cache)))
+    return rebuild_struct(est, isnothing(cache) ? repl : merge(repl, (; cache = cache)))
 end
 function copy_states(td::TimeDependent)
     return td
@@ -91,22 +91,6 @@ function data_timestamps(pr::PricesResult)
     return TimeSeries.timestamp(pr.X)
 end
 """
-    context_timestamps(cache::ReturnsBufferState)
-    context_timestamps(::Nothing)
-
-Returns the timestamps that a Fold Context holds, or `nothing` before the first step.
-
-# Related
-
-  - [`held_timestamps`](@ref)
-"""
-function context_timestamps(cache::ReturnsBufferState)
-    return cache.ts
-end
-function context_timestamps(::Nothing)
-    return nothing
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Continues an online walk-forward from the folds that its Result holds, over a longer history.
@@ -148,6 +132,8 @@ $(DocStringExtensions.FIELDS)
     Resume(res::MultiPeriodPredictionResult)
     Resume(; res::MultiPeriodPredictionResult)
 
+`opt` is a derived field, so `Accessors.set` reads it again from the new `res`, and it refuses a patch of `opt`.
+
 ## Validation
 
   - `res.opt` is not `nothing`. An `ArgumentError` is thrown otherwise, because a batch run threads no estimator.
@@ -163,15 +149,19 @@ $(DocStringExtensions.FIELDS)
   - [`Online`](@ref)
   - [`TimeDependent`](@ref)
 """
-@concrete struct Resume
+@concrete struct Resume <: AbstractResult
     """
     The Result of the online run to continue, carrying the threaded estimator in `opt`.
     """
     res
+    """
+    The estimator that `res` carries in `opt`, the same object. The Result does not carry the type of its estimator in a type parameter, so `Resume` carries it here, and the methods for an optimiser and for a [`Pipeline`](@ref) dispatch on it.
+    """
+    opt
     function Resume(res::MultiPeriodPredictionResult)
         @argcheck(!isnothing(res.opt),
                   ArgumentError("`Resume` continues an online run, and this Result carries no estimator (`res.opt === nothing`), so it is a batch run and there is nothing to continue. Run the walk-forward as an Online Scheme (`OnlineIndexWalkForward`, `OnlineDateWalkForward` or `OnlineHindsightSplit`), and resume the Result it returns."))
-        return new{typeof(res)}(res)
+        return new{typeof(res), typeof(res.opt)}(res, res.opt)
     end
 end
 function Resume(::PopulationPredictionResult)
@@ -179,6 +169,10 @@ function Resume(::PopulationPredictionResult)
 end
 function Resume(; res::MultiPeriodPredictionResult)::Resume
     return Resume(res)
+end
+# The inner constructor reads `opt` from `res`, so a lens write leaves it out.
+@forward_properties Resume begin
+    derived(opt)
 end
 """
     is_time_dependent(r::Resume)
@@ -195,11 +189,11 @@ The fold loop reads the traits off the root that it is handed. The loop resolves
   - [`is_time_dependent`](@ref)
   - [`needs_previous_weights`](@ref)
 """
-is_time_dependent(r::Resume) = is_time_dependent(r.res.opt)
-needs_previous_weights(r::Resume) = needs_previous_weights(r.res.opt)
+is_time_dependent(r::Resume) = is_time_dependent(r.opt)
+needs_previous_weights(r::Resume) = needs_previous_weights(r.opt)
 function assert_time_dependent_fold_count(r::Resume, n::Integer,
                                           all_binds::Bool = true)::Nothing
-    return assert_time_dependent_fold_count(r.res.opt, n, all_binds)
+    return assert_time_dependent_fold_count(r.opt, n, all_binds)
 end
 """
     assert_resume_scheme(::Online{<:WalkForwardEstimator})
@@ -393,8 +387,8 @@ The loop takes this arm when the estimator slot holds a [`Resume`](@ref). The ar
 function online_folds(fit_fold, r::Resume, n::Integer, ::Type{ElT}, path_id = nothing; rd,
                       train_idx, test_idx, fold_view = nothing, pws = nothing) where {ElT}
     res = r.res
-    assert_online_fee_source(res.opt, pws)
-    n_old = resume_fold_count(res.opt, rd, train_idx)
+    assert_online_fee_source(r.opt, pws)
+    n_old = resume_fold_count(r.opt, rd, train_idx)
     assert_resume_folds(n_old, n)
     last_end = last(train_idx[n_old])
     assert_resume_full_fold(test_idx[n_old], res.pred[end], data_timestamps(rd))
@@ -403,17 +397,17 @@ function online_folds(fit_fold, r::Resume, n::Integer, ::Type{ElT}, path_id = no
         prev = advance_previous_fold(pws, prev, pred)
     end
     predictions = Vector{ElT}(undef, n - n_old)
-    est = thread_online_folds!(predictions, fit_fold, copy_states(res.opt), (n_old + 1):n,
+    est = thread_online_folds!(predictions, fit_fold, copy_states(r.opt), (n_old + 1):n,
                                prev; rd = rd, train_idx = train_idx, test_idx = test_idx,
                                n = n, last_end = last_end, pws = pws, path_id = path_id)
     return predictions, est
 end
 """
-    const OptimiserResume = Resume{<:MultiPeriodPredictionResult{<:Any, <:Any, <:Any, <:NonFiniteAllocationOptimisationEstimator}}
+    const OptimiserResume = Resume{<:Any, <:NonFiniteAllocationOptimisationEstimator}
 
 Groups the [`Resume`](@ref) declarations whose Result carries an optimiser, so that the methods that take an optimiser can take them.
 
-The methods of [`cross_val_predict`](@ref) and [`fit_and_predict`](@ref) that take an optimiser dispatch on this alias. A `Resume` whose Result carries a [`Pipeline`](@ref) takes the methods for a `Pipeline` instead, through [`PipelineResume`](@ref).
+The methods of [`cross_val_predict`](@ref) and [`fit_and_predict`](@ref) that take an optimiser dispatch on this alias. A `Resume` whose Result carries a [`Pipeline`](@ref) takes the methods for a `Pipeline` instead, through [`PipelineResume`](@ref). The second type parameter of `Resume` is the type of the estimator that the Result carries.
 
 # Related
 
@@ -421,11 +415,10 @@ The methods of [`cross_val_predict`](@ref) and [`fit_and_predict`](@ref) that ta
   - [`PipelineResume`](@ref)
   - [`cross_val_predict`](@ref)
 """
-const OptimiserResume = Resume{<:MultiPeriodPredictionResult{<:Any, <:Any, <:Any,
-                                                             <:NonFiniteAllocationOptimisationEstimator}}
+const OptimiserResume = Resume{<:Any, <:NonFiniteAllocationOptimisationEstimator}
 """
     cross_val_predict(r::OptimiserResume, rd::ReturnsResult, cv::CVER; cols = :, ex = FLoops.ThreadedEx())
-    fit_and_predict(r::OptimiserResume, rd::ReturnsResult, cv::CVER; cols = :, ex = FLoops.ThreadedEx(), id = nothing)
+    fit_and_predict(r::OptimiserResume, rd::ReturnsResult, cv::CVER, cv_res = split(cv, rd); cols = :, ex = FLoops.ThreadedEx(), id = nothing)
 
 Continues an online walk-forward from a Result, over the full history extended.
 
@@ -433,9 +426,9 @@ The methods that take an optimiser in the estimator slot take a [`Resume`](@ref)
 
 # Algorithm
 
- 1. For `cross_val_predict` only, run [`assert_internal_optimiser`](@ref) and [`assert_external_optimiser`](@ref) on `r.res.opt`, and view `rd` by `cols` when `cols` is not `:`.
+ 1. For `cross_val_predict` only, run [`assert_internal_optimiser`](@ref) and [`assert_external_optimiser`](@ref) on `r.opt`, and view `rd` by `cols` when `cols` is not `:`.
  2. Refuse a scheme that a `Resume` cannot re-enter, through [`assert_resume_scheme`](@ref).
- 3. Split `rd` by `cv`, giving `train_idx` and `test_idx`, and refuse shuffled folds through [`assert_unshuffled_folds`](@ref).
+ 3. Read `train_idx` and `test_idx` from the split of `rd` by `cv`, which `fit_and_predict` takes as `cv_res`, and refuse shuffled folds through [`assert_unshuffled_folds`](@ref).
  4. Read the evaluation settings of `cv` through [`fold_evaluation`](@ref), giving `wd`, `pws`, `fa`, `store_weight_path` and `strict`, and the drift of the held weights through [`held_weights_drift`](@ref), giving `hwd`.
  5. Run [`fold_loop`](@ref) on `r`, which takes the resumed arm of [`online_folds`](@ref). Each fold calls the one-fold `fit_and_predict` with its estimator, its test window, its previous weights and the settings of step 4, giving `predictions` and the threaded `est`.
  6. Return a [`MultiPeriodPredictionResult`](@ref) of `predictions`, with `id`, and with `est` as `opt`.
@@ -445,6 +438,7 @@ The methods that take an optimiser in the estimator slot take a [`Resume`](@ref)
   - `r`: The declaration, holding the Result to continue.
   - $(arg_dict[:rd])
   - `cv`: The scheme that the Result came from, an Online Scheme.
+  - $(arg_dict[:cv_res]) `cross_val_predict` takes no `cv_res`, because it views `rd` by `cols` before the split.
   - `cols`: The asset view. `cross_val_predict` views `rd` by it. `fit_and_predict` hands it to every fold, which views its estimator and its prediction by it.
   - `ex`: Not read, because the resumed arm runs the folds in order.
   - `id`: The identifier that the Result carries.
@@ -452,7 +446,7 @@ The methods that take an optimiser in the estimator slot take a [`Resume`](@ref)
 # Validation
 
   - Everything that [`assert_resume_scheme`](@ref) and the resumed arm of [`online_folds`](@ref) refuse.
-  - For `cross_val_predict`, everything that [`assert_internal_optimiser`](@ref) and [`assert_external_optimiser`](@ref) refuse on `r.res.opt`.
+  - For `cross_val_predict`, everything that [`assert_internal_optimiser`](@ref) and [`assert_external_optimiser`](@ref) refuse on `r.opt`.
 
 # Returns
 
@@ -467,27 +461,26 @@ The methods that take an optimiser in the estimator slot take a [`Resume`](@ref)
 """
 function cross_val_predict(r::OptimiserResume, rd::ReturnsResult, cv::CVER; cols = :,
                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
-    assert_internal_optimiser(r.res.opt)
-    assert_external_optimiser(r.res.opt)
+    assert_internal_optimiser(r.opt)
+    assert_external_optimiser(r.opt)
     if !isa(cols, Colon)
         rd = port_opt_view(rd, cols)
     end
     return fit_and_predict(r, rd, cv; ex = ex)
 end
-function fit_and_predict(r::OptimiserResume, rd::ReturnsResult, cv::CVER; cols = :,
+function fit_and_predict(r::OptimiserResume, rd::ReturnsResult, cv::CVER,
+                         cv_res::CrossValidationResult = split(cv, rd); cols = :,
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          id = nothing)
     assert_resume_scheme(cv)
-    cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
     (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)
     hwd = held_weights_drift(wd, pws)
     predictions, est = fold_loop(r, length(train_idx), ex; rd = rd, train_idx = train_idx,
                                  test_idx = test_idx, cv = cv, pws = pws) do fold
-        return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
-                               test_idx = fold.test, cols = cols, wd = wd, hwd = hwd,
-                               fa = fa, store_weight_path = store_weight_path,
+        return fit_and_predict(fold.est, fold.rd, fold.train, fold.test, cols; wd = wd,
+                               hwd = hwd, fa = fa, store_weight_path = store_weight_path,
                                strict = strict, w_prev = fold.w_prev)
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id, opt = est)

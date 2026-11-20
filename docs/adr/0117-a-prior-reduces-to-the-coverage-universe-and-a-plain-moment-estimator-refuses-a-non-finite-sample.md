@@ -518,3 +518,37 @@ The column decision counts a gap in the implied volatility or in the own column 
 benchmark as a missing observation of that asset. The row decision counts a gap in a one-column
 benchmark or in a factor as an observation that misses every asset. The default `row_thr = 1`
 drops no observation, so the default output does not change.
+
+## Amendment (2026-10-28, #1867)
+
+**`peel = nothing` skips the peel, and `NoPeel` is removed.** `NoPeel()` named no rule. It skipped
+the peel procedure, and ADR 0222 spells a skipped procedure as `nothing`. So the `peel` field of
+`CoveragePolicy` is bound to `Option{<:AbstractPeel}`, and `peel_assets(::Nothing, U)` returns no
+vertex. The `NaN` of an undetermined pair still reaches `matrix_processing_block!`, which refuses
+it with the same `IsNonFiniteError`. The default `MinimalPeel()` and the numbers do not move.
+Where the decision above names `NoPeel()`, read `peel = nothing`. The removal is a clean break with
+no deprecation, as ADR 0044 and ADR 0213 set.
+
+## Amendment (2026-11-20, #2224 and #2225)
+
+**A row of a variance series whose window covers no asset is `NaN`.** The decision above says that
+`variance_series` refits once per observation, "so every window meets the refusal on its own". The
+reduce-and-expand series never raised there: it skipped a window with no covered asset, so its row
+stayed `NaN`. The windowed series over an Asset Panel raised an `IsEmptyError` at the first such
+window, so the residual of `EWResidualVolatility`, which is `NaN` in its warm-up, emptied the whole
+series of a windowed plain estimator. Since `bf3cc1955d`, `panel_series_row` writes `NaN` in that
+row too, and the series goes on. One fit of a moment verb over a sample with no covered asset still
+raises the `IsEmptyError`, as above. Only a series, which fits many windows, writes the `NaN` row.
+
+**A composite gives its inner estimator the window of each row.** `PortfolioOptimisersCovariance`
+has panel methods of `var` and `std`, which take the diagonal of its panel `cov`, and a
+`variance_series` of its own. So its inner estimator chooses the route of each row, as the section
+"A composite forwards the panel" sets for `cov`: a mask-aware one reads the window, and a plain one
+reduces it to its Coverage Universe. Before, the composite took the root series, which reduced each
+window whatever the inner estimator was. When `series_folds` answers `true`, the series folds each
+observation one time, and it gives the values of a refit at each row.
+
+**`reads_active_mask` names a mask-aware estimator.** The section above says that a plain estimator
+needs no declaration, and that stays true. A wrapper must know whether the estimator that it holds
+reads the window itself, so each mask-aware family answers `true` to the public trait, and a user
+type that overrides the panel methods adds a method of it.

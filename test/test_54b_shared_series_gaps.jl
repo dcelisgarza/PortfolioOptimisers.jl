@@ -1,5 +1,5 @@
 using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, TimeSeries,
-      Clarabel
+      Clarabel, StatsBase
 
 # Gaps in the benchmark, the implied volatilities and the factor returns, issue #1672, under
 # ADR 0117 amended for #1672. The online step drops the same observations, issue #1675.
@@ -270,6 +270,47 @@ end
         @test PO.buffer_gap_marks(copy(s)) == PO.buffer_gap_marks(s)
         @test PO.buffer_gap_marks(PO.port_opt_view(s, [2])) == PO.buffer_gap_marks(s)
         @test_throws DimensionMismatch partial_fit!(s, [1.0 1]; gaps = [true, false])
+        # A block whose marks are all false records none in a buffer that holds none.
+        e = partial_fit!(PO.SampleBufferState(; max_history = 4), [1.0 2; 3 4])
+        e = partial_fit!(e, [5.0 6; 7 8]; gaps = [false, false])
+        @test isnothing(e.G) && e.n == 4
+        # A block longer than the cap keeps the marks of the rows it keeps.
+        cap = partial_fit!(PO.SampleBufferState(; max_history = 2), [1.0 2; 3 4; 5 6; 7 8];
+                           gaps = [true, false, true, false])
+        @test PO.buffer_gap_marks(cap) == [true, false]
+        @test PO.sample_buffer(cap) == [5.0 6; 7 8]
+        # A block with no marks, appended to a buffer that holds them, marks its rows as no gap.
+        s = partial_fit!(s, [11.0 12])
+        @test PO.buffer_gap_marks(s) == [false, true, false, false]
+        @test PO.sample_buffer(s) == [5.0 6; 7 8; 9 10; 11 12]
+    end
+
+    @testset "The member rows of a gapped block carry the active mask" begin
+        # The members of a carry fold the unmarked rows of the block and the same rows of the
+        # active mask, so a block with a gap equals the block without it.
+        n = 20
+        Xg = X0[1:n, :]
+        gp = falses(n)
+        gp[7] = true
+        rk = findall(!, gp)
+        Mg = trues(n, N)
+        Mg[3, 2] = false
+        Mg[7, 1] = false
+        Mg[12, 3] = false
+        a = prior(partial_fit!(EmpiricalPrior(), Xg; gaps = gp, active_mask = Mg))
+        b = prior(partial_fit!(EmpiricalPrior(), Xg[rk, :]; active_mask = Mg[rk, :]))
+        # The asset whose only hole sits on the dropped row stays in the Coverage Universe,
+        # and the two with a hole on a kept row leave it.
+        @test isequal(isnan.(a.mu), [false, true, true])
+        @test isapprox(a.mu, b.mu; nans = true)
+        @test isapprox(a.sigma, b.sigma; nans = true)
+        # With no mask the keyword is absent from what the members get, and the rows still go.
+        c = prior(partial_fit!(EmpiricalPrior(), Xg; gaps = gp))
+        d = prior(partial_fit!(EmpiricalPrior(), Xg[rk, :]))
+        @test c.mu ≈ d.mu
+        @test c.sigma ≈ d.sigma
+        # The mask is read: the same rows without it keep every asset.
+        @test all(isfinite, c.mu)
     end
 
     @testset "A fold of an empty block leaves a co-moment unchanged" begin
@@ -385,8 +426,21 @@ end
     @test all(isnan, p3.sigma[2, :])
     # A fit that does not read the surface keeps the asset.
     @test all(isfinite, Statistics.cov(Covariance(), X0, nothing; iv = ivg))
-    @test PO.reads_implied_volatility(pe)
-    @test !PO.reads_implied_volatility(EmpiricalPrior())
+    # The same holds for a prior over the plain default: its surface has a gap, and the
+    # asset stays, with the moments of the fit on the data without the surface.
+    rdg = ReturnsResult(; nx = nx, X = X0, iv = ivg, ivpa = [1.1, 1.2, 1.3])
+    p4 = prior(EmpiricalPrior(), rdg)
+    @test all(isfinite, p4.sigma)
+    @test p4.sigma ≈ prior(EmpiricalPrior(), ReturnsResult(; nx = nx, X = X0)).sigma
+    # The wrapped surface reads the gap in the surface through every wrapper above it.
+    ce2 = PortfolioOptimisersCovariance(; ce = ce)
+    p5 = prior(EmpiricalPrior(; ce = ce2), rdg)
+    @test all(isnan, p5.sigma[2, :])
+    @test p5.sigma[[1, 3], [1, 3]] ≈ p3.sigma[[1, 3], [1, 3]]
+    # No estimator of the library holds a pair, so no verb reaches the method for a pair
+    # (#1919). It reads the value the pair holds.
+    @test PO.reads_implied_volatility("iv" => ImpliedVolatility(; ppy = 252))
+    @test !PO.reads_implied_volatility("iv" => Covariance())
 end
 
 @testset "A collapse of the implied volatilities reads the finite active cells" begin
@@ -535,7 +589,7 @@ end
 
     @testset "A graph reader pairs iv by the marks" begin
         # The window is short enough that the regression of the 59 kept rows has more than
-        # two windows.
+        # four windows.
         ive = ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityRegression(; ws = 10))
         clp = ClustersEstimator(; ce = ive, x_src = PriorSource())
         ref = clusterise(clp, pr; iv = ivg[keep, :], ivpa = 1.1)
@@ -603,4 +657,330 @@ end
         @test ro.pr.ss_gaps == rb.pr.ss_gaps
         @test ro.pr.rr.idx == rb.pr.rr.idx == keep
     end
+end
+
+struct DynamicWeights1960 <: PO.DynamicAbstractWeights end
+
+@testset "Fixed observation weights lose the observations of a Shared Series gap (#1960)" begin
+    # Before #1960 the drop cut the returns data and left the weights of the estimators at
+    # the full length, so `StatsBase` raised a bare `DimensionMismatch`. The oracle is the
+    # same fit with the gapped observation removed by hand from the data and from the
+    # weights (ADR 0229).
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 settings = Dict("verbose" => false))
+    Bg = copy(Bv0)
+    Bg[gap] = NaN
+    Fg = copy(F0)
+    Fg[gap, 2] = NaN
+    rdB = ReturnsResult(; nx = nx, X = X0, nb = ["BM"], B = Bg)
+    rdBk = ReturnsResult(; nx = nx, X = X0[keep, :], nb = ["BM"], B = Bv0[keep])
+    rdF = ReturnsResult(; nx = nx, X = X0, nf = nf, F = Fg)
+    rdFk = ReturnsResult(; nx = nx, X = X0[keep, :], nf = nf, F = F0[keep, :])
+    w = aweights(rand(StableRNG(19600001), T) .+ 0.1)
+    cov_w(w) = PortfolioOptimisersCovariance(;
+                                             ce = Covariance(; w = w,
+                                                             me = SimpleExpectedReturns(;
+                                                                                        w = w)))
+    emp(w) = EmpiricalPrior(; ce = cov_w(w), me = SimpleExpectedReturns(; w = w))
+    emp_x(w) = EmpiricalPrior(; ce = cov_w(w), me = SimpleExpectedReturns(; w = w),
+                              x_src = ExcessSource())
+
+    @testset "A prior: $name" for (name, f, rd, rdk) in
+                                  (("EmpiricalPrior", emp_x, rdB, rdBk),
+                                   ("HighOrderPriorEstimator",
+                                    w -> HighOrderPriorEstimator(; pe = emp(w),
+                                                                 kte = Cokurtosis(; w = w),
+                                                                 ske = Coskewness(; w = w),
+                                                                 x_src = ExcessSource()),
+                                    rdB, rdBk),
+                                   ("EntropyPoolingPrior",
+                                    w -> EntropyPoolingPrior(; pe = emp(w), w = w,
+                                                             x_src = ExcessSource()), rdB,
+                                    rdBk),
+                                   ("FactorPrior",
+                                    w -> FactorPrior(; pe = emp(w),
+                                                     ve = SimpleVariance(; w = w),
+                                                     re = StepwiseRegression(;
+                                                                             tgt = PO.LinearModel(;
+                                                                                                  kwargs = (;
+                                                                                                            weights = w)))),
+                                    rdF, rdFk))
+        p1 = prior(f(w), rd)
+        p2 = prior(f(w[keep]), rdk)
+        @test p1.mu ≈ p2.mu
+        @test p1.sigma ≈ p2.sigma
+    end
+
+    @testset "A regression and an uncertainty set" begin
+        re(w) = StepwiseRegression(; tgt = PO.LinearModel(; kwargs = (; weights = w)))
+        @test regression(re(w), rdF).L ≈ regression(re(w[keep]), rdFk).L
+        uc(w) = NormalUncertaintySet(; pe = emp_x(w), seed = 1)
+        @test mu_ucs(uc(w), rdB).ub ≈ mu_ucs(uc(w[keep]), rdBk).ub
+        @test sigma_ucs(uc(w), rdB).ub ≈ sigma_ucs(uc(w[keep]), rdBk).ub
+        @test ucs(uc(w), rdB)[2].lb ≈ ucs(uc(w[keep]), rdBk)[2].lb
+    end
+
+    @testset "An optimiser: $name" for (name, f) in (("MeanRisk",
+                                                      w -> MeanRisk(;
+                                                                    r = ConditionalValueatRisk(; w = w),
+                                                                    opt = JuMPOptimiser(; pe = emp_x(w),
+                                                                                        slv = slv,
+                                                                                        ret = LogarithmicReturn(;
+                                                                                                                w = w)))),
+                                                     ("MeanRisk LowOrderMoment",
+                                                      w -> MeanRisk(; r = LowOrderMoment(; w = w),
+                                                                    opt = JuMPOptimiser(; pe = emp_x(w),
+                                                                                        slv = slv))),
+                                                     ("HierarchicalRiskParity",
+                                                      w -> HierarchicalRiskParity(;
+                                                                                  r = ConditionalValueatRisk(;
+                                                                                                             w = w),
+                                                                                  opt = HierarchicalOptimiser(;
+                                                                                                              pe = emp_x(w),
+                                                                                                              cle = ClustersEstimator(;
+                                                                                                                                      ce = cov_w(w),
+                                                                                                                                      x_src = ExcessSource())))),
+                                                     ("InverseVolatility",
+                                                      w -> InverseVolatility(; pe = emp_x(w))))
+        o1 = optimise(f(w), rdB)
+        o2 = optimise(f(w[keep]), rdBk)
+        @test isapprox(o1.w, o2.w; rtol = 1e-5)
+    end
+
+    @testset "A buffer drops the weights of the marked observation" begin
+        mkb(w) = EmpiricalPrior(; ce = cov_w(w), me = SimpleExpectedReturns(; w = w),
+                                x_src = ExcessSource())
+        o = PO.update_online_estimator(PO.Online(mkb(w)))
+        o = partial_fit!(o, ReturnsResult(; nx = nx, X = X0[1:30, :], B = Bg[1:30]))
+        o = partial_fit!(o, ReturnsResult(; nx = nx, X = X0[31:T, :], B = Bg[31:T]))
+        p1 = prior(o)
+        p2 = prior(mkb(w[keep]), rdBk)
+        @test p1.mu ≈ p2.mu
+        @test p1.sigma ≈ p2.sigma
+        # A buffer with no mark leaves the estimator as it is.
+        state = PO.prior_returns_buffer(o)
+        clean = PO.shared_series_buffer(state)
+        @test PO.shared_series_buffer_estimator(o.ce, clean) === o.ce
+        @test first(PO.buffer_refit_members(o, clean)) === o
+        # A member that folds keeps its state.
+        folded = PO.update_online_estimator(PO.Online(EmpiricalPrior(;
+                                                                     x_src = ExcessSource())))
+        @test PO.buffer_refit_member(folded.me, state) === folded.me
+    end
+
+    @testset "The cut of one weights field" begin
+        obs = trues(T)
+        obs[gap] = false
+        # A weight vector of the wrong length raises, and is not cut short with no message.
+        @test_throws DimensionMismatch prior(emp_x(aweights(rand(T + 5))), rdB)
+        @test_throws DimensionMismatch PO.observed_weights(aweights(rand(T - 1)), obs)
+        # Weights that store a range keep their type (the defect that #1959 left).
+        wr = PO.observed_weights(aweights(1.0:T), obs)
+        @test wr isa StatsBase.AnalyticWeights
+        @test wr == (1.0:T)[keep]
+        @test PO.observed_weights(nothing, obs) === nothing
+        @test PO.observed_weights(w, trues(T)) === w
+        # A dynamic weight resolves on the sample that the fit reads, so the cut keeps it.
+        @test PO.observed_weights(DynamicWeights1960(), obs) isa DynamicWeights1960
+        # A set of positions indexes with no length check, as a window does.
+        @test PO.obs_weights_index(w, 1:5) == w[1:5]
+        @test PO.shared_series_estimator(emp(w), nothing, T) isa EmpiricalPrior
+        est, rdv = PO.shared_series_fit(emp(w), rdBk, ExcessSource(), false)
+        @test est.me.w === w && rdv === rdBk
+    end
+
+    @testset "A hand-written cut: $(nameof(typeof(x)))" for (x, get_w) in
+                                                            ((PO.LinearModel(;
+                                                                             kwargs = (;
+                                                                                       weights = w)),
+                                                              y -> y.kwargs.weights),
+                                                             (PO.GeneralisedLinearModel(;
+                                                                                        kwargs = (;
+                                                                                                  weights = w)),
+                                                              y -> y.kwargs.weights),
+                                                             (ElasticNet(; w = w,
+                                                                         ve = SimpleVariance(;
+                                                                                             w = w)),
+                                                              y -> y.ve.w),
+                                                             (LowOrderMoment(; w = w),
+                                                              y -> y.w),
+                                                             (HighOrderMoment(; w = w,
+                                                                              ve = SimpleVariance(;
+                                                                                                  w = w)),
+                                                              y -> y.ve.w),
+                                                             (LogarithmicReturn(; w = w),
+                                                              y -> y.w),
+                                                             (ArithmeticReturn(;
+                                                                               ucs = NormalUncertaintySet(;
+                                                                                                          pe = emp(w))),
+                                                              y -> y.ucs.pe.me.w),
+                                                             (UncertaintySetVariance(;
+                                                                                     ucs = NormalUncertaintySet(;
+                                                                                                                pe = emp(w))),
+                                                              y -> y.ucs.pe.ce.ce.w),
+                                                             (RiskTrackingRiskMeasure(;
+                                                                                      tr = WeightsTracking(;
+                                                                                                           w = fill(1 /
+                                                                                                                    N,
+                                                                                                                    N)),
+                                                                                      r = ConditionalValueatRisk(;
+                                                                                                                 w = w)),
+                                                              y -> y.r.w),
+                                                             (PipelineStep(; est = emp(w),
+                                                                           writes = :prior),
+                                                              y -> y.est.me.w),
+                                                             (JuMPOptimiser(; pe = emp(w),
+                                                                            slv = slv),
+                                                              y -> y.pe.me.w),
+                                                             (InverseVolatility(;
+                                                                                pe = emp(w)),
+                                                              y -> y.pe.me.w))
+        obs = trues(T)
+        obs[gap] = false
+        @test get_w(PO.obs_weights_view(x, obs)) == w[keep]
+        @test get_w(PO.obs_weights_view(x, obs)) isa StatsBase.AnalyticWeights
+    end
+    @test PO.obs_weights_view(PO.LinearModel(), trues(T)) isa PO.LinearModel
+end
+
+@testset "The pin of a Choice Rule on a buffer drops the weights of the marked observation (#1964)" begin
+    # Before #1964 the pin fitted the buffer with the marked observation dropped and the
+    # fixed weights of the regression target at the full length, so the target raised. The
+    # oracle is the batch fit with the observation removed by hand from the data and from the
+    # weights. The step keeps the weights of every observation of the buffer, because a later
+    # buffer marks other observations.
+    Fg = copy(F0)
+    Fg[gap, 2] = NaN
+    rdF = ReturnsResult(; nx = nx, X = X0, nf = nf, F = Fg)
+    rdFk = ReturnsResult(; nx = nx, X = X0[keep, :], nf = nf, F = F0[keep, :])
+    w = aweights(rand(StableRNG(19640001), T) .+ 0.1)
+    online(est) = PO.update_online_estimator(PO.Online(est))
+    sw(w) = StepwiseRegression(; tgt = PO.LinearModel(; kwargs = (; weights = w)),
+                               choice = PinnedChoice())
+    dr(w) = DimensionReductionRegression(; drtgt = PCA(; kwargs = (; maxoutdim = 1)),
+                                         ve = SimpleVariance(; w = w),
+                                         retgt = PO.LinearModel(; kwargs = (; weights = w)),
+                                         choice = PinnedChoice())
+    oracle = [PO._regression(sw(w[keep]), X0[keep, i], F0[keep, :]) for i in 1:N]
+
+    @testset "A regression: $name" for (name, re, get_w) in (("StepwiseRegression", sw,
+                                                              x -> x.tgt.kwargs.weights),
+                                                             ("DimensionReductionRegression", dr, x -> x.ve.w))
+        e = partial_fit!(online(FactorPrior(; re = re(w))), rdF)
+        p1 = prior(e)
+        p2 = prior(FactorPrior(; re = re(w[keep])), rdFk)
+        @test p1.mu ≈ p2.mu
+        @test p1.sigma ≈ p2.sigma
+        @test !PO.pending_choice(e)
+        @test get_w(e.re) === w
+    end
+
+    @testset "A host: $name" for (name, host, read) in (("EntropyPoolingPrior",
+                                                         w -> EntropyPoolingPrior(; pe = FactorPrior(; re = sw(w))),
+                                                         e -> e.pe.re),
+                                                        ("OpinionPoolingPrior",
+                                                         w -> OpinionPoolingPrior(;
+                                                                                  pes = [EntropyPoolingPrior(;
+                                                                                                             pe = FactorPrior(;
+                                                                                                                              re = sw(w)))]),
+                                                         e -> e.pes[1].pe.re))
+        re = read(partial_fit!(online(host(w)), rdF))
+        @test re.included == oracle
+        @test re.tgt.kwargs.weights === w
+    end
+
+    # A buffer that keeps one observation pins nothing yet, and the step keeps `proj` empty.
+    d = partial_fit!(online(FactorPrior(; re = dr(w[1:2]))),
+                     ReturnsResult(; nx = nx, X = X0[(gap - 1):gap, :], nf = nf,
+                                   F = Fg[(gap - 1):gap, :]))
+    @test isnothing(d.re.proj)
+    @test PO.adopt_pinned_choice(nothing, nothing) === nothing
+end
+
+@testset "A ReturnsTracking series loses the benchmark return of the marked observation (#1964)" begin
+    # Before #1964 the solve dropped the observation and the series kept its full length,
+    # so `tracking_benchmark` refused it. A benchmark return at a dropped observation drops
+    # with it, as an observation weight does.
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 settings = Dict("verbose" => false))
+    Bg = copy(Bv0)
+    Bg[gap] = NaN
+    rdB = ReturnsResult(; nx = nx, X = X0, nb = ["BM"], B = Bg)
+    rdBk = ReturnsResult(; nx = nx, X = X0[keep, :], nb = ["BM"], B = Bv0[keep])
+    b = randn(StableRNG(19640002), T) ./ 100
+    jo(; kwargs...) = JuMPOptimiser(; pe = EmpiricalPrior(; x_src = ExcessSource()),
+                                    slv = slv, kwargs...)
+    trm(b) = MeanRisk(; r = TrackingRiskMeasure(; tr = ReturnsTracking(; w = b)),
+                      opt = jo())
+    te(b) = MeanRisk(;
+                     opt = jo(;
+                              tr = TrackingError(; tr = ReturnsTracking(; w = b),
+                                                 err = 0.05)))
+    @testset "$name" for (name, f) in (("TrackingRiskMeasure", trm), ("TrackingError", te))
+        @test isapprox(optimise(f(b), rdB).w, optimise(f(b[keep]), rdBk).w; rtol = 1e-6)
+    end
+    obs = trues(T)
+    obs[gap] = false
+    @test PO.obs_weights_view(ReturnsTracking(; w = b), obs).w == b[keep]
+    @test PO.obs_weights_view(ReturnsTracking(; w = b), 1:5).w == b[1:5]
+    # A series of the wrong length raises, and is not cut short with no message.
+    @test_throws DimensionMismatch PO.obs_weights_view(ReturnsTracking(; w = b[keep]), obs)
+end
+
+@testset "The cut reaches a phylogeny, a centrality constraint and a prior mean adapter (#1960, R35 of #1817)" begin
+    # R35 of #1817 found that the cut of #1960 stopped at five types outside the tags, so a
+    # covariance or a mean with fixed weights under them raised a bare `DimensionMismatch`
+    # at a Shared Series gap. The oracle is the same fit with the gapped observation removed
+    # by hand from the data and from the weights (ADR 0229).
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 settings = Dict("verbose" => false))
+    Bg = copy(Bv0)
+    Bg[gap] = NaN
+    rdB = ReturnsResult(; nx = nx, X = X0, nb = ["BM"], B = Bg)
+    rdBk = ReturnsResult(; nx = nx, X = X0[keep, :], nb = ["BM"], B = Bv0[keep])
+    w = aweights(rand(StableRNG(18173501), T) .+ 0.1)
+    cov_w(w) = PortfolioOptimisersCovariance(; ce = Covariance(; w = w))
+    net(w) = NetworkEstimator(; ce = cov_w(w))
+    sdp(w) = SemiDefinitePhylogenyEstimator(; pl = net(w))
+    cnt(w) = CentralityConstraint(; A = CentralityEstimator(; pl = net(w)))
+    jo(; kwargs...) = JuMPOptimiser(; pe = EmpiricalPrior(; x_src = ExcessSource()),
+                                    slv = slv, kwargs...)
+    @testset "An optimiser with $name" for (name, f) in (("ple", w -> jo(; ple = sdp(w))),
+                                                         ("cte", w -> jo(; cte = cnt(w))))
+        o1 = optimise(MeanRisk(; opt = f(w)), rdB)
+        o2 = optimise(MeanRisk(; opt = f(w[keep])), rdBk)
+        @test isapprox(o1.w, o2.w; rtol = 1e-6)
+    end
+    @testset "A prior with a PriorExpectedReturns" begin
+        pe(w) = EmpiricalPrior(;
+                               me = PriorExpectedReturns(;
+                                                         pe = EmpiricalPrior(;
+                                                                             me = SimpleExpectedReturns(;
+                                                                                                        w = w))),
+                               x_src = ExcessSource())
+        @test prior(pe(w), rdB).mu ≈ prior(pe(w[keep]), rdBk).mu
+    end
+    obs = trues(T)
+    obs[gap] = false
+    @testset "The cut of $(nameof(typeof(x)))" for (x, get_w) in
+                                                   ((sdp(w), y -> y.pl.ce.ce.w),
+                                                    (IntegerPhylogenyEstimator(;
+                                                                               pl = net(w)),
+                                                     y -> y.pl.ce.ce.w),
+                                                    (CentralityEstimator(; pl = net(w)),
+                                                     y -> y.pl.ce.ce.w),
+                                                    (cnt(w), y -> y.A.pl.ce.ce.w),
+                                                    (PriorExpectedReturns(;
+                                                                          pe = EmpiricalPrior(;
+                                                                                              me = SimpleExpectedReturns(;
+                                                                                                                         w = w))),
+                                                     y -> y.pe.me.w))
+        @test get_w(PO.obs_weights_view(x, obs)) == w[keep]
+        @test get_w(PO.obs_weights_view(x, obs)) isa StatsBase.AnalyticWeights
+    end
+    # The bound of a centrality constraint weights the assets, so the cut leaves it whole.
+    wa = aweights(fill(1.0, N))
+    cc = CentralityConstraint(; A = CentralityEstimator(; pl = net(w)),
+                              B = MeanValue(; w = wa))
+    @test PO.obs_weights_view(cc, obs).B.w === wa
 end

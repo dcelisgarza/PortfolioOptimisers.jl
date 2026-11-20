@@ -489,3 +489,63 @@ Investable Mask but not the geometry, so `DiagonalProjection` and `GramProjectio
 Gram norm couples the assets, so its reduced programme projects
 `q_P + A_PP⁻¹ A_PZ q_Z` in the norm of `A_PP`, which is exact at the zero weights of the assets
 outside the mask.
+
+## Amendment (2026-10-28)
+
+Issue #1867: `PlainGradient` is removed. The `grad` slot of `MirrorDescent`,
+`ExponentiatedGradient` and `GradientProjection` is bound to `Option{<:AbstractGradientTransform}`,
+and its default is `nothing`, which applies no transform. `gradient_state_seed(::Nothing, w)`
+returns `nothing`, and `transform_gradient!(::Nothing, ::Nothing, g)` returns `g`, as the methods
+on `PlainGradient` did, so no number moves. `OptimisticStep` refuses a wrapped rule whose `grad`
+is not `nothing`, with the same `ArgumentError` as before.
+
+The identity transform is a skipped procedure. ADR 0222 spells such a slot with `nothing`, not
+with a singleton that names no rule of its own.
+
+## Amendment (2026-10-28): the optimistic step is a field of `MirrorDescent`
+
+Issue #1864: the optimistic step is the `predictor` field of `MirrorDescent`, and the wrapper
+`OptimisticStep` is removed. `MirrorDescent(; eta, proj, alpha, obj, grad, predictor = nothing)`
+takes the plain step at `predictor = nothing`. With an `AbstractGradientPredictor`, it takes the
+two half-steps of Rakhlin and Sridharan (2013) that the section *The optimistic step is a wrapper
+rule carrying the secondary iterate* states. The mathematics, the predictors, `HintResidualRate`
+and the residual sums do not change.
+
+The keep rule of ADR 0222 decided the change. The wrapper took one rule, `MirrorDescent`, and
+added one option, so no second site reused it, and it gave no measured benefit. Its methods
+dispatch now on the type parameter of `predictor` or on the state, so no dispatch is lost. The
+constructor checks that `grad` is `nothing` inside one struct, where the wrapper checked it
+across two.
+
+The secondary iterate stays on its own state, now `OptimisticMirrorDescentState`. The plain rule
+keeps `MirrorDescentState`. The two field sets differ: the plain state holds the state of the
+Gradient Transform, and the optimistic state holds the secondary iterate, the last hint, the
+residual sums and the state of the predictor. `online_update!` dispatches on the state, and
+`HintResidualRate` refuses every other state by name.
+
+`ExponentiatedGradient` and `GradientProjection` take the `predictor` keyword. `EGE`, `EGR`,
+`EGA`, `MAEG` and `AEG` take only the parameters of their paper, as before. The migration is
+`OptimisticStep(; alg = GradientProjection(; eta), predictor)` to
+`GradientProjection(; eta, predictor)`, and `OptimisticStep()` to
+`MirrorDescent(; predictor = LastGradient())`.
+
+## Amendment (2026-11-20): a Zero-Start Debias on the momentum transforms
+
+Issue #2222: `GradientMomentum`, `RootMeanSquareGradient` and `AdaptiveMomentGradient` take a
+`debias` field, `Option{<:AbstractZeroStartDebias}`, last. The default `nothing` is the undivided
+form of Equations 7, 8 and 9 of Li, Zheng, Chen, Wang and Xu (2022), so no number moves.
+`ZeroStartDebias()` divides each average by `1 - γ^k`, the correction of Algorithm 1 of Kingma
+and Ba (2015). The Decision above states the transforms "without bias correction". That is now
+the default, and the correction is an option. `EGE`, `EGR` and `EGA` take the keyword `debias`
+too, so the amendment of #1864 above, which says that they take only the parameters of their
+paper, no longer holds for them.
+
+The count `k` of the steps since the seed is in the state of the transform,
+`GradientAverageState(k, v, m)`, because a restart of the schedule seeds the averages again, and
+the period count of the Rule State does not restart. So `transform_gradient!(grad, gs, g)`
+returns `(gs, ĝ)`, the state after the period and the transformed gradient, as
+`predict_gradient!` returns its state and its hint. `transform_gradient!(::Nothing, ::Nothing, g)`
+returns `(nothing, g)`, where the amendment of #1867 above states `g`. The rule asserts a `Tuple`
+at the call, so a transform with the old return raises a `TypeError` at its first step.
+`gradient_state_seed` returns `nothing` for a transform with no method of its own, as
+`predictor_state_seed` does for a predictor.

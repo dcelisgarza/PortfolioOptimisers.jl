@@ -58,6 +58,96 @@ function estimated_term_factor(decay::Number, n::Integer, k::VecNum)
     return F
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the lattice of ``\\ln s`` of the exact bias table under [`EstimatedCentring`](@ref), and the
+state of each of its points.
+
+This type is an implementation detail and is not intended for direct use.
+[`estimated_bias_lattice`](@ref) makes it, [`estimated_bias_count!`](@ref) advances its state in
+place, and [`estimated_bias_integrals!`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`estimated_bias_lattice`](@ref)
+  - [`estimated_bias_count!`](@ref)
+  - [`estimated_bias_integrals!`](@ref)
+"""
+@concrete struct EstimatedBiasLattice
+    """
+    `k`: The weight of each HAC lag, empty without HAC.
+    """
+    k
+    """
+    `m`: The count of interleaved lattices, so that ``\\lambda s`` of a point is the point `m` places below it.
+    """
+    m
+    """
+    `h`: The step of the lattice in ``\\ln s``.
+    """
+    h
+    """
+    `x`: The lattice of ``\\ln s``.
+    """
+    x
+    """
+    `s`: ``s`` on the lattice.
+    """
+    s
+    """
+    `es`: ``e^{-s}`` on the lattice.
+    """
+    es
+    """
+    `sc`: The point that the state reads at each point of the lattice: ``s``, or ``s (1 + i \\varepsilon)`` for a complex state.
+    """
+    sc
+    """
+    `ep`: The step ``\\varepsilon`` of the complex point.
+    """
+    ep
+    """
+    `tail0`: The sum of ``h e^{-s}`` from each point to the top.
+    """
+    tail0
+    """
+    `tail1`: The sum of ``h \\ln s\\, e^{-s}`` from each point to the top.
+    """
+    tail1
+    """
+    `P`: The covariance of the location and the last deviations at each point (mutated by each count).
+    """
+    P
+    """
+    `P0`: The covariance at ``s = 0`` (mutated by each count).
+    """
+    P0
+    """
+    `lZ`: The log of the absolute value of the determinant at each point (mutated by each count).
+    """
+    lZ
+    """
+    `sZ`: The sign of the determinant at each point (mutated by each count).
+    """
+    sZ
+    """
+    `dZ`: The derivative of `lZ` in ``\\ln s`` at each point (mutated by each count).
+    """
+    dZ
+    """
+    `pb`: Scratch of length ``L + 1``.
+    """
+    pb
+    """
+    `top`: A reference to the index of the highest point that still moves.
+    """
+    top
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Makes the lattice of ``\\ln s`` and the state of [`estimated_bias_count!`](@ref) before the first
@@ -87,16 +177,11 @@ derivative of the log of the determinant.
 
 # Returns
 
-  - `lat::NamedTuple`: `k`, the weight of each lag; `m`; the step `h`; `x`, the lattice of
-    ``\\ln s``; `s` and `es`, ``s`` and ``e^{-s}`` on it; `sc`, the point that the state reads, and
-    `ep`, ``\\varepsilon``; `tail0` and `tail1`, the sums of ``h e^{-s}`` and
-    ``h \\ln s\\, e^{-s}`` from each point to the top; `P`, the covariance of each point; `P0`, the
-    covariance at ``s = 0``; `lZ` and `sZ`, the log and the sign of the determinant; `dZ`, the
-    derivative of `lZ` in ``\\ln s``; `pb`, scratch; and `top`, the index of the highest point that
-    still moves.
+  - `lat::EstimatedBiasLattice`: The lattice and the state of each point before the first count.
 
 # Related
 
+  - [`EstimatedBiasLattice`](@ref)
   - [`estimated_bias_count!`](@ref)
   - [`estimated_bias_integrals!`](@ref)
 """
@@ -119,10 +204,11 @@ function estimated_bias_lattice(decay::Number, hac_lags::Option{<:Integer},
     view(P, 1, 1, :) .= one(S)
     P0 = zeros(S, d, d)
     P0[1, 1] = one(S)
-    return (; k, m, h, x, s, es, sc = s .* (one(S) + ep * (S <: Complex ? im : 0)), ep,
-            tail0 = reverse(cumsum(reverse(h .* es))),
-            tail1 = reverse(cumsum(reverse(h .* x .* es))), P, P0, lZ = zeros(T, N),
-            sZ = ones(T, N), dZ = zeros(T, N), pb = zeros(S, d), top = Ref(N))
+    return EstimatedBiasLattice(k, m, h, x, s, es,
+                                s .* (one(S) + ep * (S <: Complex ? im : 0)), ep,
+                                reverse(cumsum(reverse(h .* es))),
+                                reverse(cumsum(reverse(h .* x .* es))), P, P0, zeros(T, N),
+                                ones(T, N), zeros(T, N), zeros(S, d), Ref(N))
 end
 """
     lattice_det_step(D::Real, ::Number)
@@ -265,20 +351,20 @@ so ``\\kappa_{1} = (1 - \\lambda^{n - 1}) / (1 - \\lambda)``. Each point adds th
 
 # Arguments
 
-  - `lat::NamedTuple`: Lattice of [`estimated_bias_lattice`](@ref) (mutated).
+  - `lat::EstimatedBiasLattice`: Lattice of [`estimated_bias_lattice`](@ref) (mutated).
   - `decay::Number`: Decay of the weights.
   - `n::Integer`: Count of the returns that the location holds before the term.
 
 # Returns
 
-  - `lat::NamedTuple`: The lattice after the count.
+  - `lat::EstimatedBiasLattice`: The lattice after the count.
 
 # Related
 
   - [`estimated_bias_point!`](@ref)
   - [`estimated_term_factor`](@ref)
 """
-function estimated_bias_count!(lat::NamedTuple, decay::Number, n::Integer)
+function estimated_bias_count!(lat::EstimatedBiasLattice, decay::Number, n::Integer)
     (; k, m, s, sc, ep, P, P0, lZ, sZ, dZ, pb, top) = lat
     F = estimated_term_factor(decay, n, k)
     c = (one(decay) - decay) / (one(decay) - decay^(n + 1))
@@ -295,6 +381,42 @@ function estimated_bias_count!(lat::NamedTuple, decay::Number, n::Integer)
     end
     estimated_bias_point!(P0, copy(P0), pb, zero(eltype(s)), k, F, c)
     return lat
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Holds the four integrals of the Laplace transform of an estimate that the bias factors under
+[`EstimatedCentring`](@ref) read.
+
+This type is an implementation detail and is not intended for direct use.
+[`estimated_bias_integrals!`](@ref) makes it, and [`estimated_bias_factor`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`estimated_bias_integrals!`](@ref)
+  - [`estimated_bias_factor`](@ref)
+"""
+@concrete struct EstimatedBiasIntegrals
+    """
+    `rms`: The integral ``I_{R}``, which the root-mean-squared factor reads.
+    """
+    rms
+    """
+    `fm`: The integral ``I_{F}``, which the first-moment factor reads.
+    """
+    fm
+    """
+    `l0`: The integral ``I_{0}``, which the log factor reads.
+    """
+    l0
+    """
+    `l1`: The integral ``I_{1}``, which the variance of the log reads.
+    """
+    l1
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -327,8 +449,8 @@ returns.
 
 # Arguments
 
-  - `lat::NamedTuple`: Lattice of [`estimated_bias_lattice`](@ref) after the count `K` (mutated
-    where its top falls).
+  - `lat::EstimatedBiasLattice`: Lattice of [`estimated_bias_lattice`](@ref) after the count
+    `K` (mutated where its top falls).
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Count of the terms of the estimate.
   - `dep::Bool`: Whether ``I_{R}`` and ``I_{F}`` read the dependence ``V / f``. Without it they
@@ -336,18 +458,19 @@ returns.
 
 # Returns
 
-  - `integrals::NamedTuple`: `rms`, `fm`, `l0` and `l1`, the integrals ``I_{R}``, ``I_{F}``,
-    ``I_{0}`` and ``I_{1}``.
+  - `integrals::EstimatedBiasIntegrals`: The integrals ``I_{R}``, ``I_{F}``, ``I_{0}`` and
+    ``I_{1}``.
 
 # Related
 
+  - [`EstimatedBiasIntegrals`](@ref)
   - [`estimated_bias_factor`](@ref)
   - [`estimated_bias_cut`](@ref)
   - [`estimated_bias_seed`](@ref)
   - [`estimated_bias_freeze!`](@ref)
   - [`hac_laplace!`](@ref)
 """
-function estimated_bias_integrals!(lat::NamedTuple, decay::Number, K::Integer,
+function estimated_bias_integrals!(lat::EstimatedBiasLattice, decay::Number, K::Integer,
                                    dep::Bool = true)
     (; h, x, s, es, tail0, tail1, P, lZ) = lat
     f = centring_factor(EstimatedCentring(), decay, K + 1)
@@ -365,7 +488,7 @@ function estimated_bias_integrals!(lat::NamedTuple, decay::Number, K::Integer,
                       -tail1[icut + 1] - (h - wl) * x[icut] * es[icut])
     end
     estimated_bias_freeze!(lat)
-    return NamedTuple{(:rms, :fm, :l0, :l1)}(acc)
+    return EstimatedBiasIntegrals(acc...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -379,7 +502,7 @@ still moves, the last of them takes the full weight.
 
 # Arguments
 
-  - `lat::NamedTuple`: Lattice of [`estimated_bias_lattice`](@ref).
+  - `lat::EstimatedBiasLattice`: Lattice of [`estimated_bias_lattice`](@ref).
 
 # Returns
 
@@ -389,7 +512,7 @@ still moves, the last of them takes the full weight.
 
   - [`estimated_bias_integrals!`](@ref)
 """
-function estimated_bias_cut(lat::NamedTuple)
+function estimated_bias_cut(lat::EstimatedBiasLattice)
     (; h, lZ, sZ, top) = lat
     imin, last = 1, top[]
     for i in 1:top[]
@@ -416,7 +539,7 @@ it gains ``h^{2} F'(\\ln s_{0}) / 12``, with ``F`` its integrand in ``\\ln s``.
 
 # Arguments
 
-  - `lat::NamedTuple`: Lattice of [`estimated_bias_lattice`](@ref).
+  - `lat::EstimatedBiasLattice`: Lattice of [`estimated_bias_lattice`](@ref).
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Count of the terms of the estimate.
 
@@ -428,7 +551,7 @@ it gains ``h^{2} F'(\\ln s_{0}) / 12``, with ``F`` its integrand in ``\\ln s``.
 
   - [`estimated_bias_integrals!`](@ref)
 """
-function estimated_bias_seed(lat::NamedTuple, decay::Number, K::Integer)
+function estimated_bias_seed(lat::EstimatedBiasLattice, decay::Number, K::Integer)
     (; h, x, s) = lat
     a = (one(decay) - decay^K) / (one(decay) - decay) / 2
     s0, x0 = s[1], x[1]
@@ -447,17 +570,18 @@ count moves the points past it.
 
 # Arguments
 
-  - `lat::NamedTuple`: Lattice of [`estimated_bias_lattice`](@ref) (mutated where its top falls).
+  - `lat::EstimatedBiasLattice`: Lattice of [`estimated_bias_lattice`](@ref) (mutated where its
+    top falls).
 
 # Returns
 
-  - `lat::NamedTuple`: The lattice.
+  - `lat::EstimatedBiasLattice`: The lattice.
 
 # Related
 
   - [`estimated_bias_integrals!`](@ref)
 """
-function estimated_bias_freeze!(lat::NamedTuple)
+function estimated_bias_freeze!(lat::EstimatedBiasLattice)
     (; s, lZ, top) = lat
     while top[] > 1 && exp(-lZ[top[]] / 2) * max(s[top[]], 1) < eps(eltype(s))^3
         top[] -= 1
@@ -465,10 +589,10 @@ function estimated_bias_freeze!(lat::NamedTuple)
     return lat
 end
 """
-    estimated_bias_factor(::RootMeanSquaredAdjusted, I::NamedTuple, c::Number)
-    estimated_bias_factor(::FirstMomentRegimeAdjusted, I::NamedTuple, c::Number)
-    estimated_bias_factor(::LogRegimeAdjusted, I::NamedTuple, c::Number)
-    estimated_bias_factor(m::RegimeTermMoments, I::NamedTuple, c::Number)
+    estimated_bias_factor(::RootMeanSquaredAdjusted, I::EstimatedBiasIntegrals, c::Number)
+    estimated_bias_factor(::FirstMomentRegimeAdjusted, I::EstimatedBiasIntegrals, c::Number)
+    estimated_bias_factor(::LogRegimeAdjusted, I::EstimatedBiasIntegrals, c::Number)
+    estimated_bias_factor(m::RegimeTermMoments, I::EstimatedBiasIntegrals, c::Number)
 
 Computes the bias factor of a regime method, or the moments of one term, from the integrals of
 [`estimated_bias_integrals!`](@ref).
@@ -497,7 +621,7 @@ constant.
 # Arguments
 
   - `method`: Regime adjustment method, or the table of the moments of one term.
-  - `I::NamedTuple`: Integrals of [`estimated_bias_integrals!`](@ref).
+  - `I::EstimatedBiasIntegrals`: Integrals of [`estimated_bias_integrals!`](@ref).
   - `c::Number`: Normalised weight of the newest term.
 
 # Returns
@@ -511,27 +635,29 @@ constant.
   - [`regime_bias_factor`](@ref)
   - [`RegimeTermMoments`](@ref)
 """
-function estimated_bias_factor(::RootMeanSquaredAdjusted, I::NamedTuple, c::Number)
+function estimated_bias_factor(::RootMeanSquaredAdjusted, I::EstimatedBiasIntegrals,
+                               c::Number)
     return I.rms / (2 * c)
 end
-function estimated_bias_factor(::FirstMomentRegimeAdjusted, I::NamedTuple, c::Number)
+function estimated_bias_factor(::FirstMomentRegimeAdjusted, I::EstimatedBiasIntegrals,
+                               c::Number)
     return I.fm^2 / (2 * c * pi)
 end
-function estimated_bias_factor(::LogRegimeAdjusted, I::NamedTuple, c::Number)
+function estimated_bias_factor(::LogRegimeAdjusted, I::EstimatedBiasIntegrals, c::Number)
     return exp(-(I.l0 + log(2 * c)))
 end
-function estimated_bias_factor(::RegimeTermMoments, I::NamedTuple, c::Number)
+function estimated_bias_factor(::RegimeTermMoments, I::EstimatedBiasIntegrals, c::Number)
     f = estimated_bias_factor(RootMeanSquaredAdjusted(), I, c)
     return (f, one(f), zero(f))
 end
 function estimated_bias_factor(m::RegimeTermMoments{<:FirstMomentRegimeAdjusted},
-                               I::NamedTuple, c::Number)
+                               I::EstimatedBiasIntegrals, c::Number)
     f = estimated_bias_factor(RootMeanSquaredAdjusted(), I, c)
     q = estimated_bias_factor(m.method, I, c)
     return (f, q / f, f / q - one(f))
 end
-function estimated_bias_factor(m::RegimeTermMoments{<:LogRegimeAdjusted}, I::NamedTuple,
-                               c::Number)
+function estimated_bias_factor(m::RegimeTermMoments{<:LogRegimeAdjusted},
+                               I::EstimatedBiasIntegrals, c::Number)
     f = estimated_bias_factor(RootMeanSquaredAdjusted(), I, c)
     v = 2 * (I.l1 - Base.MathConstants.eulergamma * I.l0) - I.l0^2
     return (f, estimated_bias_factor(m.method, I, c) / f, v)
@@ -554,14 +680,14 @@ this verb with `centring` bound to its own type. Without that method this method
 
 # Arguments
 
-  - `method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments}`: Regime adjustment method, or the
+  - `method::Union{RegimeAdjustedMethod, RegimeTermMoments}`: Regime adjustment method, or the
     table of the moments of one term.
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Largest count of terms in the table.
-  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
+  - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight of each lag, or
     `nothing`.
   - `centring::AbstractCentring`: The centring of the estimator.
-  - `debias::AbstractRegimeDebias`: The debias rule, [`ExactDebias`](@ref) by default.
+  - `debias::Option{<:AbstractRegimeDebias}`: The debias rule, [`ExactDebias`](@ref) by default.
 
 # Returns
 
@@ -574,55 +700,15 @@ this verb with `centring` bound to its own type. Without that method this method
   - [`AbstractCentring`](@ref)
   - [`mahalanobis_level_bias`](@ref)
 """
-function regime_bias_table(method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments},
+function regime_bias_table(method::Union{RegimeAdjustedMethod, RegimeTermMoments},
                            decay::Number, K::Integer, hac_lags, centring::AbstractCentring,
-                           debias::AbstractRegimeDebias = ExactDebias())
+                           debias::Option{<:AbstractRegimeDebias} = ExactDebias())
     law = centring_law(centring)
     if law === centring
         throw(MethodError(regime_bias_table,
                           (method, decay, K, hac_lags, centring, debias)))
     end
     return regime_bias_table(method, decay, K, hac_lags, law, debias)
-end
-"""
-    regime_bias_table(method, decay::Number, K::Integer, hac_lags, ::PreCentred, debias)
-
-Computes the bias factor of a regime statistic for every count from one to `K`, on the law of a
-pre-centred estimate.
-
-A pre-centred deviation is the return itself, so the terms do not share a location, and the table
-of [`regime_bias_table`](@ref) without a centring is exact: on the plain weights, or on the banded
-weight matrix of the HAC lags.
-
-# Arguments
-
-  - `method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments}`: Regime adjustment method, or the
-    table of the moments of one term.
-  - `decay::Number`: Decay of the weights.
-  - `K::Integer`: Largest count of terms in the table.
-  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
-    `nothing`.
-  - `::AbstractRegimeDebias`: Ignored debias rule: a pre-centred deviation does not depend on the
-    estimate.
-
-# Returns
-
-  - `table::AbstractVector`: The factor for each count.
-
-# Related
-
-  - [`regime_bias_table`](@ref)
-  - [`regime_bias!`](@ref)
-"""
-function regime_bias_table(method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments},
-                           decay::Number, K::Integer, ::Nothing, ::PreCentred,
-                           ::AbstractRegimeDebias = ExactDebias())
-    return regime_bias_table(method, decay, K)
-end
-function regime_bias_table(method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments},
-                           decay::Number, K::Integer, hac_lags::Union{<:Integer, <:VecNum},
-                           ::PreCentred, ::AbstractRegimeDebias = ExactDebias())
-    return regime_bias_table(method, decay, K, hac_lags)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -664,13 +750,13 @@ count costs 0.1 s at a half-life of 40 and two lags.
 
 # Arguments
 
-  - `method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments}`: Regime adjustment method, or the
+  - `method::Union{RegimeAdjustedMethod, RegimeTermMoments}`: Regime adjustment method, or the
     table of the moments of one term.
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Largest count of terms in the table.
   - `hac_lags::Option{<:Integer}`: Count of HAC lags, or `nothing`.
   - `::EstimatedCentring`: The centring of the estimator.
-  - `debias::AbstractRegimeDebias`: The debias rule. [`ExactDebias`](@ref), the default, reads the
+  - `debias::Option{<:AbstractRegimeDebias}`: The debias rule. [`ExactDebias`](@ref), the default, reads the
     dependence of the deviation on the estimate, and [`LawDebias`](@ref) the law of the
     estimate alone.
 
@@ -688,10 +774,10 @@ count costs 0.1 s at a half-life of 40 and two lags.
   - [`regime_bias!`](@ref)
   - [`EstimatedCentring`](@ref)
 """
-function regime_bias_table(method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments},
+function regime_bias_table(method::Union{RegimeAdjustedMethod, RegimeTermMoments},
                            decay::Number, K::Integer, hac_lags::Option{<:Integer},
                            ::EstimatedCentring,
-                           debias::AbstractRegimeDebias = ExactDebias())
+                           debias::Option{<:AbstractRegimeDebias} = ExactDebias())
     base = regime_bias_table(method, decay, K, hac_lags, PreCentred())
     lat = estimated_bias_lattice(decay, hac_lags)
     Kh = min(K, ceil(Int, log(sqrt(eps(eltype(lat.s)))) / log(decay)))

@@ -193,7 +193,7 @@ end
             @test parity_compare(PO.reduce_loadings(fcb, pr.rr.M),
                                  load("BasisReducedLoadings")).ok
             @test parity_compare(mu, vec(load("BasisReducedMu"))).ok
-            @test parity_compare(PO.expand_factor_mu(fcb, mu, 2),
+            @test parity_compare(PO.expand_factor_returns(fcb, mu, 2),
                                  vec(load("BasisExpandedMu1"))).ok
             # Measured maxrel cell by cell: 2.1e-13 on one CI host and 1.4e-12 on the other,
             # over 80 runs.

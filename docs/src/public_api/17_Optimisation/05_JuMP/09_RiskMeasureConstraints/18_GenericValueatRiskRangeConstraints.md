@@ -5,5 +5,5 @@ Description = "Generic Value at Risk Range Constraints, public API of PortfolioO
 # [Generic Value at Risk Range Constraints](@id api-generic-value-at-risk-range-constraints)
 
 ```@docs
-set_risk_constraints!(model::JuMP.Model, i::Any, r::GenericValueatRiskRange, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
+set_risk_constraints!(model::JuMP.Model, i::Any, r::GenericValueatRiskRange{<:Any, <:ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk}, <:ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk}}, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
 ```

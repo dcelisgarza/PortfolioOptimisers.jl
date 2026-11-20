@@ -56,114 +56,42 @@ function attribution_net_returns(w::VecNum, X::MatNum, fees::Option{<:Fees}, str
     if !isempty(held)
         assets = unique(last.(held))
         strict_diagnostic("a factor attribution cannot decompose a holding that earns no return. Assets $(assets) carry a non-finite return at $(length(held)) held (observation, asset) pair(s) outside their active span, the first at observation $(first(held)[1]). Those pairs contribute zero to the net series, so the total understates the portfolio by whatever they earned. A pair inside the active span is a holiday and fills zero with no message, which only returns that carry an active mask can show. Pass `strict = true` to refuse instead, zero the weights over the observations the asset is inactive, or pass a weight history.",
-                          strict)
+                          strict; id = @log_id())
     end
     Y = attribution_finite(X)
     return calc_net_returns(w, Y, fees)
 end
-"""
-    attribution_active_mask(pnl::Nothing)
-    attribution_active_mask(pnl::AssetPanel)
-
-Return the active mask a realised attribution reads off the Asset Panel of the returns data, or `nothing`.
-
-A returns result without a panel states no mask, so no blank cell of it is known to be a holiday. A static panel puts every asset in its universe at every observation, so every cell of it is active, through [`panel_active_cells`](@ref).
-
-# Arguments
-
-  - `pnl`: The Asset Panel of the returns data, or `nothing`.
-
-# Returns
-
-  - `amsk::Option{<:AbstractMatrix{Bool}}`: The active cells, `observations × assets`, or `nothing`.
-
-# Related
-
-  - [`attribution_net_returns`](@ref)
-  - [`panel_active_cells`](@ref)
-  - [`AssetPanel`](@ref)
-"""
-function attribution_active_mask(::Nothing)::Nothing
-    return nothing
-end
-function attribution_active_mask(pnl::AssetPanel)
-    return panel_active_cells(pnl)
-end
-"""
-    attribution_returns_entry(w::VecNum, pr::AbstractPriorResult, X::MatNum,
-                              amsk::Option{<:AbstractMatrix{Bool}}, fees::Option{<:Fees},
-                              args...; strict::Bool = false, kwargs...)
-
-Form the net return series of constant weights over an asset return matrix, then attribute it.
-
-Every realised method of [`factor_attribution`](@ref) that takes constant weights and asset returns calls this function. A bare matrix carries no active mask, and a returns result carries the mask of its Asset Panel, so each reaches [`attribution_net_returns`](@ref) with the rule it can state.
-
-# Algorithm
-
- 1. Refuse weights over another universe through [`assert_attribution_assets`](@ref).
- 2. Form the net series with [`attribution_net_returns`](@ref).
- 3. Decompose the series with [`attribution_realised_entry`](@ref), or roll it with [`attribution_rolling_entry`](@ref) when `args` holds the window.
-
-# Arguments
-
-  - `w`: Portfolio weights.
-  - `pr`: Prior result carrying the factor model block.
-  - `X`: Asset returns, `observations × assets`.
-  - `amsk`: The active mask of the asset returns, or `nothing`.
-  - `fees`: Fees the net series is formed against, or `nothing`.
-  - `args`: The positional `window` of a rolling attribution, or nothing.
-  - `strict`: Whether a held non-investable asset, or a non-finite return at an inactive held pair, raises rather than warns.
-  - `kwargs`: The keywords of the entry function.
-
-# Validation
-
-  - The weights hold one entry for each asset of `pr`, else a `DimensionMismatch` is raised.
-  - The rules of [`attribution_net_returns`](@ref), and of the entry function.
-
-# Returns
-
-  - `fa`: The attribution, or one attribution per window.
-
-# Related
-
-  - [`factor_attribution`](@ref)
-  - [`attribution_net_returns`](@ref)
-  - [`attribution_active_mask`](@ref)
-"""
-function attribution_returns_entry(w::VecNum, pr::AbstractPriorResult, X::MatNum,
-                                   amsk::Option{<:AbstractMatrix{Bool}},
-                                   fees::Option{<:Fees}, args...; strict::Bool = false,
-                                   kwargs...)
-    assert_attribution_assets(w, length(pr.mu))
-    ret = attribution_net_returns(w, X, fees, strict, amsk)
-    if isempty(args)
-        return attribution_realised_entry(w, pr, ret; strict = strict, kwargs...)
-    end
-    return attribution_rolling_entry(w, pr, ret, args...; strict = strict, kwargs...)
-end
 function factor_attribution(w::VecNum, pr::AbstractPriorResult, X::MatNum,
-                            fees::Option{<:Fees} = nothing;
+                            fees::Option{<:Fees} = nothing; strict::Bool = false,
                             kwargs...)::FactorAttributionResult
-    return attribution_returns_entry(w, pr, X, nothing, fees; kwargs...)
+    assert_attribution_assets(w, length(pr.mu))
+    ret = attribution_net_returns(w, X, fees, strict)
+    return factor_attribution(w, pr, ret; strict = strict, kwargs...)
 end
 function factor_attribution(w::VecNum, pr::AbstractPriorResult, X::MatNum,
-                            fees::Option{<:Fees}, window::Integer; kwargs...)
-    return attribution_returns_entry(w, pr, X, nothing, fees, window; kwargs...)
+                            fees::Option{<:Fees}, window::Integer; strict::Bool = false,
+                            kwargs...)
+    assert_attribution_assets(w, length(pr.mu))
+    ret = attribution_net_returns(w, X, fees, strict)
+    return factor_attribution(w, pr, ret, window; strict = strict, kwargs...)
 end
 function factor_attribution(w::VecNum, pr::AbstractPriorResult, X::MatNum, window::Integer;
                             kwargs...)
     return factor_attribution(w, pr, X, nothing, window; kwargs...)
 end
 function factor_attribution(w::VecNum, pr::AbstractPriorResult, rd::ReturnsResult,
-                            fees::Option{<:Fees} = nothing;
+                            fees::Option{<:Fees} = nothing; strict::Bool = false,
                             kwargs...)::FactorAttributionResult
-    return attribution_returns_entry(w, pr, rd.X, attribution_active_mask(rd.pnl), fees;
-                                     kwargs...)
+    assert_attribution_assets(w, length(pr.mu))
+    ret = attribution_net_returns(w, rd.X, fees, strict, panel_active_cells(rd.pnl))
+    return factor_attribution(w, pr, ret; strict = strict, kwargs...)
 end
 function factor_attribution(w::VecNum, pr::AbstractPriorResult, rd::ReturnsResult,
-                            fees::Option{<:Fees}, window::Integer; kwargs...)
-    return attribution_returns_entry(w, pr, rd.X, attribution_active_mask(rd.pnl), fees,
-                                     window; kwargs...)
+                            fees::Option{<:Fees}, window::Integer; strict::Bool = false,
+                            kwargs...)
+    assert_attribution_assets(w, length(pr.mu))
+    ret = attribution_net_returns(w, rd.X, fees, strict, panel_active_cells(rd.pnl))
+    return factor_attribution(w, pr, ret, window; strict = strict, kwargs...)
 end
 function factor_attribution(w::VecNum, pr::AbstractPriorResult, rd::ReturnsResult,
                             window::Integer; kwargs...)
@@ -182,28 +110,63 @@ function factor_attribution(res::OptimisationResult, pr::Option{<:Pr_RR}, rd::Re
     return factor_attribution(w, pr, investable_returns_view(imsk, rd), fees, window;
                               kwargs...)
 end
-function factor_attribution(W::MatNum, pr::AbstractPriorResult, ret::VecNum;
-                            kwargs...)::FactorAttributionResult
-    return attribution_realised_entry(W, pr, ret; kwargs...)
+function factor_attribution(W::VecNum_MatNum, pr::AbstractPriorResult, ret::VecNum;
+                            strict::Bool = false, kwargs...)::FactorAttributionResult
+    rr, _ = attribution_prior_block(pr)
+    attribution_investable_diagnostic(W, pr, strict)
+    return attribution_realised_entry(W, attribution_block_arrays(rr, pr), ret; kwargs...)
 end
-function factor_attribution(W::MatNum, pr::AbstractPriorResult, ret::VecNum,
-                            window::Integer; kwargs...)
-    return attribution_rolling_entry(W, pr, ret, window; kwargs...)
-end
-function factor_attribution(pred::MultiPeriodPredictionResult, pr::AbstractPriorResult;
-                            kwargs...)::FactorAttributionResult
-    W, ret = attribution_prediction_history(pred)
-    return attribution_realised_entry(W, pr, ret; key = attribution_series_key(pred),
-                                      kwargs...)
-end
-function factor_attribution(pred::MultiPeriodPredictionResult, pr::AbstractPriorResult,
-                            window::Integer; kwargs...)
-    W, ret = attribution_prediction_history(pred)
-    return attribution_rolling_entry(W, pr, ret, window; key = attribution_series_key(pred),
+function factor_attribution(W::VecNum_MatNum, pr::AbstractPriorResult, ret::VecNum,
+                            window::Integer; strict::Bool = false, kwargs...)
+    rr, _ = attribution_prior_block(pr)
+    attribution_investable_diagnostic(W, pr, strict)
+    return attribution_rolling_entry(W, attribution_block_arrays(rr, pr), ret, window;
                                      kwargs...)
 end
+function factor_attribution(pred::MultiPeriodPredictionResult, pr::AbstractPriorResult;
+                            strict::Bool = false, kwargs...)::FactorAttributionResult
+    W, ret = attribution_prediction_history(pred)
+    rr, _ = attribution_prior_block(pr)
+    attribution_investable_diagnostic(W, pr, strict)
+    return attribution_realised_entry(W, attribution_block_arrays(rr, pr), ret;
+                                      key = attribution_series_key(pred), kwargs...)
+end
+function factor_attribution(pred::MultiPeriodPredictionResult, pr::AbstractPriorResult,
+                            window::Integer; strict::Bool = false, kwargs...)
+    W, ret = attribution_prediction_history(pred)
+    rr, _ = attribution_prior_block(pr)
+    attribution_investable_diagnostic(W, pr, strict)
+    return attribution_rolling_entry(W, attribution_block_arrays(rr, pr), ret, window;
+                                     key = attribution_series_key(pred), kwargs...)
+end
 """
-    attribution_array_keywords(kwargs) -> NamedTuple
+$(DocStringExtensions.TYPEDEF)
+
+The keywords of a realised bare-array method, split into those of the block and those of the decomposition.
+
+This type is an implementation detail and is not intended for direct use. [`attribution_array_keywords`](@ref) makes it, and the realised bare-array methods of [`factor_attribution`](@ref) splat each field as keywords. The two bundles have one type, so a record names them.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`attribution_array_keywords`](@ref)
+  - [`attribution_array_block`](@ref)
+"""
+@concrete struct ArrayKeywords
+    """
+    `blk`: The block keywords, which [`attribution_array_block`](@ref) takes.
+    """
+    blk
+    """
+    `entry`: The other keywords, which the entry of the decomposition takes.
+    """
+    entry
+end
+"""
+    attribution_array_keywords(kwargs) -> ArrayKeywords
 
 Split the keywords of a realised bare-array method into those of the block and those of the decomposition.
 
@@ -215,7 +178,7 @@ The block keywords describe the arrays, and [`attribution_array_block`](@ref) ta
 
 # Returns
 
-  - `kw::NamedTuple`: The block keywords `blk`, among `lag`, `trim`, `rw`, `vs`, `fcb`, `unseen`, `observed`, `fam`, `h1` and `dc`, and the other keywords `entry`.
+  - `kw::ArrayKeywords`: The block keywords `blk`, among `lag`, `trim`, `rw`, `vs`, `fcb`, `unseen`, `observed`, `fam`, `h1` and `dc`, and the other keywords `entry`.
 
 # Related
 
@@ -226,7 +189,7 @@ function attribution_array_keywords(kwargs)
     nt = values(kwargs)
     ks = filter(in((:lag, :trim, :rw, :vs, :fcb, :unseen, :observed, :fam, :h1, :dc)),
                 keys(nt))
-    return (; blk = NamedTuple{ks}(nt), entry = Base.structdiff(nt, NamedTuple{ks}))
+    return ArrayKeywords(NamedTuple{ks}(nt), Base.structdiff(nt, NamedTuple{ks}))
 end
 function factor_attribution(W::VecNum_MatNum, B::MatNum_Arr3Num, f::MatNum, eps::MatNum,
                             ret::VecNum; kwargs...)::FactorAttributionResult
@@ -319,12 +282,12 @@ function attribution_fold_returns(pred::PredictionResult)
     return isa(X, VecVecNum) ? first(X) : X
 end
 """
-    attribution_unknown_kinds(rule::AbstractUnknownEntryRule) -> NamedTuple
-    attribution_unknown_kinds(rule::KindwiseUnknown) -> NamedTuple
+    attribution_unknown_kinds(rule::AbstractUnknownEntryRule) -> KindwiseUnknown
+    attribution_unknown_kinds(rule::KindwiseUnknown) -> KindwiseUnknown
 
 Return the rule of each kind of unknown entry.
 
-A preset applies to every kind, so it is the rule of each kind. [`KindwiseUnknown`](@ref) holds the rule of each kind in a field.
+A preset applies to every kind, so it is the rule of each kind, and the function puts it in both fields of a [`KindwiseUnknown`](@ref). A [`KindwiseUnknown`](@ref) holds the rule of each kind in a field already, so the function returns it.
 
 # Arguments
 
@@ -332,7 +295,7 @@ A preset applies to every kind, so it is the rule of each kind. [`KindwiseUnknow
 
 # Returns
 
-  - `kinds::NamedTuple`: The rule `unstated` for an entry the model does not state, and the rule `leverage` for the variance split of a Leverage-One Pair.
+  - `kinds::KindwiseUnknown`: The rule `unstated` for an entry the model does not state, and the rule `leverage` for the variance split of a Leverage-One Pair.
 
 # Related
 
@@ -340,14 +303,14 @@ A preset applies to every kind, so it is the rule of each kind. [`KindwiseUnknow
   - [`KindwiseUnknown`](@ref)
 """
 function attribution_unknown_kinds(rule::AbstractUnknownEntryRule)
-    return (; unstated = rule, leverage = rule)
+    return KindwiseUnknown(rule, rule)
 end
 function attribution_unknown_kinds(rule::KindwiseUnknown)
-    return (; unstated = rule.unstated, leverage = rule.leverage)
+    return rule
 end
 """
     attribution_block_arrays(rr::AbstractLoadingsRegressionResult, pr::AbstractPriorResult)
-        -> NamedTuple
+        -> AttributionBlock
 
 Return a factor model block as the bare arrays a realised attribution reads.
 
@@ -360,7 +323,7 @@ The block states its histories through the reads of [`factor_attribution`](@ref)
 
 # Returns
 
-  - `blk::NamedTuple`: The fields `B`, `f`, `eps`, `lag`, `rw`, `vs`, `fcb`, `unseen`, `no` and `fam`, from [`attribution_exposures`](@ref), [`attribution_factor_returns`](@ref), [`attribution_idiosyncratic_returns`](@ref), [`attribution_lag`](@ref), [`attribution_regression_weights`](@ref), [`attribution_idiosyncratic_variances`](@ref), [`attribution_family_basis`](@ref), [`attribution_unseen_rule`](@ref), [`attribution_observed_count`](@ref) and [`attribution_families`](@ref), and the fields `idx` and `ts` of [`attribution_row_key`](@ref).
+  - `blk::AttributionBlock`: The fields `B`, `f`, `eps`, `lag`, `rw`, `vs`, `fcb`, `unseen`, `no` and `fam`, from [`attribution_exposures`](@ref), [`attribution_factor_returns`](@ref), [`attribution_idiosyncratic_returns`](@ref), [`attribution_lag`](@ref), [`attribution_regression_weights`](@ref), [`attribution_idiosyncratic_variances`](@ref), [`attribution_family_basis`](@ref), [`attribution_unseen_rule`](@ref), [`attribution_observed_count`](@ref) and [`attribution_families`](@ref), the fields `h1` and `dc` from [`attribution_leverage_marks`](@ref) and [`attribution_dropped_columns`](@ref), and the row key `key` from [`attribution_row_key`](@ref).
 
 # Related
 
@@ -369,14 +332,14 @@ The block states its histories through the reads of [`factor_attribution`](@ref)
 """
 function attribution_block_arrays(rr::AbstractLoadingsRegressionResult,
                                   pr::AbstractPriorResult)
-    return (; B = attribution_exposures(rr), f = attribution_factor_returns(rr, pr),
-            eps = attribution_idiosyncratic_returns(rr, pr), lag = attribution_lag(rr),
-            rw = attribution_regression_weights(rr),
-            vs = attribution_idiosyncratic_variances(rr),
-            fcb = attribution_family_basis(rr), unseen = attribution_unseen_rule(rr),
-            no = attribution_observed_count(rr), fam = attribution_families(rr),
-            h1 = attribution_leverage_marks(rr), dc = attribution_dropped_columns(rr),
-            attribution_row_key(rr)...)
+    return AttributionBlock(attribution_exposures(rr), attribution_factor_returns(rr, pr),
+                            attribution_idiosyncratic_returns(rr, pr), attribution_lag(rr),
+                            attribution_regression_weights(rr),
+                            attribution_idiosyncratic_variances(rr),
+                            attribution_family_basis(rr), attribution_unseen_rule(rr),
+                            attribution_observed_count(rr), attribution_families(rr),
+                            attribution_leverage_marks(rr), attribution_dropped_columns(rr),
+                            attribution_row_key(rr))
 end
 """
     attribution_leverage_marks(rr::AbstractLoadingsRegressionResult) -> Nothing
@@ -460,12 +423,76 @@ function attribution_marked_assets(h1::AbstractMatrix{Bool})
     return BitVector(vec(any(h1; dims = 1)))
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The marks of a rule for a Leverage-One Pair: the assets and the factors whose variance split an attribution does not identify.
+
+[`attribution_leverage_split`](@ref) returns it, or `nothing` when the rule marks nothing. A rule for an unknown entry builds it in its own method of that verb, as the `# Interfaces` section of [`AbstractUnknownEntryRule`](@ref) states. So the type is the contract of the interface, and its constructor checks that the marks name an asset. [`attribution_leverage_nan`](@ref) reads it, and puts `NaN` in every variance number that the marks read. A caller reads the fields by name, as `lv.assets` or `(; assets, factors) = lv`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    LeverageSplitResult(assets::AbstractVector{Bool}, factors::AbstractVector{Bool})
+    LeverageSplitResult(; assets::AbstractVector{Bool}, factors::AbstractVector{Bool})
+
+The positional constructor checks the values. The keyword constructor takes each field by name, with no default, and calls it.
+
+## Validation
+
+  - `assets` marks at least one asset. Otherwise, the constructor raises an `ArgumentError`, because a rule that marks nothing answers `nothing`.
+
+# Examples
+
+```jldoctest
+julia> lv = PortfolioOptimisers.LeverageSplitResult(; assets = [false, true],
+                                                    factors = [true, false, false]);
+
+julia> (findall(lv.assets), findall(lv.factors))
+([2], [1])
+
+julia> PortfolioOptimisers.LeverageSplitResult([false, false], [true])
+ERROR: ArgumentError: the marks of a Leverage-One Pair must name at least one asset: a rule that marks nothing answers `nothing`
+[...]
+```
+
+# Related
+
+  - [`attribution_leverage_split`](@ref)
+  - [`attribution_leverage_nan`](@ref)
+  - [`AbstractUnknownEntryRule`](@ref)
+  - [`EntrywiseUnknown`](@ref)
+"""
+@concrete struct LeverageSplitResult <: AbstractResult
+    """
+    Whether the attribution marks each asset, `true` at every held asset whose variance split it does not identify.
+    """
+    assets
+    """
+    Whether the attribution marks each factor, `true` at every factor whose only member is a marked asset.
+    """
+    factors
+    function LeverageSplitResult(assets::AbstractVector{Bool},
+                                 factors::AbstractVector{Bool})
+        @argcheck(any(assets),
+                  ArgumentError("the marks of a Leverage-One Pair must name at least one asset: a rule that marks nothing answers `nothing`"))
+        return new{typeof(assets), typeof(factors)}(assets, factors)
+    end
+end
+function LeverageSplitResult(; assets::AbstractVector{Bool},
+                             factors::AbstractVector{Bool})::LeverageSplitResult
+    return LeverageSplitResult(assets, factors)
+end
+"""
     attribution_leverage_split(rule::ZeroUnknown, args...) -> Nothing
     attribution_leverage_split(rule::EntrywiseUnknown, lev::Nothing, args...) -> Nothing
     attribution_leverage_split(rule::EntrywiseUnknown, lev::AbstractVector{Bool}, w::VecNum,
-                               M::MatNum) -> Option{<:NamedTuple}
+                               M::MatNum) -> Option{<:LeverageSplitResult}
     attribution_leverage_split(rule::EntrywiseUnknown, h1::AbstractMatrix{Bool},
-                               W::VecNum_MatNum, B::MatNum_Arr3Num) -> Option{<:NamedTuple}
+                               W::VecNum_MatNum, B::MatNum_Arr3Num)
+        -> Option{<:LeverageSplitResult}
 
 Return the assets and the factors whose variance split the attribution does not identify, or `nothing`.
 
@@ -481,11 +508,11 @@ The predicted method reads an asset mask and one set of loadings, through [`attr
   - `w`: Portfolio weights.
   - `W`: Portfolio weights, or the weight history, `observations × assets`.
   - `M`: Loadings, `assets × factors`.
-  - `B`: Loadings, or the exposure history, `observations × assets × factors`, zero at an inactive pair.
+  - `B`: Loadings, or the exposure history, `assets × factors × observations`, zero at an inactive pair.
 
 # Returns
 
-  - `lv::Option{<:NamedTuple}`: `nothing` when the portfolio holds no marked asset. Otherwise the asset mask `assets` and the factor mask `factors`.
+  - `lv::Option{<:LeverageSplitResult}`: `nothing` when the portfolio holds no marked asset. Otherwise the asset mask `assets` and the factor mask `factors`.
 
 # Related
 
@@ -509,12 +536,12 @@ function attribution_leverage_split(::EntrywiseUnknown, lev::AbstractVector{Bool
     for i in findall(held)
         attribution_sole_factors!(fac, M, i)
     end
-    return (; assets = held, factors = fac)
+    return LeverageSplitResult(held, fac)
 end
 function attribution_leverage_split(::EntrywiseUnknown, h1::AbstractMatrix{Bool},
                                     W::VecNum_MatNum, B::MatNum_Arr3Num)
     held = falses(size(h1, 2))
-    fac = falses(size(B, ndims(B)))
+    fac = falses(size(B, 2))
     for t in axes(h1, 1)
         wt = attribution_weights(W, t)
         for i in findall(view(h1, t, :) .& .!iszero.(wt))
@@ -522,7 +549,7 @@ function attribution_leverage_split(::EntrywiseUnknown, h1::AbstractMatrix{Bool}
             attribution_sole_factors!(fac, attribution_slice(B, t), i)
         end
     end
-    return any(held) ? (; assets = held, factors = fac) : nothing
+    return any(held) ? LeverageSplitResult(held, fac) : nothing
 end
 """
     attribution_sole_factors!(fac::AbstractVector{Bool}, Bt::MatNum, i::Integer)
@@ -556,12 +583,14 @@ function attribution_sole_factors!(fac::AbstractVector{Bool}, Bt::MatNum, i::Int
 end
 """
     attribution_leverage_nan(lv::Nothing, x) -> x
-    attribution_leverage_nan(lv::NamedTuple, x::Nothing) -> Nothing
-    attribution_leverage_nan(lv::NamedTuple, c::AttributionComponent) -> AttributionComponent
-    attribution_leverage_nan(lv::NamedTuple, bd::AttributionBreakdown) -> AttributionBreakdown
-    attribution_leverage_nan(lv::NamedTuple, abd::AssetAttributionBreakdown)
+    attribution_leverage_nan(lv::LeverageSplitResult, x::Nothing) -> Nothing
+    attribution_leverage_nan(lv::LeverageSplitResult, c::AttributionComponent)
+        -> AttributionComponent
+    attribution_leverage_nan(lv::LeverageSplitResult, bd::AttributionBreakdown)
+        -> AttributionBreakdown
+    attribution_leverage_nan(lv::LeverageSplitResult, abd::AssetAttributionBreakdown)
         -> AssetAttributionBreakdown
-    attribution_leverage_nan(lv::NamedTuple, afc::AssetFactorContribution)
+    attribution_leverage_nan(lv::LeverageSplitResult, afc::AssetFactorContribution)
         -> AssetFactorContribution
 
 Return a part of an attribution with `NaN` in every variance number that reads the split of a held Leverage-One Pair.
@@ -585,14 +614,14 @@ The total return of the pair is identified, and the split between its systematic
 function attribution_leverage_nan(::Nothing, x)
     return x
 end
-function attribution_leverage_nan(::NamedTuple, ::Nothing)::Nothing
+function attribution_leverage_nan(::LeverageSplitResult, ::Nothing)::Nothing
     return nothing
 end
-function attribution_leverage_nan(::NamedTuple, c::AttributionComponent)
+function attribution_leverage_nan(::LeverageSplitResult, c::AttributionComponent)
     nan = oftype(c.vol, NaN)
     return AttributionComponent(nan, nan, nan, c.mu_contrib, nan, c.mu_se)
 end
-function attribution_leverage_nan(lv::NamedTuple, bd::AttributionBreakdown)
+function attribution_leverage_nan(lv::LeverageSplitResult, bd::AttributionBreakdown)
     m = lv.factors
     return AttributionBreakdown(bd.labels, bd.exposure, bd.exposure_std, bd.vol,
                                 attribution_mask_nan(bd.corr, m),
@@ -600,16 +629,13 @@ function attribution_leverage_nan(lv::NamedTuple, bd::AttributionBreakdown)
                                 attribution_mask_nan(bd.pct_var, m), bd.mu, bd.mu_contrib,
                                 bd.mu_se)
 end
-function attribution_leverage_nan(lv::NamedTuple, abd::AssetAttributionBreakdown)
+function attribution_leverage_nan(lv::LeverageSplitResult, abd::AssetAttributionBreakdown)
     m = lv.assets
-    return AssetAttributionBreakdown(abd.weight, abd.weight_std,
-                                     attribution_mask_nan(abd.sys_vol_contrib, m),
-                                     abd.sys_mu_contrib,
-                                     attribution_mask_nan(abd.idio_vol_contrib, m),
-                                     abd.idio_mu_contrib, abd.vol, abd.corr,
-                                     abd.vol_contrib, abd.pct_var, abd.mu, abd.mu_contrib)
+    return rebuild_struct(abd,
+                          (; sys_vol_contrib = attribution_mask_nan(abd.sys_vol_contrib, m),
+                           idio_vol_contrib = attribution_mask_nan(abd.idio_vol_contrib, m)))
 end
-function attribution_leverage_nan(lv::NamedTuple, afc::AssetFactorContribution)
+function attribution_leverage_nan(lv::LeverageSplitResult, afc::AssetFactorContribution)
     return AssetFactorContribution(attribution_mask_nan(afc.vol_contrib,
                                                         lv.assets .& transpose(lv.factors)),
                                    afc.mu_contrib)
@@ -638,8 +664,9 @@ function attribution_mask_nan(A::AbstractArray, m::AbstractArray{Bool})
     return map((x, b) -> b ? oftype(x, NaN) : x, A, m)
 end
 """
-    attribution_error_pass(s2::AbstractMatrix, g::MatNum, al::NamedTuple, red::NamedTuple,
-                           fam::Option{<:VecStr}, s1::Number) -> NamedTuple
+    attribution_error_pass(s2::AbstractMatrix, g::MatNum, al::AlignedAttributionBlock,
+                           red::ErrorRegressionBasis, fam::Option{<:VecStr}, s1::Number)
+        -> AttributionErrorsResult
 
 Return the standard errors of the mean return contributions for one matrix of idiosyncratic variances.
 
@@ -656,9 +683,7 @@ The sandwich of each observation reads `s2`, and the function sums it over the o
 
 # Returns
 
-  - `sys::Real`: The standard error of the systematic mean return contribution.
-  - `factor::VecNum`: The standard error of each factor's, `NaN` for an observed factor.
-  - `family::Option{<:VecNum}`: The standard error of each family's, or `nothing`.
+  - `ses::AttributionErrorsResult`: The standard error `sys` of the systematic mean return contribution, the standard error `factor` of each factor's, `NaN` for an observed factor, and the standard error `family` of each family's, or `nothing`.
 
 # Related
 
@@ -666,14 +691,15 @@ The sandwich of each observation reads `s2`, and the function sums it over the o
   - [`attribution_sandwich`](@ref)
   - [`attribution_family_errors`](@ref)
 """
-function attribution_error_pass(s2::AbstractMatrix, g::MatNum, al::NamedTuple,
-                                red::NamedTuple, fam::Option{<:VecStr}, s1::Number)
+function attribution_error_pass(s2::AbstractMatrix, g::MatNum, al::AlignedAttributionBlock,
+                                red::ErrorRegressionBasis, fam::Option{<:VecStr},
+                                s1::Number)
     T, K = size(g)
     cur = attribution_observed_indices(al.no, K)
     keep = findall(!, red.observed)
     se(v) = s1 * sqrt(max(zero(v), v)) / T
     function obs_covariance(t)
-        ob = attribution_dropped_observation(al.dc, view(red.B, t, :, :),
+        ob = attribution_dropped_observation(al.dc, view(red.B, :, :, t),
                                              unseen_member_change_at(red.P, t), keep,
                                              red.nr, t)
         Vt = attribution_sandwich(ob.B, view(al.rw, t, :), view(s2, t, :), keep)
@@ -682,21 +708,22 @@ function attribution_error_pass(s2::AbstractMatrix, g::MatNum, al::NamedTuple,
     V = [obs_covariance(t) for t in 1:T]
     sys = se(sum(LinearAlgebra.dot(view(red.g, t, keep), V[t], view(red.g, t, keep))
                  for t in 1:T))
-    Vf = attribution_expand_errors(al.fcb, attribution_scatter(V, keep, red.nr))
-    factor = [se(sum(g[t, k]^2 * Vf[t, k, k] for t in 1:T)) for k in 1:K]
+    Vf = expand_factor_covariance(al.fcb, attribution_scatter(V, keep, red.nr))
+    factor = [se(sum(g[t, k]^2 * Vf[k, k, t] for t in 1:T)) for k in 1:K]
     for k in cur
         factor[k] = oftype(factor[k], NaN)
     end
-    return (; sys = sys, factor = factor,
-            family = attribution_family_errors(fam, g, Vf, s1, T, cur))
+    return AttributionErrorsResult(sys, factor,
+                                   attribution_family_errors(fam, g, Vf, s1, T, cur))
 end
 """
-    attribution_leverage_errors(rule::ZeroUnknown, h1, reg, ses, pass) -> NamedTuple
+    attribution_leverage_errors(rule::ZeroUnknown, h1, reg, ses, pass)
+        -> AttributionErrorsResult
     attribution_leverage_errors(rule::EntrywiseUnknown, h1::Nothing, reg, ses, pass)
-        -> NamedTuple
+        -> AttributionErrorsResult
     attribution_leverage_errors(rule::EntrywiseUnknown, h1::AbstractMatrix{Bool},
-                                reg::AbstractMatrix{Bool}, ses::NamedTuple, pass)
-        -> NamedTuple
+                                reg::AbstractMatrix{Bool}, ses::AttributionErrorsResult,
+                                pass) -> AttributionErrorsResult
 
 Return the standard errors with `NaN` at every output whose sandwich reads a Leverage-One Pair.
 
@@ -742,7 +769,7 @@ Where:
 
 # Returns
 
-  - `ses::NamedTuple`: The standard errors, with `NaN` at every output that reads a marked pair.
+  - `ses::AttributionErrorsResult`: The standard errors, with `NaN` at every output that reads a marked pair.
 
 # Related
 
@@ -750,20 +777,27 @@ Where:
   - [`attribution_leverage_split`](@ref)
   - [`KindwiseUnknown`](@ref)
 """
-function attribution_leverage_errors(::ZeroUnknown, ::Any, ::Any, ses::NamedTuple, ::Any)
+function attribution_leverage_errors(::ZeroUnknown, ::Any, ::Any,
+                                     ses::AttributionErrorsResult, ::Any)
     return ses
 end
-function attribution_leverage_errors(::EntrywiseUnknown, ::Nothing, ::Any, ses::NamedTuple,
-                                     ::Any)
+function attribution_leverage_errors(::EntrywiseUnknown, ::Nothing, ::Any,
+                                     ses::AttributionErrorsResult, ::Any)
     return ses
 end
 function attribution_leverage_errors(::EntrywiseUnknown, h1::AbstractMatrix{Bool},
-                                     reg::AbstractMatrix{Bool}, ses::NamedTuple, pass)
+                                     reg::AbstractMatrix{Bool},
+                                     ses::AttributionErrorsResult, pass)
     mk = reg .& h1
     if !any(mk)
         return ses
     end
-    return map(attribution_leverage_error_nan, ses, pass(mk), pass(reg))
+    l, s = pass(mk), pass(reg)
+    return AttributionErrorsResult(attribution_leverage_error_nan(ses.sys, l.sys, s.sys),
+                                   attribution_leverage_error_nan(ses.factor, l.factor,
+                                                                  s.factor),
+                                   attribution_leverage_error_nan(ses.family, l.family,
+                                                                  s.family))
 end
 """
     attribution_leverage_error_nan(x::Nothing, l::Nothing, s::Nothing) -> Nothing
@@ -1002,4 +1036,5 @@ function attribution_unknown_note(::ZeroUnknown)
 end
 
 public attribution_unknown_keep, attribution_standalone, attribution_standalone_pairs,
-       attribution_unknown_note, attribution_leverage_split, attribution_leverage_errors
+       attribution_unknown_note, attribution_leverage_split, attribution_leverage_errors,
+       LeverageSplitResult

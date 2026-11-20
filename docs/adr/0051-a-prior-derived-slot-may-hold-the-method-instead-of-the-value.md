@@ -442,3 +442,22 @@ before it selected. It now selects first and hands the selected struct to the re
 deferred slot sees the solver, the observation weights and the children already settled. The three
 resolution points of this ADR are unchanged; only the order inside the first one moved. ADR 0096
 carries the decision.
+
+## Amendment (2026-10-27) — from [#1846](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1846)
+
+`Kurtosis` and `Skewness` lose `mu` and `pe`. ADR 0221 makes their functors read the comoment
+matrix, so each carries one deferrable slot, `kt` or `sk`. The rule of `NegativeSkewness` then
+holds for them: the slot takes the prior estimator itself, and the measure takes no `pe`. A
+deferred matrix takes its centre from the `me` of its own estimator. So `deferred_centre`,
+`centring_target` and `fit_deferred_moment`, which threaded a stated `mu` into the fit, are
+removed. The `pe` of `VarianceSkewKurtosis` stays, and it fills `sigma`, `sk` and `kt`.
+
+## Amendment (2026-11-15) — from [#2072](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/2072)
+
+`resolve_deferred_child` is removed. It was a second name for `resolve_deferred_quantities` with
+one method for a vector of children. The per-slot rule is now the verb itself. A child measure
+resolves through its own method, a slot that declares nothing comes back unchanged through the
+generic method, and a vector of children resolves element by element through the method
+`resolve_deferred_quantities(xs::AbstractArray{<:Union{AbstractEstimator, AbstractAlgorithm}},
+pr, slv)`. It has the element-type bound of the old arm, so a matrix slot stays a value. The
+check `assert_resolved_slots` already had this form.

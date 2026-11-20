@@ -450,7 +450,4 @@ A [`Pipeline`](@ref) makes the data preparation part of the fitted model, so you
     every fold, and no test window enters an asset filter or a fill constant.
   - One grid can hold the parameters of the preprocessing and of the optimiser, and a grid
     value can replace a whole step.
-
-`docs/adr/0028-pipeline-workflow-estimator.md` gives the reasons for the design and lists the
-features it leaves for later.
 =#

@@ -428,6 +428,9 @@ end
 @testset "Generic X at Range" begin
     mr_block6()
 end
+@testset "Generic X at Range evaluates a DistributionValueatRisk tail on the weights" begin
+    mr_block6_distribution_tails()
+end
 @testset "Range measures equal their two tails when the tails differ" begin
     mr_block6_asymmetric()
 end
@@ -689,4 +692,142 @@ end
     res = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = box),
                             opt = JuMPOptimiser(; pe = pr, slv = slv)); save = true)
     @test !haskey(res.model, :lift_W)
+end
+@testset "Kurtosis: every formulation reaches the fourth moment, and each bound holds" begin
+    # Issue #1465. The returns are of unit size: at the size of a daily return the fourth
+    # moment is about 1e-9, below the tolerance of the solver, and the lift stays far from
+    # rank one.
+    Xk = randn(StableRNG(123), 200, 4) .+ 0.05
+    rdk = ReturnsResult(; nx = string.(1:4), X = Xk)
+    prk = prior(HighOrderPriorEstimator(), rdk)
+    slvk = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                  check_sol = (; allow_local = true, allow_almost = true),
+                  settings = Dict("verbose" => false))
+    m4(w) = mean(((Xk .- mean(Xk; dims = 1)) * w) .^ 4)
+    function kurt(r; obj = MinimumRisk(), pe = prk)
+        return optimise(MeanRisk(; r = r, obj = obj,
+                                 opt = JuMPOptimiser(; pe = pe, slv = slvk)), rdk)
+    end
+    # The spectrum is real, and its forms sum to the cokurtosis matrix and to the moment.
+    vals, vecs = PortfolioOptimisers.cokurtosis_spectrum(prk.kt, 4)
+    @test eltype(vals) <: Real && all(>=(0), vals)
+    Bs = [reshape(sqrt(vals[i]) * vecs[:, i], 4, 4) for i in eachindex(vals)]
+    @test isapprox(sum(B -> kron(B, B), Bs), prk.kt; rtol = 1e-12)
+    wt = fill(0.25, 4)
+    @test isapprox(sum(B -> (wt' * B * wt)^2, Bs), m4(wt); rtol = 1e-12)
+    # At the minimum every formulation gives the same weights. The risk is the square root of
+    # the fourth moment under SOCRiskExpr, and the fourth moment under the other three. The
+    # moment is flat at its minimum, so the weights agree to the solver's tolerance only.
+    ref = kurt(Kurtosis())
+    for N in (nothing, 4),
+        alg2 in (SOCRiskExpr(), SquaredSOCRiskExpr(), QuadRiskExpr(), RSOCRiskExpr())
+
+        res = kurt(Kurtosis(; N = N, alg = alg2))
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(res.w, ref.w; atol = 1e-4)
+        rk = isa(alg2, SOCRiskExpr) ? sqrt(m4(res.w)) : m4(res.w)
+        @test isapprox(JuMP.objective_value(res.model), rk; rtol = 1e-6)
+    end
+    # The rotated cone registers its epigraph variable, and the risk expression is that
+    # variable, not the cone row.
+    res = kurt(Kurtosis(; alg = RSOCRiskExpr()))
+    @test haskey(res.model, :tkurtosis_risk_1) && haskey(res.model, :ckurtosis_rsoc_1)
+    @test isapprox(JuMP.value(res.model[:tkurtosis_risk_1]), m4(res.w); rtol = 1e-6)
+    # The approximate formulation adds real rows only.
+    res = kurt(Kurtosis(; N = 2))
+    @test eltype(res.model[:vals_Akt]) <: Real
+    @test all(T -> T[2] != JuMP.MOI.EqualTo{ComplexF64},
+              JuMP.list_of_constraint_types(res.model))
+    # A measure's own matrix builds the same programme under a low-order prior.
+    res = kurt(Kurtosis(; N = 4, kt = prk.kt); pe = EmpiricalPrior())
+    @test isapprox(res.w, ref.w; atol = 1e-4)
+    # The bound acts on the square root of the fourth moment under SOCRiskExpr, and on the
+    # fourth moment under the other three. It is exact under both objectives.
+    for obj in (MaximumReturn(), MaximumRatio()), N in (nothing, 4),
+        (alg2, ub) in
+        ((SOCRiskExpr(), 0.4), (SquaredSOCRiskExpr(), 0.16), (QuadRiskExpr(), 0.16),
+         (RSOCRiskExpr(), 0.16))
+
+        res = kurt(Kurtosis(; N = N, alg = alg2, settings = RiskMeasureSettings(; ub = ub));
+                   obj = obj)
+        @test isapprox(sqrt(m4(res.w)), 0.4; rtol = 1e-6)
+    end
+    # With fewer forms than the rank of the matrix, the bound holds the truncated sum, and the
+    # fourth moment of the weights exceeds it.
+    res = kurt(Kurtosis(; N = 1, settings = RiskMeasureSettings(; ub = 0.4));
+               obj = MaximumReturn())
+    @test sqrt(m4(res.w)) > 0.5
+end
+@testset "Brownian distance variance: every formulation reaches the bound, and the bound covers the statistic" begin
+    # Issue #597.
+    Xb = randn(StableRNG(7), 30, 4) .* 0.01 .+ 0.001
+    rdb = ReturnsResult(; nx = string.(1:4), X = Xb)
+    prb = prior(EmpiricalPrior(), rdb)
+    slvb = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                  settings = Dict("verbose" => false))
+    function bdv(r; obj = MinimumRisk())
+        return optimise(MeanRisk(; r = r, obj = obj,
+                                 opt = JuMPOptimiser(; pe = prb, slv = slvb)), rdb)
+    end
+    bdvar = BrownianDistanceVariance()
+    algs = [(a1, a2) for a1 in (QuadRiskExpr(), RSOCRiskExpr())
+            for a2 in
+                (NormOneConeBrownianDistanceVariance(), IneqBrownianDistanceVariance())]
+    # The functor is the bound of equation 9 of the paper. It equals twice the variance plus
+    # the squared mean distance, and it exceeds the distance variance of Székely et al. by
+    # 2 |D 1|^2 / T^3, which is zero for a constant series only.
+    x = randn(StableRNG(42), 50) .* 0.01
+    T = length(x)
+    D = abs.(x .- x')
+    C = I - fill(1 / T, T, T)
+    dvar = sum(abs2, C * D * C) / T^2
+    @test isapprox(dvar, sum(abs2, D) / T^2 + (sum(D) / T^2)^2 - 2 * sum(D * D) / T^3;
+                   rtol = 1e-12)
+    @test isapprox(bdvar(x), 2 * sum(abs2, x .- mean(x)) / T + mean(D)^2; rtol = 1e-12)
+    @test isapprox(bdvar(x) - dvar, 2 * sum(abs2, D * ones(T)) / T^3; rtol = 1e-10)
+    @test 6.8 < bdvar(x) / dvar < 7
+    @test iszero(bdvar(fill(0.01, 5)))
+    # At the minimum every formulation gives the same weights. The model reports the functor,
+    # and the distance matrix is the true one, because the risk increases in each distance.
+    # The bound is flat at its minimum, and the conic objective of RSOCRiskExpr reaches it to
+    # the tolerance of the solver only: 8.4e-5 in the weights, 1.2e-5 in the risk.
+    ref = bdv(bdvar)
+    for (a1, a2) in algs
+        res = bdv(BrownianDistanceVariance(; alg1 = a1, alg2 = a2))
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(res.w, ref.w; atol = 2e-4)
+        xw = Xb * res.w
+        @test isapprox(JuMP.value(res.model[:bdvariance_risk]), bdvar(xw); rtol = 5e-5)
+        @test isapprox(JuMP.value(res.model[:risk]), bdvar(xw); rtol = 5e-5)
+        @test maximum(abs, JuMP.value.(res.model[:Dt]) .- abs.(xw .- xw')) < 1e-6
+    end
+    # A bound holds the functor under an objective that does not minimise the risk. The rotated
+    # cone left a rank-one square in the risk expression, and Clarabel refused the bound.
+    ub = 1.5 * bdvar(Xb * ref.w)
+    for (a1, a2) in algs
+        res = bdv(BrownianDistanceVariance(; alg1 = a1, alg2 = a2,
+                                           settings = RiskMeasureSettings(; ub = ub));
+                  obj = MaximumReturn())
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(bdvar(Xb * res.w), ub; rtol = 1e-4)
+        @test bdvar(Xb * res.w) <= ub * (1 + 1e-8)
+    end
+    # Under a ratio objective the bound row multiplies the bound by k, and the risk expression
+    # has degree two, so the bound acts on its square root. A bound on the expression itself
+    # had no effect at the tangency portfolio.
+    tan = bdv(bdvar; obj = MaximumRatio())
+    ub = (bdvar(Xb * ref.w) + bdvar(Xb * tan.w)) / 2
+    @test bdvar(Xb * tan.w) > ub * (1 + 1e-3)
+    for (a1, a2) in algs
+        res = bdv(BrownianDistanceVariance(; alg1 = a1, alg2 = a2,
+                                           settings = RiskMeasureSettings(; ub = ub));
+                  obj = MaximumRatio())
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(bdvar(Xb * res.w), ub; rtol = 1e-4)
+        @test haskey(res.model, :bdvariance_dev)
+    end
+    res = bdv(BrownianDistanceVariance(; alg1 = RSOCRiskExpr()))
+    @test haskey(res.model, :tsum_Dt) && haskey(res.model, :rsoc_sum_Dt)
+    @test isapprox(JuMP.value(res.model[:tsum_Dt]),
+                   (sum(JuMP.value.(res.model[:Dt])) / size(Xb, 1))^2; rtol = 1e-5)
 end

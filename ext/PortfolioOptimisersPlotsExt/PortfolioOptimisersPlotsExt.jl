@@ -1,11 +1,11 @@
 module PortfolioOptimisersPlotsExt
 
-using PortfolioOptimisers, StatsPlots, GraphRecipes, LinearAlgebra, Statistics, StatsBase,
-      Clustering, Distributions, StatsAPI
+using PortfolioOptimisers, StatsPlots, LinearAlgebra, Statistics, StatsBase, Clustering,
+      Distributions, StatsAPI
 
 import PortfolioOptimisers: ArrNum, VecNum, MatNum, Arr3Num, Option, VecNum_VecVecNum,
                             Slv_VecSlv, MatNum_Pr, PrE_Pr, Pr_RR, HClE_HCl, VecVecNum,
-                            RegE_Reg, NwE_ClE_Cl, AbstractCentralityEstimator,
+                            RegE_Reg, AbstractCentralityEstimator,
                             AbstractClustersEstimator, AbstractClusteringResult,
                             AbstractBaseRiskMeasure, BaseRM_VecBaseRM, VecBaseRM,
                             Scalariser, SumScalariser, measure_label, extract_pr,
@@ -13,7 +13,10 @@ import PortfolioOptimisers: ArrNum, VecNum, MatNum, Arr3Num, Option, VecNum_VecV
                             finite_magnitudes, finite_symmetric_clim, finite_columns,
                             factor_plot_prior, investable_plot_view, result_investable_mask,
                             investable_weights_view, fold_factor_returns, fold_fees,
-                            result_investable_view, strip_liquidation_charges
+                            result_investable_view, strip_liquidation_charges,
+                            AbstractPredictionResult, PredRes_MultiPredRes, regret_series,
+                            member_vector, prediction_weights, DocStringExtensions,
+                            @concrete
 
 # A result carries its weights on the caller's universe and its prior and fee on the one
 # the fit solved (ADR 0115), so every result arity below reads the three through
@@ -50,5 +53,6 @@ include("10_FrontierPlots.jl")
 include("11_FactorDiagnosticsPlots.jl")
 include("12_ForecastEvaluationPlots.jl")
 include("13_CovarianceForecastPlots.jl")
+include("14_ReportFigures.jl")
 
 end

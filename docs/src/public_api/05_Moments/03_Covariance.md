@@ -18,10 +18,8 @@ cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 
 ```@docs
 Covariance
-cov(ce::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
-cov(ce::Covariance{<:Any, <:Any, <:SemiMoment}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
-cor(ce::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
-cor(ce::Covariance{<:Any, <:Any, <:SemiMoment}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+cor(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 ```
 
 ## Incremental fit
@@ -35,8 +33,8 @@ partial_fit!(ce::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 
 partial_fit!(ce::GeneralCovariance, x::VecNum)
 partial_fit!(ce::Covariance{<:Any, <:Any, <:FullMoment}, x::VecNum)
 partial_fit!(ce::Covariance, ::VecNum_MatNum; kwargs...)
-cov(ce::Union{<:GeneralCovariance, <:Covariance{<:Any, <:Any, <:FullMoment}}, state::CovarianceState)
-cor(ce::Union{<:GeneralCovariance, <:Covariance{<:Any, <:Any, <:FullMoment}}, state::CovarianceState)
+cov(ce::Union{GeneralCovariance, Covariance{<:Any, <:Any, <:FullMoment}}, state::CovarianceState)
+cor(ce::Union{GeneralCovariance, Covariance{<:Any, <:Any, <:FullMoment}}, state::CovarianceState)
 port_opt_view(x::CovarianceState, i, args...)
 merge_states(a::CovarianceState, b::CovarianceState)
 ```

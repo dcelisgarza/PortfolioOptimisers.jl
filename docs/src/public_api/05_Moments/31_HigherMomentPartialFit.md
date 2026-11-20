@@ -14,5 +14,5 @@ port_opt_view(x::PortfolioOptimisers.CokurtosisPartialFitState, i, args...)
 partial_fit(ske::Coskewness{<:Any, <:Any, <:FullMoment}, args...; kwargs...)
 partial_fit(kte::Cokurtosis{<:Any, <:Any, <:FullMoment}, args...; kwargs...)
 mean(me::AbstractExpectedReturnsEstimator)
-coskewness(ske::CoskewnessEstimator)
+coskewness(ske::CoskewnessEstimator, state::PortfolioOptimisers.SampleBufferState = PortfolioOptimisers.partial_fit_cache(ske))
 ```

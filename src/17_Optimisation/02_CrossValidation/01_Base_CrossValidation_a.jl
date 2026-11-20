@@ -11,17 +11,6 @@ Abstract supertype for all cross-validation result types.
 """
 abstract type CrossValidationResult <: AbstractResult end
 """
-$(DocStringExtensions.TYPEDEF)
-
-Abstract supertype for all cross-validation algorithm types.
-
-# Related
-
-  - [`CrossValidationEstimator`](@ref)
-  - [`CrossValidationResult`](@ref)
-"""
-abstract type CrossValidationAlgorithm <: AbstractAlgorithm end
-"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Give a split result back unchanged.
@@ -41,7 +30,7 @@ function Base.split(res::CrossValidationResult, args...)
     return res
 end
 """
-    CVER = Union{<:CVE_Onl, <:CrossValidationResult}
+    CVER = Union{CVE_Onl, CrossValidationResult}
 
 Union of all cross-validation schemes, plain or online, and result types.
 
@@ -50,7 +39,7 @@ Union of all cross-validation schemes, plain or online, and result types.
   - [`CVE_Onl`](@ref)
   - [`CrossValidationResult`](@ref)
 """
-const CVER = Union{<:CVE_Onl, <:CrossValidationResult}
+const CVER = Union{CVE_Onl, CrossValidationResult}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -132,30 +121,12 @@ Abstract supertype for non-sequential optimisation cross-validation results.
 """
 abstract type NonSequentialCrossValidationResult <: OptimisationCrossValidationResult end
 # The split has already happened, so the count is the length of the enumeration the result
-# carries, and the data argument the estimator methods take is not read. This is the
-# `n_splits(cv)` and `n_splits(cv, rd)` pair that the `n_splits` docstring promises for a
-# result type; every concrete `OptimisationCrossValidationResult` carries `test_idx`.
-function n_splits(res::OptimisationCrossValidationResult)
+# carries, and the data argument the estimator methods take is not read. The ignored slot
+# gives the `n_splits(cv)` and `n_splits(cv, rd)` pair that the `n_splits` docstring promises
+# for a result type; every concrete `OptimisationCrossValidationResult` carries `test_idx`.
+function n_splits(res::OptimisationCrossValidationResult, ::Option{<:Prices_RR} = nothing)
     return length(res.test_idx)
 end
-function n_splits(res::OptimisationCrossValidationResult, ::Prices_RR)
-    return n_splits(res)
-end
-"""
-    OptCVER
-
-Union of all optimisation cross-validation estimators and results.
-
-# Related
-
-  - [`OptimisationCrossValidationEstimator`](@ref)
-  - [`OptimisationCrossValidationResult`](@ref)
-  - [`NonSeqCVER`](@ref)
-  - [`SeqCVER`](@ref)
-"""
-const OptCVER = Union{<:OptimisationCrossValidationEstimator,
-                      <:OptimisationCrossValidationResult}
-
 """
     NonSeqCVER
 
@@ -170,8 +141,8 @@ Union of all non-sequential cross-validation estimators and results.
   - [`SeqCVER`](@ref)
   - [`folds_are_time_ordered`](@ref)
 """
-const NonSeqCVER = Union{<:NonSequentialCrossValidationEstimator,
-                         <:NonSequentialCrossValidationResult}
+const NonSeqCVER = Union{NonSequentialCrossValidationEstimator,
+                         NonSequentialCrossValidationResult}
 """
     SeqCVER
 
@@ -183,8 +154,7 @@ Union of all sequential cross-validation estimators and results.
   - [`SequentialCrossValidationResult`](@ref)
   - [`NonSeqCVER`](@ref)
 """
-const SeqCVER = Union{<:SequentialCrossValidationEstimator,
-                      <:SequentialCrossValidationResult}
+const SeqCVER = Union{SequentialCrossValidationEstimator, SequentialCrossValidationResult}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -272,12 +242,19 @@ cv_timestamps(pr::AbstractPricesResult) = TimeSeries.timestamp(pr.X)
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for cross-validation estimators used in non-optimisation contexts
-(e.g. resampling for hierarchical clustering or phylogeny methods).
+Abstract supertype for the cross-validation schemes that the `cv` field of a meta-optimiser does
+not take.
+
+The `cv` field of [`NestedClustered`](@ref) and [`Stacking`](@ref) is bound to [`OptCVE_Onl`](@ref), so a scheme of this
+branch reaches an optimiser through [`cross_val_predict`](@ref). [`MultipleRandomised`](@ref) is the one
+member. It draws random asset subsets, applies an inner walk-forward to each, and backtests an
+optimiser on every path.
 
 # Related
 
   - [`CrossValidationEstimator`](@ref)
+  - [`NonOptimisationSequentialCrossValidationEstimator`](@ref)
+  - [`NonOptimisationCrossValidationResult`](@ref)
 """
 abstract type NonOptimisationCrossValidationEstimator <: CrossValidationEstimator end
 """
@@ -296,20 +273,6 @@ abstract type NonOptimisationSequentialCrossValidationEstimator <:
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for non-sequential non-optimisation cross-validation estimators. A
-non-sequential scheme makes folds that are not a timeline, such as randomly sampled or
-combinatorial folds.
-
-# Related
-
-  - [`NonOptimisationCrossValidationEstimator`](@ref)
-  - [`NonOptimisationNonSequentialCrossValidationResult`](@ref)
-"""
-abstract type NonOptimisationNonSequentialCrossValidationEstimator <:
-              NonOptimisationCrossValidationEstimator end
-"""
-$(DocStringExtensions.TYPEDEF)
-
 Abstract supertype for result types produced by non-optimisation cross-validation
 routines.
 
@@ -318,7 +281,6 @@ routines.
   - [`CrossValidationResult`](@ref)
   - [`NonOptimisationCrossValidationEstimator`](@ref)
   - [`NonOptimisationSequentialCrossValidationResult`](@ref)
-  - [`NonOptimisationNonSequentialCrossValidationResult`](@ref)
 """
 abstract type NonOptimisationCrossValidationResult <: CrossValidationResult end
 """
@@ -333,6 +295,24 @@ Abstract supertype for sequential non-optimisation cross-validation result types
 """
 abstract type NonOptimisationSequentialCrossValidationResult <:
               NonOptimisationCrossValidationResult end
+# The non-sequential pair below is the empty cell of the non-optimisation branch. No scheme
+# subtypes it yet. A future twin of `MultipleRandomised` over a `KFold` or a combinatorial inner
+# scheme, whose folds are not a timeline, can uncomment the pair and subtype it (#1873).
+#=
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for non-sequential non-optimisation cross-validation estimators. A
+non-sequential scheme makes folds that are not a timeline, such as randomly sampled or
+combinatorial folds.
+
+# Related
+
+  - [`NonOptimisationCrossValidationEstimator`](@ref)
+  - [`NonOptimisationNonSequentialCrossValidationResult`](@ref)
+"""
+abstract type NonOptimisationNonSequentialCrossValidationEstimator <:
+              NonOptimisationCrossValidationEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -345,6 +325,7 @@ Abstract supertype for non-sequential non-optimisation cross-validation result t
 """
 abstract type NonOptimisationNonSequentialCrossValidationResult <:
               NonOptimisationCrossValidationResult end
+=#
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -647,7 +628,8 @@ function warn_ruined_members(::Nothing, ::Nothing, ::Integer)::Nothing
 end
 function warn_ruined_members(::Nothing, ruined::VecInt, n::Integer)::Nothing
     if !isempty(ruined)
-        @warn "the drifted wealth of $(length(ruined)) of $(n) population member(s) is not positive, so their held weights are `NaN` and their members are dropped: $(ruined)"
+        @warn("the drifted wealth of $(length(ruined)) of $(n) population member(s) is not positive, so their held weights are `NaN` and their members are dropped: $(ruined)",
+              maxlog = log_limit(:warn), _id = @log_id())
     end
     return nothing
 end
@@ -681,6 +663,8 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields. `res` and `rd` are required, because a fold prediction needs both. `hw` defaults to `nothing`, which is a fold that held its target weights on every observation. `idx` defaults to `nothing`, which is a prediction made over returns data that no fold index selected.
 
+The type of `res` is not a type parameter. The field is bound to `NonFiniteAllocationOptimisationResult`, so the folds of two optimisers have one type when their `rd`, `hw` and `idx` have one type, and [`MultiPeriodPredictionResult`](@ref) narrows its folds to that type. The type parameters are the types of `rd`, `hw` and `idx`, in that order. A reader of `res` dispatches on its value at run time.
+
 `hw` is present only when a Weight Drift or a Previous-Weights Source ran over the fold, and the fold-taking consumers dispatch on its type. It carries the asset returns of the fold, the weights the drift started from, the weights held after the last observation and the drift that made them. [`weight_path`](@ref) rebuilds the weight path from it.
 
 # Related
@@ -698,7 +682,7 @@ Keywords correspond to the struct's fields. `res` and `rd` are required, because
     """
     $(field_dict[:pred_res])
     """
-    res
+    res::NonFiniteAllocationOptimisationResult
     """
     $(field_dict[:rd])
     """
@@ -714,7 +698,9 @@ Keywords correspond to the struct's fields. `res` and `rd` are required, because
     function PredictionResult(res::NonFiniteAllocationOptimisationResult,
                               rd::PredictionReturnsResult, hw::Option{<:HeldWeightsResult},
                               idx::Option{<:VecInt})
-        return new{typeof(res), typeof(rd), typeof(hw), typeof(idx)}(res, rd, hw, idx)
+        # `res` is not a type parameter, so the folds of every optimiser share one type
+        # (ADR 0067, amendment of 2026-11-18).
+        return new{typeof(rd), typeof(hw), typeof(idx)}(res, rd, hw, idx)
     end
 end
 function PredictionResult(; res::NonFiniteAllocationOptimisationResult,
@@ -863,8 +849,9 @@ Represents the outer collection of cross-validation paths, where each inner vect
   - [`CombinatorialCrossValidation`](@ref)
 """
 const VecVecPredRes = AbstractVector{<:VecPredRes}
-function expected_risk(r::BaseRM_VecBaseRM, pred::PredictionResult; kwargs...)
-    return expected_risk_from_returns(r, pred.rd.X; kwargs...)
+function expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM,
+                       pred::PredictionResult; kwargs...)
+    return expected_risk_from_returns(sca, r, pred.rd.X; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -894,8 +881,8 @@ function rolling_window_measure(r::BaseRM_VecBaseRM, pred::PredictionResult,
     return rolling_window_measure(r, pred.rd.X, window; kwargs...)
 end
 """
-    calc_net_asset_returns(pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult}, fees = nothing)
-    calc_net_asset_returns(pred::PredictionResult{<:Any, <:Any, Nothing}, args...)
+    calc_net_asset_returns(pred::PredictionResult{<:Any, <:HeldWeightsResult}, fees = nothing)
+    calc_net_asset_returns(pred::PredictionResult{<:Any, Nothing}, args...)
 
 Split a fold's net return series over the assets that produced it.
 
@@ -931,7 +918,7 @@ A fold that carries no Held Weights record raises. `pred.rd.X` is the **portfoli
   - [`PredictionResult`](@ref)
   - [`fold_fees`](@ref)
 """
-function calc_net_asset_returns(pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult},
+function calc_net_asset_returns(pred::PredictionResult{<:Any, <:HeldWeightsResult},
                                 fees::Option{<:Fees} = nothing)
     hw = pred.hw
     # The record was expanded back to the caller's universe on the way out of `predict`, so
@@ -942,12 +929,12 @@ function calc_net_asset_returns(pred::PredictionResult{<:Any, <:Any, <:HeldWeigh
                                   fold_fees(pred.res, fees, hw.X),
                                   result_investable_mask(pred.res))
 end
-function calc_net_asset_returns(::PredictionResult{<:Any, <:Any, Nothing}, args...)
+function calc_net_asset_returns(::PredictionResult{<:Any, Nothing}, args...)
     return throw(ArgumentError("`calc_net_asset_returns(pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor a `DriftedWeights` source.\nSet one of them so the fold records its asset returns, or call `calc_net_asset_returns(w, X, fees)` with the returns you fitted on."))
 end
 """
-    risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult}, fees = nothing; kwargs...)
-    risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any, <:Any, Nothing}, args...; kwargs...)
+    risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any, <:HeldWeightsResult}, fees = nothing; kwargs...)
+    risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any, Nothing}, args...; kwargs...)
 
 Decompose a fold's risk over its assets.
 
@@ -993,7 +980,7 @@ A fold that carries no Held Weights record raises, because `pred.rd.X` is the po
   - [`fold_fees`](@ref)
 """
 function risk_contribution(r::BaseRM_VecBaseRM,
-                           pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult},
+                           pred::PredictionResult{<:Any, <:HeldWeightsResult},
                            fees::Option{<:Fees} = nothing; kwargs...)
     # The record and the target weights are on the caller's universe, and the result's
     # fee is on the investable one, so the fold views the first two at the mask before
@@ -1004,13 +991,13 @@ function risk_contribution(r::BaseRM_VecBaseRM,
                            fold_fees(pred.res, fees, pred.hw.X); kwargs...)
     return expand_investable_weights(imsk, rc)
 end
-function risk_contribution(::BaseRM_VecBaseRM, ::PredictionResult{<:Any, <:Any, Nothing},
-                           args...; kwargs...)
+function risk_contribution(::BaseRM_VecBaseRM, ::PredictionResult{<:Any, Nothing}, args...;
+                           kwargs...)
     return throw(ArgumentError("`risk_contribution(r, pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor a `DriftedWeights` source.\nSet one of them so the fold records its asset returns, or call `risk_contribution(r, pred.res.w, rd.X, fees)` with the returns you fitted on."))
 end
 """
-    factor_risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult}, fees = nothing; rd, kwargs...)
-    factor_risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any, <:Any, Nothing}, args...; kwargs...)
+    factor_risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any, <:HeldWeightsResult}, fees = nothing; rd, kwargs...)
+    factor_risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any, Nothing}, args...; kwargs...)
 
 Decompose a fold's risk over its factors.
 
@@ -1055,7 +1042,7 @@ The first-order caveat of the fold-taking [`risk_contribution`](@ref) method hol
   - [`fold_fees`](@ref)
 """
 function factor_risk_contribution(r::BaseRM_VecBaseRM,
-                                  pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult},
+                                  pred::PredictionResult{<:Any, <:HeldWeightsResult},
                                   fees::Option{<:Fees} = nothing;
                                   rd::Option{<:ReturnsResult} = nothing, kwargs...)
     # The same view at the mask as the `risk_contribution` method above, and `rd` takes
@@ -1104,9 +1091,8 @@ end
 function fold_factor_returns(imsk, rd::ReturnsResult, ::PredictionResult)
     return investable_returns_view(imsk, rd)
 end
-function factor_risk_contribution(::BaseRM_VecBaseRM,
-                                  ::PredictionResult{<:Any, <:Any, Nothing}, args...;
-                                  kwargs...)
+function factor_risk_contribution(::BaseRM_VecBaseRM, ::PredictionResult{<:Any, Nothing},
+                                  args...; kwargs...)
     return throw(ArgumentError("`factor_risk_contribution(r, pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor a `DriftedWeights` source.\nSet one of them so the fold records its asset returns, or call `factor_risk_contribution(r, pred.res.w, rd.X, fees; rd = rd)` with the returns you fitted on."))
 end
 """
@@ -1169,6 +1155,11 @@ arrays of the state in place, the held timestamps among them. The Result then na
 which no fold ends, and `Resume` refuses it. [`partial_fit!`](@ref) states this contract for a
 kept estimator.
 
+The type of `opt` is not a type parameter of the Result. The field is bound to
+`Union{Nothing, AbstractEstimator}`, so the Results of two online runs with different optimisers
+have one type, and a verb that reads the Result compiles one time for both. No verb reads
+`opt` except [`Resume`](@ref), and `Resume` carries the type of `opt` in its own type parameter.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -1181,7 +1172,9 @@ $(DocStringExtensions.FIELDS)
         opt::Option{<:AbstractEstimator} = nothing
     ) -> MultiPeriodPredictionResult
 
-Keywords correspond to the struct's fields. `pred` is required. The constructor concatenates the return data of the folds into `mrd`, and a concatenation of no folds has no names and no clock.
+Keywords correspond to the struct's fields. `pred` is required. The constructor concatenates the return data of the folds into `mrd`, and a concatenation of no folds has no names and no clock. `mrd` is a derived field, so `Accessors.set` computes it again from the new `pred`, and it refuses a patch of `mrd`.
+
+The constructor narrows `pred` to the concrete type of its folds with [`concrete_typed_array`](@ref), when that type is not the element type of `pred` already. The type of a fold does not hold the type of its optimiser (see [`PredictionResult`](@ref)), so the folds of every optimiser narrow to one type, and a verb that reads the folds compiles one time for all of them. Folds of two types have no one concrete type, and the constructor keeps `pred` as it is.
 
 ## Validation
 
@@ -1212,10 +1205,22 @@ Keywords correspond to the struct's fields. `pred` is required. The constructor 
     """
     $(field_dict[:opt_pred])
     """
-    opt
+    opt::Union{Nothing, AbstractEstimator}
     function MultiPeriodPredictionResult(pred::VecPredRes, id::Any,
                                          opt::Option{<:AbstractEstimator})
         @argcheck(!isempty(pred), IsEmptyError("pred cannot be empty"))
+        # The fold loop fills a `Vector{PredictionResult}`, and the folds share one concrete
+        # type, because `res` is not a type parameter. The narrow copy lets every reader of
+        # the folds infer, and costs no compile for each optimiser (ADR 0067, amendment of
+        # 2026-11-18). The call again is the barrier: the body below compiles for the
+        # narrow vector, not for the abstract one. Folds of two types narrow to a `Union`,
+        # which is not concrete, so that vector stays as it is and the call does not repeat.
+        if !isconcretetype(eltype(pred))
+            narrow = concrete_typed_array(pred)
+            if isconcretetype(eltype(narrow))
+                return MultiPeriodPredictionResult(narrow, id, opt)
+            end
+        end
         rd = getfield.(pred, :rd)
         nx = rd[1].nx
         X = mapreduce_RetMtx(rd)
@@ -1232,7 +1237,8 @@ Keywords correspond to the struct's fields. `pred` is required. The constructor 
         ivpa = rd[end].ivpa
         mrd = PredictionReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B,
                                       ne = ne, E = E, ts = ts, iv = iv, ivpa = ivpa)
-        return new{typeof(pred), typeof(mrd), typeof(id), typeof(opt)}(pred, mrd, id, opt)
+        # ADR 0067, amendment of 2026-11-02, measures the cost of `opt` as a type parameter.
+        return new{typeof(pred), typeof(mrd), typeof(id)}(pred, mrd, id, opt)
     end
 end
 function MultiPeriodPredictionResult(; pred::VecPredRes, id::Any = nothing,
@@ -1254,13 +1260,16 @@ Represents a collection of [`MultiPeriodPredictionResult`](@ref) objects.
 const VecMPredRes = AbstractVector{<:MultiPeriodPredictionResult}
 # Virtual properties `:res` and `:rd` broadcast over the inner `pred` vector, collecting
 # per-fold results and per-fold prediction returns (see [`@forward_properties`](@ref)).
+# The inner constructor computes `mrd` from `pred`, so a lens write leaves it out.
 @forward_properties MultiPeriodPredictionResult begin
     compute(res, pred.res; broadcast)
     compute(rd, pred.rd; broadcast)
+    derived(mrd)
 end
-function expected_risk(r::BaseRM_VecBaseRM, mpred::MultiPeriodPredictionResult; kwargs...)
+function expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM,
+                       mpred::MultiPeriodPredictionResult; kwargs...)
     X = mpred.mrd.X
-    return expected_risk_from_returns(r, X; kwargs...)
+    return expected_risk_from_returns(sca, r, X; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1290,7 +1299,7 @@ function rolling_window_measure(r::BaseRM_VecBaseRM, mpred::MultiPeriodPredictio
     return rolling_window_measure(r, mpred.mrd.X, window; kwargs...)
 end
 """
-    PredRes_MultiPredRes = Union{<:PredictionResult, <:MultiPeriodPredictionResult}
+    PredRes_MultiPredRes = Union{PredictionResult, MultiPeriodPredictionResult}
 
 Alias for a single-fold or multi-period prediction result.
 
@@ -1302,7 +1311,7 @@ Matches either a [`PredictionResult`](@ref) or a [`MultiPeriodPredictionResult`]
   - [`MultiPeriodPredictionResult`](@ref)
   - [`VecPredRes_MultiPredRes`](@ref)
 """
-const PredRes_MultiPredRes = Union{<:PredictionResult, <:MultiPeriodPredictionResult}
+const PredRes_MultiPredRes = Union{PredictionResult, MultiPeriodPredictionResult}
 """
     VecPredRes_MultiPredRes = AbstractVector{<:PredRes_MultiPredRes}
 
@@ -1362,11 +1371,21 @@ function PopulationPredictionResult(;
                                                                                                  0))::PopulationPredictionResult
     return PopulationPredictionResult(pred)
 end
-function expected_risk(r::BaseRM_VecBaseRM, preds::VecMPredRes; kwargs...)
-    return [expected_risk(r, pred; kwargs...) for pred in preds]
+function expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM, preds::VecMPredRes;
+                       kwargs...)
+    return [expected_risk(sca, r, pred; kwargs...) for pred in preds]
 end
-function expected_risk(r::BaseRM_VecBaseRM, ppred::PopulationPredictionResult; kwargs...)
-    return [expected_risk(r, p; kwargs...) for p in ppred.pred]
+function expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM,
+                       ppred::PopulationPredictionResult; kwargs...)
+    return [expected_risk(sca, r, p; kwargs...) for p in ppred.pred]
+end
+# The keyword form of every prediction method above. It takes `sca` out of the keywords and
+# calls the positional form, which every internal caller calls, as `expected_risk` on weights
+# does. The methods of a `PrRM`, which refuse a prediction, are positional too, so both forms
+# reach them.
+function expected_risk(r::BaseRM_VecBaseRM, p::Union{AbstractPredictionResult, VecMPredRes};
+                       sca::Option{<:Scalariser} = nothing, kwargs...)
+    return expected_risk(sca, r, p; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1423,36 +1442,39 @@ function rolling_window_measure(r::BaseRM_VecBaseRM, ppred::PopulationPrediction
     return [rolling_window_measure(r, p, window; kwargs...) for p in ppred.pred]
 end
 """
-    sort_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM; kwargs...)
+    sort_by_measure(sca::Option{<:Sca_VecToScaM}, ppred::PopulationPredictionResult,
+                    r::BaseRM_VecBaseRM; kwargs...)
 
-Sort the successful paths in a [`PopulationPredictionResult`](@ref) by their expected
-risk under `r`. A path in which any fold returned a failure code is left out.
+Sort the successful paths in a [`PopulationPredictionResult`](@ref) from the best to the worst
+under `r`. A path in which any fold returned a failure code is left out.
 
-A path whose measure is not finite goes **after** every finite one, under both directions of
-the ranking, because a non-finite number is not a best and must not be the answer of a
-`first`. The finite members are sorted among themselves, and the non-finite ones keep their own
-order at the end.
+A path whose measure is not finite goes **after** every finite one, because a non-finite
+number is not a best and must not be the answer of a `first`. The finite members are sorted
+among themselves, and the non-finite ones keep their own order at the end.
 
-The direction of the ranking comes from [`bigger_is_better`](@ref), which **throws** on a vector
-of measures that disagree on polarity. [`quantile_by_measure`](@ref) takes an explicit `sign`
-instead, so it admits a mixed vector.
+The rank reads the [`oriented_score`](@ref) of each path, which orients each measure before it
+reduces a vector. So a vector of measures that disagree on orientation is admitted, and the
+reduction reads oriented scores: [`MinScalariser`](@ref) ranks by the worst measure of each
+path and [`MaxScalariser`](@ref) by the best.
 
 # Algorithm
 
- 1. Keep the successful members of `ppred` with [`successful_members`](@ref).
- 2. Compute the expected risk of each member under `r`, giving `rks`.
- 3. Sort the members whose `rks` is finite by `rks`, in descending order when [`bigger_is_better`](@ref) holds of `r` and in ascending order otherwise.
- 4. Append the members whose `rks` is not finite, in their own order.
+ 1. Check `kwargs` with [`assert_path_reduction`](@ref).
+ 2. Keep the successful members of `ppred` with [`successful_members`](@ref).
+ 3. Compute the oriented score of each member under `r` and `sca` with [`oriented_score`](@ref), giving `rks`.
+ 4. Sort the members whose `rks` is finite by `rks`, in descending order.
+ 5. Append the members whose `rks` is not finite, in their own order.
 
 # Arguments
 
+  - $(arg_dict[:sca_path])
   - `ppred::PopulationPredictionResult`: Population prediction to sort.
-  - `r::BaseRM_VecBaseRM`: Risk measure used for ranking, or a vector of them. A vector is scalarised by `kwargs.sca`, defaulting to [`SumScalariser`](@ref).
-  - `kwargs...`: Keyword arguments forwarded to `expected_risk`.
+  - `r::BaseRM_VecBaseRM`: Risk measure used for ranking, or a vector of them.
+  - `kwargs...`: Keyword arguments forwarded to [`oriented_score`](@ref).
 
 # Validation
 
-  - A vector `r` whose measures disagree on polarity raises in [`bigger_is_better`](@ref).
+  - `kwargs` must not contain `sca`, through [`assert_path_reduction`](@ref).
 
 # Returns
 
@@ -1461,47 +1483,50 @@ instead, so it admits a mixed vector.
 # Related
 
   - [`quantile_by_measure`](@ref)
-  - [`bigger_is_better`](@ref)
+  - [`oriented_score`](@ref)
   - [`PopulationPredictionResult`](@ref)
-  - [`expected_risk`](@ref)
 """
-function sort_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM; kwargs...)
+function sort_by_measure(sca::Option{<:Sca_VecToScaM}, ppred::PopulationPredictionResult,
+                         r::BaseRM_VecBaseRM; kwargs...)
+    assert_path_reduction(kwargs, "kwargs")
     pred = successful_members(ppred)
-    rks = [expected_risk(r, x; kwargs...) for x in pred]
+    rks = [oriented_score(sca, r, x; kwargs...) for x in pred]
     fin = isfinite.(rks)
     idx = findall(fin)
-    return [pred[idx[sortperm(rks[idx]; rev = bigger_is_better(r))]]; pred[findall(!, fin)]]
+    return [pred[idx[sortperm(rks[idx]; rev = true)]]; pred[findall(!, fin)]]
 end
 """
-    quantile_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM, q::Real;
-                        r_kwargs::NamedTuple = (;), q_kwargs::NamedTuple = (;),
-                        sign::Integer = 1)
+    quantile_by_measure(sca::Option{<:Sca_VecToScaM}, ppred::PopulationPredictionResult,
+                        r::BaseRM_VecBaseRM, q::Real; r_kwargs::NamedTuple = (;),
+                        q_kwargs::NamedTuple = (;))
 
-Select the successful path in `ppred` whose expected risk under `r` is closest to the `q`-th quantile of the risk distribution across all successful paths.
+Select the successful path in `ppred` whose risk under `r` is closest to the `q`-th quantile of the risks across all successful paths.
+
+The risk of a path is its negated [`oriented_score`](@ref), so a larger risk is worse whatever the orientation of `r`. `q = 0` selects the best path and `q = 1` the worst. The score orients each measure before it reduces a vector, so a vector of measures that disagree on orientation is admitted.
 
 A path whose measure is not finite takes no part. It is dropped before the quantile, so one failed path cannot make the quantile non-finite and cannot be the answer.
 
-[`sort_by_measure`](@ref) calls [`bigger_is_better`](@ref) for its direction, so it **throws** on a vector of measures that disagree on polarity. This function takes an explicit `sign` instead. The caller gives the one fact that `bigger_is_better` cannot infer, so a mixed vector is admitted.
-
 # Algorithm
 
- 1. Keep the successful members of `ppred` with [`successful_members`](@ref).
- 2. Compute `sign` times the expected risk of each member under `r`, giving `rks`.
- 3. Drop the members whose `rks` is not finite.
- 4. Compute the `q`-th quantile of `rks` with `Statistics.quantile`, giving `rkq`.
- 5. Return the first member whose `abs(rks[i] - rkq)` is the smallest.
+ 1. Check `r_kwargs` with [`assert_path_reduction`](@ref).
+ 2. Keep the successful members of `ppred` with [`successful_members`](@ref).
+ 3. Compute the negated oriented score of each member under `r` and `sca` with [`oriented_score`](@ref), giving `rks`.
+ 4. Drop the members whose `rks` is not finite.
+ 5. Compute the `q`-th quantile of `rks` with `Statistics.quantile`, giving `rkq`.
+ 6. Return the first member whose `abs(rks[i] - rkq)` is the smallest.
 
 # Arguments
 
+  - $(arg_dict[:sca_path])
   - `ppred::PopulationPredictionResult`: Population prediction result.
-  - `r::BaseRM_VecBaseRM`: Risk measure for computing path risks, or a vector of them. A vector is scalarised by `r_kwargs.sca`, defaulting to [`SumScalariser`](@ref).
+  - `r::BaseRM_VecBaseRM`: Risk measure for computing path risks, or a vector of them.
   - `q::Real`: Quantile level in `[0, 1]`.
-  - `r_kwargs::NamedTuple = (;)`: Keyword arguments forwarded to `expected_risk`.
+  - `r_kwargs::NamedTuple = (;)`: Keyword arguments forwarded to [`oriented_score`](@ref). It must not contain `sca`.
   - `q_kwargs::NamedTuple = (;)`: Keyword arguments forwarded to `Statistics.quantile`.
-  - `sign::Integer = 1`: Orientation of the risk scale. Use `1` when a larger risk is worse, `-1` when it is better. This is what lets a mixed vector through, see below.
 
 # Validation
 
+  - `r_kwargs` must not contain `sca`, through [`assert_path_reduction`](@ref).
   - At least one successful member must have a finite measure. With none, `Statistics.quantile` receives an empty vector and throws.
 
 # Returns
@@ -1511,14 +1536,16 @@ A path whose measure is not finite takes no part. It is dropped before the quant
 # Related
 
   - [`sort_by_measure`](@ref)
+  - [`oriented_score`](@ref)
   - [`PopulationPredictionResult`](@ref)
-  - [`expected_risk`](@ref)
 """
-function quantile_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM,
+function quantile_by_measure(sca::Option{<:Sca_VecToScaM},
+                             ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM,
                              q::Real; r_kwargs::NamedTuple = (;),
-                             q_kwargs::NamedTuple = (;), sign::Integer = 1)
+                             q_kwargs::NamedTuple = (;))
+    assert_path_reduction(r_kwargs, "r_kwargs")
     pred = successful_members(ppred)
-    rks = [sign*expected_risk(r, p; r_kwargs...) for p in pred]
+    rks = [-oriented_score(sca, r, p; r_kwargs...) for p in pred]
     fin = findall(isfinite, rks)
     rks = rks[fin]
     pred = pred[fin]
@@ -1765,10 +1792,11 @@ function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsR
                                    ivpa = ivpa)
 end
 """
-    held_start_weights(retcode::OptimisationSuccess, w::VecNum, w_prev)
-    held_start_weights(retcode::OptimisationFailure, w::VecNum, w_prev::Nothing)
+    held_start_weights(retcode::OptimisationSuccess, w::VecNum_VecVecNum, w_prev)
+    held_start_weights(retcode::OptimisationFailure, w::VecNum_VecVecNum, w_prev::Nothing)
     held_start_weights(retcode::OptimisationFailure, w::VecNum, w_prev::VecNum)
-    held_start_weights(retcode::OptimisationReturnCode, w::VecVecNum, w_prev)
+    held_start_weights(retcode::OptimisationFailure, w::VecVecNum, w_prev::VecNum)
+    held_start_weights(retcode::OptimisationFailure, w::VecVecNum, w_prev::VecVecNum)
     held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::Nothing)
     held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::VecNum)
     held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::VecVecNum)
@@ -1779,12 +1807,13 @@ A fold that could not rebalance holds what it held. So under a Weight Drift or a
 
 # Algorithm
 
- 1. On an [`OptimisationSuccess`](@ref), give `w`.
- 2. On an [`OptimisationFailure`](@ref) over one vector, give `w_prev`, or `w` when there is none.
- 3. Over a population with one return code, repeat that code once per member.
- 4. Over a population with no `w_prev`, give `w`.
- 5. Over a population with one `w_prev` vector, repeat it once per member.
- 6. Over a population with one `w_prev` per member, give each member its own vector on a success and its entry of `w_prev` on a failure.
+The method that Julia selects is the algorithm. A population with one return code takes the same answer for every member, so its methods agree with the per-member methods under that code repeated once per member.
+
+ 1. On an [`OptimisationSuccess`](@ref), give `w`, one vector or a population.
+ 2. With no `w_prev`, give `w`.
+ 3. On an [`OptimisationFailure`](@ref) over one vector, give `w_prev`.
+ 4. On an [`OptimisationFailure`](@ref) over a population, give `w_prev` to each member: the one vector repeated once per member, or a copy of the vector of one `w_prev` per member.
+ 5. Over a population with one return code per member, give each member its own vector on a success, and on a failure the one `w_prev` vector or its own entry of `w_prev`.
 
 # Arguments
 
@@ -1794,7 +1823,8 @@ A fold that could not rebalance holds what it held. So under a Weight Drift or a
 
 # Validation
 
-  - A per-member `w_prev` has one entry per member of `w`, else a `DimensionMismatch` is raised.
+  - A per-member `w_prev` that a failure reads has one entry per member of `w`, else a `DimensionMismatch` is raised. A success reads no `w_prev`, so it does not check it.
+  - A vector of return codes with one `w_prev` vector has one code per member of `w`, else a `DimensionMismatch` is raised.
 
 # Returns
 
@@ -1807,23 +1837,29 @@ A fold that could not rebalance holds what it held. So under a Weight Drift or a
   - [`previous_weights`](@ref)
   - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
 """
-function held_start_weights(::OptimisationSuccess, w::VecNum, ::Any)
+function held_start_weights(::OptimisationSuccess, w::VecNum_VecVecNum, ::Any)
     return w
 end
-function held_start_weights(::OptimisationFailure, w::VecNum, ::Nothing)
+function held_start_weights(::OptimisationFailure, w::VecNum_VecVecNum, ::Nothing)
     return w
 end
 function held_start_weights(::OptimisationFailure, ::VecNum, w_prev::VecNum)
     return w_prev
 end
-function held_start_weights(retcode::OptimisationReturnCode, w::VecVecNum, w_prev)
-    return held_start_weights(fill(retcode, length(w)), w, w_prev)
+function held_start_weights(::OptimisationFailure, w::VecVecNum, w_prev::VecNum)
+    return fill(w_prev, length(w))
+end
+function held_start_weights(::OptimisationFailure, w::VecVecNum, w_prev::VecVecNum)
+    @argcheck(length(w_prev) == length(w),
+              DimensionMismatch("`length(w_prev) == length(w)` must hold.\nlength(w_prev) => $(length(w_prev))\nlength(w) => $(length(w))"))
+    return collect(w_prev)
 end
 function held_start_weights(::VecOptRetCode, w::VecVecNum, ::Nothing)
     return w
 end
 function held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::VecNum)
-    return held_start_weights(retcode, w, fill(w_prev, length(w)))
+    return [isa(retcode[i], OptimisationSuccess) ? w[i] : w_prev
+            for i in eachindex(retcode, w)]
 end
 function held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::VecVecNum)
     @argcheck(length(w_prev) == length(w),

@@ -31,12 +31,11 @@ WeightsInput
 scalarise_combine
 scalarise_map
 scalarise_logsumexp
+Sca_VecToScaM
 nothing_scalar_array_selector
 deferred_factors
+CoskewnessFit
 fit_deferred_quantity
-deferred_centre
-centring_target
-fit_deferred_moment
 deferred_quantity
 fan_out_slot
 fan_out_pe
@@ -47,21 +46,21 @@ deferred_slots
 functor_slots
 resolve_calibration_slots(x, pr::AbstractPriorResult)
 resolve_deferred_quantities(x, pr::AbstractPriorResult)
-resolve_deferred_child
+resolve_deferred_quantities(xs::AbstractArray{<:Union{AbstractEstimator, AbstractAlgorithm}}, pr::AbstractPriorResult)
 rebuild_with_slots
 assert_declared_slot_resolver
 assert_resolved_slots
+assert_filled_functor_slots
 sigma_chol_selector
 assert_derived_slot_has_source
 risk_measure_nothing_scalar_array_view
-solver_selector
 assert_observation_weights
 checked_observation_weights
 assert_half_open_unit_interval
 worst_positive_weight_loss
+positive_weight_rows
 weight_independent_target(::Nothing)
 weight_independent_target(::Number)
 weight_independent_target(::Any)
 moment_target_fees
-_Frontier
 ```

@@ -130,3 +130,24 @@ The standalone member tests do not change.
   the scale only in part when `rw` is a power of the capitalisation.
 - **Change the standalone member.** It stands outside a prior, and it keeps parity with the
   oracle (#1386).
+
+## Amendment (2026-11-14)
+
+The rule answers a data question, and the two seams of the fit go (#2076, #2093).
+`orthogonal_forecast_result` and `orthogonal_forecast_step` are gone. The three rules differ at the
+fit in one thing only: whether the member reads `cre`. So the rule states the regression that the
+member reads, with `orthogonal_forecast_regression(ofit, cre)`, which returns `cre` under
+`OrthogonalPartCalibration()` and `nothing` under every other rule. The batch fit calls
+`return_forecast(rfo, rd, csfm, orthogonal_forecast_regression(ofit, cre))`, and the carry fold
+calls `return_forecast_step` with the same last argument. One answer feeds both paths, so the carry
+fold cannot differ from the batch fit by a rule that changes one seam and not the other.
+
+The steps that dispatch on the rule are now `orthogonal_forecast_member`,
+`orthogonal_forecast_regression` and `orthogonal_forecast_rescale`. A rule that changes the fit in
+another way returns its own Return Forecast Estimator from `orthogonal_forecast_member`. Every
+member takes a last regression argument. A member that reads no regression takes `::Nothing =
+nothing`, so a regression that a rule gives it raises a `MethodError`.
+
+A second axis of dispatch, the rule, on `return_forecast` was refused. A method of a user rule,
+`return_forecast(::MyRule, rfe, …)`, would be ambiguous with a library method on
+`(::AbstractOrthogonalForecastFit, rfe::SomeForecast, …)`.

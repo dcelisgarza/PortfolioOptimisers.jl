@@ -1,5 +1,5 @@
 ```@meta
-Description = "Prediction CV, private API of PortfolioOptimisers.jl: Pipeline_OnlPipe, pipeline_cross_val_predict, pipeline_path_fit_and_predict, …"
+Description = "Prediction CV, private API of PortfolioOptimisers.jl: Pipeline_OnlPipe, pipeline_path_fit_and_predict, is_time_dependent, assert_pipeline_step_fold_count, …"
 ```
 
 # Prediction CV: private API
@@ -12,7 +12,6 @@ A scheme built by [`OnlineIndexWalkForward`](@ref) or [`OnlineDateWalkForward`](
 
 ```@docs
 PortfolioOptimisers.Pipeline_OnlPipe
-PortfolioOptimisers.pipeline_cross_val_predict
 ```
 
 ## Combinatorial and asset-resampling over a returns-level pipeline
@@ -28,11 +27,10 @@ PortfolioOptimisers.pipeline_path_fit_and_predict
 The functions below apply the schedule logic to each step of a pipeline. The check for a schedule looks through every step. So does the replacement of each schedule by its value for the fold, which also unwraps a schedule inside a [`PipelineStep`](@ref). A run with no folds sets each schedule step to its `default`. After the replacement, `pipeline_step_factory` gives the weights of the previous fold, `w_prev`, to the optimisation steps.
 
 ```@docs
-PortfolioOptimisers.pipeline_step_is_time_dependent
 is_time_dependent(p::Pipeline)
 PortfolioOptimisers.assert_pipeline_step_fold_count
-PortfolioOptimisers.update_time_dependent_step
 update_time_dependent_estimator(p::Pipeline, ctx::TimeDependentContext, all_binds::Bool = true)
+update_time_dependent_estimator(ps::PipelineStep, ctx::TimeDependentContext, all_binds::Bool = true)
 PortfolioOptimisers.reset_time_dependent_step
 reset_time_dependent_estimator(p::Pipeline)
 PortfolioOptimisers.pipeline_step_factory

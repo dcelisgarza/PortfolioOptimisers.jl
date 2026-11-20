@@ -231,3 +231,12 @@ and the completeness test — `Bool <: return_types(supports_precomputed_returns
 the first correction left. Net effect: the ADR-0006 locality property is restored for the
 precomputed-returns axis, at the cost of 3 explicit `= false` lines for the weights-dependent WRF
 measures.
+
+## Amendment (2026-10-27) — from [#1846](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1846)
+
+`Skewness` and `Kurtosis` leave the moment family of this contract. ADR 0221 makes their functors
+read the comoment matrix, so both are `WeightsInput` measures and have no precomputed-returns
+form. The example `Skewness()(view(pr.X, :, i))` of this ADR is now
+`ThirdCentralMoment(; ve = SimpleVariance())(view(pr.X, :, i))`, which gives the same standardised
+skewness of the series. The moment family that the contract serves is `LowOrderMoment`,
+`HighOrderMoment`, `ThirdCentralMoment` and `MedianAbsoluteDeviation`.

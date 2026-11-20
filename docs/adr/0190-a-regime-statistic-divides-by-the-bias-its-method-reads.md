@@ -540,3 +540,53 @@ and the portfolio target at `decay` too, with the limits below.
   `R = I`, and the damping has an exact model.
 - **A keyword on each target.** `DiagonalTarget` would carry a field that a geodesic shrinkage
   ignores, and the scalar estimator would need a keyword of its own anyway.
+
+## Amendment (2026-10-21)
+
+**The first-moment constant of `DiagonalTarget` is the expected root of a `χ²(n)` variate.** The
+constant was `√n`, the root of the mean of the sum and not the mean of its root, so by Jensen's
+inequality the raw statistic of `debias = RawStatistic()` read low at every correlation: at
+`n = 8` its squared multiplier was 6.0 % low on independent returns. `regime_denom` now takes the
+constant of `MahalanobisTarget`, `√2 Γ((n + 1)/2) / Γ(n/2)`, for both targets, which is exact for
+the diagonal sum at independent returns. `diagonal_law_factor` divides `S` by
+`(E[√S] / E[χ(n)])²`, so it is one at `μ = 1`, and it reads the constant, so the debiased statistic
+of the default `ExactDebias()` does not move in exact arithmetic. Measured against `v0.33.0` on a
+panel of six assets with a late listing and holidays, a `DiagonalTarget` fit of the first moment
+under `ExactDebias()` moves by 7.4e-16 relative at most, which is round-off, and the default
+estimator, on `PortfolioTarget`, is equal bit for bit. A raw fit moves by `n / E[χ(n)]²` before the
+clip, 1.0865 at `n = 6`. The decision above keeps its law factor and its
+shrunk spectrum.
+
+## Amendment (2026-10-27)
+
+**`hac_floor = nothing` turns the per-term floor off, and `NoHacFloor` is removed (#1867).** The
+two regime-adjusted estimators turned `regime_method` off with `nothing`, but turned `hac_floor`
+off with the singleton `NoHacFloor()`. One struct then had two spellings of "off". The maintainer
+ruled that `hac_floor` takes `nothing` too, so the field is bound to `Option{<:AbstractHacFloor}`,
+and `hac_floor!(::Nothing, X2, valid)` returns the squares unchanged. The default and the numbers do
+not move: no floor is still the default, and `PerTermHacFloor()` is still the oracle's rule. Where
+the decision above names `hac_floor = NoHacFloor()`, read `hac_floor = nothing`. The removal is a
+clean break with no deprecation, as ADR 0044 and ADR 0213 set.
+
+## Amendment (2026-10-28)
+
+**`debias = nothing` scores the raw statistic, and `RawStatistic` is removed (#1867).** The
+maintainer refined the rule of ADR 0222: a skipped procedure, or a trivial default, takes
+`nothing`, never a singleton that names it. `RawStatistic` skipped the debias and held no rule of
+its own, so the `debias` field of the two regime-adjusted estimators is bound to
+`Option{<:AbstractRegimeDebias}`. `debiases(::Nothing)` and `reads_dependence(::Nothing)` return
+`false`, as the methods on `RawStatistic` did. A regime method of a caller takes `debias = nothing`,
+and the refusal of the constructor names that spelling. The default `ExactDebias()` and the numbers
+do not move. Where the decision above names `debias = RawStatistic()`, read `debias = nothing`. The
+removal is a clean break with no deprecation, as ADR 0044 and ADR 0213 set.
+
+## Amendment (2026-10-31)
+
+**The HAC fixed point of the Mahalanobis factor is removed (#1919).** The decision above names
+`mahalanobis_bias(decay, K, n, hac_lags)`, which solved the fixed point from `ℓ'(t)` and `ℓ''(t)`.
+No code called it. `mahalanobis_bias_nodes` reads the exact factor of a HAC estimate from
+`mahalanobis_level_bias`, and it divides by the plain fixed point `mahalanobis_bias(decay, K, n)`
+only to interpolate the ratio between its nodes. The internal method and its tests are gone. The
+recursion now carries `ℓ'(t)` alone, because `ℓ''(t)` served only the Newton step of the removed
+method: the cut of a HAC transform bisects on `ℓ'`, and `hac_log_det_slopes` is
+`hac_log_det_slope`. The numbers do not move.

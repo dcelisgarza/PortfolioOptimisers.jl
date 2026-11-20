@@ -171,3 +171,9 @@ counting is already caught by ADR 0073's provenance comparison.
   `closed_at` it will consult. A shallow clone of depth 1 is not enough.
 - The queue is finite and self-limiting, and the refile clause adds a bounded, reviewed trickle
   rather than a second source of noise.
+
+## Amendment (2026-11-20)
+
+The job checks out `main`, the default branch, and not `dev`. ADR 0240 lands each feature in
+`main` through its own pull request, and `dev` retires when #1817 merges. The baseline that the
+job measures is then current on `main`. `Sweep.yml` (ADR 0084) takes the same change.

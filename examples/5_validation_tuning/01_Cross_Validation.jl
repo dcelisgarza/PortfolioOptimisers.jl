@@ -11,8 +11,9 @@ optimisation, and the measures and plots you can compute from their results.
 
 You can use cross-validation on its own to score an estimator, or inside a hyperparameter
 search. [`NestedClustered`](@ref) and [`Stacking`](@ref) also take a scheme in their `cv`
-field, wrapped in an [`OptimisationCrossValidation`](@ref). They then fit the outer estimator
-on the out-of-sample returns of the inner estimators.
+field. They then fit the outer estimator on the out-of-sample returns of the inner estimators.
+Under a [`CombinatorialCrossValidation`](@ref), their `scorer` field selects one path of each
+inner estimator.
 =#
 using PortfolioOptimisers, PrettyTables
 tsfmt = (v, i, j) -> begin
@@ -111,7 +112,7 @@ kfold_pred = cross_val_predict(mr, rd, kfold)
 We load the plot packages and draw four plots of the K-fold prediction.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 # The cumulative returns of the portfolio over all the KFold test windows.
 plot_portfolio_cumulative_returns(kfold_pred)
 # The distribution of the weight of every asset over the folds.

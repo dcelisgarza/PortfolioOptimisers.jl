@@ -80,7 +80,7 @@ The fallback is resolved after the optimiser's own fields, so a fallback that a 
  1. Return `opt` unchanged when [`is_time_dependent`](@ref) is `false`.
  2. Replace each scheduled field of `opt` with its value at the fold, through [`update_time_dependent_fields`](@ref). This gives the new `opt`.
  3. Resolve the inner optimiser `opt.opt` and the fallback `opt.fb` of the new `opt` with the same `ctx` and `all_binds`.
- 4. Rebuild `opt` with the two resolved estimators, through [`rebuild_estimator`](@ref).
+ 4. Rebuild `opt` with the two resolved estimators, through [`rebuild_struct`](@ref).
 
 # Arguments
 
@@ -104,11 +104,9 @@ function update_time_dependent_estimator(opt::ClusteringOptimisationEstimator,
         return opt
     end
     opt = update_time_dependent_fields(opt, ctx, all_binds)
-    return rebuild_estimator(opt,
-                             (;
-                              opt = update_time_dependent_estimator(opt.opt, ctx,
-                                                                    all_binds),
-                              fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
+    return rebuild_struct(opt,
+                          (; opt = update_time_dependent_estimator(opt.opt, ctx, all_binds),
+                           fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -122,7 +120,7 @@ A fold-less [`optimise`](@ref) calls it first, so the optimiser runs with each s
  1. Return `opt` unchanged when [`is_time_dependent`](@ref) is `false`.
  2. Replace each scheduled field of `opt` with its static default, through [`reset_time_dependent_fields`](@ref). This gives the new `opt`.
  3. Reset the inner optimiser `opt.opt` and the fallback `opt.fb` of the new `opt`.
- 4. Rebuild `opt` with the two reset estimators, through [`rebuild_estimator`](@ref).
+ 4. Rebuild `opt` with the two reset estimators, through [`rebuild_struct`](@ref).
 
 # Arguments
 
@@ -143,9 +141,9 @@ function reset_time_dependent_estimator(opt::ClusteringOptimisationEstimator)
         return opt
     end
     opt = reset_time_dependent_fields(opt)
-    return rebuild_estimator(opt,
-                             (; opt = reset_time_dependent_estimator(opt.opt),
-                              fb = reset_time_dependent_estimator(opt.fb)))
+    return rebuild_struct(opt,
+                          (; opt = reset_time_dependent_estimator(opt.opt),
+                           fb = reset_time_dependent_estimator(opt.fb)))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -288,7 +286,7 @@ $(DocStringExtensions.FIELDS)
     HierarchicalRiskParityResult(;
         hr::HierarchicalResult,
         r::BaseRM_VecBaseRM,
-        sca::Scalariser,
+        sca::Option{<:Scalariser},
         fb::Option{<:OptE_Opt_FbChain}
     ) -> HierarchicalRiskParityResult
 
@@ -309,22 +307,23 @@ Keywords correspond to the struct's fields.
     """
     $(field_dict[:r_res])
     """
-    r
+    r::BaseRM_VecBaseRM
     """
     $(field_dict[:sca_res])
     """
-    sca
+    sca::Option{<:Scalariser}
     """
     $(field_dict[:fb_res])
     """
     fb
     function HierarchicalRiskParityResult(hr::HierarchicalResult, r::BaseRM_VecBaseRM,
-                                          sca::Scalariser, fb::Option{<:OptE_Opt_FbChain})
-        return new{typeof(hr), typeof(r), typeof(sca), typeof(fb)}(hr, r, sca, fb)
+                                          sca::Option{<:Scalariser},
+                                          fb::Option{<:OptE_Opt_FbChain})
+        return new{typeof(hr), typeof(fb)}(hr, r, sca, fb)
     end
 end
 function HierarchicalRiskParityResult(; hr::HierarchicalResult, r::BaseRM_VecBaseRM,
-                                      sca::Scalariser,
+                                      sca::Option{<:Scalariser},
                                       fb::Option{<:OptE_Opt_FbChain})::HierarchicalRiskParityResult
     return HierarchicalRiskParityResult(hr, r, sca, fb)
 end
@@ -340,7 +339,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the weights and the fitted state of a hierarchical equal risk contribution optimisation.
 
-[`HierarchicalEqualRiskContribution`](@ref) returns it. It holds the shared [`HierarchicalResult`](@ref) as `hr`, and the two risk measures and the two scalarisers of its estimator, one pair inside the clusters and one pair across them. Both measures are stored resolved.
+[`HierarchicalEqualRiskContribution`](@ref) returns it. It holds the shared [`HierarchicalResult`](@ref) as `hr`, and the two risk measures and the two scalarisers of its estimator, one pair inside the clusters and one pair across them. Both measures are stored resolved. The types of the measures and of the scalarisers are not type parameters of the Result, so the Results of two such estimators have one type, and a verb that reads them compiles one time.
 
 Every property of `hr` reads through this type, so `res.w`, `res.pr`, `res.clr`, `res.wb`, `res.fees`, `res.retcode` and `res.imsk` read as if they were fields of `res`.
 
@@ -354,8 +353,8 @@ $(DocStringExtensions.FIELDS)
         hr::HierarchicalResult,
         ri::BaseRM_VecBaseRM,
         ro::BaseRM_VecBaseRM,
-        scai::Scalariser,
-        scao::Scalariser,
+        scai::Option{<:Scalariser},
+        scao::Option{<:Scalariser},
         fb::Option{<:OptE_Opt_FbChain}
     ) -> HierarchicalEqualRiskContributionResult
 
@@ -376,35 +375,36 @@ Keywords correspond to the struct's fields.
     """
     $(field_dict[:ri_res])
     """
-    ri
+    ri::BaseRM_VecBaseRM
     """
     $(field_dict[:ro_res])
     """
-    ro
+    ro::BaseRM_VecBaseRM
     """
     $(field_dict[:scai])
     """
-    scai
+    scai::Option{<:Scalariser}
     """
     $(field_dict[:scao])
     """
-    scao
+    scao::Option{<:Scalariser}
     """
     $(field_dict[:fb_res])
     """
     fb
     function HierarchicalEqualRiskContributionResult(hr::HierarchicalResult,
                                                      ri::BaseRM_VecBaseRM,
-                                                     ro::BaseRM_VecBaseRM, scai::Scalariser,
-                                                     scao::Scalariser,
+                                                     ro::BaseRM_VecBaseRM,
+                                                     scai::Option{<:Scalariser},
+                                                     scao::Option{<:Scalariser},
                                                      fb::Option{<:OptE_Opt_FbChain})
-        return new{typeof(hr), typeof(ri), typeof(ro), typeof(scai), typeof(scao),
-                   typeof(fb)}(hr, ri, ro, scai, scao, fb)
+        return new{typeof(hr), typeof(fb)}(hr, ri, ro, scai, scao, fb)
     end
 end
 function HierarchicalEqualRiskContributionResult(; hr::HierarchicalResult,
                                                  ri::BaseRM_VecBaseRM, ro::BaseRM_VecBaseRM,
-                                                 scai::Scalariser, scao::Scalariser,
+                                                 scai::Option{<:Scalariser},
+                                                 scao::Option{<:Scalariser},
                                                  fb::Option{<:OptE_Opt_FbChain})::HierarchicalEqualRiskContributionResult
     return HierarchicalEqualRiskContributionResult(hr, ri, ro, scai, scao, fb)
 end
@@ -438,8 +438,8 @@ The core holds the mask in its field `imsk`, and each of the two leaves holds th
 function result_investable_mask(res::HierarchicalResult)
     return res.imsk
 end
-function result_investable_mask(res::Union{<:HierarchicalRiskParityResult,
-                                           <:HierarchicalEqualRiskContributionResult})
+function result_investable_mask(res::Union{HierarchicalRiskParityResult,
+                                           HierarchicalEqualRiskContributionResult})
     return result_investable_mask(res.hr)
 end
 """
@@ -471,25 +471,34 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref) or [`TD_O
 
 ## Validation
 
-  - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`.
+  - If `wb` is keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`. A [`ScoreWeightBounds`](@ref) with a number or a vector of numbers in `val` names no asset and needs no sets.
   - If a field holds a [`TimeDependent`](@ref) schedule: the constructor runs again with each value of the schedule in that field, so a value that the constructor refuses raises here and not in a later fold.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `fees`: Recursively updated via [`factory`](@ref).
-  - `cache`: Carried unchanged via [`factory`](@ref).
+  - `fees`: Recursively updated through [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `pe`: Recursively viewed via [`port_opt_view`](@ref).
-  - `wb`: Recursively viewed via [`port_opt_view`](@ref).
-  - `fees`: Recursively viewed via [`port_opt_view`](@ref).
-  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
+  - `pe`: Recursively viewed through [`port_opt_view`](@ref).
+  - `wb`: Recursively viewed through [`port_opt_view`](@ref).
+  - `fees`: Recursively viewed through [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `pe`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `cle`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `fees`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `cache`: Removed by [`obs_weights_view`](@ref), because a state has no slice on the observation axis.
 
 # Examples
 
@@ -571,16 +580,17 @@ HierarchicalOptimiser
   - [`SchurComplementHierarchicalRiskParity`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
 """
 @propagatable @concrete struct HierarchicalOptimiser <: BaseClusteringOptimisationEstimator
     """
     $(field_dict[:pe])
     """
-    @vprop pe
+    @vprop @oprop pe
     """
     $(field_dict[:cle])
     """
-    cle
+    @oprop cle
     """
     $(field_dict[:slv])
     """
@@ -602,7 +612,7 @@ HierarchicalOptimiser
     """
     wf
     """
-    $(field_dict[:strict_opt]) Under `true` the fit also refuses an asset with a gap in the rows that a plain graph reader reads, which it otherwise drops with a warning, see [`graph_reader_mask`](@ref).
+    $(field_dict[:strict_opt]) Under `true` the fit also refuses an asset with a gap in the rows that a plain graph reader reads, which it otherwise drops with a warning, see [`graph_reader_mask`](@ref). It also refuses an asset that a distance reader of the fit cannot estimate, which it otherwise drops with a warning, see [`distance_reader_refusal_mask`](@ref).
     """
     strict
     """
@@ -615,7 +625,7 @@ HierarchicalOptimiser
                                    sets::TD_Option{<:UniverseSets},
                                    wf::TD{<:WeightFinaliser}, strict::Bool,
                                    cache::Option{<:ReturnsBufferState})
-        if isa(wb, WeightBoundsEstimator)
+        if name_keyed(wb)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         assert_time_dependent_substitution(HierarchicalOptimiser,
@@ -640,7 +650,7 @@ function HierarchicalOptimiser(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
     return HierarchicalOptimiser(pe, cle, slv, wb, fees, sets, wf, strict, cache)
 end
 function non_investable_universe(opt::HierarchicalOptimiser, ni::VecStr)
-    return rebuild_estimator(opt, (; sets = non_investable_sets(opt.sets, ni)))
+    return rebuild_struct(opt, (; sets = non_investable_sets(opt.sets, ni)))
 end
 """
     reader_frames(opt::HierarchicalOptimiser, path::AbstractString, refit::Bool) -> ReturnsFrames
@@ -771,7 +781,7 @@ Where:
 
 # Algorithm
 
- 1. Make the weight vector `wk`, all zero, of length `size(X, 2)`. Its entries take the type of the quotient of two returns, so an integer `X` gives fractional weights.
+ 1. Make the weight vector `wk`, all zero, of length `size(X, 2)`. Its entries take the element type of `X`.
  2. For each asset `i`, set `wk[i]` to one, evaluate `expected_risk(r, wk, X, fees)` as the `i`-th risk, and set `wk[i]` back to zero.
  3. Collect the risks into `rk`, whose element type is the type that `expected_risk` returns.
 
@@ -793,10 +803,9 @@ Where:
 """
 function unitary_expected_risks(r::OptimisationRiskMeasure, X::MatNum,
                                 fees::Option{<:Fees} = nothing)
-    # A risk is not an entry of `X`: an integer returns matrix has a fractional variance.
-    # The weights take the type of the returns, widened to a float only when it is an
-    # integer, and `map` takes the type of the risks from the values `expected_risk` returns.
-    wk = zeros(float_if_integer(eltype(X)), size(X, 2))
+    # The weights take the element type of the returns, and `map` takes the type of the
+    # risks from the values `expected_risk` returns.
+    wk = zeros(eltype(X), size(X, 2))
     return map(eachindex(wk)) do i
         wk[i] = one(eltype(wk))
         rki = expected_risk(r, wk, X, fees)
@@ -820,7 +829,7 @@ This is the in-place form of [`unitary_expected_risks`](@ref), which states the 
 # Arguments
 
   - `wk`: Scratch weight vector, of length `size(X, 2)`. It must be all zero on entry, and it is all zero on exit, because each step sets one entry to one and then back to zero.
-  - `rk`: Output risk vector, of length `size(X, 2)`. It is overwritten in full. Its element type must hold a risk, so for an integer `X` it is a floating-point type.
+  - `rk`: Output risk vector, of length `size(X, 2)`. It is overwritten in full. Its element type must hold a risk.
   - `r`: Risk measure, already resolved by [`factory`](@ref).
   - `X`: Asset return matrix, observations by assets.
   - `fees`: Fees to charge against each unit portfolio, or `nothing`.

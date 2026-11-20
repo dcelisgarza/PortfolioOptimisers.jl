@@ -91,7 +91,7 @@ The columns are ``g = \\ln \\det(I + \\sigma M_{K})`` and ``\\rho_{0} = g'``, wh
 # Arguments
 
   - `cols::NamedTuple`: `g`, `r`, `vt` and `rt` on `xf` (mutated).
-  - `lat::NamedTuple`: Complex lattice after the count `K`.
+  - `lat::EstimatedBiasLattice`: Complex lattice after the count `K`.
   - `xf::AbstractRange`: Lattice of ``\\ln \\sigma``, whose point `j0 + i` is the point `i` of `lat`.
   - `j0::Integer`: Count of the points of `xf` below the seed.
   - `decay::Number`: Decay of the weights.
@@ -106,7 +106,7 @@ The columns are ``g = \\ln \\det(I + \\sigma M_{K})`` and ``\\rho_{0} = g'``, wh
   - [`mahalanobis_level_bias`](@ref)
   - [`estimated_bias_lattice`](@ref)
 """
-function estimated_mahalanobis_columns!(cols::NamedTuple, lat::NamedTuple,
+function estimated_mahalanobis_columns!(cols::NamedTuple, lat::EstimatedBiasLattice,
                                         xf::AbstractRange, j0::Integer, decay::Number,
                                         K::Integer)
     (; g, r, vt, rt) = cols
@@ -155,12 +155,12 @@ reads the transform of [`mahalanobis_transform`](@ref) at the cut.
 
 # Arguments
 
-  - `grid::NamedTuple`: Grids of [`mahalanobis_bias_grid`](@ref).
+  - `grid::MahalanobisBiasGrid`: Grids of [`mahalanobis_bias_grid`](@ref).
   - `gh::VecNum`: ``g`` on the lattice (mutated by [`mahalanobis_cut!`](@ref)).
   - `rh::VecNum`: ``\\rho_{0}`` on the lattice (mutated by [`mahalanobis_cut!`](@ref)).
-  - `peak::Option{<:Tuple{<:Number, <:Number}}`: The peak of [`hac_log_det_peak`](@ref), or
+  - `peak::Option{<:Tuple{Number, Number}}`: The peak of [`hac_log_det_peak`](@ref), or
     `nothing`.
-  - `shift::Tuple{<:Integer, <:Number}`: The shift ``m`` of the lattice and the normalisation
+  - `shift::Tuple{Integer, Number}`: The shift ``m`` of the lattice and the normalisation
     ``\\tilde{c}``.
   - `n::Integer`: Count of assets that contribute to the statistic.
   - `bufs::NamedTuple`: Buffers `dg`, `dr`, `v`, `e` and `lv` of the recursion (mutated).
@@ -175,7 +175,7 @@ reads the transform of [`mahalanobis_transform`](@ref) at the cut.
   - [`mahalanobis_level_step!`](@ref)
   - [`mahalanobis_transform`](@ref)
 """
-function mahalanobis_level_sum!(grid::NamedTuple, gh::VecNum, rh::VecNum,
+function mahalanobis_level_sum!(grid::MahalanobisBiasGrid, gh::VecNum, rh::VecNum,
                                 peak::Option{<:Tuple}, shift::Tuple, n::Integer,
                                 bufs::NamedTuple)
     (; dg, dr, v, e, lv) = bufs
@@ -184,12 +184,12 @@ function mahalanobis_level_sum!(grid::NamedTuple, gh::VecNum, rh::VecNum,
     mahalanobis_pair_differences!(dg, dr, grid, gh, rh, shift)
     fill!(v, zero(eltype(v)))
     mahalanobis_q_integral!(e, v, grid)
-    so, L = mahalanobis_transform(merge(grid, (; cut)), gh, e, m)
+    so, L = mahalanobis_transform(grid, cut, gh, e, m)
     J = grid.ho * sum(L)
     for _ in 1:(n - 1)
         mahalanobis_level_step!(v, e, lv, dg, dr, grid)
         mahalanobis_q_integral!(e, v, grid)
-        so, L = mahalanobis_transform(merge(grid, (; cut)), gh, e, m)
+        so, L = mahalanobis_transform(grid, cut, gh, e, m)
         J += grid.ho * sum(L)
     end
     return so, L, J
@@ -234,7 +234,7 @@ under HAC, and 7.5 % at the first scored count of a half-life of 40.
   - `Ks::AbstractVector{<:Integer}`: Counts of observations, each above `n + 1`.
   - `n::Integer`: Count of assets that contribute to the statistic, at least two.
   - `hac_lags::Option{<:Integer}`: Count of HAC lags, or `nothing`.
-  - `debias::AbstractRegimeDebias`: The debias rule, read by [`reads_dependence`](@ref).
+  - `debias::Option{<:AbstractRegimeDebias}`: The debias rule, read by [`reads_dependence`](@ref).
 
 # Returns
 
@@ -250,13 +250,15 @@ under HAC, and 7.5 % at the first scored count of a half-life of 40.
 function estimated_mahalanobis_level_bias(method::RegimeAdjustedMethod, decay::Number,
                                           Ks::AbstractVector{<:Integer}, n::Integer,
                                           hac_lags::Option{<:Integer},
-                                          debias::AbstractRegimeDebias)
+                                          debias::Option{<:AbstractRegimeDebias})
     T = typeof(log(decay))
     x0 = log(eps(T)) + log1p(-decay)
     # The output grid reaches 50 at a normalisation of one, so `xf` does too, with one stencil.
     lat = estimated_bias_lattice(decay, hac_lags, x0, 51 * one(T), Complex{T})
     hf = lat.h
-    j0 = ceil(Int, (x0 - (-61 + log1p(-decay))) / hf)
+    # `xf` starts at the seed when the seed is below its usual start, as it is for a type whose
+    # epsilon is below e^-61, such as a BigFloat. Otherwise `j0` is negative.
+    j0 = max(0, ceil(Int, (x0 - (-61 + log1p(-decay))) / hf))
     grid = mahalanobis_bias_grid(decay, hf, x0 - j0 * hf, 50 + 8 * hf)
     NF = length(grid.xf)
     cols = (; g = zeros(T, NF), r = zeros(T, NF), vt = zeros(T, NF), rt = zeros(T, NF))
@@ -362,7 +364,7 @@ V(\\sigma) = 1 + \\frac{\\sigma V_{g}(\\sigma)}{\\sigma}\\,.
   - `ctx::NamedTuple`: The context of [`estimated_mahalanobis_factor`](@ref).
   - `peak::Option{<:Tuple}`: The peak and the values of [`estimated_log_det_chain`](@ref) there,
     or `nothing`. The cut stays at the peak of ``g``.
-  - `shift::Tuple{<:Integer, <:Number}`: The shift ``m`` of the lattice and ``\\tilde{c}``.
+  - `shift::Tuple{Integer, Number}`: The shift ``m`` of the lattice and ``\\tilde{c}``.
   - `f::Number`: ``f = 1 + g^{\\top} g``, [`centring_factor`](@ref) of the deviation.
 
 # Returns
@@ -436,7 +438,7 @@ sums run over the output grid of the last level.
     transform of the last level and ``J``.
   - `peak::Option{<:Tuple}`: The peak and the values of [`estimated_log_det_chain`](@ref) there,
     or `nothing`.
-  - `shift::Tuple{<:Integer, <:Number}`: The shift ``m`` of the lattice and ``\\tilde{c}``.
+  - `shift::Tuple{Integer, Number}`: The shift ``m`` of the lattice and ``\\tilde{c}``.
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Count of the terms of the estimate.
 
@@ -523,10 +525,10 @@ this verb with `centring` bound to its own type. Without that method this method
   - `decay::Number`: Decay of the weights.
   - `Ks::AbstractVector{<:Integer}`: Counts of observations, each above `n + 1`.
   - `n::Integer`: Count of assets that contribute to the statistic, at least two.
-  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
+  - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight of each lag, or
     `nothing`.
   - `centring::AbstractCentring`: The centring of the estimator.
-  - `debias::AbstractRegimeDebias`: The debias rule, [`ExactDebias`](@ref) by default.
+  - `debias::Option{<:AbstractRegimeDebias}`: The debias rule, [`ExactDebias`](@ref) by default.
 
 # Returns
 
@@ -541,7 +543,7 @@ this verb with `centring` bound to its own type. Without that method this method
 function mahalanobis_level_bias(method::RegimeAdjustedMethod, decay::Number,
                                 Ks::AbstractVector{<:Integer}, n::Integer, hac_lags,
                                 centring::AbstractCentring,
-                                debias::AbstractRegimeDebias = ExactDebias())
+                                debias::Option{<:AbstractRegimeDebias} = ExactDebias())
     law = centring_law(centring)
     if law === centring
         throw(MethodError(mahalanobis_level_bias,
@@ -550,14 +552,13 @@ function mahalanobis_level_bias(method::RegimeAdjustedMethod, decay::Number,
     return mahalanobis_level_bias(method, decay, Ks, n, hac_lags, law, debias)
 end
 """
-    mahalanobis_level_bias(method, decay::Number, Ks, n::Integer, hac_lags, ::PreCentred, debias)
     mahalanobis_level_bias(method, decay::Number, Ks, n::Integer, hac_lags, ::EstimatedCentring, debias)
 
-Computes the Mahalanobis bias factor at each count of `Ks` on the law of the centring of the
-estimator.
+Computes the Mahalanobis bias factor at each count of `Ks` on the law of an estimate whose
+deviations are taken from an estimated location.
 
-A pre-centred estimate reads [`mahalanobis_level_bias`](@ref) without a centring: its deviation
-does not share the terms of the estimate, so the debias rule changes nothing. Under [`EstimatedCentring`](@ref) a count up to
+A pre-centred estimate has its own method of [`mahalanobis_level_bias`](@ref), the level
+recursion, which ignores the debias rule. Under [`EstimatedCentring`](@ref) a count up to
 ``K_{h} = \\lceil \\ln \\sqrt{\\epsilon} / \\ln \\lambda \\rceil`` reads
 [`estimated_mahalanobis_level_bias`](@ref). Past ``K_{h}`` both factors change as ``\\lambda^{K}``,
 so a count takes the pre-centred factor times the ratio of the two at ``K_{h}``, as
@@ -569,10 +570,9 @@ so a count takes the pre-centred factor times the ratio of the two at ``K_{h}``,
   - `decay::Number`: Decay of the weights.
   - `Ks::AbstractVector{<:Integer}`: Counts of observations, each above `n + 1`.
   - `n::Integer`: Count of assets that contribute to the statistic, at least two.
-  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag
-    (pre-centred law only), or `nothing`.
-  - `centring`: The centring of the estimator.
-  - `debias::AbstractRegimeDebias`: The debias rule, [`ExactDebias`](@ref) by default.
+  - `hac_lags::Option{<:Integer}`: Count of HAC lags, or `nothing`.
+  - `::EstimatedCentring`: The centring of the estimator.
+  - `debias::Option{<:AbstractRegimeDebias}`: The debias rule, [`ExactDebias`](@ref) by default.
 
 # Returns
 
@@ -586,14 +586,8 @@ so a count takes the pre-centred factor times the ratio of the two at ``K_{h}``,
 """
 function mahalanobis_level_bias(method::RegimeAdjustedMethod, decay::Number,
                                 Ks::AbstractVector{<:Integer}, n::Integer,
-                                hac_lags::Option{<:Union{<:Integer, <:VecNum}},
-                                ::PreCentred, ::AbstractRegimeDebias = ExactDebias())
-    return mahalanobis_level_bias(method, decay, Ks, n, hac_lags)
-end
-function mahalanobis_level_bias(method::RegimeAdjustedMethod, decay::Number,
-                                Ks::AbstractVector{<:Integer}, n::Integer,
                                 hac_lags::Option{<:Integer}, ::EstimatedCentring,
-                                debias::AbstractRegimeDebias = ExactDebias())
+                                debias::Option{<:AbstractRegimeDebias} = ExactDebias())
     Kh = ceil(Int, log(sqrt(eps(typeof(log(decay))))) / log(decay))
     lo = findall(<=(Kh), Ks)
     hi = findall(>(Kh), Ks)

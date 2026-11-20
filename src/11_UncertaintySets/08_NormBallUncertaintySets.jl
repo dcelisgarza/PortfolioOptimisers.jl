@@ -254,12 +254,12 @@ The view is the projection of the set onto the cluster's coordinates, and not a 
 
  1. Take `view(risk_ucs.L, i, :)`, the rows of the map the selected assets occupy.
  2. Take `nothing_scalar_array_view(risk_ucs.val, i)`, the fitted characteristic vector restricted to the same assets, which passes a `nothing` through unchanged.
- 3. Build a [`NormBallUncertaintySet`](@ref) from the two views, carrying `kappa`, `p` and `class` through unchanged.
+ 3. Rebuild the set from the two views with [`rebuild_struct`](@ref). `kappa`, `p` and `class` do not change.
 
 # Arguments
 
   - `risk_ucs`: Mean norm-ball uncertainty set.
-  - `i`: Cluster or asset index.
+  - `i`: Indices of the assets that the view keeps.
   - `args...`: Additional positional arguments (ignored).
 
 # Returns
@@ -275,9 +275,9 @@ The view is the projection of the set onto the cluster's coordinates, and not a 
 function port_opt_view(risk_ucs::NormBallUncertaintySet{<:Any, <:MatNum, <:Any,
                                                         <:MuUncertaintySetClass}, i,
                        args...)::NormBallUncertaintySet
-    return NormBallUncertaintySet(; kappa = risk_ucs.kappa, L = view(risk_ucs.L, i, :),
-                                  p = risk_ucs.p, class = risk_ucs.class,
-                                  val = nothing_scalar_array_view(risk_ucs.val, i))
+    return rebuild_struct(risk_ucs,
+                          (; L = view(risk_ucs.L, i, :),
+                           val = nothing_scalar_array_view(risk_ucs.val, i)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -289,7 +289,7 @@ The expansion is the inverse of [`port_opt_view`](@ref): the view drops rows of 
 # Algorithm
 
  1. Allocate a zero frame of `length(imsk)` rows and `size(set.L, 2)` columns, and write `set.L` at the rows the mask keeps, giving `L`.
- 2. Build a [`NormBallUncertaintySet`](@ref) from it, carrying `kappa`, `p` and `class` through unchanged and `pr.mu` as `val`.
+ 2. Rebuild the set from `L`, with `pr.mu` as `val`, with [`rebuild_struct`](@ref). `kappa`, `p` and `class` do not change.
 
 # Arguments
 
@@ -314,8 +314,7 @@ function expand_investable_ucs(set::NormBallUncertaintySet{<:Any, <:MatNum, <:An
                                pr::AbstractPriorResult)::NormBallUncertaintySet
     L = zeros(eltype(set.L), length(imsk), size(set.L, 2))
     L[imsk, :] = set.L
-    return NormBallUncertaintySet(; kappa = set.kappa, L = L, p = set.p, class = set.class,
-                                  val = pr.mu)
+    return rebuild_struct(set, (; L = L, val = pr.mu))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -329,12 +328,12 @@ The view is the projection of the set onto the cluster's coordinates, and not a 
  1. Take `nothing_scalar_array_view(risk_ucs.val, i)`, the fitted ``N \\times N`` covariance restricted to the selected assets. It takes the plain asset index, and a `nothing` passes through unchanged. The step runs first, because step 2 overwrites `i`.
  2. Recover `N` as `isqrt(size(risk_ucs.L, 1))` from the map, and expand `i` with `fourth_moment_index_generator(N, i)`, giving the positions the selected assets occupy in the vectorised covariance.
  3. Take `view(risk_ucs.L, i, :)` under the expanded index, giving the rows of the map the selected pairs occupy.
- 4. Build a [`NormBallUncertaintySet`](@ref) from the two views, carrying `kappa`, `p` and `class` through unchanged.
+ 4. Rebuild the set from the two views with [`rebuild_struct`](@ref). `kappa`, `p` and `class` do not change.
 
 # Arguments
 
   - `risk_ucs`: Covariance norm-ball uncertainty set.
-  - `i`: Cluster or asset index.
+  - `i`: Indices of the assets that the view keeps.
   - `args...`: Additional positional arguments (ignored).
 
 # Returns
@@ -355,8 +354,7 @@ function port_opt_view(risk_ucs::NormBallUncertaintySet{<:Any, <:MatNum, <:Any,
     # index, whereas the N^2 x r map takes the fourth-moment index.
     val = nothing_scalar_array_view(risk_ucs.val, i)
     i = fourth_moment_index_generator(isqrt(size(risk_ucs.L, 1)), i)
-    return NormBallUncertaintySet(; kappa = risk_ucs.kappa, L = view(risk_ucs.L, i, :),
-                                  p = risk_ucs.p, class = risk_ucs.class, val = val)
+    return rebuild_struct(risk_ucs, (; L = view(risk_ucs.L, i, :), val = val))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -369,7 +367,7 @@ The expansion is the inverse of [`port_opt_view`](@ref): the view slices the map
 
  1. Take the positions the investable pairs occupy in the vectorised covariance with [`coverage_pair_index`](@ref), which orders them as [`fourth_moment_index_generator`](@ref) does.
  2. Allocate a zero frame of `length(imsk)^2` rows and `size(set.L, 2)` columns, and write `set.L` at those rows.
- 3. Build a [`NormBallUncertaintySet`](@ref) from it, carrying `kappa`, `p` and `class` through unchanged and `pr.sigma` as `val`.
+ 3. Rebuild the set from the frame, with `pr.sigma` as `val`, with [`rebuild_struct`](@ref). `kappa`, `p` and `class` do not change.
 
 # Arguments
 
@@ -395,8 +393,7 @@ function expand_investable_ucs(set::NormBallUncertaintySet{<:Any, <:MatNum, <:An
                                pr::AbstractPriorResult)::NormBallUncertaintySet
     L = zeros(eltype(set.L), length(imsk)^2, size(set.L, 2))
     L[coverage_pair_index(imsk), :] = set.L
-    return NormBallUncertaintySet(; kappa = set.kappa, L = L, p = set.p, class = set.class,
-                                  val = pr.sigma)
+    return rebuild_struct(set, (; L = L, val = pr.sigma))
 end
 
 """

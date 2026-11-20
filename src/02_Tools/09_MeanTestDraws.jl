@@ -190,7 +190,7 @@ julia> PortfolioOptimisers.quadrature_node_count(6 * pi / (5 * 0.1), 1e-14)
 
 # References
 
-  - $(ref_dict[:golubwelsch1969])
+  - $(ref_dict[:golubwelsch1969]) Section 2, Equations 2.2 to 2.6.
   - $(ref_dict[:trefethen2019])
 """
 @concrete struct QuadratureSumDraws <: AbstractBootstrapDraws

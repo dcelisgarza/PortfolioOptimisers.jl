@@ -24,7 +24,9 @@ The `CrossSectionalFactorPriorMacro*` files hold the fit of a prior with an esti
 macro-sensitivity factor (#1365): an `EWMacroSensitivity` that reads the column "FX" of the
 Exogenous Series. The `Plain*` files hold the fit with `EmpiricalPrior` and no currency. The
 `CurrencyDefault*` files hold the default fit beside three Currency Factors, where the
-Descriptors read the returns net of the currencies.
+Descriptors read the returns net of the currencies. The oracle wrote them again, on the same
+two exchanges of `mac_fixture`, when the regression of each asset came to share its own
+observations (#2132).
 
 The `Parity_CrossSectionalFactorPrior_CurrencyForecast_*` files hold the default fit of the
 currency fixture with a Return Forecast over one `EWMomentum` (#1394): the forecast, the factor
@@ -111,13 +113,18 @@ end
                                           scores = DescriptorScores(;
                                                                     descriptors = [EWMomentum(;
                                                                                               half_life = 8.0,
-                                                                                              skip = 2)],
+                                                                                              skip = 2,
+                                                                                              debias = nothing)],
                                                                     outlier = nothing,
                                                                     scoring = nothing),
                                           scale = 0.02)
         pr = prior(CrossSectionalFactorPrior(; factors = factors, rfe = rfe, lambda = 0.5,
                                              c = 1.0), fx.rd)
         load(o) = vec(parity_load("CrossSectionalFactorPrior", "CurrencyForecast", o))
+        # The oracle keeps the state of its momentum undivided, which `debias = nothing`
+        # reads (#2134). The fixture holds no relisted asset, so the restart of an inactive
+        # asset moves none of the stored numbers. Measured maxrel 4.3e-16 (alpha), 9.9e-15
+        # (factor mean) and 1.4e-14 (`mu`).
         @test parity_compare(pr.rr.rf.mu, load("Alpha"); name = "alpha").ok
         @test parity_compare(pr.fpr.mu, load("FactorMu"); name = "factor mu").ok
         @test parity_compare(pr.mu, load("Mu"); name = "mu").ok
@@ -226,9 +233,9 @@ end
     end
 
     @testset "An exposure at a pair of zero weight does not make a factor live" begin
-        Z = zeros(3, 4, 2)
-        Z[:, :, 1] .= 1.0
-        Z[:, 4, 2] .= 5.0
+        Z = zeros(4, 2, 3)
+        Z[:, 1, :] .= 1.0
+        Z[4, 2, :] .= 5.0
         X = [0.01 0.02 0.03 0.04; -0.01 0.0 0.01 0.02; 0.02 0.01 0.0 -0.01]
         W = [1.0 1.0 1.0 0.0; 1.0 1.0 1.0 0.0; 1.0 1.0 1.0 0.0]
         (; csr, lv) = PO.cross_sectional_live_regression(CrossSectionalLinearRegression(),
@@ -241,7 +248,7 @@ end
         @test PO.cross_sectional_live_regression(CrossSectionalLinearRegression(), Z, X,
                                                  W).lv == [true, true]
         @test_throws ArgumentError PO.cross_sectional_live_regression(CrossSectionalLinearRegression(),
-                                                                      zeros(3, 4, 2), X, W)
+                                                                      zeros(4, 2, 3), X, W)
     end
 
     @testset "A factor prior of the live factors, placed on the whole factor axis" begin
@@ -347,15 +354,15 @@ end
         F = mac_asset("PlainFactorReturns")
         @test size(pr.fpr.X) == size(F) == (150, 6)
         # A small factor return carries the round-off of the regression: measured maxrel
-        # 1.2e-12 cell by cell, and maxabs 1.4e-16. The CI hosts move such a cell by a factor
-        # of two, so the tolerance leaves a factor of four.
+        # 6.3e-13 cell by cell since #2132, and 1.2e-12 before. The CI hosts move such a cell
+        # by a factor of two, so the tolerance leaves a factor of four.
         @test parity_compare(pr.fpr.X, F; rtol = 5e-12, name = "macro factor returns").ok
-        # Measured maxrel 1.2e-13 (factor covariance), 7.5e-14 (loadings) and 7.5e-14 (`mu`).
+        # Measured maxrel 2.5e-14 (factor covariance), 3.8e-15 (loadings) and 3.6e-14 (`mu`).
         @test parity_compare(pr.fpr.sigma, mac_asset("PlainFactorCov");
                              name = "macro factor covariance").ok
         @test parity_compare(pr.rr.M, mac_asset("PlainLoadings"); name = "macro loadings").ok
         @test parity_compare(pr.mu, vec(mac_asset("PlainMu")); name = "macro mu").ok
-        # The cancellation of the default fit: measured maxscaled 6.9e-15, and maxrel 2.4e-12
+        # The cancellation of the default fit: measured maxscaled 3.1e-16, and maxrel 5.0e-14
         # cell by cell. They were 4.9e-13 and 1.3e-10 when the lift repaired the systematic block `L F L'`, which the oracle does not repair (#1576).
         @test parity_compare(pr.sigma, mac_asset("PlainSigma"); scale = :array,
                              name = "macro sigma").ok
@@ -369,10 +376,10 @@ end
                                              factors = mac_factors(; ccy = true),
                                              pe = PARITY_PE, ve = PARITY_VE), rd)
         @test pr.rr.nf[6:end] == ["macro", "currency=EUR", "currency=JPY", "currency=USD"]
-        # Measured maxrel 5.1e-14 (factor mean), 7.5e-14 (loadings) and 2.2e-13 (`mu`). An
+        # Measured maxrel 1.3e-14 (factor mean), 1.7e-14 (loadings) and 3.3e-14 (`mu`). An
         # off-diagonal entry of the factor covariance is a cancellation of two factors near
-        # zero correlation: measured maxrel 8.0e-13. The CI hosts move such a cell by a factor
-        # of two, so the tolerance leaves a factor of six.
+        # zero correlation: measured maxrel 4.4e-14 since #2132, and 8.0e-13 before. The CI
+        # hosts move such a cell by a factor of two, so the tolerance leaves a factor of six.
         @test parity_compare(pr.fpr.mu, vec(mac_asset("CurrencyDefaultFactorMu"));
                              name = "macro currency factor mean").ok
         @test parity_compare(pr.fpr.sigma, mac_asset("CurrencyDefaultFactorCov");
@@ -381,7 +388,7 @@ end
                              name = "macro currency loadings").ok
         @test parity_compare(pr.mu, vec(mac_asset("CurrencyDefaultMu"));
                              name = "macro currency mu").ok
-        # The cancellation of the default fit: measured maxscaled 6.9e-15, and maxrel 5.3e-13
+        # The cancellation of the default fit: measured maxscaled 5.9e-16, and maxrel 1.9e-13
         # cell by cell. They were 5.1e-13 and 3.1e-11 when the lift repaired the systematic block `L F L'`, which the oracle does not repair (#1576).
         @test parity_compare(pr.sigma, mac_asset("CurrencyDefaultSigma"); scale = :array,
                              name = "macro currency sigma").ok

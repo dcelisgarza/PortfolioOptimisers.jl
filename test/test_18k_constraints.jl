@@ -478,6 +478,27 @@ end
     @test_throws DimensionMismatch agf(nothing, [S3], nothing, [thr, thr])
 end
 
+@testset "A threshold above one excludes one asset (#518)" begin
+    # `Threshold` states this: a vector threshold above the upper bound of one asset sets
+    # that asset to zero, and the other assets still meet the budget. A scalar threshold
+    # above one excludes every asset, so the model has no solution.
+    res0 = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = mip_slv)))
+    j = argmax(res0.w)
+    @test res0.w[j] > 0.3
+    tv = zeros(length(res0.w))
+    tv[j] = 1.5
+    res = optimise(MeanRisk(;
+                            opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
+                                                lt = Threshold(tv))))
+    @test isa(res.retcode, OptimisationSuccess)
+    @test abs(res.w[j]) <= 1e-8
+    @test isapprox(sum(res.w), 1; rtol = 1e-6)
+    res = optimise(MeanRisk(;
+                            opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
+                                                lt = Threshold(1.5))))
+    @test isa(res.retcode, OptimisationFailure)
+end
+
 @testset "Phylogeny" begin
     plc = IntegerPhylogenyEstimator(; pl = NetworkEstimator(), B = 1)
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,
@@ -677,6 +698,28 @@ end
 
     # An entry with one column too few is refused before the solve.
     @test_throws DimensionMismatch solve_p(; ple = IntegerPhylogeny(; A = zeros(Int, 5, 5)))
+end
+
+@testset "Integer phylogeny holds one asset of each closed neighbourhood (#1539)" begin
+    # The graph of Figure 13 of graphpo1. Equation 9 there is `(A + I) z <= 1`, and the
+    # Ricca and Scozzari slides state the same rows: held assets are at distance at least 3.
+    # So two assets that share a neighbour are forbidden too, not only two neighbours.
+    A = zeros(Int, 7, 7)
+    for (i, j) in ((1, 2), (1, 3), (1, 4), (2, 5), (2, 6), (3, 6), (4, 6), (6, 7))
+        A[i, j] = A[j, i] = 1
+    end
+    pl = IntegerPhylogeny(; A = A, B = 1)
+    zs = [digits(k; base = 2, pad = 7) for k in 0:127]
+    held = Set(findall(isone, z) for z in zs if all(pl.A * z .<= pl.B))
+    eq9 = Set(findall(isone, z) for z in zs if all((A + I) * z .<= 1))
+    apart = Set(findall(isone, z)
+                for z in zs if all(A[i, j] * z[i] * z[j] == 0 for i in 1:7, j in 1:7))
+    @test held == eq9
+    @test length(held) == 12
+    @test length(apart) == 32
+    # Assets 2 and 3 are not neighbours, but both are neighbours of asset 1.
+    @test [2, 3] in apart
+    @test !([2, 3] in held)
 end
 
 @testset "Tracking" begin
@@ -1136,8 +1179,7 @@ end
     sets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A", "B", "C", "D"]))
     @test UniformValues <: PortfolioOptimisers.VectorAbstractEstimatorValueAlgorithm
     @test UniformValues <: PortfolioOptimisers.AbstractEstimatorValueAlgorithm
-    @test UniformValues <:
-          PortfolioOptimisers.EstValType{<:PortfolioOptimisers.VectorAbstractEstimatorValueAlgorithm}
+    @test UniformValues <: PortfolioOptimisers.VectorEstValType
     @test !(UniformValues <: PortfolioOptimisers.EqnType)
     # The keyword route names the slot that refused the value; the positional route has no
     # method for it.
@@ -1159,4 +1201,77 @@ end
     # `PortfolioTarget`'s `w` was such a slot. It now names the pair of shapes the
     # regime-adjusted fit can honour, so it refuses the algorithm at the keyword.
     @test_throws TypeError PortfolioOptimisers.PortfolioTarget(; w = UniformValues())
+end
+@testset "A slot over the universe refuses a matrix at the keyword (issue #1804)" begin
+    #=
+    `EstValType{T}` accepts a `MatNum` for every `T`, so each slot bound by
+    `EstValType{<:VectorAbstractEstimatorValueAlgorithm}` accepted a matrix, and its
+    resolver raised a `TypeError` later, because the result holds a `Num_VecNum` only.
+    `VectorEstValType` leaves the matrix out, so the keyword constructor refuses it. The
+    positional route goes through the generic constructor of `@concrete`, which #264 owns.
+    =#
+    M = [0.1 0.2 0.3; 0.3 0.4 0.5; 0.1 0.1 0.1]
+    @test !(M isa PortfolioOptimisers.VectorEstValType)
+    @test M isa PortfolioOptimisers.EstValType
+    for v in
+        (0.1, [0.1, 0.2, 0.3], "A" => 0.1, Dict("A" => 0.1), ["A" => 0.1], UniformValues())
+        @test v isa PortfolioOptimisers.VectorEstValType
+    end
+    @test_throws TypeError TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = M)
+    @test_throws TypeError RiskBudgetEstimator(; val = M)
+    @test_throws TypeError ThresholdEstimator(; val = M)
+    @test_throws TypeError WeightBoundsEstimator(; lb = M, ub = 1.0)
+    @test_throws TypeError WeightBoundsEstimator(; lb = 0.0, ub = M)
+    @test_throws TypeError FeesEstimator(; l = M)
+    @test_throws TypeError FeesEstimator(; s = M)
+    @test_throws TypeError FeesEstimator(; fl = M)
+    @test_throws TypeError FeesEstimator(; fs = M)
+    # `risk_budget_constraints` resolves a plain value through the same bound, so it has no
+    # method for a matrix.
+    sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+    @test_throws MethodError risk_budget_constraints(M, sets)
+end
+
+@testset "MIP indicator bundles and the big-M constant (#1912)" begin
+    pe = PortfolioOptimisers
+    # The big-M constant of a free budget is the largest finite bound times 1000. A stated
+    # `ss` is used as it is. A bound that is absent adds no magnitude, and bounds that are
+    # all absent give 1000. The model keeps the constant under `:ss`.
+    Xm = 0.01 .* randn(StableRNG(1919), 60, 5) .+ 0.001
+    rdm = ReturnsResult(; nx = string.('A':'E'), X = Xm)
+    prm = prior(EmpiricalPrior(), rdm)
+    slvm = Solver(; name = :highs,
+                  solver = optimizer_with_attributes(HiGHS.Optimizer,
+                                                     JuMP.MOI.Silent() => true),
+                  check_sol = (; allow_local = true, allow_almost = true))
+    for (ss, wb, expected) in ((nothing, WeightBounds(; lb = 0.0, ub = 1.0), 1000.0),
+                               (7.0, WeightBounds(; lb = 0.0, ub = 1.0), 7.0),
+                               (nothing, WeightBounds(; lb = nothing, ub = [0.5, 0.25, 0.5, 0.5, 0.5]), 500.0),
+                               (nothing, WeightBounds(; lb = [-2.0, 0.5, 0.0, 0.0, 0.0], ub = nothing), 2000.0),
+                               (nothing, WeightBounds(; lb = nothing, ub = nothing), 1000.0))
+        res = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(),
+                                opt = JuMPOptimiser(; pe = prm, slv = slvm, card = 3,
+                                                    ss = ss, wb = wb)))
+        @test isa(res.retcode, OptimisationSuccess)
+        @test res.model[:ss] == expected
+    end
+    # No consumer reads the held indicator of a long-short bundle, so a wrong read fails
+    # loudly and does not miscount. A held bundle has no binaries for the slack-closing
+    # rows: the held builder pins the decomposition only for a `WeightsFromParts` head.
+    ib = [1, 0, 1]
+    held = pe.HeldIndicators(ib, ib)
+    @test pe.held(held) === ib
+    @test_throws MethodError pe.long_bin(held)
+    ls = pe.LongShortIndicators([1, 0], [0, 1], [1, 0], [0, 1], [1, 1])
+    @test pe.long_bin(ls) == [1, 0] && pe.short_bin(ls) == [0, 1]
+    @test_throws MethodError pe.held(ls)
+end
+
+@testset "A vector of membership estimators is viewed estimator by estimator (#1912)" begin
+    smtx = [AssetSetsMatrixEstimator(; val = "clusters1"),
+            AssetSetsMatrixEstimator(; val = "clusters2")]
+    v = PortfolioOptimisers.port_opt_view(smtx, [1, 2])
+    @test length(v) == 2
+    @test all(x -> x isa AssetSetsMatrixEstimator, v)
+    @test [x.val for x in v] == ["clusters1", "clusters2"]
 end

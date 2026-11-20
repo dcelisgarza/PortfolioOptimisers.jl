@@ -199,3 +199,48 @@ The decision "No scorer and no summary column ship" holds. The maintainer chose 
 against the benchmark (the excess log wealth, the information ratio and the tracking error out of
 sample) to a later enhancement, #1686. The summary of a prediction now reads the same benchmark
 by default (ADR 0165, amendment of 2026-10-13).
+
+## Amendment (2026-10-21)
+
+[#1787](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1787) replaced the
+Newey–West test of the per-row difference, as it replaced the test of the covariance comparison
+(ADR 0143, amendment of 2026-10-21). A Bartlett window at a fixed number of lags does not converge
+to the long-run variance, and the default of zero lags assumes that the log growths of two
+strategies have uncorrelated differences, which volatility clustering breaks. Both methods now
+take `mt::AbstractMeanTestEstimator = WildBootstrapMeanTest()` in place of `lags`, and
+`series_regret` tests the mean of `difference` through `loss_difference_test`, the helper that the
+covariance comparison calls, at a window of one row. `OverlapMeanTest()` is the rule of zero lags
+of Diebold and Mariano.
+
+`LogWealthRegretResult` replaces `variance`, `z`, `p` and `lags` with `t_stat`, `p_value`,
+`mean_ci_lower` and `mean_ci_upper`. The interval is that of the regret per period. A row that is
+not finite, a total loss or a `NaN` return, gives a `NaN` test, as it gave before. A difference
+that is a non-zero constant gives the least p-value of the test, `1 / (n_sim + 1)`, in place of
+zero. The `lags` refusal is gone with the keyword.
+
+## Amendment (2026-11-02)
+
+[#1936](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1936) found that the verb read
+only the first member of a prediction whose optimiser gives many portfolios, such as a frontier
+sweep (ADR 0062), and dropped the others with no warning. The amendment of 2026-10-13 stated that
+first-member read for the benchmark. It is withdrawn.
+
+`regret_series` and `regret_benchmark` now give the series as the prediction stores it: one series,
+or one series for each member. `member_regret` pairs the two sides. A side with one series pairs
+with every member of the other side. Two sides with many members pair by index, and a different
+count raises a `DimensionMismatch` that names both counts. The benchmark of a prediction has the
+shape of its series, because each member collapses a benchmark matrix by its own weights, so each
+member meets its own benchmark. The path length of an entry reads the targets of the member of the
+comparator that the entry pairs with.
+
+The shape of the answer follows the types of the two series, never their count, as #1934 settles
+for `performance_summary`. A pair of single series gives one `LogWealthRegretResult`, as before.
+Every other pair gives a vector with one Result for each member. This is a break for a caller that
+passed a many-member prediction and read one Result. That caller got the regret of the first member
+only, which no docstring of the verb stated.
+
+The ADR rejected two designs. A refusal of a many-member prediction is safe, but it makes the
+regret of a frontier a hand loop. An `m × n` matrix of every pair of members compares portfolios
+that no caller paired, and two sides with the same count already state a pairing by index.
+`performance_summary` keeps its first-member read until #1934 gives it one entry for each member.
+It now reads member 1 explicitly through `member_vector`.

@@ -1,9 +1,101 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
+Divides the state of an exponentially weighted mean that starts at zero by the sum of its weights, so the mean is a weighted mean of the valid inputs whose weights sum to one.
+
+After ``n`` valid inputs, the weights of the state sum to ``1 - \\lambda^{n}``. The division removes that factor, so the first value of an asset is its first input, and the mean of an asset with a short history is comparable with the mean of an asset observed since the start. This rule is the default of every estimator that holds a `debias` field of this family. It is not the default of the three momentum Gradient Transforms, [`GradientMomentum`](@ref), [`RootMeanSquareGradient`](@ref) and [`AdaptiveMomentGradient`](@ref), because Equations 7, 8 and 9 of [li2022egm](@cite), which they implement, apply no correction. On a transform it is the correction of Algorithm 1 of [kingma2015](@cite), and [`AbstractGradientTransform`](@ref) compares the two forms of a step and cites both sources.
+
+`debias = nothing` keeps the undivided state. That state is the mean multiplied by ``1 - \\lambda^{n}``, so it is shrunk toward zero: by one half after one half-life, and by one quarter after two half-lives. For a signed mean whose neutral value is zero, such as an expected return or a momentum, this shrinkage pulls a noisy estimate from a short history toward no signal. The shrinkage applies at the start of the sample, after a late listing and after a relisting. The division removes it, so each value is the mean of the inputs that the asset has.
+
+# Constructors
+
+    ZeroStartDebias() -> ZeroStartDebias
+
+# Examples
+
+```jldoctest
+julia> ExpWeightedExpectedReturns(; debias = ZeroStartDebias()).debias
+ZeroStartDebias()
+```
+
+# Related
+
+  - [`AbstractZeroStartDebias`](@ref)
+  - [`zero_start_mean`](@ref)
+  - [`ExpWeightedExpectedReturns`](@ref)
+  - [`EWMean`](@ref)
+  - [`AbstractGradientTransform`](@ref)
+  - [`ZeroStartCentring`](@ref)
+
+# References
+
+  - $(ref_dict[:li2022egm]) Section 4.2.
+  - $(ref_dict[:kingma2015]) Algorithm 1.
+"""
+struct ZeroStartDebias <: AbstractZeroStartDebias end
+"""
+    zero_start_mean(::ZeroStartDebias, s::Number, decay::Number, n::Integer) -> Number
+    zero_start_mean(::Nothing, s::Number, ::Number, ::Integer) -> Number
+
+Read the mean of one asset out of the state of an exponentially weighted recursion that starts at zero.
+
+The rule is the dispatch slot, so a new rule of [`AbstractZeroStartDebias`](@ref) adds one method. [`ZeroStartDebias`](@ref) gives the reason for each form.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+m &= \\begin{cases} \\dfrac{S}{1 - \\lambda^{n}} & \\text{under } \\texttt{ZeroStartDebias()} \\\\ S & \\text{under } \\texttt{nothing} \\end{cases}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``m``: The mean of the asset.
+  - ``S``: The state of the recursion of the asset, from zero.
+  - $(math_dict[:lambda_ew])
+  - ``n``: The count of the valid inputs of the asset since its last restart.
+
+# Arguments
+
+  - `debias`: The rule, or `nothing` for the undivided state.
+  - `s`: The state of the recursion.
+  - `decay`: The decay factor.
+  - `n`: The count of the valid inputs.
+
+# Returns
+
+  - `m::Number`: The mean. Under [`ZeroStartDebias`](@ref) a count of zero divides by zero. Every holder keeps the state at zero there, so the mean is `NaN`, and every caller reads the mean only where the count reaches its warm-up, which is at least one.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.zero_start_mean(ZeroStartDebias(), 0.5, 0.5, 1)
+1.0
+
+julia> PortfolioOptimisers.zero_start_mean(nothing, 0.5, 0.5, 1)
+0.5
+```
+
+# Related
+
+  - [`AbstractZeroStartDebias`](@ref)
+  - [`ZeroStartDebias`](@ref)
+  - [`exp_weighted_moment`](@ref)
+  - [`ew_mean_series!`](@ref)
+"""
+function zero_start_mean(::ZeroStartDebias, s::Number, decay::Number, n::Integer)
+    return s / (one(decay) - decay^n)
+end
+function zero_start_mean(::Nothing, s::Number, ::Number, ::Integer)
+    return s
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Estimates expected returns by an exponentially weighted recursion that freezes on a holiday and resets on an inactive period.
 
-The state of each asset starts at zero, so a newly listed asset starts cold, and the answer divides out the weight that the zero start removes. An asset with fewer than `min_obs` valid observations is `NaN`, and so is an asset that is inactive at the last observation.
+The state of each asset starts at zero, so a newly listed asset starts cold, and by default the answer divides out the weight that the zero start removes. `debias = nothing` keeps the undivided state, which shrinks the expected return of an asset with a short history toward zero, as [`ZeroStartDebias`](@ref) states. An asset with fewer than `min_obs` valid observations is `NaN`, and so is an asset that is inactive at the last observation.
 
 A young asset stays investable, and the prior pays a cost for it. Every consumer of a Prior Result reads its returns matrix, so a prior fitted with this estimator fills the rows that the asset misses with zero through [`scenario_fill`](@ref). A scenario-based risk measure then reads a zero return where the asset had none, and it understates the risk of that asset over those rows. `mu` and `sigma` stay the estimates that the recursion made from the rows it saw. The fill is silent when the filled share of the asset's observations is at or below the `fill_limit` field of the prior, warns above it, and raises for any fill under `strict`. `fill_limit` defaults to `nothing`, and this family has no `CoveragePolicy` to derive a limit from, so every fill warns.
 
@@ -25,7 +117,7 @@ The state starts at ``S_i = 0`` and ``n_i = 0``. After ``n_i`` valid observation
 ```math
 \\begin{align}
 S_i &= (1 - \\lambda) \\sum_{k=0}^{n_i - 1} \\lambda^{k} r_{i, t_{n_i - k}}\\,, \\\\
-\\hat{\\mu}_i &= \\frac{S_i}{1 - \\lambda^{n_i}}\\,.
+\\hat{\\mu}_i &= \\begin{cases} \\dfrac{S_i}{1 - \\lambda^{n_i}} & \\text{under } \\texttt{debias = ZeroStartDebias()} \\\\ S_i & \\text{under } \\texttt{debias = nothing} \\end{cases}\\,.
 \\end{align}
 ```
 
@@ -56,6 +148,7 @@ $(DocStringExtensions.FIELDS)
     ExpWeightedExpectedReturns(;
         decay::Number = exp2(-inv(40.0)),
         min_obs::Integer = round(Int, max(1, decay_half_life(decay))),
+        debias::Option{<:AbstractZeroStartDebias} = ZeroStartDebias(),
         cache::Option{<:AbstractPartialFitState} = nothing
     ) -> ExpWeightedExpectedReturns
 
@@ -89,6 +182,7 @@ julia> pe.me.window
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`ExpWeightedExpectedReturnsState`](@ref)
+  - [`ZeroStartDebias`](@ref)
   - [`WindowedExpectedReturns`](@ref)
   - [`ExpWeightedVariance`](@ref)
   - [`ExpWeightedCovariance`](@ref)
@@ -106,21 +200,30 @@ julia> pe.me.window
     """
     min_obs
     """
+    $(field_dict[:zs_debias])
+    """
+    debias
+    """
     $(field_dict[:ew_cache])
     """
     cache
     function ExpWeightedExpectedReturns(decay::Number, min_obs::Integer,
+                                        debias::Option{<:AbstractZeroStartDebias},
                                         cache::Option{<:AbstractPartialFitState})
         assert_unit_interval(decay, :decay)
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
-        return new{typeof(decay), typeof(min_obs), typeof(cache)}(decay, min_obs, cache)
+        return new{typeof(decay), typeof(min_obs), typeof(debias), typeof(cache)}(decay,
+                                                                                  min_obs,
+                                                                                  debias,
+                                                                                  cache)
     end
 end
 function ExpWeightedExpectedReturns(; decay::Number = exp2(-inv(40.0)),
                                     min_obs::Integer = round(Int,
                                                              max(1, decay_half_life(decay))),
+                                    debias::Option{<:AbstractZeroStartDebias} = ZeroStartDebias(),
                                     cache::Option{<:AbstractPartialFitState} = nothing)::ExpWeightedExpectedReturns
-    return ExpWeightedExpectedReturns(decay, min_obs, cache)
+    return ExpWeightedExpectedReturns(decay, min_obs, debias, cache)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -270,13 +373,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Run one forward pass of an exponentially weighted update over the observations of `X`, and call `f` after each observation.
 
-Each verb of [`ExpWeightedExpectedReturns`](@ref) runs the recursion through this method. `f` receives the index of the observation and the cache after that observation, so a caller can read the mean at every observation in one pass.
+Each verb of [`ExpWeightedExpectedReturns`](@ref) runs the recursion through this method. `f` receives the index of the observation and the cache after that observation, so a caller can read the mean at every observation in one pass. A verb that needs only the last cache passes `Returns(nothing)` as `f`.
 
 # Algorithm
 
  1. Check `dims`, and check that `active_mask` has the size of `X`.
  2. Count the assets `N` along the dimension that is not `dims`.
- 3. If `state` is `nothing`, make a cold state: `mu` is `N` zeros, `obs_count` is `N` zeros, and `active` is `N` values `true`. The element type of `mu` is [`float_if_integer`](@ref) of `eltype(X)`, so an integer `X` gives a float state, a `Float32` `X` gives a `Float32` state, and a `Rational` `X` gives an exact state. Otherwise, check that `state` holds `N` assets, and continue from it.
+ 3. If `state` is `nothing`, make a cold state: `mu` is `N` zeros, `obs_count` is `N` zeros, and `active` is `N` values `true`. The element type of `mu` is `eltype(X)`, so a `Float32` `X` gives a `Float32` state, and a `Rational` `X` gives an exact state. Otherwise, check that `state` holds `N` assets, and continue from it.
  4. For each observation `i` along `dims`, in order, fold the observation and its row of `active_mask` into the cache with [`process_observation!`](@ref). Then call `f(i, cache)`.
  5. Return the cache.
 
@@ -318,10 +421,8 @@ function exp_weighted_pass!(f, est::ExpWeightedExpectedReturns, X::MatNum, dims:
     N = size(X, setdiff((1, 2), (dims,))[1])
 
     cache = if isnothing(state)
-        # A mean holds a fraction, so an integer sample takes a float state, and every
-        # other sample keeps its own type: a `Float32` sample stays `Float32`.
-        ExpWeightedExpectedReturnsState(zeros(float_if_integer(eltype(X)), N),
-                                        zeros(Int, N), trues(N))
+        # The state keeps the type of the sample: a `Float32` sample stays `Float32`.
+        ExpWeightedExpectedReturnsState(zeros(eltype(X), N), zeros(Int, N), trues(N))
     else
         @argcheck(length(state.mu) == N,
                   DimensionMismatch("the state holds $(length(state.mu)) assets, and `X` holds $N"))
@@ -338,35 +439,6 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Run one forward pass of an exponentially weighted update over the observations of `X`, and read no intermediate cache.
-
-It calls the method that takes a callback, with a callback that does nothing. A verb that needs only the last cache calls this method.
-
-# Arguments
-
-  - `est`: Estimator of the exponentially weighted family.
-  - $(arg_dict[:X])
-  - `dims::Int`: Dimension along which the observations run.
-  - `active_mask::Option{<:AbstractMatrix{<:Bool}}`: Optional boolean matrix with the same size as `X`.
-  - `state`: Optional state to continue from. A `nothing` starts from the cold state.
-
-# Returns
-
-  - `cache`: The cache after the last observation.
-
-# Related
-
-  - [`ExpWeightedExpectedReturns`](@ref)
-  - [`exp_weighted_moment`](@ref)
-"""
-function exp_weighted_pass!(est::ExpWeightedExpectedReturns, X::MatNum, dims::Int,
-                            active_mask::Option{<:AbstractMatrix{<:Bool}},
-                            state::Option{<:ExpWeightedExpectedReturnsState} = nothing)
-    return exp_weighted_pass!((args...) -> nothing, est, X, dims, active_mask, state)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 Read the exponentially weighted mean out of a cache, as it stands.
 
 The method reads the cache and does not write it, so the same cache answers this call after every observation of a forward pass. [`ExpWeightedExpectedReturns`](@ref) states the mathematics.
@@ -374,14 +446,14 @@ The method reads the cache and does not write it, so the same cache answers this
 # Algorithm
 
  1. Copy `cache.mu`.
- 2. For each asset with `obs_count > 0`, divide its entry by `1 - decay^obs_count`. An asset with `obs_count = 0` keeps its zero.
+ 2. For each asset with `obs_count > 0`, read its entry through [`zero_start_mean`](@ref) under `est.debias`. The default divides it by `1 - decay^obs_count`, and `nothing` keeps it. An asset with `obs_count = 0` keeps its zero.
  3. Set to `NaN` each asset that `cache.active` marks inactive, or that has `obs_count < est.min_obs`.
  4. Return the vector.
 
 # Arguments
 
   - `cache::ExpWeightedExpectedReturnsState`: State to read.
-  - `est::ExpWeightedExpectedReturns`: Exponentially weighted expected returns estimator. The method reads its `decay` and its `min_obs`.
+  - `est::ExpWeightedExpectedReturns`: Exponentially weighted expected returns estimator. The method reads its `decay`, its `min_obs` and its `debias`.
 
 # Returns
 
@@ -396,9 +468,12 @@ The method reads the cache and does not write it, so the same cache answers this
 function exp_weighted_moment(cache::ExpWeightedExpectedReturnsState,
                              est::ExpWeightedExpectedReturns)
     mu = copy(cache.mu)
-    counted = cache.obs_count .> zero(eltype(cache.obs_count))
     # `0 < decay < 1`, so `1 - decay^n >= 1 - decay > 0` in floating point as well.
-    mu[counted] ./= one(est.decay) .- est.decay .^ view(cache.obs_count, counted)
+    for (i, n) in pairs(cache.obs_count)
+        if n > zero(n)
+            mu[i] = zero_start_mean(est.debias, mu[i], est.decay, n)
+        end
+    end
     not_ready = .!cache.active .| (cache.obs_count .< est.min_obs)
     if any(not_ready)
         mu[not_ready] .= NaN
@@ -460,8 +535,13 @@ julia> length(mean(me, X))
 """
 function Statistics.mean(me::ExpWeightedExpectedReturns, X::MatNum; dims::Int = 1,
                          active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    cache = exp_weighted_pass!(me, X, dims, active_mask)
+    cache = exp_weighted_pass!(Returns(nothing), me, X, dims, active_mask)
     return exp_weighted_moment(cache, me)
+end
+# The weights of the mean are proportional to `decay^k` over the rows, so the count is their
+# Kish count, the closed form of `exp_weighted_kish_count`.
+function effective_observation_count(me::ExpWeightedExpectedReturns, X::MatNum; kwargs...)
+    return exp_weighted_kish_count(me.decay, size(X, 1))
 end
 """
     Statistics.mean(
@@ -537,13 +617,12 @@ The estimator keeps the state in its `cache` field, so a second call continues t
   - [`exp_weighted_pass!`](@ref)
   - [`Statistics.mean(me::ExpWeightedExpectedReturns; kwargs...)`](@ref)
 """
-function partial_fit!(me::ExpWeightedExpectedReturns{<:Any, <:Any,
+function partial_fit!(me::ExpWeightedExpectedReturns{<:Any, <:Any, <:Any,
                                                      <:Option{<:ExpWeightedExpectedReturnsState}},
                       X::MatNum; dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    cache = exp_weighted_pass!(me, X, dims, active_mask, me.cache)
-    Accessors.@reset me.cache = cache
-    return me
+    cache = exp_weighted_pass!(Returns(nothing), me, X, dims, active_mask, me.cache)
+    return cache === me.cache ? me : rebuild_struct(me, (; cache = cache))
 end
 """
     partial_fit!(
@@ -591,7 +670,7 @@ true
   - [`partial_fit!(me::ExpWeightedExpectedReturns, X::MatNum; dims::Int = 1, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)`](@ref)
   - [`ExpWeightedExpectedReturns`](@ref)
 """
-function partial_fit!(me::ExpWeightedExpectedReturns{<:Any, <:Any,
+function partial_fit!(me::ExpWeightedExpectedReturns{<:Any, <:Any, <:Any,
                                                      <:Option{<:ExpWeightedExpectedReturnsState}},
                       x::VecNum; active_mask::Option{<:AbstractVector{<:Bool}} = nothing,
                       kwargs...)
@@ -737,4 +816,5 @@ end
 function supports_partial_fit(::ExpWeightedExpectedReturns)
     return true
 end
-export ExpWeightedExpectedReturns
+public zero_start_mean
+export ExpWeightedExpectedReturns, ZeroStartDebias

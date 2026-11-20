@@ -1,7 +1,7 @@
 #=
 The third algorithm set of the online portfolio selection family (issue #1178 on map #1148):
-`FollowTheLeader` over a Sample Selector, the seven selectors, the Allocation Set Constraint
-through which a re-solve honours the head's set (ADR 0164), `FollowTheLeadingHistory`,
+`FollowTheLeader` over a Sample Selector, the seven selectors, the block of the head's set that
+a re-solve and each member of its fallback chain take (ADR 0164), `FollowTheLeadingHistory`,
 `RankOneCovariance` with the `ShortTermLossControlPortfolio` constructor, and the
 pattern-matching and risk-aversion aggregations as configurations.
 
@@ -14,6 +14,18 @@ leader the solver-free fixed point stops short of at its default budget.
 =#
 using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, Clarabel,
       HiGHS, Pajarito, JuMP
+# A custom objective term that costs the weight of the first asset. On a set it tests the
+# leader re-solve of the set's `cobj` (#2032).
+struct FirstCosts <: PortfolioOptimisers.CustomJuMPObjective
+    c::Float64
+end
+function PortfolioOptimisers.add_custom_objective_term!(model::JuMP.Model, ::Any,
+                                                        t::FirstCosts, ::Any, ::Any)
+    w = PortfolioOptimisers.get_w(model)
+    PortfolioOptimisers.add_to_objective_penalty!(model,
+                                                  JuMP.@expression(model, t.c * w[1]))
+    return nothing
+end
 @testset "Online portfolio selection: the third set" begin
     po = PortfolioOptimisers
     OPS = po.OnlinePortfolioSelection
@@ -299,6 +311,20 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                                                                                            rows(rd,
                                                                                                 1:30)).w
         @test maximum(abs.(wfp .- w30)) > 1e-2
+        # The warning keys its `maxlog = 1` on `iters` (#1690), so a second leader at the
+        # same budget does not warn again, and a leader at another budget does.
+        short_logs, _ = Test.collect_test_logs() do
+            optimise(OPS(; alg = FollowTheLeader()), rows(rd, 1:30))
+            optimise(OPS(; alg = FollowTheLeader()), rows(rd, 1:30))
+            return optimise(OPS(;
+                                alg = FollowTheLeader(;
+                                                      opt = BestConstantRebalancedPortfolio(;
+                                                                                            iters = 10))),
+                            rows(rd, 1:30))
+        end
+        @test [match(r"iters = (\d+)", string(l.message))[1]
+               for l in short_logs if occursin("solver-free leader", string(l.message))] ==
+              ["20000", "10"]
         # The flag is the certificate's: at the budget it reads `false`, and the certificate
         # bounds the shortfall of the log wealth from the leader's.
         r30 = optimise(BestConstantRebalancedPortfolio(), rows(rd, 1:30))
@@ -318,6 +344,436 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test maximum(abs.(rl.w .- w30)) < 2e-9
         @test isapprox(optimise(OPS(; alg = FollowTheLeader(; opt = long)), rows(rd, 1:30)).w,
                        w30; atol = 1e-8)
+    end
+
+    @testset "The held budgets meet the head's budget of one (#2034)" begin
+        # The re-solve sets the held budget to one, so the leader's model holds the head's row
+        # `sum(w) == k` (#2047). A held budget that excludes one held every step at
+        # `dc3d282e50`, when the row stood beside the held optimiser's rows.
+        ftl(; kw...) = FollowTheLeader(; opt = logopt(; kw...))
+        ls = WeightBounds(; lb = -1.0, ub = 1.0)
+        w0 = fill(1 / N, N)
+        @test_throws DomainError ftl(; bgt = 0.5)
+        @test_throws "owns the budget of one" ftl(; bgt = 0.5)
+        @test_throws DomainError ftl(; bgt = BudgetRange(; lb = 1.1, ub = 1.2))
+        @test_throws DomainError ftl(; bgt = BudgetRange(; lb = nothing, ub = 0.9))
+        # A cost estimator is refused in every form: with the head's row its cost is a band
+        # about its reference, which the wealth recursion never pays.
+        @test_throws ArgumentError ftl(; bgt = BudgetCosts(; bgt = 1.0, w = w0))
+        @test_throws "BudgetCostEstimator" ftl(;
+                                               bgt = BudgetMarketImpact(;
+                                                                        bgt = BudgetRange(;
+                                                                                          lb = 0.9,
+                                                                                          ub = 1.1),
+                                                                        w = w0))
+        # Each entry and the explicit default of a schedule meet the same rules.
+        @test_throws DomainError ftl(; bgt = TimeDependent([1.0, 0.5]))
+        @test_throws DomainError ftl(; bgt = TimeDependent([1.0, 1.0]; default = 0.5))
+        @test_throws ArgumentError ftl(; bgt = TimeDependent([1.0, BudgetCosts(; w = w0)]))
+        # The gross budget meets a net budget of one, as on a programme set.
+        @test_throws ArgumentError ftl(; bgt = nothing, gbgt = 0.8, wb = ls)
+        @test_throws ArgumentError ftl(; bgt = nothing, gbgt = TimeDependent([1.2, 0.8]),
+                                       wb = ls)
+        @test_throws "over-determined" ftl(; bgt = nothing, sbgt = 0.1, gbgt = 1.5, wb = ls)
+        # The net budget check is a value check: its no-op method takes the set that reaches
+        # it, `nothing` and an Unresolved Value, and any other type is a `MethodError` (#2108).
+        @test isnothing(po.assert_net_budget_admits_one(nothing))
+        @test isnothing(po.assert_net_budget_admits_one(TimeDependent([1.0, 1.0])))
+        @test_throws MethodError po.assert_net_budget_admits_one("one")
+        # A budget that holds one, a function schedule and the solver-free leader pass.
+        for kw in
+            ((; bgt = 1), (; bgt = nothing), (; bgt = BudgetRange(; lb = 0.8, ub = 1.2)),
+             (; bgt = BudgetRange(; lb = nothing, ub = 1.5)),
+             (; bgt = TimeDependent(ctx -> 0.5)), (; bgt = TimeDependent([1.0, nothing])),
+             (; bgt = nothing, gbgt = 1.2, wb = ls),
+             (; bgt = nothing, sbgt = BudgetRange(; lb = 0.0, ub = 0.2), gbgt = 1.5,
+              wb = ls))
+            @test isa(ftl(; kw...), FollowTheLeader)
+        end
+        @test isa(FollowTheLeader(), FollowTheLeader)
+        # A view rebuilds the rule through its constructor and keeps an admitted budget.
+        @test po.port_opt_view(ftl(; bgt = nothing), [1, 2]).opt.opt.bgt === nothing
+        # The budgets that hold one solve on every step and play a leader that sums to one,
+        # the leader of the default budget.
+        r1 = optimise(OPS(; alg = ftl()), rows(rd, 1:10))
+        for kw in ((; bgt = nothing), (; bgt = BudgetRange(; lb = 0.8, ub = 1.2)))
+            r = optimise(OPS(; alg = ftl(; kw...)), rows(rd, 1:10))
+            @test !isa(r.retcode.res, po.HeldStep)
+            @test isapprox(sum(r.w), 1; atol = 1e-8)
+            @test isapprox(r.w, r1.w; atol = 1e-6)
+        end
+    end
+
+    @testset "The re-solve passes the set as a second block (#2047)" begin
+        lead(; fb = nothing, kw...) = MeanRisk(; obj = MaximumReturn(),
+                                               opt = JuMPOptimiser(; pe = EmpiricalPrior(),
+                                                                   slv = slv,
+                                                                   ret = LogarithmicReturn(),
+                                                                   kw...), fb = fb)
+        bcrp = BestConstantRebalancedPortfolio
+        w0 = fill(1 / N, N)
+        rdv = rows(rd, 1:10)
+        # Each member of the fallback chain has the kind of the held estimator, and a JuMP
+        # member meets the budget rules of the held estimator.
+        @test isa(FollowTheLeader(; opt = lead(; fb = lead(; bgt = nothing))),
+                  FollowTheLeader)
+        @test isa(FollowTheLeader(; opt = bcrp(; fb = bcrp())), FollowTheLeader)
+        @test_throws ArgumentError FollowTheLeader(; opt = lead(; fb = EqualWeighted()))
+        @test_throws "a `BestConstantRebalancedPortfolio` after a `MeanRisk`" FollowTheLeader(;
+                                                                                              opt = lead(;
+                                                                                                         fb = bcrp()))
+        @test_throws ArgumentError FollowTheLeader(; opt = bcrp(; fb = lead()))
+        @test_throws "precomputed result" FollowTheLeader(;
+                                                          opt = lead(;
+                                                                     fb = optimise(lead(),
+                                                                                   rdv)))
+        @test_throws DomainError FollowTheLeader(; opt = lead(; fb = lead(; bgt = 0.5)))
+        @test_throws DomainError FollowTheLeader(;
+                                                 opt = lead(;
+                                                            fb = lead(;
+                                                                      fb = lead(;
+                                                                                bgt = BudgetRange(;
+                                                                                                  lb = 1.1,
+                                                                                                  ub = 1.2)))))
+        # The chain takes the budget of one on each JuMP member, and the bounds of a bounded
+        # set on each solver-free member.
+        bset = resolve(BoundedAllocationSet(; wb = WeightBounds(0, 0.4)), N)
+        ch = po.leader_chain(lead(; bgt = nothing, fb = lead(; bgt = nothing)), bset, 1.0)
+        @test ch.opt.bgt == 1 && ch.fb.opt.bgt == 1 && isnothing(ch.fb.fb)
+        bc = po.leader_chain(bcrp(; fb = bcrp()), bset, 1.0)
+        @test bc.wb.ub == bset.wb.ub && bc.fb.wb.ub == bset.wb.ub && isnothing(bc.fb.fb)
+        # The entry of a bounded set is a programme set whose block holds its bounds alone,
+        # so it fits no prior. A programme set takes the book of the step through `factory`.
+        e = po.leader_block(bset, lead(), w0, rdv)
+        @test isa(e[1], ProgrammeAllocationSet) && e[1].wb.ub == bset.wb.ub && e[2] === rdv
+        @test isnothing(po.allocation_set_prior(e[1], rdv))
+        tset = resolve(ProgrammeAllocationSet(; slv = slv,
+                                              tn = Turnover(; w = zeros(N), val = 0.2)), N)
+        ep = po.leader_block(tset, lead(), w0, rdv)
+        @test ep[1].tn.w == w0 && ep[2] === rdv
+        # The leader's model holds the block of the set under `blk_2_` and the budget of one
+        # in the row of the leader. The block of the set carries no budget row.
+        res = optimise(po.leader_chain(lead(; bgt = nothing), bset, 1.0), rdv;
+                       blocks = (e,))
+        @test haskey(res.model, :blk_2_w_ub) && haskey(res.model, :bgt)
+        @test !haskey(res.model, :blk_2_bgt) && !haskey(res.model, :aset_bgt)
+        @test maximum(res.w) <= 0.4 + 1e-8 && isapprox(sum(res.w), 1; atol = 1e-8)
+        @test maximum(optimise(lead(; bgt = nothing), rdv).w) > 0.4 + 1e-3
+    end
+
+    @testset "A fallback leader solves on the head's set (#2035)" begin
+        # The held optimiser stops at `max_iter = 0`, so its fallback is the leader. At
+        # `dc3d282e50` the fallback solved without the set, and the leader put the budget on
+        # one asset, 0.9999999937 against the cap of 0.2. The set now reaches each member of
+        # the chain as a block of the entry (#2045, #2047).
+        rngf = StableRNG(424242)
+        Tf, Nf = 80, 8
+        Ff = randn(rngf, Tf, 2)
+        Rf = (Ff * randn(rngf, 2, Nf) .+ randn(rngf, Tf, Nf)) ./ 100 .+ 0.0005
+        rdf = ReturnsResult(; nx = string.('a':'h'), X = Rf)
+        bad = Solver(; name = :bad, solver = Clarabel.Optimizer,
+                     settings = Dict("verbose" => false, "max_iter" => 0))
+        cap = ProgrammeAllocationSet(; slv = slv, wb = WeightBounds(; lb = 0.0, ub = 0.2))
+        lead(s; fb = nothing) = MeanRisk(; obj = MaximumReturn(),
+                                         opt = JuMPOptimiser(; slv = s), fb = fb)
+        free = optimise(OPS(; alg = FollowTheLeader(; opt = lead(slv))), rdf).w
+        ok = optimise(OPS(; alg = FollowTheLeader(; opt = lead(slv)), set = cap), rdf).w
+        fb = optimise(OPS(; alg = FollowTheLeader(; opt = lead(bad; fb = lead(slv))),
+                          set = cap), rdf).w
+        # The leader leaves the cap without the set, so the cap binds.
+        @test maximum(free) > 0.2 + 1e-3
+        @test maximum(ok) <= 0.2 + 1e-8
+        # The fallback leader keeps the cap, and it is the leader of the held solver.
+        @test maximum(fb) <= 0.2 + 1e-8
+        @test isapprox(fb, ok; atol = 1e-8)
+        @test isapprox(sum(fb), 1; atol = 1e-8)
+        # A member that cannot take the set raises at construction.
+        @test_throws ArgumentError FollowTheLeader(; opt = lead(bad; fb = EqualWeighted()))
+    end
+
+    @testset "A centring leader that drops rows of a programme set is refused (R48 of #1817)" begin
+        # The centring model of `UnconstrainedNearOptimalCentering` holds the bounds and the
+        # budgets of a later block alone. Under the set's row `a + b <= 0.05` the head played
+        # `a + b = 0.2054` at `gamma = 0`, at `c51fe04fa1` and at `v0.33.0`, outside its set.
+        rngc = StableRNG(424242)
+        Tc, Nc = 80, 8
+        Fc = randn(rngc, Tc, 2)
+        Rc = (Fc * randn(rngc, 2, Nc) .+ randn(rngc, Tc, Nc)) ./ 100 .+ 0.0005
+        rdc = ReturnsResult(; nx = string.('a':'h'), X = Rc)
+        lset = ProgrammeAllocationSet(; slv = slv,
+                                      sets = UniverseSets(; dict = Dict("nx" => rdc.nx)),
+                                      lcse = LinearConstraintEstimator(;
+                                                                       val = ["a + b <= 0.05"]))
+        bset = BoundedAllocationSet(; wb = WeightBounds(; lb = 0.0, ub = 0.2))
+        noc(alg; fb = nothing) = NearOptimalCentering(; opt = JuMPOptimiser(; slv = slv),
+                                                      alg = alg, fb = fb)
+        ucn = UnconstrainedNearOptimalCentering()
+        ccn = ConstrainedNearOptimalCentering()
+        mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
+        # The held leader, a member of its chain, an expert of a mixture and an entry of a
+        # schedule on the set are each refused.
+        @test_throws ArgumentError OPS(; alg = FollowTheLeader(; opt = noc(ucn)),
+                                       set = lset)
+        @test_throws "UnconstrainedNearOptimalCentering" OPS(;
+                                                             alg = FollowTheLeader(;
+                                                                                   opt = noc(ucn)),
+                                                             set = lset)
+        @test_throws ArgumentError OPS(;
+                                       alg = FollowTheLeader(;
+                                                             opt = MeanRisk(;
+                                                                            opt = JuMPOptimiser(;
+                                                                                                slv = slv),
+                                                                            fb = noc(ucn))),
+                                       set = lset)
+        @test_throws ArgumentError OPS(;
+                                       alg = ExpertMixture(;
+                                                           experts = [BuyAndHold(),
+                                                                      FollowTheLeader(;
+                                                                                      opt = noc(ucn))]),
+                                       set = lset)
+        @test_throws ArgumentError OPS(; alg = FollowTheLeader(; opt = noc(ucn)),
+                                       set = TimeDependent([lset, lset]))
+        # A bounded set holds bounds alone, which the centring model keeps. The constrained
+        # centring keeps every row of the set, as the other heads do.
+        wb = optimise(OPS(; alg = FollowTheLeader(; opt = noc(ucn)), set = bset), rdc).w
+        @test maximum(wb) <= 0.2 + 1e-8
+        for h in (noc(ccn), mr, noc(ccn; fb = noc(ccn)))
+            w = optimise(OPS(; alg = FollowTheLeader(; opt = h), set = lset), rdc).w
+            @test w[1] + w[2] <= 0.05 + 1e-6
+            @test isapprox(sum(w), 1; atol = 1e-8)
+        end
+        # The leader alone gives `a` and `b` more than the row admits, so the row binds.
+        wfree = optimise(OPS(; alg = FollowTheLeader(; opt = noc(ccn))), rdc).w
+        @test wfree[1] + wfree[2] > 0.05 + 1e-3
+    end
+
+    @testset "The set's custom objective term enters the re-solve (#2032)" begin
+        # The reproduction of #2032. The first asset has the highest drift, so the leader
+        # alone holds it. A cost of 10 on its weight moves the leader to another asset. At
+        # `dc3d282e50` the cost on the set changed no weight, and the cost on the held
+        # optimiser did.
+        R2 = 0.02 .* randn(StableRNG(23), 40, 3) .+ [0.01 0.0 0.0]
+        rd2 = ReturnsResult(; nx = ["A", "B", "C"], X = R2)
+        ftlw(; okw = (;), skw = (;)) = optimise(OPS(;
+                                                    alg = FollowTheLeader(;
+                                                                          opt = logopt(;
+                                                                                       okw...)),
+                                                    set = ProgrammeAllocationSet(;
+                                                                                 slv = slv,
+                                                                                 skw...)),
+                                                rd2).w
+        base = ftlw()
+        onset = ftlw(; skw = (; cobj = FirstCosts(10.0)))
+        onopt = ftlw(; okw = (; cobj = FirstCosts(10.0)))
+        @test base[1] > 0.99
+        @test onopt[1] < 1e-6
+        @test isapprox(onset, onopt; atol = 1e-6)
+        # The set's term goes in once. A cost of 0.0041 splits the leader between the first
+        # two assets. A term that went in twice would give the weights of twice the cost. Half
+        # of the cost on the set and half on the held optimiser add up to the whole cost.
+        c = 0.0041
+        cost(x) = (; cobj = FirstCosts(x))
+        wopt = ftlw(; okw = cost(c))
+        @test 0.3 < wopt[1] < 0.5
+        @test isapprox(ftlw(; skw = cost(c)), wopt; atol = 1e-6)
+        @test isapprox(ftlw(; okw = cost(c / 2), skw = cost(c / 2)), wopt; atol = 1e-6)
+        @test ftlw(; okw = cost(2 * c))[1] < 1e-6
+        @test ftlw(; okw = cost(c / 2))[1] > 0.99
+    end
+
+    @testset "A semidefinite phylogeny of the set binds in the re-solve (#2126)" begin
+        # The reproduction of #2126. On `c51fe04fa1` the variance of the leader took the
+        # second-order cone, because it read the phylogeny of the block of the head alone.
+        # The rows of the set sat on a lift that no term held down and that took no penalty,
+        # so the linked pairs kept 0.01997 at `p = 0.05` and at `p = 10`.
+        rngp = StableRNG(123)
+        Tp, Np, Nfp = 120, 6, 3
+        Fp = randn(rngp, Tp, Nfp) .* 0.02
+        Bp = randn(rngp, Np, Nfp)
+        Xp = Fp * transpose(Bp) .+ randn(rngp, Tp, Np) .* 0.01 .+ 0.001
+        rdp = ReturnsResult(; X = Xp, nx = string.(1:Np), F = Fp, nf = string.(1:Nfp))
+        slvp = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                      settings = Dict("verbose" => false),
+                      check_sol = (; allow_local = true, allow_almost = true))
+        Ap = zeros(Int, Np, Np)
+        Ap[2, 6] = Ap[6, 2] = 1
+        Ap[2, 3] = Ap[3, 2] = 1
+        pset(p) =
+            if isnothing(p)
+                ProgrammeAllocationSet(; slv = slvp)
+            else
+                ProgrammeAllocationSet(; slv = slvp,
+                                       ple = SemiDefinitePhylogeny(; A = Ap, p = p))
+            end
+        link(w) = maximum(abs, Ap .* (w * transpose(w)))
+        vlead = MeanRisk(; opt = JuMPOptimiser(; slv = slvp))
+        clead = MeanRisk(; r = ConditionalValueatRisk(), opt = JuMPOptimiser(; slv = slvp))
+        ftlp(h, p) = optimise(OPS(; alg = FollowTheLeader(; opt = h), set = pset(p)), rdp).w
+        batch = optimise(MeanRisk(;
+                                  opt = JuMPOptimiser(; slv = slvp,
+                                                      ple = SemiDefinitePhylogeny(; A = Ap,
+                                                                                  p = 0.05))),
+                         rdp).w
+        @test link(batch) < 1e-6
+        # The variance of the leader holds the lift down, as in the batch head, so the rows
+        # bind and the penalty is omitted at each `p`.
+        @test link(ftlp(vlead, nothing)) > 1e-2
+        wv = ftlp(vlead, 0.05)
+        @test link(wv) < 1e-6
+        @test isapprox(ftlp(vlead, 10.0), wv; atol = 1e-6)
+        # A leader with no variance keeps the penalty, which binds the rows.
+        @test link(ftlp(clead, nothing)) > 1e-2
+        @test link(ftlp(clead, 0.05)) < 1e-6
+        # Phase 1 of the block of the set marks the weights of the head, so the variance
+        # states its term on the `W` that the rows of the set bind.
+        rdv = rows(rdp, 1:60)
+        sres = resolve(pset(0.05), Np)
+        e = po.leader_block(sres, vlead, fill(1 / Np, Np), rdv)
+        m = optimise(po.leader_chain(vlead, sres, 1.0), rdv; blocks = (e,)).model
+        @test haskey(m, :sdp_phylogeny) && haskey(m, :blk_2_sdp_plg_1)
+        @test !haskey(m, :blk_2_sdp_plg_p_1) && !haskey(m, :dev_1)
+        @test issubset(keys(m[:variance_risk_1].terms), Set(vec(m[:W])))
+        # The tracking errors of the head build their variance in phase 1 of the head, before
+        # phase 1 of the set. So the block of the set marks the weights before the head (R63
+        # of #1817). A dependent variance tracks only in the semidefinite form, and on the
+        # parent of the fix it took the second-order cone, and every solve raised
+        # `UnsupportedConstraint`. It now gives the weights of the phylogeny on the head.
+        trk = RiskTrackingError(; tr = WeightsTracking(; w = fill(1 / Np, Np)),
+                                r = Variance(), err = 1e-4,
+                                alg = DependentVariableTracking())
+        tlead = MeanRisk(; opt = JuMPOptimiser(; slv = slvp, tr = trk))
+        tlead_pl = MeanRisk(;
+                            opt = JuMPOptimiser(; slv = slvp, tr = trk,
+                                                ple = SemiDefinitePhylogeny(; A = Ap,
+                                                                            p = 0.05)))
+        rt = optimise(po.leader_chain(tlead, sres, 1.0), rdv;
+                      blocks = (po.leader_block(sres, tlead, fill(1 / Np, Np), rdv),))
+        s0 = resolve(pset(nothing), Np)
+        rt0 = optimise(po.leader_chain(tlead_pl, s0, 1.0), rdv;
+                       blocks = (po.leader_block(s0, tlead_pl, fill(1 / Np, Np), rdv),))
+        @test isa(rt.retcode, po.OptimisationSuccess)
+        @test link(rt.w) < 1e-6
+        @test isapprox(rt.w, rt0.w; atol = 1e-6)
+        # A factor head writes no term on the lift of the asset weights, so the head refuses
+        # the set with a semidefinite phylogeny on a chain that holds one.
+        frc = FactorRiskContribution(; opt = JuMPOptimiser(; slv = slvp))
+        @test_throws "whose `ple` holds a semidefinite phylogeny" OPS(;
+                                                                      alg = FollowTheLeader(;
+                                                                                            opt = frc),
+                                                                      set = pset(0.05))
+        @test_throws ArgumentError OPS(;
+                                       alg = FollowTheLeader(;
+                                                             opt = MeanRisk(;
+                                                                            opt = JuMPOptimiser(;
+                                                                                                slv = slvp),
+                                                                            fb = frc)),
+                                       set = pset(0.05))
+        @test isa(OPS(; alg = FollowTheLeader(; opt = frc), set = pset(nothing)), OPS)
+        @test isa(OPS(; alg = FollowTheLeader(; opt = vlead), set = pset(0.05)), OPS)
+    end
+
+    @testset "A schedule in a leader resolves at each fold (#2049)" begin
+        # The leader solves at each step, and its `optimise` resets a schedule to its
+        # fold-less value. At `a449f96722` the fold loop read the head's own fields alone, so
+        # every fold solved on the static `wb` and the entries never ran.
+        ftl(; kw...) = FollowTheLeader(; opt = logopt(; kw...))
+        lo = WeightBounds(; lb = 0.0, ub = 0.3)
+        hi = WeightBounds(; lb = 0.0, ub = 1.0)
+        r = rows(rd, 2:11)
+        # Fold `i` of the alternating schedule is fold `i` of the static run on entry `i`, in
+        # the online arm and in the batch arm. A Prefix leader at `gamma = 0` keeps no state,
+        # so each fold reads the entry of its own fold alone.
+        for cv in
+            (OnlineIndexWalkForward(5, 1), IndexWalkForward(5, 1; expand_train = true))
+            n = length(po.split(cv, r).train_idx)
+            sched = [isodd(i) ? lo : hi for i in 1:n]
+            p = cross_val_predict(OPS(; alg = ftl(; wb = TimeDependent(sched))), r, cv)
+            pl = cross_val_predict(OPS(; alg = ftl(; wb = lo)), r, cv)
+            ph = cross_val_predict(OPS(; alg = ftl(; wb = hi)), r, cv)
+            for i in 1:n
+                @test p.pred[i].res.w == (isodd(i) ? pl : ph).pred[i].res.w
+            end
+            @test all(i -> maximum(p.pred[i].res.w) <= 0.3 + 1e-8, 1:2:n)
+            @test all(i -> maximum(p.pred[i].res.w) > 0.9, 2:2:n)
+        end
+        # The walk enters a rule over rules: a leader among the experts of a mixture.
+        cv = OnlineIndexWalkForward(5, 1)
+        n = length(po.split(cv, r).train_idx)
+        mix(wb) = OPS(; alg = ExpertMixture(; experts = [BuyAndHold(), ftl(; wb = wb)]))
+        head = mix(TimeDependent(fill(lo, n)))
+        @test po.is_time_dependent(head)
+        pm = cross_val_predict(head, r, cv)
+        pm0 = cross_val_predict(mix(lo), r, cv)
+        @test all(i -> pm.pred[i].res.w == pm0.pred[i].res.w, 1:n)
+        # A schedule in a leader is held to the fold count, and the error names the field.
+        @test_throws DimensionMismatch cross_val_predict(mix(TimeDependent([lo, hi])), r,
+                                                         cv)
+        @test_throws "time-dependent entries for wb (2)" cross_val_predict(mix(TimeDependent([lo,
+                                                                                              hi])),
+                                                                           r, cv)
+        # A solve with no fold reads the explicit default, else the static default.
+        wl = optimise(OPS(; alg = ftl(; wb = lo)), r).w
+        @test optimise(OPS(; alg = ftl(; wb = TimeDependent([hi, hi]; default = lo))), r).w ==
+              wl
+        @test optimise(OPS(; alg = ftl(; wb = TimeDependent([lo, lo]))), r).w ==
+              optimise(OPS(; alg = ftl()), r).w
+        # A rule that holds no schedule comes back as the same object.
+        ctx = po.TimeDependentContext(; i = 1, n = 1, rd = r, train_idx = [1:5],
+                                      test_idx = [6:6])
+        for alg in (ftl(), ExpertMixture(; experts = [BuyAndHold(), ftl()]), BuyAndHold(),
+                    [BuyAndHold(), ftl()])
+            @test !po.is_time_dependent(alg)
+            @test po.update_time_dependent_estimator(alg, ctx) === alg
+        end
+        plain = OPS(; alg = ftl())
+        @test !po.is_time_dependent(plain)
+        @test po.update_time_dependent_estimator(plain, ctx) === plain
+    end
+
+    @testset "A leader schedule that reads the previous weights gets them in a batch (#2054)" begin
+        # At `ce1298948e` the head answered `needs_previous_weights` from its own fields
+        # and `fb` alone. So a batch walk-forward ran its folds in parallel, and a schedule
+        # in the leader read `ctx.w_prev = nothing` at every fold.
+        ftl(; kw...) = FollowTheLeader(; opt = logopt(; kw...))
+        lo = WeightBounds(; lb = 0.0, ub = 0.3)
+        hi = WeightBounds(; lb = 0.0, ub = 1.0)
+        pwf = po.PreviousWeightsFunction(; f = ctx -> (isnothing(ctx.w_prev) ? hi : lo))
+        head = OPS(; alg = ftl(; wb = TimeDependent(pwf)))
+        @test po.needs_previous_weights(head)
+        @test po.schedule_reads_previous_weights(head)
+        experts = [BuyAndHold(), ftl(; wb = TimeDependent(pwf))]
+        @test po.needs_previous_weights(OPS(; alg = ExpertMixture(; experts = experts)))
+        # A turnover of the leader measures from the Price-Adjusted Allocation of the step,
+        # which `factory` gives it inside the rule. So a cost-aware leader still runs its
+        # folds in parallel, and so does a schedule whose entries are fixed values.
+        tn = Turnover(; w = zeros(N), val = 0.2)
+        @test po.needs_previous_weights(ftl(; tn = tn).opt)
+        @test !po.needs_previous_weights(OPS(; alg = ftl(; tn = tn)))
+        @test !po.needs_previous_weights(OPS(; alg = ftl(; wb = TimeDependent([lo, hi]))))
+        @test !po.needs_previous_weights(OPS(; alg = ftl()))
+        @test !po.schedule_reads_previous_weights(OPS(; alg = ftl()))
+        # The walk enters an optimiser entry of a schedule, and a vector of optimisers.
+        lead = logopt(; wb = TimeDependent(pwf))
+        @test po.schedule_reads_previous_weights(TimeDependent([logopt(), lead]))
+        @test !po.schedule_reads_previous_weights(TimeDependent([logopt(), logopt()]))
+        @test po.schedule_reads_previous_weights([logopt(), lead])
+        @test !po.schedule_reads_previous_weights([logopt(), logopt()])
+        # Fold 1 reads no previous weights and solves on `hi`. Every later fold reads the
+        # weights of the fold before it and solves on `lo`, in the batch arm as in the
+        # online arm. A Prefix leader at `gamma = 0` keeps no state.
+        r = rows(rd, 2:11)
+        for cv in
+            (OnlineIndexWalkForward(5, 1), IndexWalkForward(5, 1; expand_train = true))
+            n = length(po.split(cv, r).train_idx)
+            p = cross_val_predict(head, r, cv)
+            pl = cross_val_predict(OPS(; alg = ftl(; wb = lo)), r, cv)
+            ph = cross_val_predict(OPS(; alg = ftl(; wb = hi)), r, cv)
+            @test p.pred[1].res.w == ph.pred[1].res.w
+            for i in 2:n
+                @test p.pred[i].res.w == pl.pred[i].res.w
+            end
+            @test maximum(ph.pred[2].res.w) > 0.9
+        end
     end
 
     @testset "A leader in the Excess Frame fits the excess returns its rows carry (#1646)" begin
@@ -463,13 +919,6 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                                                                       rowsT, bset), rowsT,
                                               1)
         @test isapprox(wb5, 0.5 .* wb0 .+ 0.5 .* wt; atol = 1e-10)
-        # The adapter views with the held optimiser, so a leader whose prior reduces to
-        # its Investable Mask keeps the set: the set, the reference and the carrier are
-        # each sliced (ADR 0170).
-        cn = po.port_opt_view(po.AllocationSetConstraint(tset, wt, nothing), [1, 2])
-        @test isnothing(cn.X) && cn.w == wt[1:2] && length(cn.set.wb.lb) == 2
-        cr = po.port_opt_view(po.AllocationSetConstraint(tset, wt, rowsT), [1, 2])
-        @test cr.X.nx == ["C", "A"] && size(cr.X.X, 2) == 2 && cr.w == wt[1:2]
         # 4. Under card = 2 the leader holds two names and the mix of it with a
         #    two-name book is projected back to two. A MIP kind on the set needs a
         #    MIP-capable solver on the held optimiser, whose model it enters.
@@ -908,8 +1357,8 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                 string(@doc(KernelMatch)), string(@doc(NearestNeighbourMatch)),
                 string(@doc(CorrelationMatch)), string(@doc(ClusterMatch)),
                 string(@doc(RankOneCovariance)),
-                string(@doc(ShortTermLossControlPortfolio)),
-                string(@doc(po.AllocationSetConstraint)),
+                string(@doc(ShortTermLossControlPortfolio)), string(@doc(po.leader_block)),
+                string(@doc(po.leader_chain)), string(@doc(po.assert_leader_chain)),
                 string(@doc(po.AbstractSampleSelector)), string(@doc(matrix_square_root))]
         @test all(d -> !occursin("No documentation found", d), docs)
         @test occursin("follow-the-leader rule", docs[1])

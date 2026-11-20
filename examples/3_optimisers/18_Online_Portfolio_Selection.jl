@@ -467,7 +467,7 @@ cumulative-returns plot draws the wealth. The result of one fold goes into the f
 allocation as it stands.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 plot_stacked_area_composition(capped_pred; N = 8)
 
 #-

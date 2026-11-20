@@ -10,6 +10,7 @@ Description = "Covariance Forecast Evaluation, public API of PortfolioOptimisers
 RealisedCovariance
 HorizonReturn
 CovarianceForecastEvaluationResult
+CovarianceForecastStepResult
 covariance_forecast_step
 PortfolioOptimisers.partial_fit!(ce::PortfolioOptimisers.AbstractCovarianceEstimator, rd::ReturnsResult)
 covariance_forecast_evaluation

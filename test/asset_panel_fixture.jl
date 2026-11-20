@@ -18,14 +18,16 @@ mean, named after what the columns are; a test that only needs *a* panel says so
 
 Build the `AssetPanel` whose derived Feature Matrix is `Z`, with `nz` naming its columns: one
 `NumericPanelField` per column, under that column's own name. A static `assets × features` matrix
-builds a static panel, and a time-varying `observations × assets × features` array builds a
-time-varying one with all-`true` universe masks.
+builds a static panel, and a time-varying `assets × features × observations` array builds a
+time-varying one with all-`true` universe masks. Each numeric Panel Field holds
+`observations × assets`, so the helper transposes the slice of each feature.
 """
 function matrix_panel(nz, Z::AbstractMatrix)
     return asset_panel([NumericPanelInput(; name = String(n), vals = Z[:, k])
                         for (k, n) in pairs(nz)])
 end
 function matrix_panel(nz, Z::AbstractArray{<:Any, 3})
-    return asset_panel([NumericPanelInput(; name = String(n), vals = Z[:, :, k])
+    return asset_panel([NumericPanelInput(; name = String(n),
+                                          vals = permutedims(Z[:, k, :]))
                         for (k, n) in pairs(nz)])
 end

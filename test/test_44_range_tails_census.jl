@@ -3,11 +3,12 @@
 
     #=
     ADR 0057: a range risk measure is its base measure applied twice, once on the returns
-    and once on their negation. `set_range_risk_constraints!` reads the pair from
-    `range_tails`, builds each tail, and registers only their sum.
+    and once on their negation. The method of `set_risk_constraints!` for a
+    `RangeRiskMeasure` reads the pair from `range_tails`, builds each tail, and registers
+    only their sum under `range_risk_key(r)`.
 
-    The throwing fallback at `src/16_RiskMeasures/01_Base_RiskMeasures.jl:227` enforces
-    ONE direction of that rule. A non-fused range that forgets `range_tails` throws the
+    The throwing fallback of `range_tails` on `RangeRiskMeasure` enforces ONE direction of
+    that rule. A non-fused range that forgets `range_tails` throws the
     first time it is used. It cannot enforce the other direction: a FUSED range that
     wrongly declared `range_tails` would be decomposed and double-counted, and nothing
     would object. Nor can it see the settings a declared tail carries — a tail that kept
@@ -28,8 +29,9 @@
     # ------------------------------------------------------------------ the two lists
 
     #=
-    Each entry decomposes: `range_tails` answers a `(; loss, gain)` pair of point measures,
-    and `set_range_risk_constraints!` sums them.
+    Each entry decomposes: `range_tails` answers a `RangeTails` pair of point measures, and
+    the method of `set_risk_constraints!` for a `RangeRiskMeasure` sums them under the key
+    that `range_risk_key` answers.
     =#
     declaring = ["ConditionalValueatRiskRange" => ConditionalValueatRiskRange(),
                  "DistributionallyRobustConditionalValueatRiskRange" =>
@@ -48,8 +50,8 @@
     `range_tails`. The reason is written per entry, because "it throws" is not a reason.
 
       - `Range` writes `wr_risk - br_risk` directly in
-        `09_RiskMeasureConstraints/14_RangeConstraints.jl:47`. It never reaches
-        `set_range_risk_constraints!`, so there is no pair to state.
+        `09_RiskMeasureConstraints/14_RangeConstraints.jl`. Its own method of
+        `set_risk_constraints!` is more specific, so there is no pair to state.
       - `ValueatRiskRange` under `DistributionValueatRisk` is parametric: the two tails are
         two quantiles of one fitted distribution, not two separate measures.
       - `OrderedWeightsArrayRange` under `ExactOrderedWeightsArray` writes one exact OWA
@@ -68,9 +70,11 @@
     # ------------------------------------------------- the population is fully covered
 
     #=
-    A list is only a gate if nothing can be added outside it. Walk the risk-measure tree
-    for every concrete type whose name ends in `Range`, and require that the two lists
-    name exactly that set. A new range measure fails here until its author lists it.
+    A list is only a gate if nothing can be added outside it. Walk `RangeRiskMeasure` for
+    every concrete range, and require that the two lists name exactly that set. A new range
+    measure fails here until its author lists it. A type whose name ends in `Range` and that
+    does not subtype `RangeRiskMeasure` fails too, because the build of its tails would
+    never reach it.
 
     `parentmodule(S) === PortfolioOptimisers` matters: test files share a worker, so
     `subtypes` otherwise finds a measure another file declared.
@@ -83,11 +87,16 @@
         return acc
     end
 
-    range_types = Set(nameof(T)
-                      for T in concrete_leaves(PortfolioOptimisers.AbstractBaseRiskMeasure)
-                      if endswith(string(nameof(T)), "Range"))
+    RangeRiskMeasure = PortfolioOptimisers.RangeRiskMeasure
+    range_types = Set(nameof(T) for T in concrete_leaves(RangeRiskMeasure))
+    named_ranges = Set(nameof(T)
+                       for T in
+                           concrete_leaves(PortfolioOptimisers.AbstractBaseRiskMeasure)
+                       if endswith(string(nameof(T)), "Range"))
     listed = Set(nameof(typeof(r)) for (_, r) in vcat(declaring, fused))
     @test range_types == listed
+    @test named_ranges == range_types
+    @test all(r -> isa(r, RangeRiskMeasure), last.(vcat(declaring, fused)))
 
     # A floor, so a predicate that stopped matching cannot pass vacuously.
     @test length(range_types) >= 9
@@ -96,20 +105,28 @@
 
     # ------------------------------------------------------- the declaring half is sound
 
+    #=
+    The key of the sum follows `<base>_range_risk_`, and no two formulations share one, so a
+    reader of the model finds each range by the name of its base.
+    =#
+    keys_of = [PortfolioOptimisers.range_risk_key(r) for (_, r) in declaring]
+    @test all(k -> isa(k, Symbol) && endswith(string(k), "_range_risk_"), keys_of)
+    @test allunique(keys_of)
+
     for (name, r) in declaring
         tails = PortfolioOptimisers.range_tails(r)
 
-        # The shape the consumer destructures.
-        @test isa(tails, NamedTuple)
+        # The shape the consumer destructures: the public type of the contract (#2113).
+        @test isa(tails, PortfolioOptimisers.RangeTails)
         @test issetequal(propertynames(tails), (:loss, :gain))
 
-        for (side, tail) in pairs(tails)
+        for tail in (tails.loss, tails.gain)
             #=
             "The sum of TWO POINT measures". A tail that were itself a range would nest a
             decomposition inside a decomposition, and `nested_index` would be carrying a
             structure the ADR does not describe.
             =#
-            @test_throws ArgumentError PortfolioOptimisers.range_tails(tail)
+            @test_throws MethodError PortfolioOptimisers.range_tails(tail)
 
             #=
             `rke = false` is what keeps the tail out of the objective. Only the composite
@@ -125,7 +142,8 @@
             with ONE documented exception. `GenericValueatRiskRange` is the range whose
             tails are GIVEN rather than derived: the caller states both measures, and the
             constructor keeps their `ub` on purpose, "so a caller can bound one tail"
-            (`18_GenericValueatRiskRange.jl:151`). Its default tails carry no bound, so the
+            (the comment on `range_tails` in `18_GenericValueatRiskRange.jl`). Its default
+            tails carry no bound, so the
             assertion below still bites on the shipped value; what it must not do is forbid
             a bound the design admits.
             =#
@@ -203,13 +221,43 @@
         end
         @test occursin(string(nameof(typeof(r))), sprint(showerror, err))
         @test occursin("range_tails", sprint(showerror, err))
+        # A fused range states its key in its own builder, so it has no key method.
+        @test !hasmethod(PortfolioOptimisers.range_risk_key, Tuple{typeof(r)})
     end
 
     #=
-    The fallback is reachable from outside the range family too — it is the answer for
-    every point measure, which is what makes the "tails are point measures" check above
-    meaningful rather than circular.
+    A point measure is not a range, so `range_tails` has no method for it. That is what
+    makes the "tails are point measures" check above meaningful rather than circular.
     =#
-    @test_throws ArgumentError PortfolioOptimisers.range_tails(ConditionalValueatRisk())
-    @test_throws ArgumentError PortfolioOptimisers.range_tails(Variance())
+    @test_throws MethodError PortfolioOptimisers.range_tails(ConditionalValueatRisk())
+    @test_throws MethodError PortfolioOptimisers.range_tails(Variance())
+
+    #=
+    `RangeTails` is the contract that a range of your own builds (#2113). Its constructor
+    holds the invariant of the census above, so a tail that would add to the risk
+    expression fails where it is made. A tail of either side is enough to refuse.
+    =#
+    let off = RiskMeasureSettings(; rke = false),
+        RangeTails = PortfolioOptimisers.RangeTails
+
+        tails = RangeTails(; loss = ConditionalValueatRisk(; settings = off, alpha = 0.05),
+                           gain = ConditionalValueatRisk(; settings = off, alpha = 0.1))
+        # The builder of a `RangeRiskMeasure` destructures it by name.
+        (; loss, gain) = tails
+        @test (loss.alpha, gain.alpha) == (0.05, 0.1)
+        @test RangeTails(loss, gain).gain === gain
+        @test_throws ArgumentError RangeTails(ConditionalValueatRisk(), gain)
+        @test_throws ArgumentError RangeTails(loss, ConditionalValueatRisk())
+        # The typed keyword constructor is the door that refuses another type. `@concrete`
+        # appends a generic positional constructor, so the positional route does not.
+        @test_throws TypeError RangeTails(; loss = loss, gain = nothing)
+        # A public part of a configuration shows as the library shows its estimators: the
+        # wrapper name and one line for each field, not the long parametric header.
+        txt = sprint(show, MIME"text/plain"(), tails)
+        # A name carries its module when `Main` of the process does not load the package.
+        @test occursin(r"^(PortfolioOptimisers\.)?RangeTails\n", txt)
+        @test occursin(r"loss ┼ (PortfolioOptimisers\.)?ConditionalValueatRisk\n", txt)
+        @test occursin(r"gain ┼ (PortfolioOptimisers\.)?ConditionalValueatRisk\n", txt)
+        @test !occursin('{', first(split(txt, '\n')))
+    end
 end

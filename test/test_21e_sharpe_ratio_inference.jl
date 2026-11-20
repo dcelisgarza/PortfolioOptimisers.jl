@@ -178,8 +178,6 @@ end
     @test probabilistic_sharpe_ratio(big.(y)) isa BigFloat
     @test isapprox(probabilistic_sharpe_ratio(big.(y)), probabilistic_sharpe_ratio(y);
                    rtol = 1e-12)
-    # Integer data widens through the square root of the standard deviation.
-    @test probabilistic_sharpe_ratio(round.(Int, 1000 .* y)) isa Float64
 end
 
 @testset "minimum_track_record_length" begin

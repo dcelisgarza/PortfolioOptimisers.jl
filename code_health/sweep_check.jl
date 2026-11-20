@@ -3,7 +3,7 @@
 # The conformance half of the sweep of ADR 0084, run BEFORE the commit rather than after it.
 #
 #     julia --project=code_health code_health/sweep_check.jl
-#     julia --project=code_health code_health/sweep_check.jl --base origin/dev
+#     julia --project=code_health code_health/sweep_check.jl --base origin/main
 #     julia --project=code_health code_health/sweep_check.jl --file src/26_New.jl --fetch
 #     julia --project=code_health code_health/sweep_check.jl --all
 #
@@ -618,7 +618,8 @@ function check_tracker(path, row, map_names, tracker, survey)
                       [if survey
                            "An addition owes one. The standing backlog of an open map does not."
                        else
-                           "File it:"
+                           "The branch touches this file, so file it now with the " *
+                           "`sweep-file-issues` skill, even when the gap predates the branch:"
                        end, "  julia --project=code_health code_health/sweep_triage.jl \\",
                        "    --fetch --file $path",
                        "  code_health/sweep_issues.sh apply --dry-run",
@@ -666,7 +667,8 @@ end
 const USAGE = """
 usage: sweep_check.jl [--base <ref>] [--file <path>]... [--all] [--fetch] [--out <dir>]
 
-  --base <ref>  the ref the branch is measured against. Default: origin/dev.
+  --base <ref>  the ref the branch is measured against. Default: the landing base of
+                ADR 0240, which `code_health/gate_stamp.sh base` prints.
   --file <path> check this path, whatever the diff says. Repeatable.
   --all         check every file under `src/` and `ext/`.
   --fetch       read the tracker too, through `code_health/sweep_issues.sh dump`.
@@ -674,7 +676,9 @@ usage: sweep_check.jl [--base <ref>] [--file <path>]... [--all] [--fetch] [--out
 """
 
 function parse_options(args)
-    base, all, fetch, out = "origin/dev", false, false, PLAN_DIR
+    base = readchomp(Cmd(`bash $(joinpath(@__DIR__, "gate_stamp.sh")) base`;
+                         dir = dirname(@__DIR__)))
+    all, fetch, out = false, false, PLAN_DIR
     files = String[]
     i = 1
     while i <= length(args)
@@ -779,9 +783,13 @@ function main(args)
     base = opts.all ? nothing : merge_base(resolve_base(opts.base))
     failures = 0
     censused = 0
+    # Every `[fail]` with its path, repeated at the end: a reader who reads the tail of a long
+    # report, as a session does, then still sees each one with its command.
+    unmet = Pair{String, Finding}[]
     stale = check_titles(tracker, keys(rows))
     if !(isempty(stale))
         failures += length(stale)
+        append!(unmet, ["the open `$LABEL` issues" => s for s in stale])
         print_findings(stdout, "the open `$LABEL` issues", stale)
     end
     for f in scope
@@ -793,6 +801,7 @@ function main(args)
             append!(fs, pc)
         end
         failures += count(x -> x.level === :fail, fs)
+        append!(unmet, [f => x for x in fs if x.level === :fail])
         print_findings(stdout, f, fs)
     end
     if censused > 0
@@ -821,6 +830,11 @@ function main(args)
     println("\nSteps 3 and 4:  julia --project=code_health code_health/sweep_triage.jl \\")
     println("                  --fetch --file <path>")
     println("                code_health/sweep_issues.sh apply")
+    println("\nThe unmet duties again, each with its command:\n")
+    for (path, x) in unmet
+        print_findings(stdout, path, [x])
+    end
+    println("UNMET: ", failures)
     return 1
 end
 

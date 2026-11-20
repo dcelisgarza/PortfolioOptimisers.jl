@@ -68,11 +68,9 @@ function update_time_dependent_estimator(opt::JuMPOptimisationEstimator,
         return opt
     end
     opt = update_time_dependent_fields(opt, ctx, all_binds)
-    return rebuild_estimator(opt,
-                             (;
-                              opt = update_time_dependent_estimator(opt.opt, ctx,
-                                                                    all_binds),
-                              fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
+    return rebuild_struct(opt,
+                          (; opt = update_time_dependent_estimator(opt.opt, ctx, all_binds),
+                           fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -91,9 +89,9 @@ function reset_time_dependent_estimator(opt::JuMPOptimisationEstimator)
         return opt
     end
     opt = reset_time_dependent_fields(opt)
-    return rebuild_estimator(opt,
-                             (; opt = reset_time_dependent_estimator(opt.opt),
-                              fb = reset_time_dependent_estimator(opt.fb)))
+    return rebuild_struct(opt,
+                          (; opt = reset_time_dependent_estimator(opt.opt),
+                           fb = reset_time_dependent_estimator(opt.fb)))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -123,8 +121,8 @@ It is the result-side twin of [`BaseJuMPOptimisationEstimator`](@ref). It is not
 """
 abstract type BaseJuMPOptimisationResult <: AbstractResult end
 # The concrete core `JuMPOptimisationResult` is defined in 03_JuMPOptimiser_a.jl, after
-# `ProcessedJuMPOptimiserAttributes` and `JuMPOptimiser` — it is the result-side analogue
-# of `JuMPOptimiser` and its typed constructor binds `pa::ProcessedJuMPOptimiserAttributes`,
+# `ResolvedJuMPOptimiser` and `JuMPOptimiser` — it is the result-side analogue
+# of `JuMPOptimiser` and its typed constructor binds `jor::ResolvedJuMPOptimiser`,
 # which must be in scope.
 """
 $(DocStringExtensions.TYPEDEF)
@@ -133,7 +131,7 @@ Abstract supertype for the JuMP optimisation results that carry a resolved risk 
 
 It is the result-side twin of [`RiskJuMPOptimisationEstimator`](@ref), and [`NonRiskJuMPOptimisationResult`](@ref) is its sibling for the results that carry no risk measure. A concrete subtype holds an embedded [`JuMPOptimisationResult`](@ref) in its first field `jr`, then its own fields, then the fallback `fb`. Every subtype carries a resolved `r`.
 
-The default `getproperty` of [`RJR_NRJR`](@ref) reads a field of the subtype directly and forwards every other name, `w` and the fields of `pa` among them, to `jr`. A subtype that holds a composed result in a field overrides it and forwards into that field first.
+A concrete subtype declares a [`@forward_properties`](@ref) block that reads a field of the subtype directly and forwards every other name, `w` and the fields of `jor` among them, to `jr`. A subtype that holds a composed result in a field forwards into that field first, see [`RJR_NRJR`](@ref).
 
 # Related
 
@@ -159,51 +157,27 @@ It is the sibling of [`RiskJuMPOptimisationResult`](@ref). A relaxed risk budget
 """
 abstract type NonRiskJuMPOptimisationResult <: NonFiniteAllocationOptimisationResult end
 """
-    const RJR_NRJR = Union{<:RiskJuMPOptimisationResult, <:NonRiskJuMPOptimisationResult}
+    const RJR_NRJR = Union{RiskJuMPOptimisationResult, NonRiskJuMPOptimisationResult}
 
 Union of the two branches of JuMP optimisation results.
 
-The default `getproperty` and `propertynames` dispatch on this union, not on one branch. [`MeanRiskResult`](@ref) and [`NearOptimalCenteringResult`](@ref) declare no [`@forward_properties`](@ref) rule, and read `res.w` through the default. A default on the risk branch alone would leave a new result on the other branch with no forwarding.
+Every concrete member declares its own [`@forward_properties`](@ref) block, with `forward(jr)` as its last rule. So a field of the result reads the field, and every other name, `w` and the fields of `jor` among them, reads the embedded [`JuMPOptimisationResult`](@ref) `jr`. The block also gives `ConstructionBase.setproperties`, so `Accessors.set` patches a field of the result, and it refuses a forwarded name with the path that stores it. No property method is written on the union, because the macro does not decorate a `Union`, and a method on it gives no `setproperties`.
 
 # Related
 
   - [`RiskJuMPOptimisationResult`](@ref)
   - [`NonRiskJuMPOptimisationResult`](@ref)
+  - [`@forward_properties`](@ref)
 """
-const RJR_NRJR = Union{<:RiskJuMPOptimisationResult, <:NonRiskJuMPOptimisationResult}
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Read the property `sym` of a JuMP optimisation result.
-
-# Algorithm
-
- 1. When `sym` is a field of the result, return that field.
- 2. Otherwise return `getproperty` of the embedded [`JuMPOptimisationResult`](@ref) `jr`, which in turn reads the fields of `pa`.
-"""
-function Base.getproperty(r::RJR_NRJR, sym::Symbol)
-    return if sym in fieldnames(typeof(r))
-        getfield(r, sym)
-    else
-        getproperty(getfield(r, :jr), sym)
-    end
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return the names that the default `getproperty` of [`RJR_NRJR`](@ref) reads.
-
-The tuple holds the field names of the result, then the property names of the embedded [`JuMPOptimisationResult`](@ref) `jr` that are not field names of the result. The names of `jr` include the fields of `pa`. A subtype that overrides `getproperty` through [`@forward_properties`](@ref) gets its own `propertynames` from that macro.
-"""
-function Base.propertynames(r::RJR_NRJR)
-    return Tuple(unique((fieldnames(typeof(r))..., propertynames(getfield(r, :jr))...)))
-end
+const RJR_NRJR = Union{RiskJuMPOptimisationResult, NonRiskJuMPOptimisationResult}
 """
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the objective functions of a JuMP portfolio optimisation.
 
-Four concrete subtypes are the four classic objectives of the source, one for each subsection of its Section 8.2: [`MinimumRisk`](@ref), [`MaximumReturn`](@ref), [`MaximumUtility`](@ref) and [`MaximumRatio`](@ref). The fifth, [`MaximumElementReturn`](@ref), is internal. It maximises one return term, for the corner solves of a return frontier.
+Four concrete subtypes are the four classic objectives of Section 8.2 of [cajas2025](@cite), one for each subsection: [`MinimumRisk`](@ref), [`MaximumReturn`](@ref), [`MaximumUtility`](@ref) and [`MaximumRatio`](@ref). The fifth, [`MaximumElementReturn`](@ref), is internal. It maximises one return term, for the corner solves of a return frontier.
+
+[`MinimumRisk`](@ref) and [`MaximumReturn`](@ref) are the two ends of the efficient set of [markowitz1952](@cite). Its expected return-variance rule keeps a portfolio of minimum variance for a given return or more, and of maximum return for a given variance or less, on page 82. [`MaximumRatio`](@ref) picks the portfolio at which a ray from the riskless point is tangent to the opportunity curve, which is the tangency portfolio on page 432 of [sharpe1964](@cite). [`MaximumUtility`](@ref) trades return against risk through a risk aversion parameter, as in Section 8.2.3 of [cajas2025](@cite).
 
 # Related
 
@@ -215,7 +189,9 @@ Four concrete subtypes are the four classic objectives of the source, one for ea
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 8.2.
+  - $(ref_dict[:cajas2025]) Section 8.2.3, Equation 8.12. $(ref_dict[:no_original_source])
+  - $(ref_dict[:markowitz1952]) Page 82.
+  - $(ref_dict[:sharpe1964]) Page 432.
 """
 abstract type ObjectiveFunction <: AbstractEstimator end
 """
@@ -223,7 +199,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the estimators that write the expected portfolio return into a JuMP model.
 
-Two concrete subtypes are the two return definitions of the source: [`ArithmeticReturn`](@ref), the arithmetic return of its Section 8.1.1, and [`LogarithmicReturn`](@ref), the geometric return of its Section 8.1.2. The third, [`NoReturn`](@ref), writes a return term that is identically zero.
+Two concrete subtypes are the two return definitions of Section 8.1 of [cajas2025](@cite): [`ArithmeticReturn`](@ref), the arithmetic return of its Section 8.1.1, and [`LogarithmicReturn`](@ref), the geometric return of its Section 8.1.2. The third, [`NoReturn`](@ref), writes a return term that is identically zero.
+
+The arithmetic return is the weighted sum of the expected returns of the assets, on page 81 of [markowitz1952](@cite). The logarithmic return is the expected rate of growth of capital that [kelly1956](@cite) maximises, on pages 919 and 920. The mean of the logarithm of one plus the return of a portfolio is the geometric mean of Chapter 6 of [markowitz1959](@cite), on pages 120 and 121.
 
 # Related
 
@@ -234,6 +212,9 @@ Two concrete subtypes are the two return definitions of the source: [`Arithmetic
 # References
 
   - $(ref_dict[:cajas2025]) Section 8.1.
+  - $(ref_dict[:markowitz1952]) Page 81.
+  - $(ref_dict[:kelly1956]) Pages 919 and 920.
+  - $(ref_dict[:markowitz1959]) Chapter 6, pages 120 and 121.
 """
 abstract type JuMPReturnsEstimator <: AbstractEstimator end
 """
@@ -266,14 +247,14 @@ To add a constraint, subtype `CustomJuMPConstraint` with the parameters of the c
 
 ## `add_custom_constraint!`
 
-  - `add_custom_constraint!(model::JuMP.Model, ccnt::MyConstraint, optimiser, attrs::ProcessedJuMPOptimiserAttributes) -> Nothing`: Add the constraint to `model`. The verb has no fallback for a subtype, so a subtype with no method of its own raises. Multiply the constraint by [`get_constraint_scale`](@ref). Multiply a constant bound by [`get_k`](@ref), the homogenisation variable, so that the bound holds on the reported weights under a ratio objective.
+  - `add_custom_constraint!(model::JuMP.Model, ccnt::MyConstraint, optimiser, attrs) -> Nothing`: Add the constraint to `model`. The verb has no fallback for a subtype, so a subtype with no method of its own raises. Multiply the constraint by [`get_constraint_scale`](@ref). Multiply a constant bound by [`get_k`](@ref), the homogenisation variable, so that the bound holds on the reported weights under a ratio objective.
 
 ### Arguments
 
   - `model`: The JuMP model while it is built. Read the weights with [`get_w`](@ref).
   - `ccnt`: The instance of the subtype.
-  - `optimiser`: The outer optimiser, for example the [`MeanRisk`](@ref).
-  - `attrs`: The processed problem data. `attrs.pr` is the prior and `attrs.wb` the weight bounds.
+  - `optimiser`: The owner of the constraint: the outer optimiser, for example the [`MeanRisk`](@ref), or the [`ProgrammeAllocationSet`](@ref) of a constraint in its `ccnt`.
+  - `attrs`: For a constraint of a head, the [`ResolvedJuMPOptimiser`](@ref): `attrs.pr` is the prior and `attrs.wb` the weight bounds. For a constraint of a set, `nothing`, because the set has no bundle. Leave `attrs` untyped, so one method serves a constraint of a head and of a set.
 
 ### Returns
 
@@ -300,7 +281,7 @@ The `ccnt` field of [`JuMPOptimiser`](@ref) accepts a vector, and [`add_custom_c
 """
 const VecJuMPConstr = AbstractVector{<:CustomJuMPConstraint}
 """
-    const JuMPConstr_VecJuMPConstr = Union{<:CustomJuMPConstraint, <:VecJuMPConstr}
+    const JuMPConstr_VecJuMPConstr = Union{CustomJuMPConstraint, VecJuMPConstr}
 
 Alias for one custom JuMP constraint or a vector of them.
 
@@ -311,7 +292,7 @@ The `ccnt` field of [`JuMPOptimiser`](@ref) accepts a value of this alias, `noth
   - [`CustomJuMPConstraint`](@ref)
   - [`VecJuMPConstr`](@ref)
 """
-const JuMPConstr_VecJuMPConstr = Union{<:CustomJuMPConstraint, <:VecJuMPConstr}
+const JuMPConstr_VecJuMPConstr = Union{CustomJuMPConstraint, VecJuMPConstr}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -325,15 +306,15 @@ To add a penalty or a reward, subtype `CustomJuMPObjective` with the parameters 
 
 ## `add_custom_objective_term!`
 
-  - `add_custom_objective_term!(model::JuMP.Model, obj::ObjectiveFunction, cobj::MyObjective, optimiser, attrs::ProcessedJuMPOptimiserAttributes) -> Nothing`: Add the term to the objective of `model`. The verb has no fallback for a subtype, so a subtype with no method of its own raises. Add the term through [`add_to_objective_penalty!`](@ref), and do not write the objective expression. The model adds the accumulated penalty with the sign that the sense of the objective needs, so a positive term always makes the objective worse, and a reward is a negative term. A term that is not homogeneous of degree one in the weights multiplies its constants by [`get_k`](@ref).
+  - `add_custom_objective_term!(model::JuMP.Model, obj, cobj::MyObjective, optimiser, attrs) -> Nothing`: Add the term to the objective of `model`. The verb has no fallback for a subtype, so a subtype with no method of its own raises. Add the term through [`add_to_objective_penalty!`](@ref), and do not write the objective expression. The model adds the accumulated penalty with the sign that the sense of the objective needs, so a positive term always makes the objective worse, and a reward is a negative term. A term that is not homogeneous of degree one in the weights multiplies its constants by [`get_k`](@ref).
 
 ### Arguments
 
   - `model`: The JuMP model while it is built. Read the weights with [`get_w`](@ref).
-  - `obj`: The objective that the model builds. Inside a [`Frontier`](@ref) sweep it is not the objective that the user declared.
+  - `obj`: The objective of the optimiser that builds the model, see [`add_custom_objective_term!`](@ref). The corners of a [`Frontier`](@ref) sweep solve the same model under other objectives, and the term keeps this `obj` and counts once in each solve.
   - `cobj`: The instance of the subtype.
-  - `optimiser`: The outer optimiser, for example the [`MeanRisk`](@ref).
-  - `attrs`: The processed problem data. `attrs.pr` is the prior and `attrs.wb` the weight bounds.
+  - `optimiser`: The owner of the term: the outer optimiser, for example the [`MeanRisk`](@ref), or the [`ProgrammeAllocationSet`](@ref) of a term in its `cobj`.
+  - `attrs`: The resolved problem data. For a term of a head it is the [`ResolvedJuMPOptimiser`](@ref), and for a term of a set it is the [`ResolvedConstraintBlock`](@ref) of the set. In both, `attrs.pr` is the prior and `attrs.wb` the weight bounds. Leave `obj` and `attrs` untyped, so one method serves a term of a head and of a set.
 
 ### Returns
 
@@ -360,7 +341,7 @@ The `cobj` field of [`JuMPOptimiser`](@ref) accepts a vector, and [`add_custom_o
 """
 const VecJuMPObj = AbstractVector{<:CustomJuMPObjective}
 """
-    const JuMPObj_VecJuMPObj = Union{<:CustomJuMPObjective, <:VecJuMPObj}
+    const JuMPObj_VecJuMPObj = Union{CustomJuMPObjective, VecJuMPObj}
 
 Alias for one custom JuMP objective term or a vector of them.
 
@@ -371,7 +352,7 @@ The `cobj` field of [`JuMPOptimiser`](@ref) accepts a value of this alias, `noth
   - [`CustomJuMPObjective`](@ref)
   - [`VecJuMPObj`](@ref)
 """
-const JuMPObj_VecJuMPObj = Union{<:CustomJuMPObjective, <:VecJuMPObj}
+const JuMPObj_VecJuMPObj = Union{CustomJuMPObjective, VecJuMPObj}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -418,13 +399,15 @@ A term that is not homogeneous of degree one in `w` multiplies each constant by 
 
 `nothing`, the value when no custom term is configured, is the only no-op.
 
+[`assemble_jump_model!`](@ref) calls the verb once for each model, while it builds the model. A [`Frontier`](@ref) sweep of [`MeanRisk`](@ref) solves its end points as [`MinimumRisk`](@ref) and [`MaximumReturn`](@ref) on the same model, and the term is in each of these objectives once, with the `obj` of the model. A sweep under [`MaximumRatio`](@ref) solves its end points on a copy of the head built under [`MinimumRisk`](@ref), and the term is in that copy once too.
+
 # Arguments
 
   - `model::JuMP.Model`: The JuMP model while it is built.
-  - `obj`: The [`ObjectiveFunction`](@ref) that the model builds. Inside a [`Frontier`](@ref) sweep it is not the objective that the user declared, because the sweep builds the sub-problems of its end points as [`MinimumRisk`](@ref) and [`MaximumReturn`](@ref).
+  - `obj`: The objective of the optimiser that builds the model. It is the `obj` of a [`MeanRisk`](@ref) or a [`FactorRiskContribution`](@ref), and [`MinimumRisk`](@ref) for [`RiskBudgeting`](@ref), [`RelaxedRiskBudgeting`](@ref) and the centring solve of [`NearOptimalCentering`](@ref). The end points of a frontier of a [`MaximumRatio`](@ref) solve a copy of the head with [`MinimumRisk`](@ref), so a term there gets [`MinimumRisk`](@ref). The projection programme of a [`ProgrammeAllocationSet`](@ref) gives its Projection Geometry.
   - `cobj`: The custom term, the argument to dispatch on.
-  - `optimiser`: The outer optimiser, for example the [`MeanRisk`](@ref). Its `opt` field is the [`JuMPOptimiser`](@ref).
-  - `attrs::ProcessedJuMPOptimiserAttributes`: The processed problem data: the prior `attrs.pr`, the returns estimator `attrs.ret`, the weight bounds `attrs.wb` and the rest.
+  - `optimiser`: The owner of the term. For a term of a head it is the outer optimiser, for example the [`MeanRisk`](@ref), whose `opt` field is the [`JuMPOptimiser`](@ref). For a term in the `cobj` of a [`ProgrammeAllocationSet`](@ref) it is the set.
+  - `attrs`: The resolved problem data. For a term of a head it is the [`ResolvedJuMPOptimiser`](@ref): the prior `attrs.pr`, the returns estimator `attrs.ret`, the weight bounds `attrs.wb` and the rest. For a term of a set it is the [`ResolvedConstraintBlock`](@ref) of the set, which holds the prior `attrs.pr`, the rows `attrs.rd` and the slots of the block, and no returns estimator.
 
 # Validation
 
@@ -491,8 +474,8 @@ Implement this verb for a subtype of [`CustomJuMPConstraint`](@ref) to impose a 
 
   - `model::JuMP.Model`: The JuMP model while it is built.
   - `ccnt`: The custom constraint, the argument to dispatch on.
-  - `optimiser`: The outer optimiser, for example the [`MeanRisk`](@ref).
-  - `attrs::ProcessedJuMPOptimiserAttributes`: The processed problem data.
+  - `optimiser`: The owner of the constraint. For a constraint of a head it is the outer optimiser, for example the [`MeanRisk`](@ref). For a constraint in the `ccnt` of a [`ProgrammeAllocationSet`](@ref) it is the set.
+  - `attrs`: The [`ResolvedJuMPOptimiser`](@ref) of a head, or `nothing` for a constraint of a set, which has no bundle.
 
 # Validation
 
@@ -591,7 +574,7 @@ A [`Frontier`](@ref) sweep solves one model per point, and its result holds one 
 """
 const VecJuMPOptSol = AbstractVector{<:JuMPOptimisationSolution}
 """
-    const JuMPOptSol_VecJuMPOptSol = Union{<:JuMPOptimisationSolution, <:VecJuMPOptSol}
+    const JuMPOptSol_VecJuMPOptSol = Union{JuMPOptimisationSolution, VecJuMPOptSol}
 
 Alias for one JuMP optimisation solution or a vector of them.
 
@@ -602,7 +585,7 @@ It is the type of the `sol` argument of [`JuMPOptimisationResult`](@ref), which 
   - [`JuMPOptimisationSolution`](@ref)
   - [`VecJuMPOptSol`](@ref)
 """
-const JuMPOptSol_VecJuMPOptSol = Union{<:JuMPOptimisationSolution, <:VecJuMPOptSol}
+const JuMPOptSol_VecJuMPOptSol = Union{JuMPOptimisationSolution, VecJuMPOptSol}
 
 export JuMPOptimisationSolution, JuMPOptimisationResult
 public CustomJuMPObjective, CustomJuMPConstraint, VecJuMPObj, VecJuMPConstr,

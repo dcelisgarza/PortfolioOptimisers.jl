@@ -9,7 +9,7 @@ comment is the specification these tests read.
 
 Two probe types stand in for the members the layers above will be. They are the shape those
 members have: a `cache` field and a keyword constructor, which is all the seam and
-`rebuild_estimator` read.
+`rebuild_struct` read.
 
 Issue #997 then made the eleven shipped families subjects of their own. Each narrows the
 `cache` type parameter of its own `partial_fit!` methods to the state its exact fold reads,
@@ -149,8 +149,8 @@ end
         warm = po.update_online_estimator(Online(BufferProbe()))
         warm = partial_fit!(warm, view(X, 1:7, :))
         cold = partial_fit(warm, view(X, 8, :))
-        @test isequal(po.sample_buffer(warm), X[1:7, :])
-        @test isequal(po.sample_buffer(cold), X[1:8, :])
+        @test isequal(po.sample_buffer(warm.cache), X[1:7, :])
+        @test isequal(po.sample_buffer(cold.cache), X[1:8, :])
     end
 
     @testset "port_opt_view slices, obs_weights_view drops" begin
@@ -205,9 +205,9 @@ end
     @testset "The generic buffering fold" begin
         r = po.update_online_estimator(Online(BufferProbe()))
         r = partial_fit!(r, X)
-        @test isequal(po.sample_buffer(r), X)
+        @test isequal(po.sample_buffer(r.cache), X)
         r = partial_fit!(r, view(X, 1, :))
-        @test isequal(po.sample_buffer(r), vcat(X, transpose(X[1, :])))
+        @test isequal(po.sample_buffer(r.cache), vcat(X, transpose(X[1, :])))
         # An estimator that was never wrapped meets a message naming the wrapper, not a
         # `MethodError`.
         @test_throws ArgumentError partial_fit!(BufferProbe(), X)
@@ -217,10 +217,24 @@ end
             sprint(showerror, e)
         end
         @test occursin("Online", msg)
-        @test_throws ArgumentError po.sample_buffer(BufferProbe())
+        @test_throws ArgumentError po.assert_sample_buffer(BufferProbe())
+        # The reader takes the state alone: the caller resolves the estimator (#2088).
+        @test_throws MethodError po.sample_buffer(r)
         # A wrapper is not an estimator that folds: it must be resolved first.
         @test_throws ArgumentError po.assert_sample_buffer(Online(BufferProbe()))
         @test_throws ArgumentError partial_fit!(Online(BufferProbe()), X)
+        # A buffer folds a block, in either orientation.
+        s = partial_fit!(po.SampleBufferState(), X)
+        @test isequal(po.sample_buffer(s), X)
+        s = partial_fit!(s, permutedims(X[1:2, :]); dims = 2)
+        @test isequal(po.sample_buffer(s), vcat(X, X[1:2, :]))
+        # The count of a mean over a buffer reads the rows of the buffer, as it reads the sample.
+        @test po.effective_observation_count(SimpleExpectedReturns(), s) ==
+              po.effective_observation_count(SimpleExpectedReturns(),
+                                             po.sample_buffer(s)) ==
+              size(X, 1) + 2
+        # A member that the outer estimator does not hold folds vacuously.
+        @test po.supports_partial_fit(nothing)
     end
 
     @testset "A wrapper and a schedule compose in one direction" begin
@@ -434,14 +448,14 @@ end
             @test isa(wrapped.cache, po.SampleBufferState)
             folded = partial_fit!(wrapped, Y)
             @test isa(folded.cache, po.SampleBufferState)
-            @test isequal(po.sample_buffer(folded), Y)
+            @test isequal(po.sample_buffer(folded.cache), Y)
             # An uncapped buffer answers what a batch fit over every observation answers.
             @test isapprox(fam.readout(folded), fam.batch(fam.est, Y))
             # The cap is the window: a capped buffer answers what a batch fit over the last
             # `max_history` observations answers, for a family that folds exactly too.
             capped = partial_fit!(po.update_online_estimator(Online(fam.est;
                                                                     max_history = w)), Y)
-            @test isequal(po.sample_buffer(capped), Y[(end - w + 1):end, :])
+            @test isequal(po.sample_buffer(capped.cache), Y[(end - w + 1):end, :])
             @test isapprox(fam.readout(capped), fam.batch(fam.est, Y[(end - w + 1):end, :]))
             # An estimator left unwrapped is untouched: it still folds into its own family
             # state, and its own state is not a buffer.
@@ -536,7 +550,7 @@ the same per-observation nature and the same silent failure.
         # arm once wrapped, and both answer what the batch fit answers.
         block = partial_fit!(po.update_online_estimator(Online(fam.est)), Y;
                              active_mask = M)
-        @test isequal(po.sample_buffer(block), Y)
+        @test isequal(po.sample_buffer(block.cache), Y)
         @test amask(block.cache) == M
         @test isapprox(fam.readout(block), fam.batch(fam.est, Y, M); nans = true)
         # One observation at a time reaches the same buffer, the same mask and the same
@@ -553,7 +567,7 @@ the same per-observation nature and the same silent failure.
         for t in axes(Y, 1)
             capped = partial_fit!(capped, view(Y, t, :); active_mask = view(M, t, :))
         end
-        @test isequal(po.sample_buffer(capped), Y[rows, :])
+        @test isequal(po.sample_buffer(capped.cache), Y[rows, :])
         @test po.sample_buffer_kwargs(capped.cache).active_mask == M[rows, :]
         @test isapprox(fam.readout(capped), fam.batch(fam.est, Y[rows, :], M[rows, :]);
                        nans = true)
@@ -561,7 +575,7 @@ the same per-observation nature and the same silent failure.
         one_block = partial_fit!(po.update_online_estimator(Online(fam.est;
                                                                    max_history = w)), Y;
                                  active_mask = M)
-        @test isequal(po.sample_buffer(one_block), Y[rows, :])
+        @test isequal(po.sample_buffer(one_block.cache), Y[rows, :])
         @test isapprox(fam.readout(one_block), fam.batch(fam.est, Y[rows, :], M[rows, :]);
                        nans = true)
     end
@@ -606,14 +620,16 @@ the same per-observation nature and the same silent failure.
         @test isnothing(alone.cache.A)
     end
     @testset "The mixture is refused" begin
-        # A buffer whose activity is known for some rows and not for others answers neither
-        # question, so a fold that disagrees with what the buffer records is refused in both
-        # directions.
+        # A side with no mask states the universe of the finiteness of its rows, so the fold
+        # writes that universe for it, in both directions (#1882): an all-true active mask.
         with = partial_fit!(po.update_online_estimator(Online(Covariance())), Y;
                             active_mask = M)
-        @test_throws ArgumentError partial_fit!(with, Y)
+        @test amask(partial_fit!(with, Y).cache) == vcat(M, trues(T, N))
         without = partial_fit!(po.update_online_estimator(Online(Covariance())), Y)
-        @test_throws ArgumentError partial_fit!(without, Y; active_mask = M)
+        @test amask(partial_fit!(without, Y; active_mask = M).cache) == vcat(trues(T, N), M)
+        # A buffer whose activity is known for some rows and not for others answers neither
+        # question, so a fold that gives one mask the buffer does not record, beside one it
+        # does, is refused.
         @test_throws ArgumentError partial_fit!(with, Y; active_mask = M,
                                                 estimation_mask = M)
         # A buffer holding no observations has nothing to disagree with, so it adopts.
@@ -634,8 +650,8 @@ the same per-observation nature and the same silent failure.
                                  active_mask = permutedims(M))
         @test isequal(po.sample_buffer(by_column), Y)
         @test amask(by_column) == M
-        # `merge_states` concatenates the masks with the rows they explain, and refuses two
-        # buffers that do not record the same masks.
+        # `merge_states` concatenates the masks with the rows they explain. A buffer that
+        # records no mask states the universe of its finiteness (#1882).
         a = partial_fit!(po.SampleBufferState(), view(Y, 1:10, :);
                          active_mask = view(M, 1:10, :))
         b = partial_fit!(po.SampleBufferState(), view(Y, 11:T, :);
@@ -643,9 +659,9 @@ the same per-observation nature and the same silent failure.
         merged = po.merge_states(a, b)
         @test isequal(po.sample_buffer(merged), Y)
         @test amask(merged) == M
-        @test_throws ArgumentError po.merge_states(a,
-                                                   partial_fit!(po.SampleBufferState(),
-                                                                view(Y, 11:T, :)))
+        @test amask(po.merge_states(a,
+                                    partial_fit!(po.SampleBufferState(), view(Y, 11:T, :)))) ==
+              vcat(M[1:10, :], trues(T - 10, N))
         # A capped merge keeps the last rows of the mask with the last rows of the sample.
         ac = partial_fit!(po.SampleBufferState(; max_history = w), view(Y, 1:10, :);
                           active_mask = view(M, 1:10, :))
@@ -693,7 +709,8 @@ end
                                                  codes = rand(rng, 1:2, T, N)),
                            TensorPanelField(; name = "expo", axis = "factor",
                                             labels = ["f1", "f2"],
-                                            vals = randn(rng, T, N, 2))], amsk = M,
+                                            vals = permutedims(randn(rng, T, N, 2),
+                                                               (2, 3, 1)))], amsk = M,
                      emsk = Em)
     fields_of(r, c = :) = po.port_opt_view(pnl, r, c).pf
     values_of(P) = [po.panel_field_array(f) for f in P]

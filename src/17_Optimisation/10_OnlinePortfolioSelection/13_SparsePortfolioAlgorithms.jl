@@ -37,11 +37,11 @@ L1Optimum()
   - [`ShortTermSparsePortfolio`](@ref)
   - [`HuberOptimum`](@ref)
   - [`AlternatingDirectionMethod`](@ref)
-  - [`largest_forecast_split`](@ref)
+  - [`sparse_portfolio_iterate`](@ref)
 
 # References
 
-  - $(ref_dict[:lai2018sspo])
+  - $(ref_dict[:lai2018sspo]) Section 3.2, Equation 12.
 """
 struct L1Optimum <: AbstractSparsePortfolioAlgorithm end
 """
@@ -83,7 +83,7 @@ When ``N \\gamma \\leq 1`` the sum is at most one everywhere. An asset ``k`` wit
 # Algorithm
 
  1. Compute the ends of the interval of the multiplier, `lo = -lambda - minimum(phi)` and `hi = lambda - maximum(phi)`.
- 2. When `lo > hi`, the programme has no minimum. Return the split of [`largest_forecast_split`](@ref).
+ 2. When `lo > hi`, the programme has no minimum. Return the split of [`L1Optimum`](@ref).
  3. Find the multiplier `nu` in `[lo, hi]` with [`huber_multiplier`](@ref).
  4. Compute the coordinates `b` at `nu` with [`huber_coordinates`](@ref).
  5. Add the remainder of the budget to `b` with [`huber_remainder!`](@ref), in equal parts between tied assets, and return `b`.
@@ -120,7 +120,7 @@ HuberOptimum
 
 # References
 
-  - $(ref_dict[:lai2018sspo])
+  - $(ref_dict[:lai2018sspo]) Section 3.3.1, Equations 13, 17 to 20 and 22, and Section 4.1.
 """
 @concrete struct HuberOptimum <: AbstractSparsePortfolioAlgorithm
     """
@@ -229,7 +229,7 @@ AlternatingDirectionMethod
 
 # References
 
-  - $(ref_dict[:lai2018sspo])
+  - $(ref_dict[:lai2018sspo]) Section 3.3.2, Equations 13, 27, 29 and 32, Algorithm 1 and Section 4.1.
 """
 @concrete struct AlternatingDirectionMethod <: AbstractSparsePortfolioAlgorithm
     """
@@ -278,7 +278,7 @@ end
 
 Finds the unscaled target of a [`ShortTermSparsePortfolio`](@ref) step for the objective vector `phi`.
 
-[`L1Optimum`](@ref) returns the optimum of the programme of [lai2018sspo](@cite). [`HuberOptimum`](@ref) returns the fixed point of the iteration of [lai2018sspo](@cite) in closed form. [`AlternatingDirectionMethod`](@ref) runs that iteration from the held allocation `w`, and it is the only method that reads `w`. The type docstrings state the formulas.
+[`L1Optimum`](@ref) returns the optimum of the programme of [lai2018sspo](@cite): it splits the whole budget in equal parts between the smallest entries of `phi`, which are the assets with the largest forecast. [`HuberOptimum`](@ref) returns the fixed point of the iteration of [lai2018sspo](@cite) in closed form, and the split of [`L1Optimum`](@ref) where its programme has no minimum. [`AlternatingDirectionMethod`](@ref) runs that iteration from the held allocation `w`, and it is the only method that reads `w`. The type docstrings state the formulas.
 
 # Returns
 
@@ -288,21 +288,21 @@ Finds the unscaled target of a [`ShortTermSparsePortfolio`](@ref) step for the o
 
   - [`AbstractSparsePortfolioAlgorithm`](@ref)
   - [`ShortTermSparsePortfolio`](@ref)
-  - [`largest_forecast_split`](@ref)
   - [`huber_multiplier`](@ref)
 
 # References
 
-  - $(ref_dict[:lai2018sspo])
+  - $(ref_dict[:lai2018sspo]) Equations 12, 27, 29 and 32 and Algorithm 1.
 """
 function sparse_portfolio_iterate(::L1Optimum, phi::AbstractVector, ::AbstractVector)
-    return largest_forecast_split(phi)
+    K = phi .== minimum(phi)
+    return ifelse.(K, one(eltype(phi)) / count(K), zero(eltype(phi)))
 end
-function sparse_portfolio_iterate(alg::HuberOptimum, phi::AbstractVector, ::AbstractVector)
+function sparse_portfolio_iterate(alg::HuberOptimum, phi::AbstractVector, w::AbstractVector)
     lo = -alg.lambda - minimum(phi)
     hi = alg.lambda - maximum(phi)
     if lo > hi
-        return largest_forecast_split(phi)
+        return sparse_portfolio_iterate(L1Optimum(), phi, w)
     end
     b = huber_coordinates(alg, phi, huber_multiplier(alg, phi, lo, hi))
     return huber_remainder!(b, phi)
@@ -326,22 +326,6 @@ function sparse_portfolio_iterate(alg::AlternatingDirectionMethod, phi::Abstract
         end
     end
     return b
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Splits the whole budget in equal parts between the smallest entries of `phi`, which are the assets with the largest forecast.
-
-The split is the optimum of [`L1Optimum`](@ref). [`HuberOptimum`](@ref) returns it where its programme has no minimum.
-
-# Related
-
-  - [`L1Optimum`](@ref)
-  - [`HuberOptimum`](@ref)
-"""
-function largest_forecast_split(phi::AbstractVector)
-    K = phi .== minimum(phi)
-    return ifelse.(K, one(eltype(phi)) / count(K), zero(eltype(phi)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

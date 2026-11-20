@@ -163,3 +163,17 @@ against `POMOD`. The test that catches a breach is `test/test_05_tools.jl`: it d
 a module that imports **only** the macro, then asserts that the caller gained no `factory` of its
 own and that `PortfolioOptimisers.factory` dispatches on the new type. A bare name fails that
 test whether it is private (`UndefVarError`) or exported (silent shadow).
+
+## Amendment (2026-11-14)
+
+The per-field helper `factory_child` is gone (#2089, by the ruling of #2109). `factory` is a
+traversal, so it owns the identity on every leaf: `factory(a, args...; kwargs...) = a` on `::Any`
+replaces the fallback of `factory_child`, and the array method of `factory` takes every
+`AbstractArray` of estimators, algorithms, results, covariance estimators and `nothing`. An
+`@fprop` field now expands to `PortfolioOptimisers.factory(x.field, args...; kwargs...)`, still
+fully qualified, so decision 4 holds with one name in place of two.
+
+ADRs 0012, 0061, 0088 and 0107 name `factory_child` as the verb of an `@fprop` field. Read
+`factory` there, and each of their decisions holds. One case differs. `factory_child` returned an
+array whose element type holds `Nothing`, such as a list of thresholds with one entry for each
+block, with no change. `factory` rebuilds each element of it.

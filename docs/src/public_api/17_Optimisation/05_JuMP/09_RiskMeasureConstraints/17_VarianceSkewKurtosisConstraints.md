@@ -7,3 +7,10 @@ Description = "Variance Skew Kurtosis Constraints, public API of PortfolioOptimi
 ```@docs
 set_risk_constraints!(model::JuMP.Model, i::Any, r::VarianceSkewKurtosis, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

@@ -78,7 +78,7 @@ end
 # A test-local target that fits as a `LinearModel` and keeps the default answer of
 # `is_basis_invariant`, so a move of the dropped member under it fits every observation again
 # (#1614).
-struct BasisBoundTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+struct BasisBoundTarget <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget end
 function PortfolioOptimisers.factory(::BasisBoundTarget, w::PortfolioOptimisers.ObsWeights)
     return factory(LinearModel(), w)
 end
@@ -167,6 +167,7 @@ end
             st = de
             for (a, b) in blocks
                 r = po.descriptor_step(st, rows(syn, a:b))
+                @test r isa po.DescriptorStepResult
                 @test same(r.D, full[a:b, :])
                 @test same(po.descriptor_step(st, rows(syn, a:b)).D, r.D)
                 @test same(partial_fit!(st, rows(syn, a:b)).cache.cs[end],
@@ -238,6 +239,7 @@ end
             st = de
             for (a, b) in blocks
                 r = po.descriptor_step(st, rows(syn, a:b))
+                @test r isa po.DescriptorStepResult
                 @test same(r.D, full[a:b, :])
                 @test same(po.descriptor_step(st, rows(syn, a:b)).D, r.D)
                 @test same(partial_fit!(st, rows(syn, a:b)).cache.s, r.de.cache.s)
@@ -263,7 +265,7 @@ end
         @test occursin("hold one entry per asset, got 2 and 1",
                        message(() -> po.EWMeanState(; s = [0.0, 0.0], n = [0])))
         @test po.show_fields(EWMean(; decay = 0.5, min_obs = 1)) ==
-              (:decay, :min_obs, :skip, :exponentiate)
+              (:decay, :min_obs, :skip, :exponentiate, :debias)
         # On the carry fold each Descriptor counts as one row, so the carry keeps the rows of
         # the lag alone, and the exposures of every step equal those of the batch fit.
         ew = ["market" => ConstantExposure(),
@@ -320,6 +322,7 @@ end
             st = de
             for (a, b) in blocks
                 r = po.descriptor_step(st, rows(syn, a:b))
+                @test r isa po.DescriptorStepResult
                 @test same(r.D, full[a:b, :])
                 @test same(po.descriptor_step(st, rows(syn, a:b)).D, r.D)
                 @test same(partial_fit!(st, rows(syn, a:b)).cache.q[end], r.de.cache.q[end])
@@ -422,6 +425,7 @@ end
             st = de
             for (a, b) in blocks
                 r = po.descriptor_step(st, rows(syn, a:b))
+                @test r isa po.DescriptorStepResult
                 @test same(r.D, full[a:b, :])
                 @test same(po.descriptor_step(st, rows(syn, a:b)).D, r.D)
                 @test same(partial_fit!(st, rows(syn, a:b)).cache.ve.variance,
@@ -444,20 +448,32 @@ end
         # The beta recursion folds by itself too: a step from the carried state equals the
         # batch call, also where `min_obs` counts observations across the cut.
         rm = po.market_return_series(syn, "market_cap")
-        B, Vm = po.ew_beta_series(syn.X, rm, 0.8, 7, 1e-12, syn.pnl.amsk)
-        b1 = po.ew_beta_series!(po.ew_beta_state(nothing, syn.X, rm, 0.8), syn.X[1:4, :],
-                                rm[1:4], 0.8, 7, 1e-12, syn.pnl.amsk[1:4, :])
-        b2 = po.ew_beta_series!(po.ew_beta_state(b1.st, syn.X, rm, 0.8), syn.X[5:160, :],
-                                rm[5:160], 0.8, 7, 1e-12, syn.pnl.amsk[5:160, :])
-        @test same([b1.B; b2.B], B) && same([b1.Vm; b2.Vm], Vm) && b2.st.t == 160
+        am = syn.pnl.amsk
+        new() = po.ew_beta_state(nothing, syn.X, rm, nothing, 0.8, nothing, 1)
+        B, st = po.ew_regression_series!(new(), nothing, syn.X, rm, nothing, am, 7, 1)
+        B1, st1 = po.ew_regression_series!(new(), nothing, syn.X[1:4, :], rm[1:4], nothing,
+                                           am[1:4, :], 7, 1)
+        B2, st2 = po.ew_regression_series!(po.ew_beta_state(st1, syn.X, rm, nothing, 0.8,
+                                                            nothing, 1), nothing,
+                                           syn.X[5:160, :], rm[5:160], nothing,
+                                           am[5:160, :], 7, 1)
+        @test same([B1; B2], B) && st2.t == 160 && same(st2.mo.C, st.mo.C)
         @test occursin("cannot merge two states fitted on disjoint blocks",
-                       message(() -> po.merge_states(b1.st, b2.st)))
+                       message(() -> po.merge_states(st1, st2)))
         @test occursin("the beta state carries 60 assets, and the step brings 5",
-                       message(() -> po.ew_beta_state(b1.st, syn.X[:, 1:5], rm, 0.8)))
+                       message(() -> po.ew_beta_state(st1, syn.X[:, 1:5], rm, nothing, 0.8,
+                                                      nothing, 1)))
+        @test occursin("folded by another configuration",
+                       message(() -> po.ew_beta_state(st1, syn.X, rm, nothing, 0.8,
+                                                      "industry", 1)))
         @test occursin("hold one entry per asset",
-                       message(() -> po.EWBetaState(; b = [0.0], mu = [0.0, 0.0],
-                                                    cv = [0.0], n = [0], act = trues(1),
-                                                    mu_m = 0.0, var_m = 0.0, t = 0)))
+                       message(() -> po.EWBetaState(; mo = st1.mo, b = [0.0],
+                                                    y = [0.0, 0.0], t = 0)))
+        @test occursin("hold K series of each asset",
+                       message(() -> po.EWMoments([0], [0.0], zeros(2, 1), zeros(2, 1),
+                                                  zeros(2, 2, 1), zeros(3), 0.5, 0.5)))
+        @test occursin("holds K series of each asset",
+                       message(() -> po.EWReturnWindow([0, 0], zeros(2, 1), zeros(2, 1))))
         # A state of the other form is refused.
         res = partial_fit!(EWResidualVolatility(), rows(syn, 1:5)).cache
         vol = partial_fit!(EWVolatility(), rows(syn, 1:5)).cache
@@ -470,12 +486,19 @@ end
         @test po.EWVolatilityState(; ve = vol.ve).ve === vol.ve
         @test po.show_fields(EWVolatility()) == (:ce, :alg, :mar)
         @test po.show_fields(EWResidualVolatility()) ==
-              (:mcap, :ce, :beta_decay, :alg, :mar, :min_val)
+              (:mcap, :ce, :beta_decay, :beta_min_obs, :alg, :mar)
         # A `ce` with no fold has no state: the Descriptor answers no step, and its batch
         # call is the variance series of `ce`.
         wv = EWVolatility(; ce = WindowedVariance(; window = 20))
         @test isnothing(po.descriptor_step(wv, rows(syn, 1:5)))
         @test isnothing(po.carry_lookback(wv))
+        # The answer of a step names its two values, and its keyword constructor refuses a
+        # value that is not an estimator and a matrix (#2093).
+        sr = po.DescriptorStepResult(; de = wv, D = [0.1 NaN])
+        @test sr.de === wv && isequal(sr.D, [0.1 NaN])
+        @test po.DescriptorStepResult(wv, [0.1 0.2]).D == [0.1 0.2]
+        @test_throws TypeError po.DescriptorStepResult(; de = 1.0, D = [0.1 0.2])
+        @test_throws TypeError po.DescriptorStepResult(; de = wv, D = [0.1, 0.2])
         @test isnothing(po.ew_volatility_fold(wv, syn, nothing).st)
         # On the carry fold each Descriptor counts as one row, so the carry keeps the rows of
         # the lag alone, and every step equals the batch fit.
@@ -549,11 +572,13 @@ end
         # copies the state.
         blocks = ((1, 1), (2, 3), (4, 30), (31, 31), (32, 33), (34, 100), (101, 101),
                   (102, 250))
-        # A copy is equal and shares no array with the original, at every level.
+        # A copy is equal and shares no array with the original, at every level, the moments
+        # and the open window of a beta state included.
         function copied(c, s)
             return all(fieldnames(typeof(c))) do f
                 x, y = getfield(c, f), getfield(s, f)
-                if isa(x, po.AbstractPartialFitState)
+                if isa(x,
+                       Union{po.AbstractPartialFitState, po.EWMoments, po.EWReturnWindow})
                     copied(x, y)
                 else
                     isequal(x, y) && (!isa(x, AbstractArray) || x !== y)
@@ -571,6 +596,7 @@ end
             st = de
             for (a, b) in blocks
                 r = po.descriptor_step(st, rows(rd, a:b))
+                @test r isa po.DescriptorStepResult
                 @test same(r.D, full[a:b, :])
                 @test same(po.descriptor_step(st, rows(rd, a:b)).D, r.D)
                 @test copied(partial_fit!(st, rows(rd, a:b)).cache, r.de.cache)
@@ -616,20 +642,45 @@ end
         # The state of the other Descriptor is refused.
         b = partial_fit!(EWMarketBeta(; half_life = 10), rows(rd, 1:20)).cache
         m = partial_fit!(dm, rows(rd, 1:20)).cache
-        @test occursin("holds no reference return, so it belongs to another Descriptor",
+        d = partial_fit!(EWDownsideBeta(; half_life = 7), rows(rd, 1:20)).cache
+        @test occursin("is not an EWMacroSensitivityState, so it belongs to another Descriptor",
                        message(() -> partial_fit!(EWMacroSensitivity(; series = "MACRO",
                                                                      cache = b),
                                                   rows(rd, 21:22))))
-        @test occursin("holds a reference return, so it belongs to another Descriptor",
+        @test occursin("is not an EWBetaState, so it belongs to another Descriptor",
                        message(() -> partial_fit!(EWBeta(; decay = 0.9, min_obs = 5,
                                                          cache = m), rows(rd, 21:22))))
-        @test occursin("hold one market return and one reference return each",
-                       message(() -> po.EWBlockState(; st = b.st, X = zeros(1, 2),
-                                                     m = Float64[])))
-        @test occursin("hold one entry per asset, got 2 and 1",
-                       message(() -> po.EWDownsideBetaState(; cd = [0.0, 0.0], n = [0],
-                                                            vd = 0.0, t = 0)))
-        @test po.show_fields(EWDownsideBeta()) == (:mcap, :decay, :min_obs, :mar, :min_val)
+        @test occursin("is not an EWDownsideBetaState, so it belongs to another Descriptor",
+                       message(() -> partial_fit!(EWDownsideBeta(; cache = b),
+                                                  rows(rd, 21:22))))
+        @test occursin("folded by another configuration",
+                       message(() -> partial_fit!(EWBeta(; decay = 0.9, min_obs = 5,
+                                                         agg_obs = 3, cache = b),
+                                                  rows(rd, 21:22))))
+        @test occursin("the state of this exponentially weighted Descriptor carries",
+                       message(() -> partial_fit!(EWDownsideBeta(; cache = d),
+                                                  po.port_opt_view(rows(rd, 21:22), 1:5))))
+        @test occursin("hold one entry per asset, got 2, 2 and 1",
+                       message(() -> po.EWDownsideBetaState(; cd = [0.0, 0.0],
+                                                            vd = [0.0, 0.0], n = [0])))
+        @test occursin("one constant-market flag per asset",
+                       message(() -> po.EWMacroSensitivityState(; be = b, cm = trues(2),
+                                                                c = 0, hf = false)))
+        @test po.show_fields(EWDownsideBeta()) == (:mcap, :decay, :min_obs, :mar)
+        # Two states of the macro sensitivity do not merge: the second block starts from the first.
+        @test isa(m, po.EWMacroSensitivityState)
+        @test occursin("an EWMacroSensitivityState cannot merge",
+                       message(() -> po.merge_states(m, copy(m))))
+        @test occursin("an EWDownsideBetaState cannot merge",
+                       message(() -> po.merge_states(d, copy(d))))
+        # A carried Descriptor pads the rows before its own with `NaN`, keeps them when they fill the returns.
+        Nd = length(rd.nx)
+        carried = po.CarriedDescriptor(ones(2, Nd))
+        padded = descriptor(carried, rows(rd, 1:5))
+        @test size(padded) == (5, Nd)
+        @test all(isnan, padded[1:3, :]) && padded[4:5, :] == ones(2, Nd)
+        @test descriptor(carried, rows(rd, 1:2)) == ones(2, Nd)
+        @test_throws DimensionMismatch descriptor(carried, rows(rd, 1:1))
         # On the carry fold each Descriptor counts as one row, so the carry keeps the rows of
         # the lag alone, and the exposures of every step equal those of the batch fit.
         ewb = ["market" => ConstantExposure(),
@@ -670,8 +721,9 @@ end
         # The case reads out at least once, so the loop is not vacuous.
         @test fitted >= 3
         @test size(last(s).pe.cache.win.X, 1) == 2
-        @test all(d -> isa(d.cache, Union{po.EWBlockState, po.EWDownsideBetaState}),
+        @test all(d -> isa(d.cache, Union{po.EWBetaState, po.EWDownsideBetaState}),
                   last(last(s).pe.cache.xf[2]).descriptors)
-        @test isa(first(last(last(s).pe.cache.xf[3]).descriptors).cache, po.EWBlockState)
+        @test isa(first(last(last(s).pe.cache.xf[3]).descriptors).cache,
+                  po.EWMacroSensitivityState)
     end
 end

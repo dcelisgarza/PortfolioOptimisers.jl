@@ -106,7 +106,7 @@ end
     @test PO.expand_moment(sigma, nothing, Val(:kt)) === sigma
     @test PO.expand_columns(sigma, nothing) === sigma
     @test PO.expand_rows(sigma, nothing) === sigma
-    @test PO.expand_vector([1.0, 2.0], nothing) == [1.0, 2.0]
+    @test PO.expand_moment([1.0, 2.0], nothing) == [1.0, 2.0]
 
     # A covariance-like matrix.
     blk = reshape(collect(1.0:9.0), 3, 3)
@@ -138,10 +138,10 @@ end
     @test PO.coverage_reduced_pair(A, A, cmsk) == (A[:, 1:3], A[:, 1:3])
 
     # An idiosyncratic covariance expands in either of the two shapes it takes.
-    @test isnothing(PO.expand_idiosyncratic_covariance(nothing, cmsk))
-    ev = PO.expand_idiosyncratic_covariance([1.0, 2.0, 3.0], cmsk)
+    @test isnothing(PO.expand_moment(nothing, cmsk))
+    ev = PO.expand_moment([1.0, 2.0, 3.0], cmsk)
     @test ev[1:3] == [1.0, 2.0, 3.0]
-    em = PO.expand_idiosyncratic_covariance(blk, cmsk)
+    em = PO.expand_moment(blk, cmsk)
     @test em[1:3, 1:3] == blk
 
     # The pair index of a co-moment tensor, `a` outermost.
@@ -442,9 +442,9 @@ end
     end
     @test occursin("Rational{Int64} cannot hold NaN", err.msg)
     @test occursin("floating-point type", err.msg)
-    @test_throws ArgumentError PO.coverage_nan_frame([1 2; 3 4], (2, 2))
+    @test_throws ArgumentError PO.coverage_nan_frame(similar([1 2; 3 4], (2, 2)))
     # A type that holds `NaN` keeps its own type in the frame.
-    @test eltype(PO.coverage_nan_frame(Float32[1 2], (2, 2))) === Float32
+    @test eltype(PO.coverage_nan_frame(similar(Float32[1 2], (2, 2)))) === Float32
     # The float sample of the same data expands as before.
     sig = Statistics.cov(Covariance(), Float64.(Xrg), nothing)
     @test all(isnan, sig[3, :]) && all(isnan, sig[:, 3])
@@ -654,15 +654,8 @@ end
     @test all(isnan, view(got, :, 4))
     @test findall(isfinite, view(PO.variance_series(vc, Xlist, pnl_full), :, 4)) == 32:T
 
-    # A variance divides, so an integer sample gives the series of the same sample in Float64,
-    # bit for bit, and a Float32 sample stays Float32. The frame took `eltype(X)` and an integer
-    # sample threw `InexactError: Int64(NaN)`.
-    Xi = rand(StableRNG(33), -5:5, T, N)
-    for est in (ve, vc)
-        vi = PO.variance_series(est, Xi, pnl_inactive)
-        @test eltype(vi) == Float64
-        @test isequal(vi, PO.variance_series(est, Float64.(Xi), pnl_inactive))
-    end
+    # A Float32 sample stays Float32. Issue #1972 removed the integer case: integer data
+    # convert at the carrier.
     @test eltype(PO.variance_series(ve, Float32.(Xhol), pnl_full)) == Float32
     @test eltype(PO.variance_series(vc, Float32.(Xhol), nothing)) == Float32
 end

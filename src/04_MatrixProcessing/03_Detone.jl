@@ -3,14 +3,14 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all detoning estimators.
 
-All concrete and/or abstract types representing detoning estimators should be subtypes of `AbstractDetoneEstimator`.
+A type that detones a matrix is a subtype of `AbstractDetoneEstimator`.
 
 # Interfaces
 
-In order to implement a new detoning estimator which will work seamlessly with the library, subtype `AbstractDetoneEstimator` with all necessary parameters as part of the struct, and implement the following methods:
+To add a detoning estimator, subtype `AbstractDetoneEstimator`, keep its parameters in the fields of the struct, and add these methods:
 
-  - `detone!(dt::AbstractDetoneEstimator, X::MatNum) -> MatNum`: In-place detoning.
-  - `detone(dt::AbstractDetoneEstimator, X::MatNum) -> MatNum`: Optional out-of-place detoning. A fallback method copies `X` and calls `detone!`, so it is only needed if the copy can be avoided.
+  - `detone!(dt::AbstractDetoneEstimator, X::MatNum) -> MatNum`: Detones `X` in place.
+  - `detone(dt::AbstractDetoneEstimator, X::MatNum) -> MatNum`: Optional. Returns the detoned `X` in a new matrix. A fallback method copies `X` and calls `detone!`, so add this method only when it avoids the copy.
 
 ## Arguments
 
@@ -23,7 +23,7 @@ In order to implement a new detoning estimator which will work seamlessly with t
 
 # Examples
 
-We can create a dummy detoning estimator as follows:
+The example below defines a minimal detoning estimator.
 
 ```jldoctest
 julia> struct MyDetoneEstimator <: PortfolioOptimisers.AbstractDetoneEstimator end
@@ -65,15 +65,15 @@ abstract type AbstractDetoneEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Removes the largest `n` principal components (market modes) from a covariance or correlation matrix. Applied by [`detone!`](@ref) and [`detone`](@ref).
+Removes the `n` largest principal components, the market modes, from a covariance or correlation matrix, or fewer when the `n`-th of them ties with the next one. [`detone!`](@ref) and [`detone`](@ref) apply it.
 
-For financial data, the leading principal components often represent market-wide movements that can obscure asset-specific signals. The `Detone` estimator allows users to specify the number of these leading components to remove, thereby enhancing the focus on idiosyncratic relationships between market members [mlp1](@cite).
+In financial data, the largest principal components often show movements of the whole market, which can hide the signals of single assets. The field `n` sets the largest number of these components that `Detone` removes, so the result shows the relations between assets that the market modes do not explain [mlp1](@cite).
 
-Detoned matrices may not be suitable for non-clustering optimisations because it can make the matrix non-positive definite. However, they can be quite effective for clustering optimsations.
+A detoned matrix is singular before [`posdef!`](@ref) runs under `pdm`, because the subtraction sets the removed eigenvalues to zero. Section 2.6 of [mlp1](@cite) states that this is not a problem for a clustering method, which does not invert the matrix. That section also states that a mean-variance optimisation cannot use the detoned matrix directly.
 
 # Mathematical definition
 
-The ``n`` largest eigenmodes are subtracted, and the remainder is rescaled to unit diagonal:
+The algorithm subtracts the ``n`` largest eigenmodes, and rescales the remainder to a unit diagonal:
 
 ```math
 \\begin{align}
@@ -84,33 +84,34 @@ The ``n`` largest eigenmodes are subtracted, and the remainder is rescaled to un
 
 Where:
 
-  - ``\\mathbf{C}``: Remainder after the market modes are subtracted.
-  - ``\\tilde{\\mathbf{X}}``: Detoned matrix.
-  - ``\\mathbf{X}``: Original correlation or covariance matrix.
-  - ``\\lambda_k``: ``k``-th largest eigenvalue of ``\\mathbf{X}``.
-  - ``\\boldsymbol{v}_k``: ``k``-th largest eigenvector of ``\\mathbf{X}``.
-  - ``n``: Number of eigenmodes (market modes) to remove.
+  - ``\\mathbf{C}``: The remainder after the subtraction of the market modes.
+  - ``\\tilde{\\mathbf{X}}``: The detoned matrix.
+  - ``\\mathbf{X}``: The original correlation or covariance matrix.
+  - ``\\lambda_k``: The ``k``-th eigenvalue of ``\\mathbf{X}`` in ascending order, so the sum takes the ``n`` largest.
+  - ``\\boldsymbol{v}_k``: The eigenvector of ``\\lambda_k``.
+  - ``n``: The number of market modes to remove. After a tie, the algorithm removes ``m < n`` modes, as the paragraph below states.
   - $(math_dict[:N])
 
-Subtracting a set of eigenmodes takes the diagonal of ``\\mathbf{C}`` below one, so the rescaling is not cosmetic: it changes every entry. The subtraction can also take an eigenvalue of ``\\mathbf{C}`` below zero, which is the reason a detoned matrix may not be positive definite.
+When the algorithm subtracts a set of eigenmodes, the diagonal of ``\\mathbf{C}`` falls below one. So the rescaling changes every entry of the matrix. The subtraction sets the removed eigenvalues to zero and keeps the others, so ``\\mathbf{C}`` and ``\\tilde{\\mathbf{X}}`` are positive semidefinite and singular. [`posdef!`](@ref) then runs on ``\\tilde{\\mathbf{X}}`` under `pdm`.
 
-Equation 5 of [kim2005](@cite) splits a correlation matrix into the market mode, the group modes and the noise modes, and the subtraction at ``n = 1`` removes the first of those parts. That work does not rescale. Section 2.6 of [mlp1](@cite) states detoning: it subtracts the market components, usually one but possibly more, and rescales the remainder to unit diagonal. No earlier work that states the rescale was found. That section detones a denoised matrix, and this estimator detones the matrix it is given.
+The ``n`` largest eigenmodes are one subspace only when ``\\lambda_{N-n+1} > \\lambda_{N-n}``. When the two eigenvalues are equal, the eigenvectors in the subtraction are an arbitrary choice from a larger subspace, and the result depends on that choice. The identity is such a matrix, and [`Denoise`](@ref) gives the identity when it finds no signal. So the algorithm removes the largest number ``m \\leq n`` of leading modes that is one subspace, and it gives the matrix back when no such ``m`` exists. A covariance then comes back to within the rounding of its conversion to a correlation and back. A tie is a difference of not more than ``N \\varepsilon \\max_k \\lvert \\lambda_k \\rvert``, the rounding bound of the decomposition. An asset whose remainder ``C_{ii}`` is not more than that bound has all of its variance in the removed modes, so it has no correlation after the subtraction. Its row and column of ``\\tilde{\\mathbf{X}}`` are zero, with a one on the diagonal. So the diagonal of a covariance returns without change, and ``n = N`` gives the identity.
+
+Equation 5 of [kim2005](@cite) splits a correlation matrix into the market mode, the group modes and the noise modes, and the subtraction at ``n = 1`` removes the first of those parts. That work does not rescale. Section 2.6 of [mlp1](@cite) states detoning. It subtracts the market components, usually one but possibly more, and rescales the remainder to a unit diagonal. A search of the literature found no earlier work that states the rescale. That section detones a denoised matrix, and this estimator detones the matrix that it gets.
 
 # Algorithm
 
-The steps that [`detone!`](@ref) runs under this estimator.
+[`detone!`](@ref) runs these steps under this estimator.
 
  1. Read `dt.n` into `n`, and check that `0 < n <= size(X, 2)`.
  2. When `X` has a zero variance, set its row and column to zero and detone the block of the positive variances with a recursive call, through [`zero_variance_block!`](@ref), and return `X`. A zero variance has no correlation, so step 4 cannot standardise it. The recursive call checks `dt.n` against the size of the block.
- 3. Decrement `n` by one. `n` counts the modes to remove, and steps 6 and 7 slice `(end - n):end`, which is a window of the original `dt.n` columns. So `dt.n = 1` removes the single largest component, which is the market mode.
- 4. Read the diagonal of `X` into `s`. When any entry of `s` is not one, `X` is a covariance matrix: replace `s` with its square roots and convert `X` to a correlation matrix with `StatsBase.cov2cor!`. The test is `any(!isone, s)`, so it is the value of the diagonal that decides, never the type of `X`.
- 5. Eigendecompose `X`, giving the ascending eigenvalues `vals` and the eigenvectors `vecs`.
- 6. Take the trailing block of `vals`, which holds the `dt.n` largest eigenvalues.
- 7. Take the matching trailing columns of `vecs`.
- 8. Subtract `vecs * vals * transpose(vecs)` from `X`, giving the remainder ``\\mathbf{C}``.
- 9. Rescale the remainder to unit diagonal with `StatsBase.cov2cor`.
-10. Repair the rescaled matrix with [`posdef!`](@ref), under `dt.pdm`.
-11. When step 4 converted a covariance matrix, convert `X` back with `StatsBase.cor2cov!`. The standard deviations are the ones read in step 4, so the original diagonal returns exactly.
+ 3. Read the diagonal of `X` into `s`. When any entry of `s` is not one, `X` is a covariance matrix. Then replace `s` with its square roots and convert `X` to a correlation matrix with `StatsBase.cov2cor!`. The test is `any(!isone, s)`, so it is the value of the diagonal that decides, never the type of `X`.
+ 4. Eigendecompose `X` into the ascending eigenvalues `vals` and the eigenvectors `vecs`. Set the tolerance `tol = N * eps(T) * maximum(abs, vals)`.
+ 5. Find `m`, the largest number in `1:n` for which `m == N`, or `vals[N - m + 1] - vals[N - m] > tol`. When no such `m` exists, skip to step 10. So `dt.n = 1` removes the single largest component, which is the market mode, when it stands above the next one.
+ 6. Subtract the `m` largest eigenmodes from `X`. The result is the remainder ``\\mathbf{C}``.
+ 7. Set the row and the column of each asset whose remainder on the diagonal is at most `tol` to zero, and its diagonal entry to one.
+ 8. Rescale the remainder to unit diagonal with `StatsBase.cov2cor`.
+ 9. Repair the rescaled matrix with [`posdef!`](@ref), under `dt.pdm`.
+10. When step 3 converted a covariance matrix, convert `X` back with `StatsBase.cor2cov!`. The standard deviations are the ones read in step 3, so the original diagonal returns exactly.
 
 # Fields
 
@@ -157,7 +158,7 @@ Detone
     """
     pdm
     """
-    Number of leading principal components to remove.
+    Largest number of leading principal components to remove. The detoner removes fewer when the last of them ties with the next eigenvalue, as [`Detone`](@ref) states.
     """
     n
     function Detone(pdm::Option{<:AbstractPosdefEstimator}, n::Integer)
@@ -171,16 +172,18 @@ end
 """
     detone!(dt::Option{<:AbstractDetoneEstimator}, X::MatNum) -> MatNum
 
-In-place removal of the top `n` principal components (market modes) from a covariance or correlation matrix.
+Removes the `n` largest principal components, the market modes, from a covariance or correlation matrix in place, or fewer when the `n`-th of them ties with the next one.
 
-For matrices without unit diagonal, the function converts them into correlation matrices i.e. matrices with unit diagonal, applies the algorithm, and rescales them back.
+When the diagonal of `X` is not all ones, the function converts `X` to a correlation matrix, applies the algorithm, and scales the result back to a covariance.
+
+A matrix with no leading mode that stands above the next one, such as the identity, comes back, to within the rounding of the conversion of a covariance, as [`Detone`](@ref) states.
 
 # Arguments
 
   - $(arg_dict[:odt])
 
-      + `::Detone`: The top `n` principal components are removed from `X` in-place.
-      + `::Nothing`: No-op.
+      + `::Detone`: Removes at most the `dt.n` largest principal components from `X` in place.
+      + `::Nothing`: Returns `X` unchanged.
 
   - $(arg_dict[:sigrhoX])
 
@@ -190,7 +193,7 @@ For matrices without unit diagonal, the function converts them into correlation 
 
 # Returns
 
-  - `X::MatNum`: The input matrix `X` is modified in-place.
+  - `X::MatNum`: The input matrix `X`, modified in place.
 
 # Examples
 
@@ -245,7 +248,6 @@ function detone!(dt::Detone, X::MatNum)
     if zero_variance_block!((block, _) -> detone!(dt, block), X)
         return X
     end
-    n -= 1
     s = LinearAlgebra.diag(X)
     iscov = any(!isone, s)
     if iscov
@@ -253,11 +255,23 @@ function detone!(dt::Detone, X::MatNum)
         StatsBase.cov2cor!(X, s)
     end
     vals, vecs = LinearAlgebra.eigen(X)
-    vals = LinearAlgebra.Diagonal(vals)[(end - n):end, (end - n):end]
-    vecs = vecs[:, (end - n):end]
-    X .-= vecs * vals * transpose(vecs)
-    X .= StatsBase.cov2cor(X)
-    posdef!(dt.pdm, X)
+    N = length(vals)
+    tol = N * eps(eltype(vals)) * maximum(abs, vals)
+    # The `m` leading modes are one subspace only when the smallest of them stands above the next
+    # eigenvalue by more than the rounding of the decomposition. A tie leaves them arbitrary.
+    m = findlast(k -> k == N || vals[N - k + 1] - vals[N - k] > tol, 1:n)
+    if !isnothing(m)
+        idx = (N - m + 1):N
+        V = view(vecs, :, idx)
+        X .-= V * LinearAlgebra.Diagonal(view(vals, idx)) * transpose(V)
+        # The removed modes hold all the variance of such an asset, so it keeps a unit row.
+        z = LinearAlgebra.diag(X) .<= tol
+        X[z, :] .= zero(eltype(X))
+        X[:, z] .= zero(eltype(X))
+        X[view(LinearAlgebra.diagind(X), z)] .= one(eltype(X))
+        X .= StatsBase.cov2cor(X)
+        posdef!(dt.pdm, X)
+    end
     if iscov
         StatsBase.cor2cov!(X, s)
     end
@@ -271,13 +285,13 @@ Out-of-place version of [`detone!`](@ref).
 # Algorithm
 
  1. Copy `X`.
- 2. Apply [`detone!`](@ref) to the copy, and return it. The input is never modified.
+ 2. Apply [`detone!`](@ref) to the copy, and return it. The function never changes the input.
 
 # Arguments
 
   - $(arg_dict[:odt])
-      + `::Detone`: The top `n` principal components are removed from a copy of `X`.
-      + `::Nothing`: No-op, returns `X` unchanged.
+      + `::Detone`: Removes at most the `dt.n` largest principal components from a copy of `X`.
+      + `::Nothing`: Returns `X` unchanged.
   - $(arg_dict[:sigrhoX])
 
 # Returns

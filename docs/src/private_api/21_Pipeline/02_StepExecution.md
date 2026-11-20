@@ -1,5 +1,5 @@
 ```@meta
-Description = "Step execution, private API of PortfolioOptimisers.jl: run_step, require_slot, set_slot, run_uncertainty_step, uncertainty_step_source, run_constraint_step, …"
+Description = "Step execution, private API of PortfolioOptimisers.jl: run_step, require_slot, set_slot, uncertainty_step_source, resolve_constraint_target, …"
 ```
 
 # Step execution: private API
@@ -12,9 +12,7 @@ The estimators do not depend on the pipeline code, and their docstrings are with
 run_step
 require_slot
 set_slot
-run_uncertainty_step
 uncertainty_step_source
-run_constraint_step
 resolve_constraint_target
 pipeline_asset_sets
 add_constraint_result

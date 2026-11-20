@@ -84,7 +84,7 @@ The two plots below show the structure every optimiser on this page acts on. The
 the dendrogram.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 plot_dendrogram(clr, rd.nx)
 # The second is the correlation heatmap, reordered by the tree, with a box around each cluster.
 plot_clusters(clr, rd.nx)

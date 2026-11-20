@@ -202,7 +202,7 @@ end
     nx = ["A", "B", "C", "D", "E", "F"]
     rd = ReturnsResult(; nx = nx, X = X)
 
-    for alg in (Proximity(), Proximity(; decay = NoDecay())),
+    for alg in (Proximity(), Proximity(; decay = nothing)),
         pl in (NetworkEstimator(), ClustersEstimator())
 
         ape = PhylogenyPanel(; pl = pl, alg = alg)
@@ -394,7 +394,7 @@ end
     @test size(f.codes) == (T, 4)
     # Every row is the same classification, stored once.
     @test all(t -> f.codes[t, :] == f.codes[1, :], 1:T)
-    @test isa(f.codes, PortfolioOptimisers.RepeatedLeading)
+    @test isa(f.codes, PortfolioOptimisers.RepeatedObservations)
     # The input cannot blank, so the lifted field carries no observed mask (#1631).
     @test isnothing(f.omsk)
     # The masks are the second lift signal.

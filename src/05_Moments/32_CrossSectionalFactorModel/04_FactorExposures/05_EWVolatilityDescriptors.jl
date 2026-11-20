@@ -133,7 +133,7 @@ julia> (de.ce.decay ≈ exp2(-inv(5.0)), isa(de.alg, FullMoment), de.mar)
 """
 @concrete struct EWVolatility <: AbstractDescriptorEstimator
     """
-    Variance estimator whose [`variance_series`](@ref) the Descriptor takes the square root of. It carries the recursion, the warm-up and the reset of an asset that turns inactive.
+    Variance estimator whose [`variance_series`](@ref) the Descriptor takes the square root of. It carries the recursion, the warm-up and the reset of an asset that turns inactive. A [`PortfolioOptimisersCovariance`](@ref) with a step in its `mp`, as its default `mp` holds, raises on this series, as its docstring states.
     """
     ce
     """
@@ -223,6 +223,7 @@ The variance estimator owns the warm-up and the bias correction, so a cell where
 # Validation
 
   - `rd.pnl` is an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
+  - No variance overflows the arithmetic. Raises an `IsNonFiniteError`, as [`assert_ew_volatility_finite`](@ref) states.
 
 # Returns
 
@@ -305,7 +306,7 @@ Exponentially weighted volatility of the market-model residual, at every observa
 
 This is the archetype of every residual volatility Descriptor. It removes the part of a return the market explains, and measures the volatility of what is left, so the Descriptor carries the risk that belongs to the asset alone. A caller who already models market beta reads this in place of the total volatility, because the two together would count the market twice.
 
-[`ew_beta_series`](@ref) estimates the beta at its own decay, and the residual of an observation takes the beta of that same observation. The volatility of the residual is the [`variance_series`](@ref) of the estimator in the `ce` field. That estimator carries the recursion, the bias correction and the reset of an asset that turns inactive, so this type repeats none of them.
+[`ew_regression_series!`](@ref) estimates the beta at its own decay, as [`EWBeta`](@ref) states, and the residual of an observation takes the beta of that same observation. The volatility of the residual is the [`variance_series`](@ref) of the estimator in the `ce` field. That estimator carries the recursion, the bias correction and the reset of an asset that turns inactive, so this type repeats none of them.
 
 # Mathematical definition
 
@@ -317,7 +318,7 @@ d_{t,i} &= \\sqrt{\\hat{\\sigma}_{t,i}^2}\\,.
 \\end{align}
 ```
 
-The beta includes observation ``t``. At the first valid observation of an asset, the beta is ``x_{t,\\,i} / r_{m,t}`` up to the floor ``\\texttt{min\\_val}``, so the residual there is zero up to that floor.
+The beta includes observation ``t``, and it is fitted with an intercept that the residual keeps. A beta from a few observations can be extreme and inflate the residual, so the beta exists only from the `beta_min_obs`-th valid observation of the asset, and the residual exists only where the beta does. A residual that does not exist does not enter the variance, so the warm-up of `ce` counts the residuals alone. The Descriptor is `NaN` where the beta of the observation is `NaN`, for example where the market does not vary, and the variance still keeps its history there.
 
 Where:
 
@@ -325,13 +326,12 @@ Where:
   - $(math_dict[:x_ti_ret])
   - $(math_dict[:r_mt_ewb])
   - $(math_dict[:beta_ti_ewb])
-  - $(math_dict[:min_val_ewb])
-  - ``\\varepsilon_{t,i}``: Market-model residual of asset ``i`` at observation ``t``, `NaN` where the asset is inactive or its return is not finite.
+  - ``\\varepsilon_{t,i}``: Market-model residual of asset ``i`` at observation ``t``, `NaN` where the asset is inactive, its return is not finite, or its beta is `NaN`.
   - ``y_{t,i}``: Input the variance estimator reads for asset ``i`` at observation ``t``.
   - ``\\hat{\\sigma}_{t,i}^2``: Variance of asset ``i`` after observation ``t``, as `ce` estimates it from the inputs ``y`` up to ``t``. The default `ce` is the recursion that [`ew_variance_estimator`](@ref) states.
   - ``\\mathrm{mar}``: `mar`, the minimum acceptable return.
 
-[`market_return_series`](@ref) builds ``r_{m,t}``, and [`ew_beta_series`](@ref) runs the recursion of ``\\beta_{t,i}`` at the decay `beta_decay`.
+[`market_return_series`](@ref) builds ``r_{m,t}``, and [`ew_regression_series!`](@ref) runs the recursion of ``\\beta_{t,i}`` at the decay `beta_decay`.
 
 # Fields
 
@@ -342,21 +342,22 @@ $(DocStringExtensions.FIELDS)
     EWResidualVolatility(; mcap::AbstractString = "market_cap", half_life::Real = 40.0,
                          beta_half_life::Real = 60.0,
                          beta_decay::Real = half_life_decay(beta_half_life, :beta_half_life),
+                         beta_min_obs::Integer = 10,
                          ce::AbstractCovarianceEstimator = ew_variance_estimator(half_life,
                                                                                  max(half_life,
                                                                                      beta_half_life)),
                          alg::AbstractMomentAlgorithm = FullMoment(), mar::Real = 0.0,
-                         min_val::Real = 1e-12,
                          cache::Option{<:AbstractPartialFitState} = nothing) -> EWResidualVolatility
 
-Keywords correspond to the struct's fields, except `half_life` and `beta_half_life`, which are not fields. `half_life` fixes the decay of `ce`, `beta_half_life` fixes `beta_decay`, and the **longer** of the two fixes the warm-up of `ce`, because a residual is no better estimated than the beta that formed it. The constructor keeps a `ce` or a `beta_decay` that the caller passes as it is. The default half-lives of `40` and `60` weight about as far back as two months and one quarter of daily observations.
+Keywords correspond to the struct's fields, except `half_life` and `beta_half_life`, which are not fields. `half_life` fixes the decay of `ce`, `beta_half_life` fixes `beta_decay`, and the **longer** of the two fixes the warm-up of `ce`, because a residual is no better estimated than the beta that formed it. The constructor keeps a `ce` or a `beta_decay` that the caller passes as it is. The default half-lives of `40` and `60` weight about as far back as two months and one quarter of daily observations. With the defaults and no missing return, the first value is at observation `69`: the beta needs ten observations, and `ce` then needs sixty residuals.
 
 ## Validation
 
   - `mcap` is not empty.
+  - `ce` is mask-aware, or a window of its series leaves the warm-up of the residual. Raises an `ArgumentError`, as [`assert_mask_aware_variance`](@ref) states.
   - `0 < beta_decay < 1`.
+  - `beta_min_obs >= 1`.
   - `isfinite(mar)`.
-  - `0 < min_val < Inf`.
   - `0 < half_life < Inf` and `0 < beta_half_life < Inf`, where each fixes a default. Raises a `DomainError` that names the half-life.
 
 # Examples
@@ -364,8 +365,9 @@ Keywords correspond to the struct's fields, except `half_life` and `beta_half_li
 ```jldoctest
 julia> de = EWResidualVolatility(; half_life = 5, beta_half_life = 8);
 
-julia> (de.ce.decay ≈ exp2(-inv(5.0)), de.ce.min_obs, de.beta_decay ≈ exp2(-inv(8.0)))
-(true, 8, true)
+julia> (de.ce.decay ≈ exp2(-inv(5.0)), de.ce.min_obs, de.beta_decay ≈ exp2(-inv(8.0)),
+        de.beta_min_obs)
+(true, 8, true, 10)
 ```
 
 # Related
@@ -374,7 +376,7 @@ julia> (de.ce.decay ≈ exp2(-inv(5.0)), de.ce.min_obs, de.beta_decay ≈ exp2(-
   - [`descriptor`](@ref)
   - [`EWResidualDownsideVolatility`](@ref)
   - [`EWVolatility`](@ref)
-  - [`ew_beta_series`](@ref)
+  - [`ew_regression_series!`](@ref)
   - [`ew_variance_estimator`](@ref)
   - [`market_return_series`](@ref)
   - [`variance_series`](@ref)
@@ -385,13 +387,17 @@ julia> (de.ce.decay ≈ exp2(-inv(5.0)), de.ce.min_obs, de.beta_decay ≈ exp2(-
     """
     mcap
     """
-    Variance estimator whose [`variance_series`](@ref) the Descriptor takes the square root of, over the residual rather than over the return. It carries the recursion, the warm-up and the reset of an asset that turns inactive.
+    Variance estimator whose [`variance_series`](@ref) the Descriptor takes the square root of, over the residual rather than over the return. It carries the recursion, the warm-up and the reset of an asset that turns inactive. It must be mask-aware, a windowed estimator whose window leaves the first observations, or a [`PortfolioOptimisersCovariance`](@ref) over one of them, because the residual of every asset is `NaN` until its beta exists, as [`assert_mask_aware_variance`](@ref) states. A [`PortfolioOptimisersCovariance`](@ref) with a step in its `mp`, as its default `mp` holds, raises on the `NaN` row of the warm-up, as its docstring states.
     """
     ce
     """
     Decay factor of the beta recursion. It is separate from the decay of `ce`, so the beta can weight observations further back than the variance of the residual does.
     """
     beta_decay
+    """
+    Number of valid observations of an asset, since its last reset, that its beta needs before a residual is formed from it. A beta from a few observations can be extreme, and its residual then inflates the volatility.
+    """
+    beta_min_obs
     """
     $(field_dict[:malg])
     """
@@ -401,36 +407,126 @@ julia> (de.ce.decay ≈ exp2(-inv(5.0)), de.ce.min_obs, de.beta_decay ≈ exp2(-
     """
     mar
     """
-    $(field_dict[:min_val])
-    """
-    min_val
-    """
     $(field_dict[:ew_vol_desc_cache])
     """
     cache
     function EWResidualVolatility(mcap::AbstractString, ce::AbstractCovarianceEstimator,
-                                  beta_decay::Real, alg::AbstractMomentAlgorithm, mar::Real,
-                                  min_val::Real, cache::Option{<:AbstractPartialFitState})
+                                  beta_decay::Real, beta_min_obs::Integer,
+                                  alg::AbstractMomentAlgorithm, mar::Real,
+                                  cache::Option{<:AbstractPartialFitState})
         assert_panel_terms(mcap, :mcap)
         assert_ew_decay(beta_decay)
+        assert_nonempty_gt0_finite_val(beta_min_obs, :beta_min_obs)
+        assert_mask_aware_variance(ce, beta_min_obs)
         assert_finite(mar, :mar)
-        assert_nonempty_gt0_finite_val(min_val, :min_val)
-        return new{typeof(mcap), typeof(ce), typeof(beta_decay), typeof(alg), typeof(mar),
-                   typeof(min_val), typeof(cache)}(mcap, ce, beta_decay, alg, mar, min_val,
-                                                   cache)
+        return new{typeof(mcap), typeof(ce), typeof(beta_decay), typeof(beta_min_obs),
+                   typeof(alg), typeof(mar), typeof(cache)}(mcap, ce, beta_decay,
+                                                            beta_min_obs, alg, mar, cache)
     end
 end
 function EWResidualVolatility(; mcap::AbstractString = "market_cap", half_life::Real = 40.0,
                               beta_half_life::Real = 60.0,
                               beta_decay::Real = half_life_decay(beta_half_life,
                                                                  :beta_half_life),
+                              beta_min_obs::Integer = 10,
                               ce::AbstractCovarianceEstimator = ew_variance_estimator(half_life,
                                                                                       max(half_life,
                                                                                           beta_half_life)),
                               alg::AbstractMomentAlgorithm = FullMoment(), mar::Real = 0.0,
-                              min_val::Real = 1e-12,
                               cache::Option{<:AbstractPartialFitState} = nothing)::EWResidualVolatility
-    return EWResidualVolatility(mcap, ce, beta_decay, alg, mar, min_val, cache)
+    return EWResidualVolatility(mcap, ce, beta_decay, beta_min_obs, alg, mar, cache)
+end
+"""
+    assert_mask_aware_variance(ce::AbstractCovarianceEstimator, beta_min_obs::Integer)
+    assert_mask_aware_variance(ce::Union{WindowedVariance, WindowedCovariance},
+                               beta_min_obs::Integer)
+    assert_mask_aware_variance(ce::PortfolioOptimisersCovariance, beta_min_obs::Integer)
+
+Refuses a variance estimator whose [`variance_series`](@ref) over an Asset Panel is `NaN` at every cell of the residual, as the `ce` of an [`EWResidualVolatility`](@ref).
+
+[`ew_residual_returns`](@ref) writes `NaN` into the residual of every asset from its first observation until its beta exists. The beta of observation `1` reads one observation, whose market return does not vary, so it is `NaN` too. So the residual of every asset is `NaN` at each observation before `max(beta_min_obs, 2)`, the warm-up. A plain estimator reduces each window of the series to its Coverage Universe, and a window that holds a row of the warm-up covers no asset, so its row is `NaN`. A mask-aware estimator, by [`reads_active_mask`](@ref), reads each asset from its first finite residual, so it answers. The configuration alone decides if every window holds a row of the warm-up, so the constructor refuses that configuration:
+
+  - A plain estimator fits an expanding window, which holds observation `1` at every row, so it is refused.
+  - A windowed estimator with an integer window drops the first observations once its window is full, so it is admitted over any inner estimator. Its rows before the window leaves the warm-up are `NaN`.
+  - A windowed estimator with an index window holds its first index at every row that keeps an observation. It is admitted when that index is past the warm-up, and otherwise it is admitted only when its inner estimator is.
+  - A windowed estimator with no window is admitted only when its inner estimator is.
+  - A [`PortfolioOptimisersCovariance`](@ref) passes each window to its inner estimator, so it is admitted when its inner estimator is.
+
+A variance estimator of your own whose [`variance_series`](@ref) over an Asset Panel reads the active mask of each asset adds a method of [`reads_active_mask`](@ref) that returns `true`, as the admitted types do. Without that method the constructor refuses it, because the generic method cannot see the panel method of the type. The same method tells a windowed series and a [`PortfolioOptimisersCovariance`](@ref) that the type reads the window itself.
+
+# Arguments
+
+  - `ce`: The variance estimator of the Descriptor.
+  - `beta_min_obs`: The number of valid observations that the beta of an asset needs before a residual is formed from it.
+
+# Validation
+
+  - Some window of the series of `ce` leaves the warm-up. An `ArgumentError` that names the plain estimator is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`EWResidualVolatility`](@ref)
+  - [`ew_residual_returns`](@ref)
+  - [`reads_active_mask`](@ref)
+  - [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
+  - [`CoveragePolicy`](@ref)
+"""
+function assert_mask_aware_variance(ce::AbstractCovarianceEstimator, ::Integer)::Nothing
+    @argcheck(reads_active_mask(ce),
+              ArgumentError("the `ce` of an EWResidualVolatility holds a `$(typeof(ce).name.name)`, which is not mask-aware: its variance series reduces each expanding window to its Coverage Universe, and the residual of every asset is `NaN` until its beta exists, so every cell of the Descriptor would be `NaN`. Pass the default `ce`, an `ExpWeightedVariance`, a `SimpleVariance(; cvg = CoveragePolicy())`, or a windowed estimator with an integer window, such as `WindowedVariance(; window = 60)`. A type of your own whose `variance_series` over an Asset Panel reads the active mask adds a method of `PortfolioOptimisers.reads_active_mask` that returns `true`."))
+    return nothing
+end
+function assert_mask_aware_variance(ce::Union{WindowedVariance, WindowedCovariance},
+                                    beta_min_obs::Integer)::Nothing
+    return if window_leaves_warmup(ce.window, beta_min_obs)
+        nothing
+    else
+        assert_mask_aware_variance(getfield(ce, 1), beta_min_obs)
+    end
+end
+function assert_mask_aware_variance(ce::PortfolioOptimisersCovariance,
+                                    beta_min_obs::Integer)::Nothing
+    return assert_mask_aware_variance(ce.ce, beta_min_obs)
+end
+"""
+    window_leaves_warmup(window::Nothing, beta_min_obs::Integer) -> Bool
+    window_leaves_warmup(window::Integer, beta_min_obs::Integer) -> Bool
+    window_leaves_warmup(window::VecInt, beta_min_obs::Integer) -> Bool
+
+Answer whether some window of a windowed variance series holds no row of the warm-up of the residual of an [`EWResidualVolatility`](@ref), the observations before `max(beta_min_obs, 2)`.
+
+[`assert_mask_aware_variance`](@ref) reads the answer. The method that Julia selects is the rule:
+
+  - No window is an expanding window, which holds observation `1`, so the answer is `false`.
+  - An integer window drops the first observations once it is full, so the answer is `true`.
+  - An index window keeps its first index at every row that keeps an observation, so the answer is `true` when that index is not in the warm-up.
+
+# Arguments
+
+  - $(arg_dict[:window])
+  - `beta_min_obs`: The number of valid observations that the beta of an asset needs before a residual is formed from it.
+
+# Returns
+
+  - `flag::Bool`: `true` when a window leaves the warm-up.
+
+# Related
+
+  - [`assert_mask_aware_variance`](@ref)
+  - [`windowed_series_rows`](@ref)
+"""
+function window_leaves_warmup(::Nothing, ::Integer)
+    return false
+end
+function window_leaves_warmup(::Integer, ::Integer)
+    return true
+end
+function window_leaves_warmup(window::VecInt, beta_min_obs::Integer)
+    return minimum(window) >= max(beta_min_obs, 2)
 end
 """
     ew_residual_returns(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
@@ -480,13 +576,13 @@ julia> PortfolioOptimisers.ew_residual_returns([0.1 0.2; NaN 0.0], [0.1, -0.05],
 # Related
 
   - [`EWResidualVolatility`](@ref)
-  - [`ew_beta_series`](@ref)
+  - [`ew_regression_series!`](@ref)
   - [`descriptor`](@ref)
 """
 function ew_residual_returns(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
                              B::AbstractMatrix{<:Real},
                              amsk::AbstractMatrix{Bool})::Matrix{<:Real}
-    Tf = float_if_integer(promote_type(eltype(X), eltype(rm), eltype(B)))
+    Tf = promote_type(eltype(X), eltype(rm), eltype(B))
     E = fill(Tf(NaN), size(X))
     for t in axes(X, 1), i in axes(X, 2)
         x = X[t, i]
@@ -504,11 +600,11 @@ Compute an exponentially weighted residual volatility Descriptor from a [`Return
 # Algorithm
 
  1. Build the market return `rm` through [`market_return_series`](@ref).
- 2. Run the beta recursion through [`ew_beta_series`](@ref), giving the betas `B`. The recursion resets an asset that turns inactive, and its warm-up of one observation writes a beta at every valid observation.
- 3. Remove the market from every return through [`ew_residual_returns`](@ref), giving the residuals `E`.
+ 2. Run the beta regression through [`ew_regression_series!`](@ref), giving the betas `B`. The regression resets an asset that turns inactive, and it writes a beta from the `beta_min_obs`-th valid observation of the asset.
+ 3. Remove the market from every return through [`ew_residual_returns`](@ref), giving the residuals `E`. A residual is `NaN` where the beta is `NaN`.
  4. Transform the residuals through [`ew_volatility_input`](@ref), which reads the `alg` field, giving `Y`.
  5. Take the point-in-time variance series `V` of `Y` through [`variance_series`](@ref), and take its square root `D`.
- 6. Write `NaN` into the inactive cells through [`descriptor_active_fill!`](@ref).
+ 6. Write `NaN` where the beta is `NaN` through [`ew_residual_unresolved!`](@ref), and into the inactive cells through [`descriptor_active_fill!`](@ref).
 
 The variance estimator owns the warm-up and the bias correction, so a cell where it returns `NaN` is `NaN` in the Descriptor. The call is [`ew_volatility_fold`](@ref) from no state, so a step of the carry fold runs the same arithmetic.
 
@@ -521,6 +617,7 @@ The variance estimator owns the warm-up and the bias correction, so a cell where
 
   - `rd.pnl` is an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
   - The rules of [`market_return_series`](@ref).
+  - No variance of a residual overflows the arithmetic. Raises an `IsNonFiniteError`, as [`assert_ew_volatility_finite`](@ref) states.
 
 # Returns
 
@@ -535,18 +632,18 @@ julia> pnl = asset_panel([NumericPanelInput(; name = \"market_cap\",
 
 julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; -0.1 0.0; 0.05 0.05], pnl = pnl);
 
-julia> descriptor(EWResidualVolatility(; half_life = 1, beta_half_life = 1), rd)
+julia> descriptor(EWResidualVolatility(; half_life = 1, beta_half_life = 1, beta_min_obs = 2), rd)
 3×2 Matrix{Float64}:
- 7.20002e-12  1.44e-11
- 0.0496512    0.0343739
- 0.0325048    0.0226705
+ NaN          NaN
+   0.0590909    0.0409091
+   0.0341457    0.0239417
 ```
 
 # Related
 
   - [`EWResidualVolatility`](@ref)
   - [`EWResidualDownsideVolatility`](@ref)
-  - [`ew_beta_series`](@ref)
+  - [`ew_regression_series!`](@ref)
   - [`ew_residual_returns`](@ref)
   - [`ew_volatility_input`](@ref)
   - [`variance_series`](@ref)
@@ -563,7 +660,7 @@ end
                                  ce::AbstractCovarianceEstimator = ew_variance_estimator(half_life,
                                                                                          max(half_life,
                                                                                              beta_half_life)),
-                                 min_val::Real = 1e-12) -> EWResidualVolatility
+                                 beta_min_obs::Integer = 10) -> EWResidualVolatility
 
 Exponentially weighted volatility of the market-model residuals that fall short of a minimum acceptable return.
 
@@ -577,7 +674,7 @@ The value is the volatility of [`EWResidualVolatility`](@ref) measured on `min(�
   - `mar`: Minimum acceptable return. A residual above it contributes zero.
   - `beta_decay`: Decay factor of the beta recursion.
   - `ce`: Variance estimator the Descriptor reads.
-  - $(arg_dict[:min_val])
+  - `beta_min_obs`: Number of valid observations that the beta of an asset needs before a residual is formed from it.
 
 # Validation
 
@@ -612,9 +709,9 @@ function EWResidualDownsideVolatility(; mcap::AbstractString = "market_cap",
                                       ce::AbstractCovarianceEstimator = ew_variance_estimator(half_life,
                                                                                               max(half_life,
                                                                                                   beta_half_life)),
-                                      min_val::Real = 1e-12)::EWResidualVolatility
+                                      beta_min_obs::Integer = 10)::EWResidualVolatility
     return EWResidualVolatility(; mcap = mcap, ce = ce, beta_decay = beta_decay,
-                                alg = SemiMoment(), mar = mar, min_val = min_val)
+                                beta_min_obs = beta_min_obs, alg = SemiMoment(), mar = mar)
 end
 
 """
@@ -700,7 +797,7 @@ end
     ew_volatility_parts(::Nothing)
     ew_volatility_parts(st::EWVolatilityState)
 
-Returns the two parts of the carried state of a volatility Descriptor, as the fields `ve` and `beta`: both `nothing` for no state, or the state itself.
+Returns the two parts of the carried state of a volatility Descriptor, `ve` and `beta`: both `nothing` for no state, or the two fields of the state.
 
 # Arguments
 
@@ -708,18 +805,18 @@ Returns the two parts of the carried state of a volatility Descriptor, as the fi
 
 # Returns
 
-  - `parts`: An object with the fields `ve` and `beta`.
+  - `(ve, beta)::Tuple`: The plain tuple of the state of the variance estimator and the beta state, each `nothing` when the state does not hold it.
 
 # Related
 
   - [`EWVolatilityState`](@ref)
   - [`ew_volatility_fold`](@ref)
 """
-function ew_volatility_parts(::Nothing)
-    return (; ve = nothing, beta = nothing)
+function ew_volatility_parts(::Nothing)::Tuple{Nothing, Nothing}
+    return nothing, nothing
 end
-function ew_volatility_parts(st::EWVolatilityState)::EWVolatilityState
-    return st
+function ew_volatility_parts(st::EWVolatilityState)::Tuple
+    return st.ve, st.beta
 end
 """
     ew_volatility_state(::Nothing, ::Option{<:EWBetaState})
@@ -771,7 +868,7 @@ A [`RegimeAdjustedExpWeightedVariance`](@ref) runs the forward pass of its [`var
 
 # Returns
 
-  - `fold::NamedTuple`: `V`, the variance of each observation, `observations × assets`, and `st`, the state of `ce` after the observations, or `nothing` for an estimator that does not fold.
+  - `(V, st)::Tuple`: The plain tuple of `V`, the variance of each observation, `observations × assets`, and `st`, the state of `ce` after the observations, or `nothing` for an estimator that does not fold.
 
 # Related
 
@@ -783,17 +880,17 @@ function ew_volatility_variance(ce::RegimeAdjustedExpWeightedVariance,
                                 Y::AbstractMatrix{<:Real}, pnl::AssetPanel,
                                 st::Option{<:RegimeAdjustedVarianceState})
     amsk, emsk = panel_moment_masks(pnl)
-    V = Matrix{float_if_integer(eltype(Y))}(undef, size(Y))
+    V = Matrix{eltype(Y)}(undef, size(Y))
     vs = regime_adjusted_variance_pass!(ce, Y, 1, emsk, amsk,
                                         isnothing(st) ? nothing : copy(st)) do i, cache
         V[i, :] = regime_adjusted_variance(cache, ce)
         return nothing
     end
-    return (; V = V, st = vs)
+    return V, vs
 end
 function ew_volatility_variance(ce::AbstractCovarianceEstimator, Y::AbstractMatrix{<:Real},
                                 pnl::AssetPanel, ::Any)
-    return (; V = variance_series(ce, Y, pnl; dims = 1), st = nothing)
+    return variance_series(ce, Y, pnl; dims = 1), nothing
 end
 """
     ew_volatility_fold(de::EWVolatility, rd::ReturnsResult,
@@ -807,10 +904,10 @@ The batch call [`descriptor`](@ref) is this function from no state, so a step eq
 
 # Algorithm
 
- 1. For an [`EWResidualVolatility`](@ref), build the market return, and run the beta recursion with [`ew_beta_series!`](@ref) from the beta state, or from zero. Remove the market from every return.
+ 1. For an [`EWResidualVolatility`](@ref), build the market return, and run the beta regression with [`ew_regression_series!`](@ref) from the beta state, or from zero. Remove the market from every return.
  2. Transform the returns, or the residuals, through [`ew_volatility_input`](@ref).
- 3. Take the variance of each observation and the state of `ce` after them with [`ew_volatility_variance`](@ref), and take the square root.
- 4. Write `NaN` into the inactive cells through [`descriptor_active_fill!`](@ref).
+ 3. Take the variance of each observation and the state of `ce` after them with [`ew_volatility_variance`](@ref), refuse an infinite variance with [`assert_ew_volatility_finite`](@ref), and take the square root.
+ 4. For an [`EWResidualVolatility`](@ref), write `NaN` where the beta is `NaN` through [`ew_residual_unresolved!`](@ref). Write `NaN` into the inactive cells through [`descriptor_active_fill!`](@ref).
 
 # Arguments
 
@@ -820,12 +917,12 @@ The batch call [`descriptor`](@ref) is this function from no state, so a step eq
 
 # Validation
 
-  - The rules of [`descriptor`](@ref), of [`ew_beta_state`](@ref) and of [`ew_volatility_variance`](@ref).
+  - The rules of [`descriptor`](@ref), of [`ew_beta_state`](@ref), of [`ew_volatility_variance`](@ref) and of [`assert_ew_volatility_finite`](@ref).
   - The state of an [`EWResidualVolatility`](@ref) holds a beta state, and the state of an [`EWVolatility`](@ref) holds none. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
-  - `fold::NamedTuple`: `st`, the state after the observations, or `nothing` where `ce` does not fold, and `D`, the Descriptor of each observation, `observations × assets`.
+  - `fold::DescriptorFold`: `st`, the state after the observations, or `nothing` where `ce` does not fold, and `D`, the Descriptor of each observation, `observations × assets`.
 
 # Related
 
@@ -834,33 +931,91 @@ The batch call [`descriptor`](@ref) is this function from no state, so a step eq
 """
 function ew_volatility_fold(de::EWVolatility, rd::ReturnsResult,
                             cache::Option{<:EWVolatilityState})
-    c = ew_volatility_parts(cache)
-    @argcheck(isnothing(c.beta),
+    ve, beta = ew_volatility_parts(cache)
+    @argcheck(isnothing(beta),
               ArgumentError("the state of this EWVolatility holds a beta state, so it is the state of an EWResidualVolatility. An EWVolatility folds from its own state, or from no state."))
     pnl = descriptor_asset_panel(rd)
     Y = ew_volatility_input(de.alg, rd.X, de.mar)
-    vf = ew_volatility_variance(de.ce, Y, pnl, c.ve)
-    D = sqrt.(vf.V)
+    V, vst = ew_volatility_variance(de.ce, Y, pnl, ve)
+    assert_ew_volatility_finite(V)
+    D = sqrt.(V)
     descriptor_active_fill!(D, pnl)
-    return (; st = ew_volatility_state(vf.st, nothing), D = D)
+    return DescriptorFold(ew_volatility_state(vst, nothing), D)
 end
 function ew_volatility_fold(de::EWResidualVolatility, rd::ReturnsResult,
                             cache::Option{<:EWVolatilityState})
-    c = ew_volatility_parts(cache)
-    @argcheck(isnothing(cache) == isnothing(c.beta),
+    ve, beta = ew_volatility_parts(cache)
+    @argcheck(isnothing(cache) == isnothing(beta),
               ArgumentError("the state of this EWResidualVolatility holds no beta state, so it is the state of an EWVolatility. An EWResidualVolatility folds from its own state, or from no state."))
     pnl = descriptor_asset_panel(rd)
     rm = market_return_series(rd, de.mcap)
     X = rd.X
     amsk = pnl.amsk
-    bs = ew_beta_state(c.beta, X, rm, de.beta_decay)
-    bf = ew_beta_series!(bs, X, rm, de.beta_decay, 1, de.min_val, amsk)
-    E = ew_residual_returns(X, rm, bf.B, amsk)
+    bs = ew_beta_state(beta, X, rm, nothing, de.beta_decay, nothing, 1)
+    B, bst = ew_regression_series!(bs, nothing, X, rm, nothing, amsk, de.beta_min_obs, 1)
+    E = ew_residual_returns(X, rm, B, amsk)
     Y = ew_volatility_input(de.alg, E, de.mar)
-    vf = ew_volatility_variance(de.ce, Y, pnl, c.ve)
-    D = sqrt.(vf.V)
+    V, vst = ew_volatility_variance(de.ce, Y, pnl, ve)
+    assert_ew_volatility_finite(V)
+    D = sqrt.(V)
+    ew_residual_unresolved!(D, B)
     descriptor_active_fill!(D, pnl)
-    return (; st = ew_volatility_state(vf.st, bf.st), D = D)
+    return DescriptorFold(ew_volatility_state(vst, bst), D)
+end
+"""
+    ew_residual_unresolved!(D::AbstractMatrix{<:Real}, B::AbstractMatrix{<:Real}) -> D
+
+Writes `NaN` into every cell of the residual volatility `D` whose beta in `B` is `NaN`, in place. A beta that the regression cannot resolve leaves no residual, so the volatility of that observation is not stated, and the variance keeps its history for the next observation.
+
+# Arguments
+
+  - `D`: The residual volatility, `observations × assets`, changed in place.
+  - `B`: The betas of the same cells.
+
+# Returns
+
+  - `D::AbstractMatrix{<:Real}`: The residual volatility.
+
+# Related
+
+  - [`ew_volatility_fold`](@ref)
+  - [`EWResidualVolatility`](@ref)
+"""
+function ew_residual_unresolved!(D::AbstractMatrix{<:Real}, B::AbstractMatrix{<:Real})
+    for k in eachindex(D, B)
+        if isnan(B[k])
+            D[k] = eltype(D)(NaN)
+        end
+    end
+    return D
+end
+"""
+    assert_ew_volatility_finite(V::AbstractMatrix{<:Real}) -> nothing
+
+Checks that no variance of a volatility Descriptor is infinite. The returns are finite, so an infinite variance is the square of a return or of a residual that overflows the arithmetic. Without the check, the Descriptor would be an infinite volatility, where every other cell is finite or `NaN`. A `NaN` variance, as in the warm-up, passes.
+
+# Arguments
+
+  - `V`: The variance of each observation, `observations × assets`.
+
+# Validation
+
+  - No entry of `V` is infinite. An `IsNonFiniteError` that names the observation and the asset is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ew_volatility_fold`](@ref)
+  - [`ew_volatility_variance`](@ref)
+"""
+function assert_ew_volatility_finite(V::AbstractMatrix{<:Real})::Nothing
+    k = findfirst(isinf, V)
+    @argcheck(isnothing(k),
+              IsNonFiniteError("the exponentially weighted variance of asset $(k[2]) at observation $(k[1]) is not finite, because the square of its return or of its residual overflows the arithmetic. Rescale the returns."))
+    return nothing
 end
 """
     descriptor_step(de::Union{EWVolatility{<:RegimeAdjustedExpWeightedVariance},
@@ -885,7 +1040,7 @@ A volatility Descriptor with any other `ce` has no state to carry, so it takes t
 
 # Returns
 
-  - `step::NamedTuple`: `de`, the estimator with the state after the observations in `cache`, and `D`, the Descriptor of each observation, `observations × assets`.
+  - `step::DescriptorStepResult`: `de`, the estimator with the state after the observations in `cache`, and `D`, the Descriptor of each observation, `observations × assets`.
 
 # Related
 
@@ -898,7 +1053,7 @@ function descriptor_step(de::Union{EWVolatility{<:RegimeAdjustedExpWeightedVaria
                                                         <:RegimeAdjustedExpWeightedVariance}},
                          rd::ReturnsResult)
     (; st, D) = ew_volatility_fold(de, rd, de.cache)
-    return (; de = Accessors.@set(de.cache = st), D = D)
+    return DescriptorStepResult(rebuild_struct(de, (; cache = st)), D)
 end
 """
     partial_fit!(de::Union{EWVolatility{<:RegimeAdjustedExpWeightedVariance},

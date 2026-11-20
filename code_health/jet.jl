@@ -155,7 +155,8 @@ end
 
 # --- measurement -----------------------------------------------------------
 
-const RUNS = ("main" => :package, "plots_ext" => :PortfolioOptimisersPlotsExt)
+const RUNS = ("main" => :package, "plots_ext" => :PortfolioOptimisersPlotsExt,
+              "graph_ext" => :PortfolioOptimisersGraphRecipesExt)
 
 function target_module(name::Symbol)
     m = Base.get_extension(PortfolioOptimisers, name)
@@ -263,43 +264,47 @@ function dismissal_repairs(rulings, files)
     return nothing
 end
 
-function render(m, recorded, accept_rise::Bool)
-    rulings = CodeHealth.read_rulings()
+# `rulings` defaults to the committed Rulings. A test over fixture rows passes its own.
+function render(m, recorded, accept_rise::Bool; rulings = CodeHealth.read_rulings())
     dismissal_repairs(rulings, m.files)
+    th = CodeHealth.thresholds(rulings)
+    recs = Dict(run => recorded_rows(recorded, run) for (run, _) in m.runs)
+    rows_of = Dict(run => Dict(f => Dict(row(counts, f)) for f in m.files)
+                   for (run, counts) in m.runs)
+    # ADR 0074: a rename pairs on the raw count alone, because a rename breaks every Dismissal on
+    # the file and the reviewed count therefore does not survive the move. A run that the
+    # baseline does not hold checks the files new to the tree (#2189).
+    equal(a, b) = a["raw"] == b["raw"]
+    entries = CodeHealth.entries_by_run(m.files, recs, rows_of, equal)
     out = Pair{String, Any}[]
     rs = CodeHealth.Rise[]
+    refusals = String[]
     for (run, counts) in m.runs
-        rec = recorded_rows(recorded, run)
-        measured = Dict(f => Dict(row(counts, f)) for f in m.files)
-        if !isempty(rec)
-            missing_rows, dead_rows = CodeHealth.set_differences(m.files,
-                                                                 collect(keys(rec)))
-            # ADR 0074: a rename pairs on the raw count alone, because a rename breaks every
-            # Dismissal on the file and the reviewed count therefore does not survive the move.
-            equal(a, b) = a["raw"] == b["raw"]
-            pairs, _, added = CodeHealth.pair_renames(dead_rows, missing_rows, rec,
-                                                      measured, equal)
-            for (dead, new) in pairs
-                # The carried row keeps its old reviewed number, so the gate stays red until the
-                # Dismissals name the new path. No new rule creates the red; the subtraction does.
-                measured[new] = Dict("raw" => rec[dead]["raw"],
-                                     "reviewed" => rec[dead]["reviewed"])
-                println("Paired the row of ", dead, " with ", new,
-                        ", which measures the same raw",
-                        " count. Its reviewed number is carried unchanged.")
-            end
-            th = CodeHealth.thresholds(rulings)
-            for f in added
-                if counts[f]["reviewed"] >= th["jet_reviewed"]
-                    print_reports(m, run, f)
-                    throw(CodeHealth.RefreshRefused("ERROR: $f enters with reviewed = $(counts[f]["reviewed"]), and an added " *
-                                                    "file must enter at 0.\n       Lower it, or add a Dismissal citing an " *
-                                                    "approved Rationale."))
-                end
+        rec, measured = recs[run], rows_of[run]
+        for (dead, new) in entries[run].pairs
+            # The carried row keeps its old reviewed number, so the gate stays red until the
+            # Dismissals name the new path. No new rule creates the red; the subtraction does.
+            measured[new] = Dict("raw" => rec[dead]["raw"],
+                                 "reviewed" => rec[dead]["reviewed"])
+            println("Paired the row of ", dead, " with ", new, " in run ", run,
+                    ", which measures the same raw count. Its reviewed number is carried",
+                    " unchanged.")
+        end
+        for f in entries[run].added
+            n = counts[f]["reviewed"]
+            if n >= th["jet_reviewed"]
+                print_reports(m, run, f)
+                push!(refusals,
+                      "ERROR: $f enters run $run with reviewed = $n, and an added file must " *
+                      "enter at 0.\n       Lower it, or add a Dismissal citing an approved " *
+                      "Rationale.")
             end
         end
         append!(rs, CodeHealth.rises(rec, measured, BINDING; group = run))
         push!(out, run => measured)
+    end
+    if !(isempty(refusals))
+        throw(CodeHealth.RefreshRefused(join(refusals, "\n")))
     end
     # The refusal waits for every run, so it names every rise the accepting refresh would record.
     if !isempty(rs) && !accept_rise
@@ -407,6 +412,9 @@ end
 # of it, so the command line runs only when this file is the program. `code_health/triage.jl`
 # includes it into a module of its own and calls `measure` directly.
 if abspath(PROGRAM_FILE) == @__FILE__
-    exit(CodeHealth.run_script(ARGS; name = NAME, measure = measure, verify = verify,
-                               render = render, publish = publish))
+    exit(CodeHealth.JuliaSlot.with_slot("jet.jl $(join(ARGS, ' '))") do
+             return CodeHealth.run_script(ARGS; name = NAME, measure = measure,
+                                          verify = verify, render = render,
+                                          publish = publish)
+         end)
 end

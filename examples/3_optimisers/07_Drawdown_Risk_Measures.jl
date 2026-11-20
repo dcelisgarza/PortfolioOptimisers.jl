@@ -87,7 +87,7 @@ reduce that one loss. `AverageDrawdown` and `UlcerIndex` use the whole drawdown 
 uses the worst 5 % of it.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 plot_stacked_bar_composition(results, rd)
 
 #=

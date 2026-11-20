@@ -1,22 +1,27 @@
 ```@meta
-Description = "Base search cross validation, private API of PortfolioOptimisers.jl: AbstractSearchCrossValidationEstimator, CrossValSearchScorer, …"
+Description = "Base search cross validation, private API of PortfolioOptimisers.jl: AbstractSearchCrossValidationEstimator, assert_search_scorer, assert_search_reduction, …"
 ```
 
 # Base search cross validation: private API
 
 ```@docs
 AbstractSearchCrossValidationEstimator
-CrossValSearchScorer
-AbstractSearchCrossValidationAlgorithm
-finite_candidate_index
+assert_search_scorer
+assert_search_reduction
+search_result
+assert_search_ranking
 assert_search_entry
 search_candidate
 assert_search_candidates(::Any, ::Any, ::Any)
-pin_draw
 score_rows
+score_path_ids
 fold_train_returns
 candidate_train_score
 write_candidate_scores!
+allocate_search_scores
+search_score_array
+store_search_score!
+path_train_scores
 parse_lens
 assert_search_grid_cap
 _expr_to_lens

@@ -114,8 +114,8 @@ end
         return w ./ M
     end
     @testset "the average of the subset weights" begin
-        sr = SubsetResampling(; opt = InverseVolatility(), n_subsets = 7, ex = seq,
-                              seed = 11)
+        sr = SubsetResampling(; subset_size = 0.8, opt = InverseVolatility(), n_subsets = 7,
+                              ex = seq, seed = 11)
         res = optimise(sr, rd)
         # `round(0.8 * 12) = 10`.
         @test size(res.idx) == (10, 7)
@@ -160,10 +160,12 @@ end
         pr5 = prior(EmpiricalPrior(), ReturnsResult(; nx = rd.nx[1:5], X = X[:, 1:5]))
         pr6 = prior(EmpiricalPrior(), rd6)
         # `round` takes the even integer at a tie: `0.5 * 5 = 2.5` gives 2.
-        @test PO.get_subset_size(0.5, pr5) == 2
-        @test PO.get_subset_size(eps(), pr6) == 1
+        @test PO.get_subset_size(FractionOf(0.5), pr5) == 2
+        @test PO.get_subset_size(FractionOf(eps()), pr6) == 1
         @test PO.get_subset_size(pr -> 3, pr6) == 3
-        @test PO.get_subset_size(1 // 2, pr6) == 3
+        @test PO.get_subset_size(FractionOf(1 // 2), pr6) == 3
+        @test PO.get_subset_size(CountOf(4), pr6) == 4
+        @test_throws ArgumentError PO.get_subset_size(CountOf(7), pr6)
         # A `Rational` size is a fraction of the assets, as a float is.
         rq = optimise(SubsetResampling(; opt = InverseVolatility(), subset_size = 1 // 2,
                                        ex = seq, seed = 2), rd6)
@@ -175,10 +177,66 @@ end
         @test_throws TypeError SubsetResampling(; opt = InverseVolatility(),
                                                 subset_size = 0.5 + 0im)
         wf = IndexWalkForward(20, 10)
-        @test MultipleRandomised(wf; subset_size = 1 // 2).subset_size == 1 // 2
+        @test MultipleRandomised(wf; subset_size = 1 // 2).subset_size ===
+              FractionOf(1 // 2)
         @test_throws DomainError MultipleRandomised(wf; subset_size = 3 // 2)
         @test_throws DomainError MultipleRandomised(wf; window_size = 3 // 2)
-        @test PO.get_window_size(1 // 2, rd6) == 40
+        @test PO.get_window_size(FractionOf(1 // 2), rd6) == 40
+        # Issue #2013: the plain form is read by its type, and the wrapper keeps its own.
+        @test MultipleRandomised(wf; subset_size = 2, window_size = 30).window_size ===
+              CountOf(30)
+        @test PO.get_window_size(CountOf(30), rd6) == 30
+        @test_throws DomainError MultipleRandomised(wf; window_size = CountOf(1))
+        @test SubsetResampling(; opt = InverseVolatility(), subset_size = 3).subset_size ===
+              CountOf(3)
+        @test_throws DomainError SubsetResampling(; opt = InverseVolatility(),
+                                                  subset_size = 1.0)
+        # Issue #2013: a search grid sets each value through the constructor. Julia
+        # promotes the plain `[1, 0.5]` to `[1.0, 0.5]`, and the plain `1.0` is refused,
+        # where the wrappers keep each value at its own member.
+        sr0 = SubsetResampling(; opt = InverseVolatility())
+        lens = (PO.Accessors.PropertyLens(:subset_size),)
+        @test eltype([1, 0.5]) == Float64
+        @test_throws DomainError PO.search_candidate(sr0, lens, ([1, 0.5][1],))
+        vals = [CountOf(1), FractionOf(0.5)]
+        @test [PO.search_candidate(sr0, lens, (v,)).subset_size for v in vals] == vals
+        # R43 of #1817: the literal of a whole grid promotes its pairs as well, to
+        # `Pair{String, Vector}`, and each value keeps its member through a full search.
+        grid = ["subset_size" => [CountOf(2), FractionOf(0.5)], "n_subsets" => [2, 3]]
+        @test eltype(grid) == Pair{String, Vector}
+        glenses, gvals = PO.lens_val_grid(grid)
+        @test first.(gvals) == [CountOf(2), FractionOf(0.5), CountOf(2), FractionOf(0.5)]
+        @test [PO.get_subset_size(PO.search_candidate(sr0, l, v).subset_size, rd6)
+               for (l, v) in zip(glenses, gvals)] == [2, 3, 2, 3]
+        gscv = GridSearchCrossValidation(grid; cv = KFold(; n = 3),
+                                         r = ConditionalValueatRisk())
+        res = search_cross_validation(SubsetResampling(; opt = InverseVolatility(),
+                                                       ex = seq, seed = 1), gscv, rd6)
+        @test size(res.test_scores) == (3, 4)
+        @test res.opt.subset_size in (CountOf(2), FractionOf(0.5))
+    end
+    @testset "the default subset size is a power of the number of assets" begin
+        # shen2017 sizes a subset as `n^0.8` in its simulation study and as `n^0.7` in its
+        # empirical study: `100^0.8 ≈ 39.8` and `100^0.7 ≈ 25.1`.
+        X100 = 0.01 .* randn(StableRNG(3), 60, 100) .+ 0.001
+        rd100 = ReturnsResult(; nx = ["A$i" for i in 1:100], X = X100)
+        @test PowerSubsetSize() === PowerSubsetSize(; p = 0.8)
+        @test PowerSubsetSize()(rd100) == 40
+        @test PowerSubsetSize(; p = 0.7)(rd100) == 25
+        @test PowerSubsetSize(; p = 1)(rd100) == 100
+        @test PowerSubsetSize(; p = 1 // 2)(rd6) == 2
+        @test PO.get_subset_size(PowerSubsetSize(), rd6) == 4
+        @test_throws DomainError PowerSubsetSize(; p = 0)
+        @test_throws DomainError PowerSubsetSize(; p = 1.5)
+        sr = SubsetResampling(; opt = InverseVolatility(), ex = seq, seed = 1)
+        @test sr.subset_size === PowerSubsetSize()
+        @test PO.time_dependent_field_defaults(sr).subset_size === PowerSubsetSize()
+        res = optimise(sr, rd100)
+        @test isa(res.retcode, OptimisationSuccess) && size(res.idx) == (40, 2)
+        @test sum(res.w) ≈ 1
+        rp = optimise(SubsetResampling(; opt = InverseVolatility(), subset_size = 40,
+                                       ex = seq, seed = 1), rd100)
+        @test rp.idx == res.idx && rp.w == res.w
     end
     @testset "the subset draw" begin
         # The combination count overflows a machine integer, and the draw is approximate.
@@ -190,8 +248,8 @@ end
         @test all(c -> issorted(c) && allunique(c) && all(in(1:100), c), eachcol(sub))
         X100 = 0.01 .* randn(StableRNG(3), 60, 100) .+ 0.001
         rd100 = ReturnsResult(; nx = ["A$i" for i in 1:100], X = X100)
-        res = optimise(SubsetResampling(; opt = InverseVolatility(), ex = seq, seed = 1),
-                       rd100)
+        res = optimise(SubsetResampling(; subset_size = 0.8, opt = InverseVolatility(),
+                                        ex = seq, seed = 1), rd100)
         @test isa(res.retcode, OptimisationSuccess) && size(res.idx) == (80, 2)
         @test sum(res.w) ≈ 1
         # The exact route draws the same subsets as ranks of the combinations.
@@ -255,37 +313,41 @@ end
         @test isa(rfb.fb[1][2], SubsetResamplingResult)
     end
     @testset "the constructor checks" begin
-        @test_throws IsNothingError SubsetResampling(; opt = InverseVolatility(),
+        @test_throws IsNothingError SubsetResampling(; subset_size = 0.8,
+                                                     opt = InverseVolatility(),
                                                      wb = WeightBoundsEstimator(; lb = 0.0))
-        @test_throws IsNothingError SubsetResampling(; opt = InverseVolatility(),
+        @test_throws IsNothingError SubsetResampling(; subset_size = 0.8,
+                                                     opt = InverseVolatility(),
                                                      fees = FeesEstimator(; l = 0.001))
         @test_throws DomainError SubsetResampling(; opt = InverseVolatility(),
                                                   subset_size = 0)
-        @test_throws DomainError SubsetResampling(; opt = InverseVolatility(),
-                                                  n_subsets = 1)
-        @test_throws DomainError SubsetResampling(; opt = InverseVolatility(), max_comb = 0)
+        @test_throws DomainError SubsetResampling(; subset_size = 0.8,
+                                                  opt = InverseVolatility(), n_subsets = 1)
+        @test_throws DomainError SubsetResampling(; subset_size = 0.8,
+                                                  opt = InverseVolatility(), max_comb = 0)
     end
     @testset "the schedules" begin
         ctx(i) = TimeDependentContext(; i = i, n = 2, rd = rd6, train_idx = [1:20, 1:40],
                                       test_idx = [21:40, 41:60])
-        static = SubsetResampling(; opt = InverseVolatility())
+        static = SubsetResampling(; subset_size = 0.8, opt = InverseVolatility())
         @test PO.update_time_dependent_estimator(static, ctx(1)) === static
         @test !PO.is_time_dependent(static)
         @test !PO.needs_previous_weights(static)
-        sr = SubsetResampling(; opt = InverseVolatility(),
+        sr = SubsetResampling(; subset_size = 0.8, opt = InverseVolatility(),
                               n_subsets = TimeDependent([3, 4], :outermost))
         @test PO.is_time_dependent(sr)
         @test PO.update_time_dependent_estimator(sr, ctx(1)).n_subsets == 3
         @test PO.update_time_dependent_estimator(sr, ctx(2)).n_subsets == 4
         @test PO.reset_time_dependent_estimator(sr).n_subsets == 2
-        sd = SubsetResampling(; opt = InverseVolatility(),
+        sd = SubsetResampling(; subset_size = 0.8, opt = InverseVolatility(),
                               n_subsets = TimeDependent([3, 4], :outermost; default = 5))
         @test PO.reset_time_dependent_estimator(sd).n_subsets == 5
-        sf = SubsetResampling(; opt = InverseVolatility(),
+        sf = SubsetResampling(; subset_size = 0.8, opt = InverseVolatility(),
                               fb = TimeDependent([InverseVolatility(), EqualWeighted()],
                                                  :outermost))
         @test isnothing(PO.reset_time_dependent_estimator(sf).fb)
         @test_throws TimeDependentDefaultError PO.reset_time_dependent_estimator(SubsetResampling(;
+                                                                                                  subset_size = 0.8,
                                                                                                   opt = TimeDependent([InverseVolatility(),
                                                                                                                        EqualWeighted()],
                                                                                                                       :outermost)))
@@ -294,7 +356,8 @@ end
     end
     @testset "the view" begin
         pr6 = prior(EmpiricalPrior(), rd6)
-        sr = SubsetResampling(; pe = pr6, opt = InverseVolatility(), fb = EqualWeighted())
+        sr = SubsetResampling(; subset_size = 0.8, pe = pr6, opt = InverseVolatility(),
+                              fb = EqualWeighted())
         v = PO.port_opt_view(sr, [2, 4, 5], zeros(3, 3))
         @test v.pe.X == pr6.X[:, [2, 4, 5]]
         @test isa(v.fb, EqualWeighted) && v.subset_size === sr.subset_size

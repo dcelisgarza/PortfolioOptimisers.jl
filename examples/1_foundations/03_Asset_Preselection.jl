@@ -131,10 +131,11 @@ with the bounds `(lo, hi)`, both optional and both exclusive, and ignores `bigge
 filter for zero variance must drop the assets of low variance, and a rule that kept the better
 assets by the trait would keep those assets instead.
 
-An ordinal rule compares the scores with each other. [`RankRule`](@ref) and
-[`QuantileRule`](@ref) sort the assets from best to worst by `bigger_is_better`, and take a count or
-a fraction of assets from each end. A rule takes counts, not positions, and it can take the two
-ends at once. `action = :drop` inverts the selection, so the rule drops the assets it names and
+An ordinal rule compares the scores with each other. [`RankRule`](@ref) sorts the assets from
+best to worst by `bigger_is_better`, and takes a [`CountOf`](@ref) or a [`FractionOf`](@ref) of
+the assets from each end. A plain `5` is a count and a plain `0.25` is a fraction, but the wrapper
+states the reading in a search grid too, where Julia promotes `[5, 0.25]` to `[5.0, 0.25]`. A rule
+takes sizes, not positions, and it can take the two ends at once. `action = :drop` inverts the selection, so the rule drops the assets it names and
 keeps the rest. With it you can drop the worst five without knowing how many assets there are.
 =#
 
@@ -142,7 +143,7 @@ rules = ["RankRule(best = 5)" => RankRule(; best = 5),
          "RankRule(worst = 5)" => RankRule(; worst = 5),
          "RankRule(worst = 3, action = :drop)" => RankRule(; worst = 3, action = :drop),
          "RankRule(best = 2, worst = 2)" => RankRule(; best = 2, worst = 2),
-         "QuantileRule(best = 0.25)" => QuantileRule(; best = 0.25)]
+         "RankRule(best = FractionOf(0.25))" => RankRule(; best = FractionOf(0.25))]
 
 rows = map(rules) do (label, rule)
     kept = fit_preprocessing(ScoreSelector(; score = ConditionalValueatRisk(), rule = rule),
@@ -405,7 +406,84 @@ assets keeps 20 and throws no error, and the largest value of a grid never stops
 other degenerate case throws an error: a measure that cannot score an asset, a rule that selects
 nothing, a score that is not finite, and a fitted asset that is missing from a test window.
 
-## 8. Plot the two decisions
+## 8. Scores from cross-validation
+
+A risk measure scores each asset on the whole training window, so one bad month can decide the
+rank of an asset. An asset scorer scores each asset over the folds of a cross-validation scheme
+inside that window. A selector takes it in its `score` field, in the place of a risk measure.
+
+[`FoldRiskScorer`](@ref) evaluates a risk measure on each test window of a scheme, and aggregates
+the values over the windows. The aggregation holds a statistic. [`Value`](@ref) keeps the raw
+value of the measure, so a volatile window weighs more in a mean. [`Rank`](@ref) replaces each
+value with the rank of the asset in its window, from 0 for the best to 1 for the worst, so every
+window weighs the same. Each window scores only the assets that it covers, so an asset with a gap
+in one window keeps its score from the other windows.
+
+We score the CVaR of each asset over five folds with both statistics.
+=#
+
+cv5 = KFold(; n = 5)
+fold_value = FoldRiskScorer(; r = ConditionalValueatRisk(), cv = cv5)
+fold_rank = FoldRiskScorer(; r = ConditionalValueatRisk(), cv = cv5,
+                           agg = MeanFoldScore(; alg = Rank()))
+pretty_table(sort(DataFrame(; asset = rd.nx, in_sample = cvar,
+                            mean_value = PortfolioOptimisers.asset_scores(fold_value, rd),
+                            mean_rank = PortfolioOptimisers.asset_scores(fold_rank, rd)),
+                  :mean_rank); formatters = [resfmt])
+
+#=
+The two statistics keep the orientation they need. A smaller CVaR is better, and a smaller rank
+is better too, so `RankRule(; best = 10)` keeps the ten best assets under either score. We compare
+the ten assets that each score keeps with the choice in sample.
+=#
+
+function kept_by(score)
+    return fit_preprocessing(ScoreSelector(; score = score, rule = RankRule(; best = 10)),
+                             rd).nx
+end
+DataFrame(;
+          score = ["CVaR in sample", "mean CVaR over the folds",
+                   "mean rank over the folds"],
+          kept = [join(kept_by(s), ", ")
+                  for s in (ConditionalValueatRisk(), fold_value, fold_rank)])
+
+#=
+The three scores share nine assets and differ in the tenth. A score over the folds asks for a low
+CVaR in each window, not over the whole window at once.
+
+[`MedianFoldScore`](@ref) and [`WorstFoldScore`](@ref) take the same statistics. The worst
+statistic is the largest CVaR, or the largest rank, over the windows.
+
+### 8.1 Score the weight that an optimiser gives
+
+[`WeightMassScorer`](@ref) runs an optimiser, or a pipeline, through a cross-validation scheme,
+and scores each asset by its mean weight over the folds. A grid `p`, in the form that
+[`GridSearchCrossValidation`](@ref) takes, adds configurations, and the scorer pools the folds of
+all of them. With `tol`, the score is the share of the folds in which the absolute weight of the
+asset is above `tol`. The score reads the whole cross-section of each fold, so no risk measure on
+one asset can state it.
+
+The scorer runs one optimisation for each split and each configuration. Inside a search, the cost
+multiplies again by the outer folds and the outer candidates.
+
+We keep the best fifth of the assets by the mean weight of a minimum-risk portfolio over five folds.
+=#
+
+mass = WeightMassScorer(; opt = MeanRisk(; opt = JuMPOptimiser(; slv = slv)), cv = cv5)
+w_mass = PortfolioOptimisers.asset_scores(mass, rd)
+pretty_table(sort(DataFrame(; asset = rd.nx, mean_weight = w_mass), :mean_weight;
+                  rev = true); formatters = [resfmt])
+
+#=
+A bigger weight is better, so `RankRule(; best = FractionOf(0.2))` keeps the four assets with the
+largest mean weight.
+=#
+
+fit_preprocessing(ScoreSelector(; score = mass, rule = RankRule(; best = FractionOf(0.2))),
+                  rd).nx
+
+#=
+## 9. Plot the two decisions
 
 A score and a rule sort the assets along one axis and cut them at one place. The bar chart shows
 the CVaR of each asset, and the blue bars are the ten assets that `RankRule(; best = 10)` keeps.
@@ -457,8 +535,8 @@ plot!(; xlabel = "|correlation| threshold", ylabel = "assets kept",
     of `best` and `worst`, so you pass no flag for it. [`Variance`](@ref) cannot score an asset,
     and `SCM()` replaces it.
   - [`ThresholdRule`](@ref) compares each score with fixed bounds and ignores the direction.
-    [`RankRule`](@ref) and [`QuantileRule`](@ref) rank the assets and take counts or fractions
-    from each end, so you can drop the worst five without knowing how many assets there are.
+    [`RankRule`](@ref) ranks the assets and takes a `CountOf` or a `FractionOf` from each end, so
+    you can drop the worst five without knowing how many assets there are.
   - A rule keeps neither of two tied assets and never splits a tied block. `RankRule(; best = k)`
     can return fewer than `k` assets, and two identical columns both leave the universe.
   - [`PairwiseCorrelation`](@ref) keeps no pair above the threshold.
@@ -469,6 +547,10 @@ plot!(; xlabel = "|correlation| threshold", ylabel = "assets kept",
     that no longer exists.
   - The thresholds and counts of a selection are parameters. Tune them with
     [`search_cross_validation`](@ref), never on the full sample.
+  - An asset scorer scores each asset over the folds of a cross-validation scheme.
+    [`FoldRiskScorer`](@ref) aggregates a risk measure over the test windows, with the raw
+    [`Value`](@ref) or the [`Rank`](@ref) of each window. [`WeightMassScorer`](@ref) scores the
+    weight that an optimiser gives each asset.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)
@@ -481,5 +563,9 @@ plot!(; xlabel = "|correlation| threshold", ylabel = "assets kept",
 #src     * Tie demo is honest: duplicating the 2nd-lowest-variance column makes ranks 2 and 3
 #src       tie, so best=2 returns 1 asset and best=3 returns 3. Do not "fix" this.
 #src     * search_cross_validation over "select.rule" picks best = 10 on IndexWalkForward(500, 250).
+#src - Section 8 (asset scorers, ADR 0225), verified under Kaimon on the same slice, KFold(n = 5):
+#src     * RankRule(best = 10): in sample keeps MSFT, the mean CVaR over the folds keeps JPM,
+#src       and the mean rank keeps HD; the other nine assets are common to all three.
+#src     * WeightMassScorer(MeanRisk) with RankRule(best = FractionOf(0.2)) keeps JNJ, KO, MRK, WMT.
 #src - No new docs/Project.toml deps: CSV, TimeSeries, Clarabel, StatsPlots, PrettyTables,
 #src   DataFrames all already present.

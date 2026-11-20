@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base exposure, private API of PortfolioOptimisers.jl: assert_exposure_family, exposure_benchmark_weights, exposure_weight_fill!, exposure_group_labels, …"
+Description = "Base exposure, private API of PortfolioOptimisers.jl: assert_exposure_family, exposure_benchmark_weights, exposure_weight_fill!, exposure_active_fill!."
 ```
 
 # Base exposure: private API
@@ -10,7 +10,5 @@ Description = "Base exposure, private API of PortfolioOptimisers.jl: assert_expo
 assert_exposure_family
 exposure_benchmark_weights
 exposure_weight_fill!
-exposure_group_labels
-exposure_transform
 exposure_active_fill!
 ```

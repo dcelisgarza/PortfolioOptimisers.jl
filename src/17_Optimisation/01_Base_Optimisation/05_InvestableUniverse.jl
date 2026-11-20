@@ -86,7 +86,10 @@ function non_investable_universe(opt, ::VecStr)
     return opt
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    investable_reduction(pr::AbstractPriorResult, opt::AbstractOptimisationEstimator,
+                         rd::ReturnsResult, imsk::Nothing)
+    investable_reduction(pr::AbstractPriorResult, opt::AbstractOptimisationEstimator,
+                         rd::ReturnsResult, imsk::BitVector = investable_mask(pr))
 
 Derive the Investable Mask of a fitted prior, and reduce the prior, the optimiser and the returns data to the assets it keeps.
 
@@ -94,7 +97,7 @@ A Prior Estimator fits on the Coverage Universe and returns a result on the full
 
 Every optimisation family reduces through this one verb. That is why it is bound to [`AbstractOptimisationEstimator`](@ref) and lives here rather than beside the JuMP prelude: the hierarchical, naive and meta files load before that prelude and reach this verb without a back reference. A meta-optimiser composes two masks, its own at its entry and the mask of each inner head inside the solve of that head, and both expand.
 
-The branch is dispatch rather than a condition, over three methods. The first derives the mask. The `nothing` method is the all-investable path and returns its arguments unchanged. The `BitVector` method takes the three views. A universe with nothing to exclude therefore costs the derivation of the mask and nothing more: no view, no copy of the data and no expansion.
+The branch is dispatch rather than a condition, over two methods. A call without the mask derives it with the default of the last slot, and dispatches to one of them. The `nothing` method is the all-investable path and returns its arguments unchanged. The `BitVector` method takes the three views. A universe with nothing to exclude therefore costs the derivation of the mask and nothing more: no view, no copy of the data and no expansion.
 
 The optimiser is viewed with `pr.X`, the *unreduced* returns matrix, because [`port_opt_view`](@ref) slices a tracking estimator against it by the same asset index. The prior is reduced after the optimiser, so the view reads the full matrix.
 
@@ -102,21 +105,24 @@ The mask stays a `BitVector` because the expansion needs the length of the full 
 
 # Algorithm
 
- 1. Derive the Investable Mask from the fitted prior with [`investable_mask`](@ref).
- 2. Return the mask, the prior, the optimiser and the returns data unchanged when the mask is `nothing`.
- 3. Otherwise read the departed names `ni` off the *unreduced* `rd.nx` with [`non_investable_names`](@ref), and announce them once with [`announce_non_investable`](@ref).
- 4. Take a [`port_opt_view`](@ref) of each of the three at `findall(imsk)`.
- 5. Declare the Non-Investable Axis on the viewed optimiser with [`non_investable_universe`](@ref), and return it beside the mask and the other two views. The axis is declared after the view because the view drops it, so a name-keyed constraint stated for a departed asset resolves here and nowhere deeper.
+ 1. Take the Investable Mask `imsk`. By default, [`investable_mask`](@ref) derives it from the fitted prior.
+ 2. Check that every [`UniverseSets`](@ref) in the tree of the optimiser names the columns of the *unreduced* `rd`, in order, with [`assert_universe_axis_order`](@ref). Both methods that take a mask do it, because a caller can pass a mask that it composed itself.
+ 3. Return the mask, the prior, the optimiser and the returns data unchanged when the mask is `nothing`.
+ 4. Otherwise read the departed names `ni` off the *unreduced* `rd.nx` with [`non_investable_names`](@ref), and announce them once with [`announce_non_investable`](@ref).
+ 5. Take a [`port_opt_view`](@ref) of each of the three at `findall(imsk)`.
+ 6. Declare the Non-Investable Axis on the viewed optimiser with [`non_investable_universe`](@ref), and return it beside the mask and the other two views. The axis is declared after the view because the view drops it, so a name-keyed constraint stated for a departed asset resolves here and nowhere deeper.
 
 # Arguments
 
   - $(arg_dict[:pr])
   - `opt::AbstractOptimisationEstimator`: The optimisation estimator, holding every constraint estimator the caller stated over the full universe.
   - $(arg_dict[:rd])
+  - `imsk`: The Investable Mask of `pr`, or `nothing` when every asset is investable. A meta-optimiser passes the mask that it composed itself.
 
 # Validation
 
   - At least one asset must be investable. [`investable_mask`](@ref) throws an `IsEmptyError` otherwise.
+  - The rules of [`assert_universe_axis_order`](@ref).
 
 # Returns
 
@@ -132,15 +138,13 @@ The mask stays a `BitVector` because the expansion needs the length of the full 
   - [`announce_non_investable`](@ref)
 """
 function investable_reduction(pr::AbstractPriorResult, opt::AbstractOptimisationEstimator,
-                              rd::ReturnsResult)
-    return investable_reduction(investable_mask(pr), pr, opt, rd)
-end
-function investable_reduction(::Nothing, pr::AbstractPriorResult,
-                              opt::AbstractOptimisationEstimator, rd::ReturnsResult)
+                              rd::ReturnsResult, ::Nothing)
+    assert_universe_axis_order(opt, rd)
     return nothing, pr, opt, rd
 end
-function investable_reduction(imsk::BitVector, pr::AbstractPriorResult,
-                              opt::AbstractOptimisationEstimator, rd::ReturnsResult)
+function investable_reduction(pr::AbstractPriorResult, opt::AbstractOptimisationEstimator,
+                              rd::ReturnsResult, imsk::BitVector = investable_mask(pr))
+    assert_universe_axis_order(opt, rd)
     idx = findall(imsk)
     # Read the departed names before the view, declare them after it: the view drops the
     # Non-Investable Axis, so this function is the one place a name-keyed constraint stated
@@ -154,21 +158,60 @@ end
 # The estimators that hold a distance estimator, each forwarded to the estimator it holds, so
 # that `feature_readable_mask` finds each `FeatureDistance` of a fit. They load after the
 # distance estimators, so their methods live here, beside the reduction that reads them.
-function feature_readable_mask(x::Union{<:ClustersEstimator, <:NetworkEstimator},
+function feature_readable_mask(x::Union{ClustersEstimator, NetworkEstimator},
                                imsk::Option{<:BitVector}, rd)
     return feature_readable_mask(x.de, imsk, rd)
 end
 function feature_readable_mask(x::NetworkClustersEstimator, imsk::Option{<:BitVector}, rd)
     return feature_readable_mask(x.nte, imsk, rd)
 end
-function feature_readable_mask(x::Union{<:CentralityEstimator,
-                                        <:SemiDefinitePhylogenyEstimator,
-                                        <:IntegerPhylogenyEstimator},
+function feature_readable_mask(x::Union{CentralityEstimator, SemiDefinitePhylogenyEstimator,
+                                        IntegerPhylogenyEstimator},
                                imsk::Option{<:BitVector}, rd)
     return feature_readable_mask(x.pl, imsk, rd)
 end
 function feature_readable_mask(x::CentralityConstraint, imsk::Option{<:BitVector}, rd)
     return feature_readable_mask(x.A, imsk, rd)
+end
+"""
+    distance_reader_entry_mask(x, pr::AbstractPriorResult, rd::ReturnsResult, strict::Bool;
+                               rmsk::Option{BitVector} = nothing) -> Option{BitVector}
+
+Compose the Investable Mask of a fit that reads distances, at its entry.
+
+Every fit that clusters or builds a phylogeny composes the mask of its prior with two rules before [`investable_reduction`](@ref): the assets that a [`FeatureDistance`](@ref) can read, [`feature_readable_mask`](@ref), and the assets that a plain graph reader can read, [`graph_reader_mask`](@ref). A distance reader can still refuse an asset after the reduction. The fit then fits again from the same prior result, and passes the mask of [`distance_reader_refusal_mask`](@ref) as `rmsk`. That mask already holds the two rules, so this function returns it as it is, and the two rules do not warn a second time.
+
+# Algorithm
+
+ 1. Return `rmsk` when it is a `BitVector`.
+ 2. Otherwise compose `investable_mask(pr)` with [`feature_readable_mask`](@ref), then with [`graph_reader_mask`](@ref).
+
+# Arguments
+
+  - `x`: The distance readers of the fit, one estimator or a `Tuple` of them.
+  - $(arg_dict[:pr])
+  - $(arg_dict[:rd])
+  - `strict`: The `strict` field of the optimiser.
+  - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
+
+# Returns
+
+  - `imsk::Option{BitVector}`: The composed mask, or `nothing` when every asset stays.
+
+# Related
+
+  - [`feature_readable_mask`](@ref)
+  - [`graph_reader_mask`](@ref)
+  - [`distance_reader_refusal_mask`](@ref)
+  - [`investable_reduction`](@ref)
+"""
+function distance_reader_entry_mask(x, pr::AbstractPriorResult, rd::ReturnsResult,
+                                    strict::Bool; rmsk::Option{BitVector} = nothing)
+    if !isnothing(rmsk)
+        return rmsk
+    end
+    return graph_reader_mask(x, feature_readable_mask(x, investable_mask(pr), rd), pr, rd,
+                             strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -184,10 +227,11 @@ The branch is dispatch rather than a condition, over three methods, as in [`inve
 # Algorithm
 
  1. Derive the Coverage Universe `cmsk` of `rd.X` and `rd.pnl` with [`coverage_mask`](@ref), with `dims = 1`, because a `ReturnsResult` holds its observations along the rows.
- 2. Return the mask, the optimiser and the returns data unchanged when the mask is `nothing`.
- 3. Otherwise read the departed names `ni` off the *unreduced* `rd.nx` with [`non_investable_names`](@ref), and announce them once with [`announce_non_investable`](@ref).
- 4. Take a [`port_opt_view`](@ref) of the optimiser and of the returns data at `findall(cmsk)`.
- 5. Declare the Non-Investable Axis on the viewed optimiser with [`non_investable_universe`](@ref), and return it beside the mask and the viewed returns data.
+ 2. Check the universes of the optimiser against the *unreduced* `rd` with [`assert_universe_axis_order`](@ref), as in [`investable_reduction`](@ref).
+ 3. Return the mask, the optimiser and the returns data unchanged when the mask is `nothing`.
+ 4. Otherwise read the departed names `ni` off the *unreduced* `rd.nx` with [`non_investable_names`](@ref), and announce them once with [`announce_non_investable`](@ref).
+ 5. Take a [`port_opt_view`](@ref) of the optimiser and of the returns data at `findall(cmsk)`.
+ 6. Declare the Non-Investable Axis on the viewed optimiser with [`non_investable_universe`](@ref), and return it beside the mask and the viewed returns data.
 
 # Arguments
 
@@ -197,6 +241,7 @@ The branch is dispatch rather than a condition, over three methods, as in [`inve
 # Validation
 
   - At least one asset must be in the Coverage Universe. [`coverage_mask`](@ref) throws an `IsEmptyError` otherwise, so every prior-free head refuses an all-dead window in one place.
+  - The rules of [`assert_universe_axis_order`](@ref).
 
 # Returns
 
@@ -214,10 +259,12 @@ function coverage_reduction(opt::AbstractOptimisationEstimator, rd::ReturnsResul
 end
 function coverage_reduction(::Nothing, opt::AbstractOptimisationEstimator,
                             rd::ReturnsResult)
+    assert_universe_axis_order(opt, rd)
     return nothing, opt, rd
 end
 function coverage_reduction(cmsk::BitVector, opt::AbstractOptimisationEstimator,
                             rd::ReturnsResult)
+    assert_universe_axis_order(opt, rd)
     idx = findall(cmsk)
     # As in `investable_reduction`: the Coverage Universe and the Investable Mask are the
     # same object downstream, so a prior-free head declares the Non-Investable Axis exactly
@@ -236,7 +283,9 @@ The optimiser solves over the assets that the Investable Mask keeps, so its weig
 
 A failed solve carries `NaN` at every solved position. The expansion keeps two cases apart: `NaN` where the optimiser tried and failed, and zero where it could not try. It does not flatten both to zero.
 
-The `nothing` mask returns the weights unchanged, so nothing is copied when every asset is investable. A `nothing` weight vector stays `nothing`, which is what a naive head records when its finaliser gave up. The vector-of-vectors method serves the efficient-frontier route, which records one weight vector per sweep point. [`JuMPOptimisationSolution`](@ref) carries its own methods beside the JuMP prelude, and they delegate to the plain weight vector here, so one length check and one message serve every family.
+The `nothing` mask returns the weights unchanged, so nothing is copied when every asset is investable. A `nothing` weight vector stays `nothing`, which is what a naive head records when its finaliser gave up. The vector-of-vectors method serves the efficient-frontier route, which records one weight vector per sweep point.
+
+A matrix is a per-asset history over the investable assets, `observations × investable assets`: the weight path or the asset returns of a [`HeldWeightsResult`](@ref), which [`expand_held_weights`](@ref) expands on the way out of a fold. The column of a non-investable asset is zero, which is what [`filter_held_gaps`](@ref) writes over its whole `NaN` column anyway. A drift over a zero column at a zero weight moves no wealth, so the expanded history rebuilds the same weight path that the reduced one did. A vector of matrices is the population of the efficient-frontier route, and each member expands as one matrix. [`JuMPOptimisationSolution`](@ref) carries its own methods beside the JuMP prelude, and they delegate to the plain weight vector here, so one length check and one message serve every family.
 
 The **keyword** constructor of each optimisation result is the caller, and every family builds its result through it. The positional constructor never expands, because every rebuild of a return code goes through it, and a second pass would expand twice.
 
@@ -265,21 +314,22 @@ The expansion keeps the sum of the weights, ``\\sum_{i=1}^{N} \\tilde{w}_{i} = \
 # Arguments
 
   - $(arg_dict[:imsk])
-  - `w`: The weights the optimisation solved over the investable universe: one weight vector, or a vector of them on the efficient-frontier route.
+  - `w`: The weights the optimisation solved over the investable universe: one weight vector, or a vector of them on the efficient-frontier route. Or a history over the investable assets, `observations × investable assets`, or a vector of them.
 
 # Validation
 
-  - The solved weight vector must hold one weight per investable asset.
+  - The solved weight vector must hold one weight per investable asset, and a history one column per investable asset.
 
 # Returns
 
-  - `w`: The weights, or the vector of them, on the full asset universe.
+  - `w`: The weights, the history, or the vector of them, on the full asset universe.
 
 # Related
 
   - [`investable_mask`](@ref)
   - [`investable_reduction`](@ref)
   - [`set_retcode`](@ref)
+  - [`expand_held_weights`](@ref)
 """
 function expand_investable_weights(::Nothing, w::Option{<:VecNum_VecVecNum})
     return w
@@ -296,6 +346,16 @@ function expand_investable_weights(imsk::BitVector, w::VecNum)
 end
 function expand_investable_weights(imsk::BitVector, w::VecVecNum)
     return [expand_investable_weights(imsk, wi) for wi in w]
+end
+function expand_investable_weights(imsk::BitVector, A::MatNum)
+    @argcheck(count(imsk) == size(A, 2),
+              DimensionMismatch("the investable mask keeps $(count(imsk)) of $(length(imsk)) assets, but the history holds $(size(A, 2)) columns; the mask and the history must come from the same reduction"))
+    out = zeros(eltype(A), size(A, 1), length(imsk))
+    out[:, imsk] = A
+    return out
+end
+function expand_investable_weights(imsk::BitVector, A::VecMatNum)
+    return [expand_investable_weights(imsk, Ai) for Ai in A]
 end
 """
     optimise(opt::OptimisationEstimator, args...; kwargs...) -> OptimisationResult
@@ -371,7 +431,7 @@ The prior that the solve fits then sees no gap, and it counts its rows among the
 
 The method that Julia selects is the algorithm.
 
- 1. A [`ReturnsResult`](@ref) first: find the kept observations with [`optimiser_shared_series_rows`](@ref), which reads the group of `opt` and its prior, see [`group_source`](@ref). Solve `opt` with [`_optimise`](@ref) on the cut of [`optimiser_shared_series_view`](@ref). When the cut dropped an observation and the solve fitted its prior, replace the prior of the result with its record, through [`set_result_prior`](@ref).
+ 1. A [`ReturnsResult`](@ref) first: find the kept observations with [`optimiser_shared_series_rows`](@ref), which reads the group of `opt` and its prior, see [`group_source`](@ref). Solve `opt` with [`_optimise`](@ref) on the cut of [`optimiser_shared_series_view`](@ref). When the cut drops an observation, the solve reads `opt` cut at the same observations with [`shared_series_estimator`](@ref), so each fixed observation weight in its tree loses them too. When the cut dropped an observation and the solve fitted its prior, replace the prior of the result with its record, through [`set_result_prior`](@ref).
  2. Any other data: solve `opt` with `_optimise` on it unchanged.
 
 # Arguments
@@ -394,11 +454,16 @@ The method that Julia selects is the algorithm.
 """
 function shared_series_solve(opt, rd::ReturnsResult, args...; kwargs...)
     rows = optimiser_shared_series_rows(rd, opt)
-    res = _optimise(opt, optimiser_shared_series_view(rd, opt, rows), args...; kwargs...)
-    if isnothing(rows) || !fits_prior(opt)
-        return res
+    if isnothing(rows)
+        return _optimise(opt, optimiser_shared_series_view(rd, opt, rows), args...;
+                         kwargs...)
     end
     T = size(rd.X, 1)
+    res = _optimise(shared_series_estimator(opt, rows, T),
+                    optimiser_shared_series_view(rd, opt, rows), args...; kwargs...)
+    if !fits_prior(opt)
+        return res
+    end
     return set_result_prior(res, pr -> shared_series_record(pr, rows, T))
 end
 function shared_series_solve(opt, args...; kwargs...)
@@ -420,9 +485,10 @@ It is a batch fit, so [`assert_batch_entry`](@ref) refuses an [`Online`](@ref) a
  1. Refuse an [`Online`](@ref) in the tree of `opt` with [`assert_batch_entry`](@ref).
  2. Reset every time-dependent schedule of `opt` to its fold-less value with [`reset_time_dependent_estimator`](@ref), giving `current_opt`.
  3. Solve `current_opt` with [`shared_series_solve`](@ref), which drops the observations of a Shared Series gap that `current_opt` reads before [`_optimise`](@ref) runs, giving `res`. A precomputed result gives itself.
- 4. Stop when `res.retcode` is an [`OptimisationSuccess`](@ref), when `current_opt` is a precomputed result, or when `current_opt.fb` is `nothing`.
- 5. Otherwise record `(current_opt, res)` in the chain `fb`, take `current_opt.fb` as the new `current_opt`, warn that the fallback runs, and return to step 3.
- 6. Return `res` when `fb` is empty. Otherwise return `res` rebuilt with `fb` through [`factory`](@ref).
+ 4. Return `res` when `res.retcode` is an [`OptimisationSuccess`](@ref) or when `current_opt.fb` is `nothing`. The chain `fb` does not exist yet, so this answer allocates no chain, and an estimator whose `fb` has the type `Nothing` has the return type of `res`.
+ 5. Otherwise record `(current_opt, res)` in the chain `fb`, take `current_opt.fb` as the new `current_opt`, warn that the fallback runs, and solve it as in step 3.
+ 6. Repeat step 5 until `res.retcode` is an [`OptimisationSuccess`](@ref), `current_opt` is a precomputed result, or `current_opt.fb` is `nothing`.
+ 7. Return `res` rebuilt with `fb` through [`factory`](@ref).
 
 # Arguments
 
@@ -447,9 +513,15 @@ It is a batch fit, so [`assert_batch_entry`](@ref) refuses an [`Online`](@ref) a
 """
 function optimise(opt::OptimisationEstimator, args...; kwargs...)
     assert_batch_entry(opt, "`optimise`")
-    fb = Tuple{OptimisationEstimator, OptimisationResult}[]
     current_opt = reset_time_dependent_estimator(opt)
     res = shared_series_solve(current_opt, args...; kwargs...)
+    # A solve that succeeds, or an estimator with no fallback, is the answer. It returns
+    # before the chain exists, so it allocates no chain, and for a `fb` of type `Nothing` the
+    # compiler knows the type of the answer: the type of `res`.
+    if isa(res.retcode, OptimisationSuccess) || isnothing(current_opt.fb)
+        return res
+    end
+    fb = Tuple{OptimisationEstimator, OptimisationResult}[]
     # A precomputed result answers itself and ends the chain: its own `fb` records how it
     # was answered, and is not a fallback to walk on to.
     while !isa(res.retcode, OptimisationSuccess) &&
@@ -457,10 +529,11 @@ function optimise(opt::OptimisationEstimator, args...; kwargs...)
           !isnothing(current_opt.fb)
         push!(fb, (current_opt, res))
         current_opt = current_opt.fb
-        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.",
+              maxlog = log_limit(:warn), _id = @log_id(typeof(current_opt)))
         res = shared_series_solve(current_opt, args...; kwargs...)
     end
-    return isempty(fb) ? res : factory(res, fb)
+    return factory(res, fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

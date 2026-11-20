@@ -70,7 +70,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Result type produced by [`CustomValueReturnForecast`](@ref).
 
-The member states its forecast and computes none, so `hist` is `nothing`. A stated vector has no history. The two fields are the two reads [`AbstractReturnForecastResult`](@ref) states.
+The member states its forecast and computes none, so `hist` is `nothing`. A stated vector has no history. The two fields are the two reads [`AbstractReturnForecastResult`](@ref) states. `hist` is a derived field, so `Accessors.set` builds the Result again from the new `mu`, and it refuses a patch of `hist`.
 
 # Fields
 
@@ -99,9 +99,14 @@ end
 function CustomValueReturnForecastResult(; mu::VecNum)::CustomValueReturnForecastResult
     return CustomValueReturnForecastResult(mu)
 end
+# The inner constructor sets `hist` to `nothing`, so a lens write leaves it out.
+@forward_properties CustomValueReturnForecastResult begin
+    derived(hist)
+end
 """
     return_forecast(rfe::CustomValueReturnForecast, rd::ReturnsResult,
-                    csfm::CrossSectionalFactorModel) -> CustomValueReturnForecastResult
+                    csfm::CrossSectionalFactorModel,
+                    cre::Nothing = nothing) -> CustomValueReturnForecastResult
 
 Return the Return Forecast a caller stated.
 
@@ -117,6 +122,7 @@ The member reads no Panel Field and fits nothing, so it does not read `rd`.
   - `rfe`: Stated Return Forecast Estimator.
   - $(arg_dict[:rd])
   - `csfm`: The fitted factor-model block. The member reads its asset count and nothing else.
+  - `cre`: No regression. The member fits nothing, so it reads none, as [`return_forecast`](@ref) states.
 
 # Validation
 
@@ -149,7 +155,8 @@ julia> rf.mu
   - [`CrossSectionalFactorModel`](@ref)
 """
 function return_forecast(rfe::CustomValueReturnForecast, ::ReturnsResult,
-                         csfm::CrossSectionalFactorModel)::CustomValueReturnForecastResult
+                         csfm::CrossSectionalFactorModel,
+                         ::Nothing = nothing)::CustomValueReturnForecastResult
     N = size(csfm.M, 1)
     @argcheck(length(rfe.mu) == N,
               DimensionMismatch("mu ($(length(rfe.mu))) states one Return Forecast per asset of the coverage universe, so it must match the asset count of the factor model block ($N)"))

@@ -44,7 +44,7 @@ end
 
 Convert a half-life in observations into the warm-up of an exponentially weighted Descriptor.
 
-The recursion starts from zero, so its early values lie closer to zero than the data does. Every exponentially weighted Descriptor returns `NaN` for an asset until that asset has this many valid observations.
+By default the recursion divides by the total weight of the observations it read, so its first value is not biased toward zero, but it reads few observations. Every exponentially weighted Descriptor returns `NaN` for an asset until that asset has this many valid observations.
 
 # Arguments
 
@@ -112,51 +112,67 @@ function assert_ew_decay(decay::Real)::Nothing
     return nothing
 end
 """
-    ew_mean_series(R::AbstractMatrix{<:Real}, decay::Real, min_obs::Integer) -> Matrix{<:Real}
+    ew_mean_series(R::AbstractMatrix{<:Real}, amsk::AbstractMatrix{Bool}, decay::Real,
+                   min_obs::Integer, debias::Option{<:AbstractZeroStartDebias}) -> Matrix{<:Real}
 
 Run the exponentially weighted mean recursion down each column of a matrix.
 
-This is the one recursion every exponentially weighted mean Descriptor shares, so the three archetypes of this file differ only in the matrix they build before they call it. Each asset carries its own state and its own count of valid observations. A cell that is not finite advances neither. The state holds there, and the recursion neither restarts nor reads the cell as a zero.
+This is the one recursion every exponentially weighted mean Descriptor shares, so the three archetypes of this file differ only in the matrix they build before they call it. Each asset carries its own state and its own count of valid observations. An active cell that is not finite advances neither. The state holds there, and the recursion neither restarts nor reads the cell as a zero. An inactive cell restarts the asset: its state and its count go back to zero, and the cell is not read. An asset that is delisted and listed again therefore starts a fresh recursion, as the variance of [`EWVolatility`](@ref) and the regression of [`EWBeta`](@ref) do.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-S_{t,i} &= \\begin{cases} \\lambda S_{t-1,i} + (1 - \\lambda) y_{t,i} & \\text{if } y_{t,i} \\text{ is finite} \\\\ S_{t-1,i} & \\text{otherwise} \\end{cases}\\,, \\quad S_{0,i} = 0\\,, \\\\
-n_{t,i} &= \\begin{cases} n_{t-1,i} + 1 & \\text{if } y_{t,i} \\text{ is finite} \\\\ n_{t-1,i} & \\text{otherwise} \\end{cases}\\,, \\quad n_{0,i} = 0\\,, \\\\
-m_{t,i} &= \\begin{cases} S_{t,i} & \\text{if } n_{t,i} \\geq \\texttt{min\\_obs} \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
+S_{t,i} &= \\begin{cases} 0 & \\text{if asset } i \\text{ is inactive at } t \\\\ \\lambda S_{t-1,i} + (1 - \\lambda) y_{t,i} & \\text{if } y_{t,i} \\text{ is finite} \\\\ S_{t-1,i} & \\text{otherwise} \\end{cases}\\,, \\quad S_{0,i} = 0\\,, \\\\
+n_{t,i} &= \\begin{cases} 0 & \\text{if asset } i \\text{ is inactive at } t \\\\ n_{t-1,i} + 1 & \\text{if } y_{t,i} \\text{ is finite} \\\\ n_{t-1,i} & \\text{otherwise} \\end{cases}\\,, \\quad n_{0,i} = 0\\,, \\\\
+m_{t,i} &= \\begin{cases} S_{t,i} / \\left(1 - \\lambda^{n_{t,i}}\\right) & \\text{if } n_{t,i} \\geq \\texttt{min\\_obs} \\text{ under } \\texttt{ZeroStartDebias()} \\\\ S_{t,i} & \\text{if } n_{t,i} \\geq \\texttt{min\\_obs} \\text{ under } \\texttt{nothing} \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
 \\end{align}
 ```
 
-The recursion applies no bias correction, so the first value of an asset is ``(1 - \\lambda) y_{t,i}`` and not ``y_{t,i}``. The start at zero biases the first values toward zero, and the warm-up `min_obs` replaces them with `NaN`.
+The state starts at zero, so after ``n_{t,i}`` finite inputs it is ``1 - \\lambda^{n_{t,i}}`` times a weighted mean of those inputs whose weights sum to one. Under [`ZeroStartDebias`](@ref) the division removes that factor, so the first value of an asset is ``y_{t,i}``. Under `nothing` every value of an asset with a short history is shrunk toward zero, by one half after one half-life. [`ZeroStartDebias`](@ref) gives the reason for each form, and [`zero_start_mean`](@ref) reads the value out of the state.
 
 Where:
 
   - ``y_{t,i}``: Input of the recursion for asset ``i`` at observation ``t``, the entry `R[t, i]`.
   - $(math_dict[:lambda_ew])
   - ``S_{t,i}``: State of the recursion of asset ``i`` after observation ``t``.
-  - ``n_{t,i}``: Count of the finite inputs of asset ``i`` up to observation ``t``.
+  - ``n_{t,i}``: Count of the finite inputs of asset ``i`` since observation ``1`` or since its last inactive observation, up to observation ``t``.
   - ``m_{t,i}``: Value of the series for asset ``i`` at observation ``t``.
 
 # Arguments
 
   - `R`: The input, `observations × assets`.
+  - `amsk`: The active mask, `observations × assets`.
   - `decay`: The decay factor.
   - `min_obs`: The warm-up, in valid observations per asset.
+  - `debias`: The rule that reads the value out of the state, or `nothing` for the undivided state.
+
+# Validation
+
+  - The rule of [`ew_mean_series!`](@ref).
 
 # Returns
 
-  - `S::Matrix{<:Real}`: The series, `observations × assets`, `NaN` before the warm-up of an asset ends. An integer input gives a floating point series.
+  - `S::Matrix{<:Real}`: The series, `observations × assets`, `NaN` before the warm-up of an asset ends and where the asset is inactive.
 
 # Examples
 
 ```jldoctest
-julia> PortfolioOptimisers.ew_mean_series([1.0; 3.0; NaN; 5.0;;], 0.5, 1)
+julia> PortfolioOptimisers.ew_mean_series([1.0; 3.0; NaN; 5.0;;], trues(4, 1), 0.5, 1,
+                                          ZeroStartDebias())
 4×1 Matrix{Float64}:
- 0.5
- 1.75
- 1.75
- 3.375
+ 1.0
+ 2.3333333333333335
+ 2.3333333333333335
+ 3.857142857142857
+
+julia> PortfolioOptimisers.ew_mean_series([1.0; 3.0; 4.0; 5.0;;], [true; false; true; true;;], 0.5,
+                                          1, ZeroStartDebias())
+4×1 Matrix{Float64}:
+   1.0
+ NaN
+   4.0
+   4.666666666666667
 ```
 
 # Related
@@ -166,10 +182,11 @@ julia> PortfolioOptimisers.ew_mean_series([1.0; 3.0; NaN; 5.0;;], 0.5, 1)
   - [`DaysToCover`](@ref)
   - [`ew_mean_series!`](@ref)
 """
-function ew_mean_series(R::AbstractMatrix{<:Real}, decay::Real,
-                        min_obs::Integer)::Matrix{<:Real}
+function ew_mean_series(R::AbstractMatrix{<:Real}, amsk::AbstractMatrix{Bool}, decay::Real,
+                        min_obs::Integer,
+                        debias::Option{<:AbstractZeroStartDebias})::Matrix{<:Real}
     st = ew_mean_state(nothing, R, decay, nothing)
-    return ew_mean_series!(st.s, st.n, R, decay, min_obs)
+    return ew_mean_series!(st.s, st.n, R, amsk, decay, min_obs, debias)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -183,12 +200,18 @@ The batch call starts it from zeros, and a step of the carry fold from the state
   - `s`: The state of the recursion of each asset, changed in place.
   - `n`: The count of the finite inputs of each asset, changed in place.
   - `R`: The input, `observations × assets`.
+  - `amsk`: The active mask, `observations × assets`. An inactive cell sets the state and the count of its asset to zero.
   - `decay`: The decay factor.
   - `min_obs`: The warm-up, in valid observations per asset.
+  - `debias`: The rule that reads the value out of the state through [`zero_start_mean`](@ref), or `nothing` for the undivided state.
+
+# Validation
+
+  - `size(R) == size(amsk)`. Raises a `DimensionMismatch`.
 
 # Returns
 
-  - `S::Matrix{<:Real}`: The series, `observations × assets`, `NaN` before the warm-up of an asset ends.
+  - `S::Matrix{<:Real}`: The series, `observations × assets`, `NaN` before the warm-up of an asset ends and where the asset is inactive.
 
 # Related
 
@@ -196,129 +219,33 @@ The batch call starts it from zeros, and a step of the carry fold from the state
   - [`EWMeanState`](@ref)
 """
 function ew_mean_series!(s::AbstractVector{<:Real}, n::AbstractVector{<:Integer},
-                         R::AbstractMatrix{<:Real}, decay::Real,
-                         min_obs::Integer)::Matrix{<:Real}
-    Tf = float_if_integer(eltype(R))
+                         R::AbstractMatrix{<:Real}, amsk::AbstractMatrix{Bool}, decay::Real,
+                         min_obs::Integer,
+                         debias::Option{<:AbstractZeroStartDebias})::Matrix{<:Real}
+    @argcheck(size(R) == size(amsk),
+              DimensionMismatch("the input of the recursion is observations × assets, so it must match the active mask, got size(R) = $(size(R)) and size(amsk) = $(size(amsk))"))
+    Tf = eltype(R)
     S = fill(Tf(NaN), size(R))
     for i in axes(R, 2)
         si = s[i]
         ni = n[i]
         for t in axes(R, 1)
             r = R[t, i]
-            if isfinite(r)
+            if !amsk[t, i]
+                si = zero(si)
+                ni = 0
+            elseif isfinite(r)
                 si = decay * si + (one(Tf) - decay) * r
                 ni += 1
             end
             if ni >= min_obs
-                S[t, i] = si
+                S[t, i] = zero_start_mean(debias, si, decay, ni)
             end
         end
         s[i] = si
         n[i] = ni
     end
     return S
-end
-"""
-    assert_ew_ratio_side(x::Nothing, sym::Sym_Str) -> nothing
-    assert_ew_ratio_side(x::Union{<:AbstractString,
-                                  <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
-                         sym::Sym_Str) -> nothing
-    assert_ew_ratio_side(x::AbstractVector{<:AbstractString}, sym::Sym_Str) -> nothing
-
-Check one side of an exponentially weighted ratio.
-
-This function checks the four forms of one side, so [`EWVolumeRatio`](@ref) states each rule once. `nothing` names the returns and reads nothing out of the Asset Panel, so it needs no check.
-
-# Arguments
-
-  - `x`: One side of the ratio, in any of the forms [`ew_ratio_values`](@ref) reads.
-  - `sym`: The field's name, for the message.
-
-# Validation
-
-  - A name is not the empty string, and a combination holds at least one term whose name is not empty and whose coefficient is finite. Raises an [`IsEmptyError`](@ref) or a `DomainError`.
-  - A product holds at least one name, and no name is the empty string. Raises an [`IsEmptyError`](@ref).
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`EWVolumeRatio`](@ref)
-  - [`ew_ratio_values`](@ref)
-  - [`assert_panel_terms`](@ref)
-"""
-function assert_ew_ratio_side(::Nothing, ::Sym_Str)::Nothing
-    return nothing
-end
-function assert_ew_ratio_side(x::Union{<:AbstractString,
-                                       <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
-                              sym::Sym_Str)::Nothing
-    assert_panel_terms(x, sym)
-    return nothing
-end
-function assert_ew_ratio_side(x::AbstractVector{<:AbstractString}, sym::Sym_Str)::Nothing
-    @argcheck(!isempty(x),
-              IsEmptyError("$sym is a product of Panel Fields, so it needs at least one name"))
-    for (k, name) in enumerate(x)
-        @argcheck(!isempty(name),
-                  IsEmptyError("factor $k of $sym names a Panel Field, so its name cannot be the empty string"))
-    end
-    return nothing
-end
-"""
-    ew_ratio_values(rd::ReturnsResult, x::Nothing) -> Matrix{<:Real}
-    ew_ratio_values(rd::ReturnsResult, x::AbstractString) -> Matrix{<:Real}
-    ew_ratio_values(rd::ReturnsResult,
-                    x::AbstractVector{<:Pair{<:AbstractString, <:Real}}) -> Matrix{<:Real}
-    ew_ratio_values(rd::ReturnsResult, x::AbstractVector{<:AbstractString}) -> Matrix{<:Real}
-
-Read one side of an exponentially weighted ratio out of a [`ReturnsResult`](@ref).
-
-A side takes four forms. Julia selects the method from the form, and each method reads the side as follows.
-
- 1. `nothing` reads the absolute returns `abs.(rd.X)`. Returns are not a Panel Field, so this is how a ratio names them.
- 2. A name reads that one Panel Field, through [`descriptor_field_values`](@ref).
- 3. A vector of `name => coefficient` pairs reads their sum, through [`descriptor_field_values`](@ref). `["a" => 1, "b" => -1]` reads `a - b`.
- 4. A vector of names reads their product. `["adj_close", "adj_volume"]` reads a traded amount out of a price and a volume, which no single Panel Field carries.
-
-# Arguments
-
-  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl` unless `x` is `nothing`.
-  - `x`: One side of the ratio.
-
-# Validation
-
-  - The rules of [`descriptor_field_values`](@ref) for every Panel Field the side names.
-
-# Returns
-
-  - `V::Matrix{<:Real}`: The values, `observations × assets`, `NaN` where a Panel Field the side names was not observed.
-
-# Related
-
-  - [`EWVolumeRatio`](@ref)
-  - [`assert_ew_ratio_side`](@ref)
-  - [`descriptor_field_values`](@ref)
-"""
-function ew_ratio_values(rd::ReturnsResult, ::Nothing)::Matrix{<:Real}
-    return abs.(rd.X)
-end
-function ew_ratio_values(rd::ReturnsResult, x::AbstractString)::Matrix{<:Real}
-    return descriptor_field_values(rd, x)
-end
-function ew_ratio_values(rd::ReturnsResult,
-                         x::AbstractVector{<:Pair{<:AbstractString, <:Real}})::Matrix{<:Real}
-    return descriptor_field_values(rd, x)
-end
-function ew_ratio_values(rd::ReturnsResult,
-                         x::AbstractVector{<:AbstractString})::Matrix{<:Real}
-    V = descriptor_field_values(rd, x[1])
-    for k in 2:length(x)
-        V .*= descriptor_field_values(rd, x[k])
-    end
-    return V
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -331,13 +258,14 @@ This is the archetype of every momentum Descriptor. The skip separates a medium-
 
 ```math
 \\begin{align}
-y_{t,i} &= \\begin{cases} \\log(1 + x_{t-s,\\,i}) & \\text{if } t > s \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,, \\\\
+y_{t,i} &= \\begin{cases} \\log(1 + x_{t-s,\\,i}) & \\text{if } t > s \\text{ and asset } i \\text{ is active at every observation from } t - s \\text{ to } t \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,, \\\\
 S_{t,i} &= \\lambda S_{t-1,i} + (1 - \\lambda) y_{t,i}\\,, \\quad S_{0,i} = 0\\,, \\\\
-d_{t,i} &= \\begin{cases} \\exp(S_{t,i}) - 1 & \\text{if } \\texttt{exponentiate} \\\\ S_{t,i} & \\text{otherwise} \\end{cases}\\,.
+\\bar{S}_{t,i} &= \\begin{cases} S_{t,i} / \\left(1 - \\lambda^{n_{t,i}}\\right) & \\text{under } \\texttt{debias = ZeroStartDebias()} \\\\ S_{t,i} & \\text{under } \\texttt{debias = nothing} \\end{cases}\\,, \\\\
+d_{t,i} &= \\begin{cases} \\exp(\\bar{S}_{t,i}) - 1 & \\text{if } \\texttt{exponentiate} \\\\ \\bar{S}_{t,i} & \\text{otherwise} \\end{cases}\\,.
 \\end{align}
 ```
 
-The state moves only where ``y_{t,i}`` is finite, and holds everywhere else. The delay counts rows of the panel, not valid observations of the asset, so a gap in the returns of asset ``i`` reaches the recursion ``s`` rows later as a hold. ``d_{t,i}`` is `NaN` until ``n_{t,i} \\geq \\texttt{min\\_obs}``, and where asset ``i`` is inactive. [`ew_mean_series`](@ref) states the hold and the count in full.
+The state moves only where ``y_{t,i}`` is finite, and holds everywhere else. The delay counts rows of the panel, not valid observations of the asset, so a gap in the returns of asset ``i`` reaches the recursion ``s`` rows later as a hold. An inactive observation restarts the recursion of asset ``i`` from zero, and the recursion after it reads no return of an observation at or before the inactive one. ``d_{t,i}`` is `NaN` until ``n_{t,i} \\geq \\texttt{min\\_obs}``, and where asset ``i`` is inactive. [`ew_mean_series`](@ref) states the hold, the restart, the count and the division in full.
 
 Where:
 
@@ -347,6 +275,7 @@ Where:
   - ``s``: `skip`, the delay in observations.
   - $(math_dict[:lambda_ew])
   - ``S_{t,i}``: State of the recursion of asset ``i`` after observation ``t``.
+  - ``\\bar{S}_{t,i}``: Exponentially weighted mean of asset ``i`` after observation ``t``.
   - ``n_{t,i}``: Count of the finite inputs ``y`` of asset ``i`` up to observation ``t``.
 
 # Fields
@@ -357,6 +286,7 @@ $(DocStringExtensions.FIELDS)
 
     EWMean(; decay::Real, min_obs::Integer, skip::Integer = 0,
            exponentiate::Bool = false,
+           debias::Option{<:AbstractZeroStartDebias} = ZeroStartDebias(),
            cache::Option{<:AbstractPartialFitState} = nothing) -> EWMean
 
 Keywords correspond to the struct's fields. `decay` and `min_obs` take no default, because they depend on the data frequency. [`EWMomentum`](@ref) states a half-life instead and converts it through [`half_life_decay`](@ref) and [`half_life_min_obs`](@ref).
@@ -375,7 +305,8 @@ EWMean
          decay ┼ Float64: 0.5
        min_obs ┼ Int64: 2
           skip ┼ Int64: 0
-  exponentiate ┴ Bool: false
+  exponentiate ┼ Bool: false
+        debias ┴ ZeroStartDebias()
 ```
 
 # Related
@@ -404,10 +335,15 @@ EWMean
     """
     exponentiate
     """
+    $(field_dict[:zs_debias])
+    """
+    debias
+    """
     $(field_dict[:ew_desc_cache])
     """
     cache
     function EWMean(decay::Real, min_obs::Integer, skip::Integer, exponentiate::Bool,
+                    debias::Option{<:AbstractZeroStartDebias},
                     cache::Option{<:AbstractPartialFitState})
         assert_ew_decay(decay)
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
@@ -415,13 +351,15 @@ EWMean
                   DomainError(skip,
                               "skip is the number of the most recent observations the recursion does not read, so it cannot be negative, got $skip"))
         return new{typeof(decay), typeof(min_obs), typeof(skip), typeof(exponentiate),
-                   typeof(cache)}(decay, min_obs, skip, exponentiate, cache)
+                   typeof(debias), typeof(cache)}(decay, min_obs, skip, exponentiate,
+                                                  debias, cache)
     end
 end
 function EWMean(; decay::Real, min_obs::Integer, skip::Integer = 0,
                 exponentiate::Bool = false,
+                debias::Option{<:AbstractZeroStartDebias} = ZeroStartDebias(),
                 cache::Option{<:AbstractPartialFitState} = nothing)::EWMean
-    return EWMean(decay, min_obs, skip, exponentiate, cache)
+    return EWMean(decay, min_obs, skip, exponentiate, debias, cache)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -436,11 +374,11 @@ This is the archetype of every liquidity Descriptor built from a daily ratio. A 
 \\begin{align}
 q_{t,i} &= \\begin{cases} \\dfrac{a_{t,i}}{b_{t,i}} & \\text{if } b_{t,i} > 0 \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,, \\\\
 S_{t,i} &= \\lambda S_{t-1,i} + (1 - \\lambda) q_{t,i}\\,, \\quad S_{0,i} = 0\\,, \\\\
-d_{t,i} &= S_{t,i}\\,.
+d_{t,i} &= S_{t,i} / \\left(1 - \\lambda^{n_{t,i}}\\right)\\,.
 \\end{align}
 ```
 
-The state moves only where ``q_{t,i}`` is finite, and holds everywhere else. A missing Panel Field on either side, and a denominator that is not strictly positive, both hold the state. A negative value of a Panel Field that `nonneg` names is a data error, so [`descriptor`](@ref) refuses it before the recursion starts. ``d_{t,i}`` is `NaN` until ``n_{t,i} \\geq \\texttt{min\\_obs}``, and where asset ``i`` is inactive. [`ew_mean_series`](@ref) states the hold and the count in full.
+The state moves only where ``q_{t,i}`` is finite, and holds everywhere else. A missing Panel Field on either side, and a denominator that is not strictly positive, both hold the state. A negative value of a Panel Field that `nonneg` names is a data error, so [`descriptor`](@ref) refuses it before the recursion starts. An inactive observation restarts the recursion of asset ``i`` from zero. ``d_{t,i}`` is `NaN` until ``n_{t,i} \\geq \\texttt{min\\_obs}``, and where asset ``i`` is inactive. [`ew_mean_series`](@ref) states the hold, the restart, the count and the division in full.
 
 Where:
 
@@ -459,12 +397,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     EWVolumeRatio(;
-        num::Union{Nothing, <:AbstractString,
-                   <:AbstractVector{<:Pair{<:AbstractString, <:Real}},
-                   <:AbstractVector{<:AbstractString}},
-        den::Union{Nothing, <:AbstractString,
-                   <:AbstractVector{<:Pair{<:AbstractString, <:Real}},
-                   <:AbstractVector{<:AbstractString}},
+        num::Option{<:PanelTermType},
+        den::Option{<:PanelTermType},
         nonneg::Option{<:VecStr} = nothing,
         gt0::Option{<:VecStr} = nothing,
         decay::Real,
@@ -476,7 +410,7 @@ Keywords correspond to the struct's fields. `decay` and `min_obs` take no defaul
 
 ## Validation
 
-  - The rules of [`assert_ew_ratio_side`](@ref) for `num` and for `den`.
+  - The rules of [`assert_panel_terms`](@ref) for `num` and for `den`.
   - Every name in `nonneg` and in `gt0` is a Panel Field that `num` or `den` reads, see [`assert_panel_guard_names`](@ref).
   - $(val_dict[:decay])
   - $(val_dict[:min_obs])
@@ -501,7 +435,7 @@ EWVolumeRatio
   - [`descriptor`](@ref)
   - [`EWShareTurnover`](@ref)
   - [`EWAmihudIlliquidity`](@ref)
-  - [`ew_ratio_values`](@ref)
+  - [`descriptor_field_values`](@ref)
   - [`DaysToCover`](@ref)
 """
 @concrete struct EWVolumeRatio <: AbstractDescriptorEstimator
@@ -533,16 +467,11 @@ EWVolumeRatio
     $(field_dict[:ew_desc_cache])
     """
     cache
-    function EWVolumeRatio(num::Union{Nothing, <:AbstractString,
-                                      <:AbstractVector{<:Pair{<:AbstractString, <:Real}},
-                                      <:AbstractVector{<:AbstractString}},
-                           den::Union{Nothing, <:AbstractString,
-                                      <:AbstractVector{<:Pair{<:AbstractString, <:Real}},
-                                      <:AbstractVector{<:AbstractString}},
+    function EWVolumeRatio(num::Option{<:PanelTermType}, den::Option{<:PanelTermType},
                            nonneg::Option{<:VecStr}, gt0::Option{<:VecStr}, decay::Real,
                            min_obs::Integer, cache::Option{<:AbstractPartialFitState})
-        assert_ew_ratio_side(num, :num)
-        assert_ew_ratio_side(den, :den)
+        assert_panel_terms(num, :num)
+        assert_panel_terms(den, :den)
         known = vcat(panel_term_names(num), panel_term_names(den))
         assert_panel_guard_names(nonneg, known, :nonneg)
         assert_panel_guard_names(gt0, known, :gt0)
@@ -553,13 +482,7 @@ EWVolumeRatio
                                                    cache)
     end
 end
-function EWVolumeRatio(;
-                       num::Union{Nothing, <:AbstractString,
-                                  <:AbstractVector{<:Pair{<:AbstractString, <:Real}},
-                                  <:AbstractVector{<:AbstractString}},
-                       den::Union{Nothing, <:AbstractString,
-                                  <:AbstractVector{<:Pair{<:AbstractString, <:Real}},
-                                  <:AbstractVector{<:AbstractString}},
+function EWVolumeRatio(; num::Option{<:PanelTermType}, den::Option{<:PanelTermType},
                        nonneg::Option{<:VecStr} = nothing, gt0::Option{<:VecStr} = nothing,
                        decay::Real, min_obs::Integer,
                        cache::Option{<:AbstractPartialFitState} = nothing)::EWVolumeRatio
@@ -577,11 +500,14 @@ The days to cover of a short position is the shares held short divided by a smoo
 ```math
 \\begin{align}
 V_{t,i} &= \\begin{cases} \\lambda V_{t-1,i} + (1 - \\lambda) b_{t,i} & \\text{if } b_{t,i} > 0 \\\\ V_{t-1,i} & \\text{otherwise} \\end{cases}\\,, \\quad V_{0,i} = 0\\,, \\\\
-d_{t,i} &= \\begin{cases} \\dfrac{a_{t,i}}{V_{t,i}} & \\text{if } V_{t,i} > 0 \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
+\\bar{V}_{t,i} &= V_{t,i} / \\left(1 - \\lambda^{n_{t,i}}\\right)\\,, \\\\
+d_{t,i} &= \\begin{cases} \\dfrac{a_{t,i}}{\\bar{V}_{t,i}} & \\text{if } \\bar{V}_{t,i} > 0 \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
 \\end{align}
 ```
 
-A zero or a missing volume holds the state and does not count toward the warm-up. A missing short interest gives a `NaN` Descriptor at that observation, and the state of the volume moves all the same. A negative short interest or a negative volume is a data error, so [`descriptor`](@ref) refuses it before the recursion starts, for every Panel Field that `nonneg` names. With `nonneg = nothing`, a negative volume holds the state, and a negative short interest gives a negative Descriptor. ``d_{t,i}`` is `NaN` until ``n_{t,i} \\geq \\texttt{min\\_obs}``, and where asset ``i`` is inactive.
+The volume is in the denominator, so without the division by ``1 - \\lambda^{n_{t,i}}`` the days to cover of an asset with a short history would be too large, by about two after one half-life.
+
+A zero or a missing volume holds the state and does not count toward the warm-up. A missing short interest gives a `NaN` Descriptor at that observation, and the state of the volume moves all the same. A negative short interest or a negative volume is a data error, so [`descriptor`](@ref) refuses it before the recursion starts, for every Panel Field that `nonneg` names. With `nonneg = nothing`, a negative volume holds the state, and a negative short interest gives a negative Descriptor. An inactive observation restarts the recursion of the volume of asset ``i`` from zero. ``d_{t,i}`` is `NaN` until ``n_{t,i} \\geq \\texttt{min\\_obs}``, and where asset ``i`` is inactive.
 
 Where:
 
@@ -589,7 +515,8 @@ Where:
   - ``a_{t,i}``: Value of the Panel Field `num` for asset ``i`` at observation ``t``.
   - ``b_{t,i}``: Value of the Panel Field `den` for asset ``i`` at observation ``t``.
   - $(math_dict[:lambda_ew])
-  - ``V_{t,i}``: Smoothed denominator of asset ``i`` after observation ``t``.
+  - ``V_{t,i}``: State of the recursion of the denominator of asset ``i`` after observation ``t``.
+  - ``\\bar{V}_{t,i}``: Smoothed denominator of asset ``i`` after observation ``t``.
   - ``n_{t,i}``: Count of the strictly positive values ``b`` of asset ``i`` up to observation ``t``.
 
 # Fields
@@ -686,14 +613,14 @@ end
 
 Compute an exponentially weighted mean Descriptor from a [`ReturnsResult`](@ref).
 
-Each of the three archetypes builds one `observations × assets` matrix and runs it through [`ew_mean_series`](@ref). [`descriptor_active_fill!`](@ref) then writes `NaN` into the inactive cells. An asset that is listed but has no value at an observation holds its state there, so a gap in the data neither restarts the recursion nor enters it as a zero.
+Each of the three archetypes builds one `observations × assets` matrix and runs it through [`ew_mean_series`](@ref). [`descriptor_active_fill!`](@ref) then writes `NaN` into the inactive cells. An asset that is listed but has no value at an observation holds its state there, so a gap in the data neither restarts the recursion nor enters it as a zero. An inactive observation restarts the recursion of its asset, because the active mask of the Asset Panel passes into [`ew_mean_series`](@ref).
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. [`EWMean`](@ref): check the returns through [`assert_log_returns`](@ref), then run the recursion over `log1p(rd.X)` delayed by `skip` observations. The first `skip` rows have no input. Take `expm1` of the series when `exponentiate` is set.
- 2. [`EWVolumeRatio`](@ref): check the `nonneg` and `gt0` guards through [`assert_panel_field_sign`](@ref), read both sides through [`ew_ratio_values`](@ref), divide them through [`positive_divide`](@ref), and run the recursion over the ratio.
+ 1. [`EWMean`](@ref): check the returns through [`assert_log_returns`](@ref), then run the recursion over `log1p(rd.X)` delayed by `skip` observations. The first `skip` rows have no input, and neither has a row whose delay window, from `t - skip` to `t`, holds an inactive observation of the asset. Take `expm1` of the series when `exponentiate` is set.
+ 2. [`EWVolumeRatio`](@ref): check the `nonneg` and `gt0` guards through [`assert_panel_field_sign`](@ref), read both sides through [`descriptor_field_values`](@ref), divide them through [`positive_divide`](@ref), and run the recursion over the ratio.
  3. [`DaysToCover`](@ref): check the `nonneg` guard through [`assert_panel_field_sign`](@ref), run the recursion over the denominator's Panel Field, with every value that is not strictly positive read as a `NaN`, then divide the numerator's Panel Field by the series through [`positive_divide`](@ref).
 
 Every method then writes `NaN` into the inactive cells.
@@ -728,16 +655,16 @@ julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; -0.1 0.0; 0.05 0.
 
 julia> descriptor(EWMean(; decay = 0.5, min_obs = 1), rd)
 3×2 Matrix{Float64}:
-  0.0476551   0.0911608
- -0.0288527   0.0455804
-  0.00996873  0.0471853
+  0.0953102  0.182322
+ -0.0384703  0.0607739
+  0.0113928  0.053926
 
 julia> descriptor(EWVolumeRatio(; num = \"adj_volume\", den = \"adj_shares_outstanding\", decay = 0.5,
                                 min_obs = 1), rd)
 3×2 Matrix{Float64}:
- 0.05    0.1
- 0.175   0.15
- 0.3375  0.225
+ 0.1       0.2
+ 0.233333  0.2
+ 0.385714  0.257143
 ```
 
 # Related
@@ -753,13 +680,24 @@ function descriptor(de::EWMean, rd::ReturnsResult)::Matrix{<:Real}
     pnl = descriptor_asset_panel(rd)
     X = rd.X
     assert_log_returns(X)
-    Tf = float_if_integer(eltype(X))
+    Tf = eltype(X)
     R = fill(Tf(NaN), size(X))
     skip = de.skip
-    for i in axes(X, 2), t in (skip + 1):size(X, 1)
-        R[t, i] = log1p(X[t - skip, i])
+    amsk = pnl.amsk
+    for i in axes(X, 2)
+        # The last inactive observation of the asset, so the delay reads no return before
+        # its restart.
+        off = 0
+        for t in axes(X, 1)
+            if !amsk[t, i]
+                off = t
+            end
+            if t - skip > off
+                R[t, i] = log1p(X[t - skip, i])
+            end
+        end
     end
-    S = ew_mean_series(R, de.decay, de.min_obs)
+    S = ew_mean_series(R, amsk, de.decay, de.min_obs, de.debias)
     D = de.exponentiate ? expm1.(S) : S
     descriptor_active_fill!(D, pnl)
     return D
@@ -922,7 +860,7 @@ The value of a new state takes the type of the input and the decay, as the batch
 """
 function ew_mean_state(::Nothing, X::AbstractMatrix{<:Real}, decay::Real,
                        cap::Option{<:Integer})::EWMeanState
-    Tf = float_if_integer(eltype(X))
+    Tf = eltype(X)
     N = size(X, 2)
     return EWMeanState(zeros(promote_type(Tf, typeof(decay)), N), zeros(Int, N),
                        ew_state_buffer(Tf, cap))
@@ -935,17 +873,18 @@ function ew_mean_state(st::EWMeanState, X::AbstractMatrix{<:Real}, ::Real,
 end
 """
     ew_mean_delayed!(buf::DataStructures.CircularBuffer{<:AbstractVector{<:Real}},
-                     X::AbstractMatrix{<:Real})
-    ew_mean_delayed!(::Nothing, ::AbstractMatrix{<:Real})
+                     X::AbstractMatrix{<:Real}, amsk::AbstractMatrix{Bool})
+    ew_mean_delayed!(::Nothing, ::AbstractMatrix{<:Real}, ::AbstractMatrix{Bool})
 
 Pushes the log return of each observation of a matrix into the ring of an [`EWMeanState`](@ref), and returns the input of the recursion of an [`EWMean`](@ref) at each observation: the log return of the observation `skip` rows back, the oldest row of a full ring, or `NaN` while the ring is not full.
 
-The batch call [`descriptor`](@ref) reads the same `log1p` of the same return, so the input equals the one of the batch call.
+An observation where an asset is inactive writes `NaN` into the column of that asset in every row of the ring, so the recursion that restarts there reads no return of an observation at or before it. A row of the ring can be a row of the carried state, so the function replaces such a row with a cleared copy and changes no carried row. It copies only a row that holds a value of an inactive asset, so an asset that stays inactive costs no copy of the ring after its first inactive observation. The batch call [`descriptor`](@ref) reads the same `log1p` of the same return under the same rule, so the input equals the one of the batch call.
 
 # Arguments
 
   - `buf`: The ring of `skip + 1` rows, changed in place, or `nothing`.
   - `X`: The returns of the new observations, `observations × assets`.
+  - `amsk`: The active mask of the new observations, `observations × assets`.
 
 # Validation
 
@@ -961,17 +900,30 @@ The batch call [`descriptor`](@ref) reads the same `log1p` of the same return, s
   - [`ew_mean_fold`](@ref)
 """
 function ew_mean_delayed!(buf::DataStructures.CircularBuffer{<:AbstractVector{<:Real}},
-                          X::AbstractMatrix{<:Real})::Matrix{<:Real}
-    R = fill(eltype(eltype(buf))(NaN), size(X))
+                          X::AbstractMatrix{<:Real},
+                          amsk::AbstractMatrix{Bool})::Matrix{<:Real}
+    nan = eltype(eltype(buf))(NaN)
+    R = fill(nan, size(X))
     for t in axes(X, 1)
         push!(buf, log1p.(view(X, t, :)))
+        act = view(amsk, t, :)
+        if !all(act)
+            off = findall(!, act)
+            # The newest row is a new vector, so it is cleared in place.
+            buf[end][off] .= nan
+            # A new row, because a ring row can be a row of the carried state. A row that an
+            # earlier observation cleared is kept.
+            for k in findall(r -> any(!isnan, view(r, off)), buf)
+                buf[k] = ifelse.(act, buf[k], nan)
+            end
+        end
         if DataStructures.isfull(buf)
             R[t, :] = buf[1]
         end
     end
     return R
 end
-function ew_mean_delayed!(::Nothing, ::AbstractMatrix{<:Real})
+function ew_mean_delayed!(::Nothing, ::AbstractMatrix{<:Real}, ::AbstractMatrix{Bool})
     return throw(ArgumentError("the state of this EWMean holds no ring of log returns, so it is the state of an EWVolumeRatio or of a DaysToCover. An EWMean folds from its own state, or from no state."))
 end
 """
@@ -1001,7 +953,7 @@ The batch call [`descriptor`](@ref) of an [`EWVolumeRatio`](@ref) and of a [`Day
 
 # Returns
 
-  - `fold::NamedTuple`: `st`, the state after the observations, and `D`, the Descriptor of each observation, `observations × assets`.
+  - `fold::DescriptorFold`: `st`, the state after the observations, and `D`, the Descriptor of each observation, `observations × assets`.
 
 # Related
 
@@ -1012,21 +964,24 @@ function ew_mean_fold(de::EWMean, rd::ReturnsResult, cache::Option{<:EWMeanState
     pnl = descriptor_asset_panel(rd)
     X = rd.X
     assert_log_returns(X)
+    amsk = pnl.amsk
     st = ew_mean_state(cache, X, de.decay, de.skip + 1)
-    S = ew_mean_series!(st.s, st.n, ew_mean_delayed!(st.buf, X), de.decay, de.min_obs)
+    S = ew_mean_series!(st.s, st.n, ew_mean_delayed!(st.buf, X, amsk), amsk, de.decay,
+                        de.min_obs, de.debias)
     D = de.exponentiate ? expm1.(S) : S
     descriptor_active_fill!(D, pnl)
-    return (; st = st, D = D)
+    return DescriptorFold(st, D)
 end
 function ew_mean_fold(de::EWVolumeRatio, rd::ReturnsResult, cache::Option{<:EWMeanState})
     pnl = descriptor_asset_panel(rd)
     assert_panel_field_sign(rd, de.nonneg, false)
     assert_panel_field_sign(rd, de.gt0, true)
-    Q = positive_divide.(ew_ratio_values(rd, de.num), ew_ratio_values(rd, de.den))
+    Q = positive_divide.(descriptor_field_values(rd, de.num),
+                         descriptor_field_values(rd, de.den))
     st = ew_mean_state(cache, Q, de.decay, nothing)
-    D = ew_mean_series!(st.s, st.n, Q, de.decay, de.min_obs)
+    D = ew_mean_series!(st.s, st.n, Q, pnl.amsk, de.decay, de.min_obs, ZeroStartDebias())
     descriptor_active_fill!(D, pnl)
-    return (; st = st, D = D)
+    return DescriptorFold(st, D)
 end
 function ew_mean_fold(de::DaysToCover, rd::ReturnsResult, cache::Option{<:EWMeanState})
     pnl = descriptor_asset_panel(rd)
@@ -1036,9 +991,11 @@ function ew_mean_fold(de::DaysToCover, rd::ReturnsResult, cache::Option{<:EWMean
     Tf = eltype(B)
     V = [b > zero(b) ? b : Tf(NaN) for b in B]
     st = ew_mean_state(cache, V, de.decay, nothing)
-    D = positive_divide.(A, ew_mean_series!(st.s, st.n, V, de.decay, de.min_obs))
+    D = positive_divide.(A,
+                         ew_mean_series!(st.s, st.n, V, pnl.amsk, de.decay, de.min_obs,
+                                         ZeroStartDebias()))
     descriptor_active_fill!(D, pnl)
-    return (; st = st, D = D)
+    return DescriptorFold(st, D)
 end
 """
     descriptor_step(de::Union{EWMean, EWVolumeRatio, DaysToCover}, rd::ReturnsResult)
@@ -1058,7 +1015,7 @@ The Descriptor of an observation equals the one of the batch call [`descriptor`]
 
 # Returns
 
-  - `step::NamedTuple`: `de`, the estimator with the state after the observations in `cache`, and `D`, the Descriptor of each observation, `observations × assets`.
+  - `step::DescriptorStepResult`: `de`, the estimator with the state after the observations in `cache`, and `D`, the Descriptor of each observation, `observations × assets`.
 
 # Related
 
@@ -1068,7 +1025,7 @@ The Descriptor of an observation equals the one of the batch call [`descriptor`]
 """
 function descriptor_step(de::Union{EWMean, EWVolumeRatio, DaysToCover}, rd::ReturnsResult)
     (; st, D) = ew_mean_fold(de, rd, de.cache)
-    return (; de = Accessors.@set(de.cache = st), D = D)
+    return DescriptorStepResult(rebuild_struct(de, (; cache = st)), D)
 end
 """
     partial_fit!(de::Union{EWMean, EWVolumeRatio, DaysToCover}, rd::ReturnsResult)
@@ -1124,7 +1081,8 @@ end
     EWMomentum(; half_life::Real = 87.0, skip::Integer = 21,
                exponentiate::Bool = false,
                decay::Real = half_life_decay(half_life),
-               min_obs::Integer = half_life_min_obs(half_life)) -> EWMean
+               min_obs::Integer = half_life_min_obs(half_life),
+               debias::Option{<:AbstractZeroStartDebias} = ZeroStartDebias()) -> EWMean
 
 Exponentially weighted mean of the log returns of the past year, less the past month.
 
@@ -1137,6 +1095,7 @@ The value is the recursion of [`EWMean`](@ref) over `log1p(r)` delayed by `skip`
   - `exponentiate`: Whether the Descriptor is in return units.
   - `decay`: Decay factor of the recursion.
   - `min_obs`: Warm-up, in valid observations per asset.
+  - `debias`: How the momentum is read out of the state of the recursion. [`ZeroStartDebias`](@ref), the default, divides the state by the sum of its weights. `nothing` keeps the undivided state, which shrinks the momentum of an asset with a short history toward zero, the neutral value of a momentum.
 
 # Validation
 
@@ -1155,7 +1114,8 @@ EWMean
          decay ┼ Float64: 0.8705505632961241
        min_obs ┼ Int64: 5
           skip ┼ Int64: 21
-  exponentiate ┴ Bool: false
+  exponentiate ┼ Bool: false
+        debias ┴ ZeroStartDebias()
 ```
 
 # Related
@@ -1167,9 +1127,10 @@ EWMean
 """
 function EWMomentum(; half_life::Real = 87.0, skip::Integer = 21,
                     exponentiate::Bool = false, decay::Real = half_life_decay(half_life),
-                    min_obs::Integer = half_life_min_obs(half_life))::EWMean
+                    min_obs::Integer = half_life_min_obs(half_life),
+                    debias::Option{<:AbstractZeroStartDebias} = ZeroStartDebias())::EWMean
     return EWMean(; decay = decay, min_obs = min_obs, skip = skip,
-                  exponentiate = exponentiate)
+                  exponentiate = exponentiate, debias = debias)
 end
 """
     EWShareTurnover(; num::AbstractString = "adj_volume",
@@ -1279,7 +1240,7 @@ EWVolumeRatio
   - [`EWVolumeRatio`](@ref)
   - [`descriptor`](@ref)
   - [`EWShareTurnover`](@ref)
-  - [`ew_ratio_values`](@ref)
+  - [`descriptor_field_values`](@ref)
 """
 function EWAmihudIlliquidity(;
                              den::AbstractVector{<:AbstractString} = ["adj_close",

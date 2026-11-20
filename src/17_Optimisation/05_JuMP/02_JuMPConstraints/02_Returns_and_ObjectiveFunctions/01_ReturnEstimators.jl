@@ -130,7 +130,7 @@ alone.
 """
 const VecJRE = AbstractVector{<:JuMPReturnsEstimator}
 """
-    const JRE_VecJRE = Union{<:JuMPReturnsEstimator, <:VecJRE}
+    const JRE_VecJRE = Union{JuMPReturnsEstimator, VecJRE}
 
 Field bound for [`JuMPOptimiser`](@ref)'s `ret` slot, which takes one return term or several.
 
@@ -141,9 +141,9 @@ It is the return-side twin of [`RM_VecRM`](@ref).
   - [`JuMPReturnsEstimator`](@ref)
   - [`VecJRE`](@ref)
 """
-const JRE_VecJRE = Union{<:JuMPReturnsEstimator, <:VecJRE}
+const JRE_VecJRE = Union{JuMPReturnsEstimator, VecJRE}
 """
-    const ArithRetMu = Union{<:Num_VecNum, <:AbstractExpectedReturnsEstimator, <:AbstractPriorEstimator}
+    const ArithRetMu = Union{Num_VecNum, AbstractExpectedReturnsEstimator, AbstractPriorEstimator}
 
 Field bound for [`ArithmeticReturn`](@ref)'s `mu` slot, which holds the expected returns or the Estimator that computes them, a [`DeferredQuantity`](@ref).
 
@@ -156,8 +156,8 @@ The bound is [`MuSlot`](@ref) less a [`VecScalar`](@ref), for two reasons. A `Ve
   - [`DeferredQuantity`](@ref)
   - [`resolve_deferred_quantities`](@ref)
 """
-const ArithRetMu = Union{<:Num_VecNum, <:AbstractExpectedReturnsEstimator,
-                         <:AbstractPriorEstimator}
+const ArithRetMu = Union{Num_VecNum, AbstractExpectedReturnsEstimator,
+                         AbstractPriorEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -234,8 +234,7 @@ Keywords correspond to the struct's fields.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 8.1.1.
-  - $(ref_dict[:markowitz1952])
+  - $(ref_dict[:markowitz1952]) Page 81.
 """
 @concrete struct ArithmeticReturn <: JuMPReturnsEstimator
     """
@@ -286,11 +285,26 @@ function ArithmeticReturn(; settings::JuMPReturnsSettings = JuMPReturnsSettings(
     return ArithmeticReturn(settings, ucs, mu, mtx_sqrt)
 end
 """
+    obs_weights_view(rt::ArithmeticReturn, i) -> ArithmeticReturn
+
+Return the estimator with the observation weights of its uncertainty set estimator cut to the observations `i`, through [`obs_weights_fields`](@ref).
+
+The estimator is not [`@propagatable`](@ref), so it needs this method of [`obs_weights_view`](@ref). An uncertainty set estimator in `ucs` fits its prior on the returns of the solve, so a cut of those returns, such as the drop of a Shared Series gap, must reach its weights, see [`shared_series_estimator`](@ref).
+
+# Related
+
+  - [`ArithmeticReturn`](@ref)
+  - [`obs_weights_view`](@ref)
+"""
+function obs_weights_view(rt::ArithmeticReturn, i)::ArithmeticReturn
+    return obs_weights_fields(rt, i)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve a Deferred Quantity in [`ArithmeticReturn`](@ref)'s `mu` slot against prior result `pr`.
 
-The estimator has one slot that the prior can supply, so the slot itself admits the Estimator, and the method resolves that one slot. Every `JuMP` path calls it through [`factory`](@ref), which [`processed_jump_optimiser_attributes`](@ref) calls on `opt.ret` before it builds a model. A risk measure has a second entry point, and a return term needs none.
+The estimator has one slot that the prior can supply, so the slot itself admits the Estimator, and the method resolves that one slot. Every `JuMP` path calls it through [`factory`](@ref), which [`resolve_jump_optimiser`](@ref) calls on `opt.ret` before it builds a model. A risk measure has a second entry point, and a return term needs none.
 
 # Algorithm
 
@@ -343,28 +357,27 @@ end
 function factory(rt::ArithmeticReturn, pr::AbstractPriorResult, ::Any,
                  ucs::Option{<:UcSE_UcS} = nothing, args...; kwargs...)
     rt = resolve_deferred_quantities(rt, pr)
-    return ArithmeticReturn(; settings = rt.settings, ucs = ucs_selector(rt.ucs, ucs),
-                            mu = nothing_scalar_array_selector(rt.mu, pr.mu),
-                            mtx_sqrt = rt.mtx_sqrt)
+    return rebuild_struct(rt,
+                          (; ucs = ucs_selector(rt.ucs, ucs),
+                           mu = nothing_scalar_array_selector(rt.mu, pr.mu)))
 end
 function factory(rt::ArithmeticReturn, pr::AbstractPriorResult,
                  ucs::Option{<:UcSE_UcS} = nothing; kwargs...)
     rt = resolve_deferred_quantities(rt, pr)
-    return ArithmeticReturn(; settings = rt.settings, ucs = ucs_selector(rt.ucs, ucs),
-                            mu = nothing_scalar_array_selector(rt.mu, pr.mu),
-                            mtx_sqrt = rt.mtx_sqrt)
+    return rebuild_struct(rt,
+                          (; ucs = ucs_selector(rt.ucs, ucs),
+                           mu = nothing_scalar_array_selector(rt.mu, pr.mu)))
 end
 function factory(rt::ArithmeticReturn, ucs::UcSE_UcS, pr::AbstractPriorResult; kwargs...)
     rt = resolve_deferred_quantities(rt, pr)
-    return ArithmeticReturn(; settings = rt.settings, ucs = ucs_selector(rt.ucs, ucs),
-                            mu = nothing_scalar_array_selector(rt.mu, pr.mu),
-                            mtx_sqrt = rt.mtx_sqrt)
+    return rebuild_struct(rt,
+                          (; ucs = ucs_selector(rt.ucs, ucs),
+                           mu = nothing_scalar_array_selector(rt.mu, pr.mu)))
 end
 function factory(rt::ArithmeticReturn, ucs::UcSE_UcS, args...; kwargs...)
     # No prior in hand, so a Deferred Quantity cannot resolve here. It travels on unchanged
     # and the prior-carrying `factory` the sub-problem runs resolves it.
-    return ArithmeticReturn(; settings = rt.settings, ucs = ucs_selector(rt.ucs, ucs),
-                            mu = rt.mu, mtx_sqrt = rt.mtx_sqrt)
+    return rebuild_struct(rt, (; ucs = ucs_selector(rt.ucs, ucs)))
 end
 function port_opt_view(r::ArithmeticReturn, i, args...)
     uset = port_opt_view(r.ucs, i)
@@ -372,26 +385,25 @@ function port_opt_view(r::ArithmeticReturn, i, args...)
     # identity on an Estimator. It then computes on the subset, which is the whole
     # fold-stability argument for the feature.
     mu = nothing_scalar_array_view(r.mu, i)
-    return ArithmeticReturn(; settings = r.settings, ucs = uset, mu = mu,
-                            mtx_sqrt = r.mtx_sqrt)
+    return rebuild_struct(r, (; ucs = uset, mu = mu))
 end
 """
-    no_bounds_returns_estimator(r, args...)
+    no_bounds_returns_estimator(r)
 
 Create a version of the return term with its lower bound removed.
 
 The sub-problems of the frontier and of [`NearOptimalCentering`](@ref) call it, because their
 corner solves must range over the whole feasible set.
 
-The function removes `lb`, and it removes `ucs` when `flag` is `false`. The term keeps all
-other fields, `mu` included. Without `mu`, the term takes the prior's own vector as its
-centre. But a set describes the neighbourhood of the one vector that it was calibrated on.
-Also, with several terms, each term then gives the same corner.
+The function removes `lb`, and the term keeps all other fields, `ucs` and `mu` included. The
+copy keeps `ucs`, so a corner solve and [`expected_return`](@ref) read the same worst case as
+the model of the term. The copy keeps `mu`, because without it the term takes the prior's own
+vector as its centre. But a set describes the neighbourhood of the one vector that it was
+calibrated on. Also, with several terms, each term then gives the same corner.
 
 # Arguments
 
   - `r`: One return term, or a vector of them.
-  - `flag::Bool`: When `false`, the copy drops the uncertainty set too.
 
 # Returns
 
@@ -403,27 +415,11 @@ Also, with several terms, each term then gives the same corner.
   - [`LogarithmicReturn`](@ref)
   - [`no_bounds_optimiser`](@ref)
 """
-function no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool = true)
-    return ArithmeticReturn(; settings = no_bounds_returns_settings(r.settings),
-                            ucs = ifelse(flag, r.ucs, nothing), mu = r.mu,
-                            mtx_sqrt = r.mtx_sqrt)
+function no_bounds_returns_estimator(r::JuMPReturnsEstimator)
+    return rebuild_struct(r, (; settings = rebuild_struct(r.settings, (; lb = nothing))))
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a copy of `settings` with its lower bound cleared.
-
-`scale`, `rte`, `fee` and `mic` are not bounds, so the copy keeps them. A corner solve must
-charge the same fees and weigh the same terms as the sweep that it starts.
-
-# Related
-
-  - [`no_bounds_returns_estimator`](@ref)
-  - [`JuMPReturnsSettings`](@ref)
-"""
-function no_bounds_returns_settings(settings::JuMPReturnsSettings)
-    return JuMPReturnsSettings(; scale = settings.scale, lb = nothing, rte = settings.rte,
-                               fee = settings.fee, mic = settings.mic)
+function no_bounds_returns_estimator(r::VecJRE)
+    return [no_bounds_returns_estimator(ri) for ri in r]
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -439,7 +435,7 @@ own expression, and the term still charges the same fees. This is the return-sid
 # Algorithm
 
  1. When `isone(r.settings.scale)`, return `r` unchanged, which allocates nothing.
- 2. Otherwise build a [`JuMPReturnsSettings`](@ref) with `scale = one(scale)` and the other four fields of `r.settings`.
+ 2. Otherwise rebuild `r.settings` with `scale = one(scale)`, and keep its other four fields.
  3. Return a copy of `r` that holds the new settings.
 
 # Arguments
@@ -453,21 +449,45 @@ own expression, and the term still charges the same fees. This is the return-sid
 # Related
 
   - [`unit_scale_risk_measure`](@ref)
-  - [`no_bounds_returns_settings`](@ref)
   - [`set_return_constraints!`](@ref)
 """
 function unit_scale_returns_estimator(r::JuMPReturnsEstimator)
     settings = r.settings
     scale = settings.scale
-    return if isone(scale)
-        r
-    else
-        Accessors.@set r.settings = JuMPReturnsSettings(; scale = one(scale),
-                                                        lb = settings.lb,
-                                                        rte = settings.rte,
-                                                        fee = settings.fee,
-                                                        mic = settings.mic)
+    if isone(scale)
+        return r
     end
+    s = rebuild_struct(settings, (; scale = one(scale)))
+    return rebuild_struct(r, (; settings = s))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a copy of return term `r` with `rte = false`, so its expression joins no return expression of an objective.
+
+This is the copy that a return floor takes when it only bounds the return, as a risk ceiling takes [`no_risk_expr_risk_measure`](@ref). The bound `lb` still binds on the term's own expression, and the term still charges the same fees. `scale` weighs the term only in the return expression, so the copy keeps it and it has no effect.
+
+# Arguments
+
+  - `r`: A [`JuMPReturnsEstimator`](@ref).
+
+# Returns
+
+  - The return term with `rte = false`, or `r` itself when `rte` is already `false`.
+
+# Related
+
+  - [`no_risk_expr_risk_measure`](@ref)
+  - [`unit_scale_returns_estimator`](@ref)
+  - [`set_allocation_return_floor!`](@ref)
+"""
+function no_return_expr_returns_estimator(r::JuMPReturnsEstimator)
+    settings = r.settings
+    if !settings.rte
+        return r
+    end
+    s = rebuild_struct(settings, (; rte = false))
+    return rebuild_struct(r, (; settings = s))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -478,7 +498,9 @@ The term takes optional observation weights. Unlike [`ArithmeticReturn`](@ref), 
 per-asset quantity, which is why this family is named for the return term and not for the
 characteristic. [`expected_return`](@ref) computes the same quantity in closed form, and the
 model's `:ret` agrees with it when the objective raises the return. The formulation is on
-[`set_return_constraints!`](@ref).
+[`set_return_constraints!`](@ref). Page 919 of [kelly1956](@cite) states the criterion for
+the bets of a gambler, and Section 7 of [thorp2008](@cite) states it for a portfolio of
+securities.
 
 # Mathematical definition
 
@@ -531,10 +553,8 @@ Keywords correspond to the struct's fields.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 8.1.2, equations 8.2 and 8.5.
-  - $(ref_dict[:kelly1956])
-  - $(ref_dict[:thorp2008])
-  - $(ref_dict[:chares2009])
+  - $(ref_dict[:kelly1956]) Page 919.
+  - $(ref_dict[:thorp2008]) Section 7, page 406.
 """
 @concrete struct LogarithmicReturn <: JuMPReturnsEstimator
     """
@@ -558,8 +578,20 @@ function factory(rt::LogarithmicReturn, pr::AbstractPriorResult, args...; kwargs
     return LogarithmicReturn(; settings = rt.settings,
                              w = nothing_scalar_array_selector(rt.w, pr.w))
 end
-function no_bounds_returns_estimator(r::LogarithmicReturn, args...)
-    return LogarithmicReturn(; settings = no_bounds_returns_settings(r.settings), w = r.w)
+"""
+    obs_weights_view(rt::LogarithmicReturn, i) -> LogarithmicReturn
+
+Return the estimator with its observation weights cut to the observations `i`, through [`obs_weights_index`](@ref).
+
+The estimator is not [`@propagatable`](@ref), so it needs this method of [`obs_weights_view`](@ref). A cut of the observations of a fit, such as the drop of a Shared Series gap, then cuts the weights of the objective too, see [`shared_series_estimator`](@ref).
+
+# Related
+
+  - [`LogarithmicReturn`](@ref)
+  - [`obs_weights_view`](@ref)
+"""
+function obs_weights_view(rt::LogarithmicReturn, i)::LogarithmicReturn
+    return LogarithmicReturn(; settings = rt.settings, w = obs_weights_index(rt.w, i))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -644,11 +676,207 @@ end
 function NoReturn(; settings::JuMPReturnsSettings = JuMPReturnsSettings())::NoReturn
     return NoReturn(settings)
 end
-function no_bounds_returns_estimator(r::NoReturn, args...)
-    return NoReturn(; settings = no_bounds_returns_settings(r.settings))
+"""
+    resolved_expected_return(rt::JRE_VecJRE, wd::VecNum, w::VecNum, X::MatNum,
+                             fees::Option{<:Fees}) -> Number
+
+Compute the expected return of the weights `wd` from a return estimator that [`factory`](@ref) resolved against a prior, net of the fee of the portfolio `w`.
+
+A resolved estimator holds every moment that it reads, so the returns matrix `X` is the only data that the function needs. [`expected_return`](@ref) on a prior calls it on `factory(rt, pr)` and `pr.X`, and [`ExpectedReturn`](@ref) and [`ExpectedReturnRiskRatio`](@ref) call it on the returns matrix of the risk path. Thus both routes read one ladder, the ladder of the model that [`set_return_constraints!`](@ref) builds.
+
+[`expected_return`](@ref) states the closed form of each estimator. The function reads the gross return of `wd` and the fee term of `w`. The two are the same vector, except in [`difference_risk`](@ref), where `wd` is the difference of `w` and a benchmark. The `mu` slot of an [`ArithmeticReturn`](@ref) and the `w` slot of a [`LogarithmicReturn`](@ref) take the place of the moments of the prior. An [`ArithmeticReturn`](@ref) reads its `ucs` through [`ucs_expected_return`](@ref). A fitted set gives the worst-case return over the set, and an estimator or `nothing` gives the nominal return. A vector of estimators sums `settings.scale` times the return of each term whose `settings.rte` is `true`.
+
+# Arguments
+
+  - `rt`: Return estimator that [`factory`](@ref) resolved, or a vector of them.
+  - `wd`: The weights whose gross return the function computes, `assets × 1`.
+  - $(arg_dict[:pw])
+  - `X`: Asset returns matrix `observations × assets`.
+  - `fees`: Fee of the portfolio `w`, or `nothing`.
+
+# Validation
+
+  - The `mu` slot of an [`ArithmeticReturn`](@ref) holds no [`DeferredQuantity`](@ref), from [`assert_resolved_slots`](@ref), and it is not `nothing`. Otherwise the function throws an `ArgumentError` or an `IsNothingError`.
+
+# Returns
+
+  - `rt::Number`: The expected return of `wd`, net of the fee of `w`.
+
+# Related
+
+  - [`expected_return`](@ref)
+  - [`ExpectedReturn`](@ref)
+  - [`ExpectedReturnRiskRatio`](@ref)
+  - [`ucs_expected_return`](@ref)
+  - [`term_fees`](@ref)
+  - [`factory`](@ref)
+"""
+function resolved_expected_return(rt::ArithmeticReturn, wd::VecNum, w::VecNum, X::MatNum,
+                                  fees::Option{<:Fees})
+    assert_resolved_slots(rt)
+    @argcheck(!isnothing(rt.mu),
+              IsNothingError("an `ArithmeticReturn` reads the expected returns `mu` of a prior, and this one holds none. A returns matrix does not hold them. Pass the prior result, for example `expected_risk(r, w, pr)`, or resolve the measure first with `factory(r, pr)`, or state `mu` on the `ArithmeticReturn`."))
+    # A fitted set gives the worst case that the model bounds, as the functor of
+    # `UncertaintySetVariance` gives the worst-case variance.
+    return ucs_expected_return(rt.ucs, rt.mu, wd, rt.mtx_sqrt) -
+           term_fees(w, fees, size(X, 1), rt.settings.fee)
 end
-function no_bounds_returns_estimator(r::VecJRE, args...)
-    return [no_bounds_returns_estimator(ri, args...) for ri in r]
+function resolved_expected_return(rt::LogarithmicReturn, wd::VecNum, w::VecNum, X::MatNum,
+                                  fees::Option{<:Fees})
+    x = X * wd
+    kret = isnothing(rt.w) ? Statistics.mean(log1p, x) : Statistics.mean(log1p.(x), rt.w)
+    return kret - term_fees(w, fees, size(X, 1), rt.settings.fee)
+end
+function resolved_expected_return(::NoReturn, wd::VecNum, ::VecNum, ::MatNum,
+                                  ::Option{<:Fees})
+    # No charge, exactly as `set_return_constraints!` applies none.
+    return zero(eltype(wd))
+end
+function resolved_expected_return(rt::VecJRE, wd::VecNum, w::VecNum, X::MatNum,
+                                  fees::Option{<:Fees})
+    ret = zero(eltype(wd))
+    for rt_i in rt
+        if !rt_i.settings.rte
+            continue
+        end
+        ret += rt_i.settings.scale * resolved_expected_return(rt_i, wd, w, X, fees)
+    end
+    return ret
+end
+"""
+    ucs_expected_return(ucs, mu::Num_VecNum, w::VecNum,
+                        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
+
+Compute the expected return of the weights `w` over the mean uncertainty set `ucs`, before the charges.
+
+It is the value level of the return expression that [`set_ucs_return_constraints!`](@ref) builds for the same set. [`resolved_expected_return`](@ref) calls it on the `ucs` of an [`ArithmeticReturn`](@ref), as the functor of [`UncertaintySetVariance`](@ref) calls [`ucs_variance`](@ref). A fitted set gives the worst-case return over the set. An estimator or `nothing` gives the nominal return ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}``, because the set does not exist yet. [`ucs_returns_estimator`](@ref) fits the set before the optimiser builds a model, so every reader of a resolved term reads the worst case.
+
+The model expression lies at or below this value, and the two are equal when the objective raises the return or when the lower bound of the term binds. So a weight vector meets a lower bound on the model expression exactly when this value meets it. A level of a [`Frontier`](@ref) and an anchor of [`NearOptimalCentering`](@ref) read this value, and not the value of the model expression at a corner, which can lie far below it.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{r}_{\\mathrm{box}}(\\boldsymbol{w}) &= \\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w} - \\boldsymbol{\\Delta}^\\intercal \\lvert \\boldsymbol{w} \\rvert\\,,\\\\
+\\hat{r}_{\\mathrm{ell}}(\\boldsymbol{w}) &= \\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w} - \\kappa \\lVert \\mathbf{G}\\boldsymbol{w} \\rVert_2\\,,\\\\
+\\hat{r}_{\\ell_1}(\\boldsymbol{w}) &= \\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w} - \\epsilon \\lVert \\boldsymbol{\\sigma} \\odot \\boldsymbol{w} \\rVert_\\infty\\,,\\\\
+\\hat{r}_{\\pm\\ell_1}(\\boldsymbol{w}) &= \\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w} - \\epsilon_{+} \\left(\\underset{i}{\\max}\\, (-\\sigma_i w_i)\\right)_{+} - \\epsilon_{-} \\left(\\underset{i}{\\max}\\, (\\sigma_i w_i)\\right)_{+}\\,,\\\\
+\\hat{r}_{\\mathrm{nb}}(\\boldsymbol{w}) &= \\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w} - \\kappa_{b} \\lVert \\mathbf{L}^{\\intercal}\\boldsymbol{w} \\rVert_{p^{*}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{r}_{\\mathrm{box}}``, ``\\hat{r}_{\\mathrm{ell}}``, ``\\hat{r}_{\\ell_1}``, ``\\hat{r}_{\\pm\\ell_1}``, ``\\hat{r}_{\\mathrm{nb}}``: Worst-case expected return over a [`BoxUncertaintySet`](@ref), an [`EllipsoidalUncertaintySet`](@ref), an [`L1UncertaintySet`](@ref), a [`SignedL1UncertaintySet`](@ref) and a mean [`NormBallUncertaintySet`](@ref).
+  - $(math_dict[:mu_hat_ucs])
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{\\Delta}``: Half-width of the box, half the difference of its `ub` and `lb` fields.
+  - ``\\kappa``, ``\\mathbf{G}``: Radius of the ellipsoid, its `k` field, and the transpose of the square root of its `sigma` field that [`matrix_square_root`](@ref) takes under `mtx_sqrt`.
+  - ``\\epsilon``: Radius of the ``\\ell_1`` set, its `eps` field.
+  - ``\\epsilon_{+}``, ``\\epsilon_{-}``: Radii of the positive-error and the negative-error sides of the signed set, its `ep` and `en` fields.
+  - $(math_dict[:sigma_i_ucs]) ``\\boldsymbol{\\sigma}`` is the vector of these factors, the `sd` field.
+  - $(math_dict[:pos_part])
+  - ``\\kappa_{b}``, ``\\mathbf{L}``, ``p^{*}``: Radius of the norm ball, its map, and the dual order of its norm, [`dual_norm_order`](@ref) of its `p` field. A map with no column adds nothing.
+
+# Arguments
+
+  - `ucs`: Fitted mean uncertainty set, an estimator of one, or `nothing`.
+  - `mu::Num_VecNum`: Fallback centre. The centre that the set carries wins over it.
+  - $(arg_dict[:pw])
+  - `mtx_sqrt`: Square-root algorithm of the matrix of an ellipsoid, or `nothing` for the plain Cholesky factor. The other sets ignore it.
+
+# Validation
+
+  - Ellipsoid: `ucs.sigma` has a square root under `mtx_sqrt`, as [`matrix_square_root`](@ref) states. Raises a `LinearAlgebra.PosDefException`.
+
+# Returns
+
+  - `rt::Number`: The worst-case expected return for a fitted set, and the nominal expected return otherwise.
+
+# Related
+
+  - [`ArithmeticReturn`](@ref)
+  - [`resolved_expected_return`](@ref)
+  - [`ucs_returns_estimator`](@ref)
+  - [`ucs_variance`](@ref)
+  - [`set_ucs_return_constraints!`](@ref): The model expression, whose value lies at or below this value.
+"""
+function ucs_expected_return(::Option{<:AbstractUncertaintySetEstimator}, mu::Num_VecNum,
+                             w::VecNum, ::Any = nothing)
+    return dot_scalar(mu, w)
+end
+function ucs_expected_return(ucs::BoxUncertaintySet, mu::Num_VecNum, w::VecNum,
+                             ::Any = nothing)
+    # The set names its own centre, and `mu` is the fallback (ADR 0050).
+    mu = something(ucs.val, mu)
+    return dot_scalar(mu, w) - LinearAlgebra.dot((ucs.ub - ucs.lb) / 2, abs.(w))
+end
+function ucs_expected_return(ucs::EllipsoidalUncertaintySet, mu::Num_VecNum, w::VecNum,
+                             mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
+    mu = something(ucs.val, mu)
+    G = transpose(matrix_square_root(mtx_sqrt, ucs.sigma))
+    return dot_scalar(mu, w) - ucs.k * LinearAlgebra.norm(G * w)
+end
+function ucs_expected_return(ucs::L1UncertaintySet, mu::Num_VecNum, w::VecNum,
+                             ::Any = nothing)
+    mu = something(ucs.mu, mu)
+    sw = isnothing(ucs.sd) ? w : ucs.sd .* w
+    return dot_scalar(mu, w) - ucs.eps * LinearAlgebra.norm(sw, Inf)
+end
+function ucs_expected_return(ucs::SignedL1UncertaintySet, mu::Num_VecNum, w::VecNum,
+                             ::Any = nothing)
+    mu = something(ucs.mu, mu)
+    sw = isnothing(ucs.sd) ? w : ucs.sd .* w
+    z = zero(eltype(sw))
+    return dot_scalar(mu, w) - ucs.ep * max(maximum(-sw), z) - ucs.en * max(maximum(sw), z)
+end
+function ucs_expected_return(ucs::NormBallUncertaintySet{<:Any, <:Any, <:Any,
+                                                         <:MuUncertaintySetClass},
+                             mu::Num_VecNum, w::VecNum, ::Any = nothing)
+    mu = something(ucs.val, mu)
+    # `norm` of an empty vector is zero under every order, so a map with no column pays
+    # nothing without a branch, as the builder raises no cone for it.
+    penalty = LinearAlgebra.norm(transpose(ucs.L) * w, dual_norm_order(ucs.p))
+    return dot_scalar(mu, w) - ucs.kappa * penalty
+end
+"""
+    ucs_returns_estimator(rt, rd::ReturnsResult, pr::AbstractPriorResult)
+
+Fit the estimator in the `ucs` of an [`ArithmeticReturn`](@ref) on the returns data `rd` and the prior result `pr`, so that the set becomes an [`AbstractUncertaintySetResult`](@ref).
+
+[`resolve_jump_optimiser`](@ref) calls it once, on the reduced prior and the reduced returns data that the builder of the model reads. So the model, the levels of a return [`Frontier`](@ref), the anchors of [`NearOptimalCentering`](@ref) and its sub-problems read one fitted set, and [`ucs_expected_return`](@ref) gives the worst case that the model bounds. It is the return twin of [`ucs_risk_measure`](@ref). The prior exists here, so an estimator that reads a prior result is fitted too, through [`mu_ucs`](@ref) of three arguments.
+
+A set that is already fitted, `nothing`, and a term of another type return unchanged. A vector of terms is fitted term by term.
+
+# Arguments
+
+  - `rt`: One return term, or a vector of them.
+  - $(arg_dict[:rd])
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - The term, or the vector of terms, with each estimator in `ucs` replaced by its fitted set.
+
+# Related
+
+  - [`ArithmeticReturn`](@ref)
+  - [`mu_ucs`](@ref)
+  - [`ucs_expected_return`](@ref)
+  - [`ucs_risk_measure`](@ref)
+  - [`resolve_jump_optimiser`](@ref)
+"""
+function ucs_returns_estimator(rt::ArithmeticReturn{<:Any,
+                                                    <:AbstractUncertaintySetEstimator},
+                               rd::ReturnsResult, pr::AbstractPriorResult)
+    return rebuild_struct(rt, (; ucs = mu_ucs(rt.ucs, rd, pr)))
+end
+function ucs_returns_estimator(rt::JuMPReturnsEstimator, ::ReturnsResult,
+                               ::AbstractPriorResult)
+    return rt
+end
+function ucs_returns_estimator(rt::VecJRE, rd::ReturnsResult, pr::AbstractPriorResult)
+    return [ucs_returns_estimator(rt_i, rd, pr) for rt_i in rt]
 end
 """
     bounds_returns_estimator(r, lb)
@@ -682,7 +910,12 @@ whether one number has the same meaning for all of the terms.
   - [`LogarithmicReturn`](@ref)
 """
 function bounds_returns_estimator(r::JuMPReturnsEstimator, lb::Option{<:RkRtBounds})
-    return Accessors.@set r.settings.lb = lb
+    settings = r.settings
+    return if lb === settings.lb
+        r
+    else
+        rebuild_struct(r, (; settings = rebuild_struct(settings, (; lb = lb))))
+    end
 end
 function bounds_returns_estimator(r::VecJRE, lb::Nothing)
     return [bounds_returns_estimator(ri, nothing) for ri in r]

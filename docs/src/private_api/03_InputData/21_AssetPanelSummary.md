@@ -1,8 +1,16 @@
 ```@meta
-Description = "Asset panel summary, private API of PortfolioOptimisers.jl: panel_field_kind, panel_field_width, panel_field_missing, panel_active_cells, …"
+Description = "Asset panel summary, private API of PortfolioOptimisers.jl: PanelFieldCoverage, CountSpread, PanelMaskCoverage, panel_field_kind, panel_field_width, …"
 ```
 
 # Asset panel summary: private API
+
+## Types
+
+```@docs
+PortfolioOptimisers.PanelFieldCoverage
+PortfolioOptimisers.CountSpread
+PortfolioOptimisers.PanelMaskCoverage
+```
 
 ## Functions
 

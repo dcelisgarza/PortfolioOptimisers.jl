@@ -21,11 +21,10 @@ PositivePartWarmUp
 forecast_scale_warm_up
 ```
 
-The two members of the systematic repair rule of a [`CrossSectionalFactorPrior`](@ref), and the method that each one implements, are on this page too. The rule stands in `srep`.
+The member of the systematic repair rule of a [`CrossSectionalFactorPrior`](@ref), and the method that it implements, are on this page too. The rule stands in `srep`, and the default `nothing` does not repair the systematic block.
 
 ```@docs
 SystematicRepair
-NoSystematicRepair
 systematic_processing!
 ```
 

@@ -1,5 +1,5 @@
 ```@meta
-Description = "Shrunk Expected Returns, public API of PortfolioOptimisers.jl: GrandMean, VolatilityWeighted, MeanSquaredError, JamesStein, BayesStein, BodnarOkhrinParolya, …"
+Description = "Shrunk Expected Returns, public API of PortfolioOptimisers.jl: GrandMean, VolatilityWeighted, MeanSquaredError, AbstractShrunkExpectedReturnsIntensity, …"
 ```
 
 # Shrunk Expected Returns
@@ -8,6 +8,10 @@ Description = "Shrunk Expected Returns, public API of PortfolioOptimisers.jl: Gr
 GrandMean
 VolatilityWeighted
 MeanSquaredError
+AbstractShrunkExpectedReturnsIntensity
+UnitIntervalIntensity
+NonNegativeIntensity
+shrinkage_intensity
 JamesStein
 BayesStein
 BodnarOkhrinParolya

@@ -31,9 +31,9 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    Online(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator};
+    Online(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator};
            max_history::Option{<:Integer} = nothing)
-    Online(; est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator},
+    Online(; est::Union{AbstractEstimator, StatsBase.CovarianceEstimator},
            max_history::Option{<:Integer} = nothing)
 
 ## Validation
@@ -81,7 +81,7 @@ Online
     $(field_dict[:pf_max_history])
     """
     max_history
-    function Online(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator};
+    function Online(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator};
                     max_history::Option{<:Integer} = nothing)
         @argcheck(hasfield(typeof(est), :cache),
                   ArgumentError("`$(typeof(est))` has no `cache` field, so it has nowhere to carry a sample buffer and cannot be wrapped in `Online`. A covariance estimator of this kind takes the buffer of a `PortfolioOptimisersCovariance(; ce = …)`, which carries one for any estimator that it holds, and a prior holds the rows for each of its members."))
@@ -109,7 +109,7 @@ end
 function Online(::Online, args...; kwargs...)
     return throw(ArgumentError("est cannot be an Online: wrappers do not nest. One wrapper declares one buffer, and an estimator it wraps may carry wrappers of its own — they resolve at the same warm-up — but they belong in its fields, not inside this one."))
 end
-function Online(; est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator},
+function Online(; est::Union{AbstractEstimator, StatsBase.CovarianceEstimator},
                 max_history::Option{<:Integer} = nothing)::Online
     return Online(est; max_history = max_history)
 end
@@ -144,7 +144,67 @@ function assert_sample_buffer(::Online)
     return throw(ArgumentError("an `Online` is a declaration, not an estimator that folds, and this one reached a fold unresolved. `update_online_estimator` resolves every wrapper it can reach at warm-up; a wrapper that survives to a fold came from a callable `TimeDependent`, whose value is computed per fold and so is never seeded. A schedule and a wrapper do not compose in that direction: a schedule replaces the field's value every fold, while the buffer is threaded through it, so a schedule that returns a captured estimator returns the buffer as it stood when the closure was built."))
 end
 """
-    const Online_Option{X} = Union{Nothing, <:Online, X}
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Folds observations into the sample buffer an estimator carries.
+
+This is the buffering arm of [`partial_fit!`](@ref). Each estimator that carries a [`SampleBufferState`](@ref) reaches this method. A family that folds exactly has methods of its own, and each of them narrows the `cache` type parameter of its estimator to the state of that fold. So a buffer never reaches them, and it reaches this method. The type of the state selects the route, and no method refuses the step.
+
+The method covers both arms of the interface. The families that refuse the step also declare one method over both arms, and two narrower methods here would be ambiguous against each of them. So the body selects the arm by the type of `X`, and the compiler resolves that branch at each call site.
+
+A buffer carries the per-observation masks beside the observations. So a [`CoveragePolicy`](@ref) mask goes through the wrapper as it goes through the accumulator of an estimator, and the call with no data gives it back to the batch verb. A wrapped estimator folded under a policy gives the answer of a batch fit over the same window under the same policy. The implied volatilities and `ivpa` go through the wrapper in the same way, so a wrapped estimator that reads them, such as an [`ImpliedVolatility`](@ref) inside a [`PortfolioOptimisersCovariance`](@ref), gives the answer of a batch fit over the same rows.
+
+# Algorithm
+
+ 1. Read the buffer out of the `cache` field with [`assert_sample_buffer`](@ref), which refuses an estimator that was never wrapped in [`Online`](@ref).
+ 2. Fold a matrix, its masks and its implied volatilities through the block arm of [`partial_fit!`](@ref), and a vector, its masks and its implied volatilities through the single-observation arm.
+ 3. Rebuild the estimator with the new buffer in `cache` through [`rebuild_struct`](@ref), and return it.
+
+# Arguments
+
+  - `est`: Estimator whose buffer is folded forward.
+  - `X`: Observations to fold. A matrix holds one observation per row when `dims == 1`, and one per column when `dims == 2`. A vector is a single observation across the assets, and `dims` is ignored.
+  - $(arg_dict[:dims])
+  - `active_mask`: The active mask of the block, of the shape of `X`, or of one entry per asset when `X` is one observation, or `nothing`.
+  - `estimation_mask`: The estimation mask, on the same terms as `active_mask`.
+  - `iv`: The implied volatilities, on the same terms as `active_mask`.
+  - `ivpa`: The implied volatility risk premium adjustment, or `nothing`.
+
+# Validation
+
+  - `est` carries a [`SampleBufferState`](@ref). An `ArgumentError` is thrown otherwise.
+  - The masks and `iv`, when they are not `nothing`, have the shape of `X`. A `DimensionMismatch` is thrown otherwise.
+  - A buffer that holds observations receives the masks that it records, and it receives `iv` if and only if it records implied volatilities. An `ArgumentError` is thrown otherwise.
+  - `ivpa` equals the adjustment that the first append pinned. An `ArgumentError` is thrown otherwise.
+  - $(val_dict[:dims])
+
+# Returns
+
+  - `est`: The estimator, with its `cache` field rebound to the buffer after the last observation.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`Online`](@ref)
+  - [`sample_buffer_kwargs`](@ref)
+  - [`CoveragePolicy`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function partial_fit!(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator},
+                      X::VecNum_MatNum; dims::Int = 1, active_mask = nothing,
+                      estimation_mask = nothing, iv = nothing, ivpa = nothing)
+    state = assert_sample_buffer(est)
+    state = if isa(X, MatNum)
+        partial_fit!(state, X; dims = dims, active_mask = active_mask,
+                     estimation_mask = estimation_mask, iv = iv, ivpa = ivpa)
+    else
+        partial_fit!(state, X; active_mask = active_mask, estimation_mask = estimation_mask,
+                     iv = iv, ivpa = ivpa)
+    end
+    return state === est.cache ? est : rebuild_struct(est, (; cache = state))
+end
+"""
+    const Online_Option{X} = Union{Nothing, Online, X}
 
 Alias for a field that accepts `nothing`, a static estimator of type `X`, or an [`Online`](@ref) declaration.
 
@@ -156,9 +216,9 @@ The fields whose constructor signatures use this alias are the fields that can t
   - [`Option`](@ref)
   - [`online_fields`](@ref)
 """
-const Online_Option{X} = Union{Nothing, <:Online, X}
+const Online_Option{X} = Union{Nothing, Online, X}
 """
-    const Onl{X} = Union{<:Online, X}
+    const Onl{X} = Union{Online, X}
 
 Alias for a required field that accepts a static estimator of type `X` or an [`Online`](@ref) declaration.
 
@@ -170,9 +230,9 @@ This is the form of [`Online_Option`](@ref) for a required field, as [`TD`](@ref
   - [`Online_Option`](@ref)
   - [`online_fields`](@ref)
 """
-const Onl{X} = Union{<:Online, X}
+const Onl{X} = Union{Online, X}
 """
-    const CVE_Onl = Union{<:CrossValidationEstimator, <:Online{<:CrossValidationEstimator}}
+    const CVE_Onl = Union{CrossValidationEstimator, Online{<:CrossValidationEstimator}}
 
 Alias for a cross-validation scheme, plain or an Online Scheme.
 
@@ -185,7 +245,7 @@ An Online Scheme is an [`Online`](@ref) around a walk-forward, built by the func
   - [`CVER`](@ref)
   - [`folds_are_stepped`](@ref)
 """
-const CVE_Onl = Union{<:CrossValidationEstimator, <:Online{<:CrossValidationEstimator}}
+const CVE_Onl = Union{CrossValidationEstimator, Online{<:CrossValidationEstimator}}
 """
     online_candidate_fields(x)
 
@@ -225,7 +285,7 @@ The scan reads the fields of the outer estimator, so the constructor signatures 
   - [`online_candidate_fields`](@ref)
   - [`update_online_estimator`](@ref)
 """
-function online_fields(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
+function online_fields(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
     fns = online_candidate_fields(est)
     return filter(f -> isa(getfield(est, f), Online), fns)
 end
@@ -236,7 +296,7 @@ Resolves the [`Online`](@ref) declarations of an estimator, seeding the sample b
 
 The warm-up calls it once, before the first fold. It replaces each wrapper with the estimator that the wrapper holds, rebuilt through its keyword constructor with the state of [`online_state_seed`](@ref) in `cache`. That state is an empty [`SampleBufferState`](@ref) with the cap of the wrapper, unless the family has a seed of its own. The function then rebuilds the outer estimator through its keyword constructor, so each construction check runs again. The result holds no `Online`, and each estimator that was wrapped carries the state that its refit or its carry reads.
 
-The function finds a wrapper in the fields of the estimator that it receives, and in the fields of an estimator inside a wrapper. An outer estimator that passes estimators across a boundary of its own, such as a meta-optimiser or a pipeline, has a method of its own that recurses, as it has for [`update_time_dependent_estimator`](@ref).
+The function is a structural traversal, so it owns the identity on a leaf. A value that is not an estimator, such as `nothing`, a prior result or a schedule, holds no wrapper to resolve, and it passes unchanged. The function finds a wrapper in the fields of the estimator that it receives, and in the fields of an estimator inside a wrapper. An outer estimator that passes estimators across a boundary of its own, such as a meta-optimiser or a pipeline, has a method of its own that recurses, as it has for [`update_time_dependent_estimator`](@ref).
 
 The function takes no fold context, unlike [`update_time_dependent_estimator`](@ref). The seed reads nothing from a fold, because the wrapper resolves once and not at each fold.
 
@@ -245,11 +305,12 @@ The function takes no fold context, unlike [`update_time_dependent_estimator`](@
  1. For an [`Online`](@ref), rebuild the wrapped estimator with `cache` set to the state of [`online_state_seed`](@ref), and continue with that estimator.
  2. Find the fields of the estimator that hold a wrapper, with [`online_fields`](@ref). Return the estimator when there is none.
  3. Resolve the value of each of these fields with this function.
- 4. Rebuild the estimator with the resolved values through [`rebuild_estimator`](@ref).
+ 4. Rebuild the estimator with the resolved values through [`rebuild_struct`](@ref).
+ 5. Return any value that is not an estimator unchanged.
 
 # Arguments
 
-  - `est`: Estimator, wrapper, or `nothing`.
+  - `est`: Estimator, wrapper, or any other value, which the function returns unchanged.
 
 # Returns
 
@@ -260,19 +321,19 @@ The function takes no fold context, unlike [`update_time_dependent_estimator`](@
   - [`Online`](@ref)
   - [`SampleBufferState`](@ref)
   - [`online_fields`](@ref)
-  - [`rebuild_estimator`](@ref)
+  - [`rebuild_struct`](@ref)
 """
-function update_online_estimator(est::Union{<:AbstractEstimator,
-                                            <:StatsBase.CovarianceEstimator})
+function update_online_estimator(est::Union{AbstractEstimator,
+                                            StatsBase.CovarianceEstimator})
     fns = online_fields(est)
     if isempty(fns)
         return est
     end
     repl = NamedTuple{fns}(map(f -> update_online_estimator(getfield(est, f)), fns))
-    return rebuild_estimator(est, repl)
+    return rebuild_struct(est, repl)
 end
-function update_online_estimator(::Nothing)
-    return nothing
+function update_online_estimator(x::Any)
+    return x
 end
 """
     estimator_fields(x)
@@ -290,8 +351,8 @@ Field names of `x` whose type admits an estimator, the candidate set that [`onli
     fns = Tuple(f
                 for f in fieldnames(T)
                 if typeintersect(fieldtype(T, f),
-                                 Union{<:AbstractEstimator,
-                                       <:StatsBase.CovarianceEstimator}) !== Union{})
+                                 Union{AbstractEstimator, StatsBase.CovarianceEstimator}) !==
+                   Union{})
     return :($fns)
 end
 """
@@ -329,8 +390,7 @@ The cold start of the fold loop uses this walk. The online arm of [`fold_loop`](
   - [`partial_fit_cache`](@ref)
   - [`AbstractPartialFitState`](@ref)
 """
-function online_entry_state(est::Union{<:AbstractEstimator,
-                                       <:StatsBase.CovarianceEstimator})
+function online_entry_state(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
     # The index form keeps a type with no `cache` field, such as `HighOrderPriorEstimator`,
     # from a `getfield` by a name that it does not have.
     i = findfirst(==(:cache), fieldnames(typeof(est)))
@@ -397,17 +457,18 @@ end
 """
     online_wrapper_path(est)
     online_wrapper_path(::Online)
+    online_wrapper_path(::Online{<:CrossValidationEstimator})
     online_wrapper_path(::TimeDependent)
 
 Names the first field of an estimator tree that holds an [`Online`](@ref) declaration, or answers `nothing`.
 
-[`assert_batch_entry`](@ref) uses this walk. Only the warm-up of the online arm of the fold loop resolves a wrapper, with [`update_online_estimator`](@ref). Without the check, a batch fit that reaches a wrapper gets a `MethodError` at `prior(pe, X)`, not a refusal. The walk reads the fields of [`estimator_fields`](@ref), and the answer is the dotted path from the root. It is `"pe"` for a wrapped prior on a naive optimiser, and `"opt.pe"` for a wrapped prior under a JuMP head. The walk does not enter a field that holds a wrapper, because the warm-up resolves the wrappers below it. A wrapper at the root answers `""`, the empty path. A [`TimeDependent`](@ref) schedule answers `nothing`, because its constructor refuses a wrapper among its entries. A value that is not an estimator also answers `nothing`.
+[`assert_batch_entry`](@ref) uses this walk. Only the warm-up of the online arm of the fold loop resolves a wrapper, with [`update_online_estimator`](@ref). Without the check, a batch fit that reaches a wrapper gets a `MethodError` at `prior(pe, X)`, not a refusal. The walk reads the fields of [`estimator_fields`](@ref), and the answer is the dotted path from the root. It is `"pe"` for a wrapped prior on a naive optimiser, and `"opt.pe"` for a wrapped prior under a JuMP head. The walk does not enter a field that holds a wrapper, because the warm-up resolves the wrappers below it. A wrapper at the root answers `""`, the empty path. An Online Scheme answers `nothing`. It is a scheme in the `cv` field of a meta-optimiser, such as [`Stacking`](@ref), and not the declaration of a sample buffer, so the fold loop that runs it resolves it. A [`TimeDependent`](@ref) schedule answers `nothing`, because its constructor refuses a wrapper among its entries. A value that is not an estimator also answers `nothing`.
 
 # Algorithm
 
- 1. Answer `""` when `est` is an [`Online`](@ref).
- 2. Walk the fields of [`estimator_fields`](@ref) in order, and answer the name of the first field that holds a wrapper.
- 3. For a field that holds no wrapper, find the path in the field with this function, and answer it with the field name and a dot before it.
+ 1. Answer `""` when `est` is an [`Online`](@ref), and `nothing` when it is an Online Scheme.
+ 2. Walk the fields of [`estimator_fields`](@ref) in order, and find the path in each field with this function.
+ 3. Answer the first path found, with the field name before it, as [`tree_path`](@ref) joins them.
  4. Answer `nothing` when no field gives a path.
 
 # Arguments
@@ -425,22 +486,20 @@ Names the first field of an estimator tree that holds an [`Online`](@ref) declar
   - [`estimator_fields`](@ref)
   - [`update_online_estimator`](@ref)
 """
-function online_wrapper_path(est::Union{<:AbstractEstimator,
-                                        <:StatsBase.CovarianceEstimator})
+function online_wrapper_path(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
     for f in estimator_fields(est)
-        v = getfield(est, f)
-        if isa(v, Online)
-            return string(f)
-        end
-        path = online_wrapper_path(v)
+        path = online_wrapper_path(getfield(est, f))
         if !isnothing(path)
-            return string(f, ".", path)
+            return tree_path(f, path)
         end
     end
     return nothing
 end
 function online_wrapper_path(::Online)
     return ""
+end
+function online_wrapper_path(::Online{<:CrossValidationEstimator})
+    return nothing
 end
 function online_wrapper_path(::Any)
     return nothing
@@ -623,7 +682,7 @@ The walk reads every field, not only the fields of [`estimator_fields`](@ref). A
   - [`tree_path`](@ref)
   - [`estimator_fields`](@ref)
 """
-function seed_window_path(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
+function seed_window_path(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
     for f in fieldnames(typeof(est))
         path = seed_window_path(getfield(est, f))
         if !isnothing(path)
@@ -699,8 +758,7 @@ The predicate reads a type and a field, never a method table. A read of the disp
   - [`Online`](@ref)
   - [`HighOrderPriorEstimator`](@ref)
 """
-function supports_partial_fit(est::Union{<:AbstractEstimator,
-                                         <:StatsBase.CovarianceEstimator})
+function supports_partial_fit(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
     return hasfield(typeof(est), :cache) && isa(getfield(est, :cache), SampleBufferState)
 end
 function supports_partial_fit(::Nothing)
@@ -732,12 +790,12 @@ The function takes the estimator and not its type, so a family that sizes its se
   - [`SampleBufferState`](@ref)
   - [`update_online_estimator`](@ref)
 """
-function online_state_seed(::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator},
+function online_state_seed(::Union{AbstractEstimator, StatsBase.CovarianceEstimator},
                            max_history::Option{<:Integer})
     return SampleBufferState(; max_history = max_history)
 end
 function update_online_estimator(o::Online)
-    est = rebuild_estimator(o.est, (; cache = online_state_seed(o.est, o.max_history)))
+    est = rebuild_struct(o.est, (; cache = online_state_seed(o.est, o.max_history)))
     return update_online_estimator(est)
 end
 function update_online_estimator(::Online{<:CrossValidationEstimator})
@@ -765,7 +823,7 @@ A path that starts with a bracket follows the name with no dot, so a walk names 
   - [`online_entry_state`](@ref)
   - [`element_path`](@ref)
 """
-function tree_path(head::Union{<:Symbol, <:AbstractString}, path::AbstractString)
+function tree_path(head::Union{Symbol, AbstractString}, path::AbstractString)
     return if isempty(path) || startswith(path, '[')
         string(head, path)
     else
@@ -802,13 +860,14 @@ function seed_window_path(v::AbstractVector)
     return element_path(seed_window_path, v)
 end
 function seed_window_path(p::Pair)
-    return seed_window_path(last(p))
+    # A Pair is a node of the tree, and the walk goes on in its value (#2088).
+    return seed_window_path(p.second)
 end
 function online_entry_state(v::AbstractVector)
     return element_path(online_entry_state, v)
 end
 function online_entry_state(p::Pair)
-    return online_entry_state(last(p))
+    return online_entry_state(p.second)
 end
 
 """
@@ -822,7 +881,7 @@ The head is [`OnlinePortfolioSelection`](@ref), and it holds the set in its `set
 
 In order to implement a new set kind, subtype `AbstractAllocationSet` with its constraint objects as part of the struct, and implement:
 
-  - `resolve_allocation_set(set::AbstractAllocationSet, N::Integer, strict::Bool, datatype::DataType) -> AbstractAllocationSet`: The set with every estimator resolved to a value over the `N` assets, which the projection then reads.
+  - `resolve_allocation_set(set::AbstractAllocationSet, N::Integer, strict::Bool, datatype::DataType) -> AbstractAllocationSet`: The set with every estimator resolved to a value over the `N` assets, which the projection then reads. The library implements the method on `nothing`, the empty slot, which resolves to the bare simplex, a default [`BoundedAllocationSet`](@ref).
   - `project(proj::AbstractProjectionGeometry, set::AbstractAllocationSet, q::AbstractVector, w::AbstractVector) -> AbstractVector`: The projection onto the resolved set, for every geometry the set admits.
   - `rows_needed(set::AbstractAllocationSet) -> Union{Nothing, Integer}`: The number of rows the set's constraints read at a step, `0` for a set that reads none.
 

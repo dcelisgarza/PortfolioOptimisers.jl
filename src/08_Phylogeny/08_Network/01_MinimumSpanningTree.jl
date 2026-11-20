@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all minimum spanning tree (MST) algorithm types.
+Abstract supertype for the algorithms that build a minimum spanning tree.
 
-All concrete and/or abstract types implementing specific MST algorithms (e.g., Kruskal, Boruvka, Prim) should be subtypes of `AbstractTreeType`.
+Every concrete or abstract type that selects a minimum spanning tree algorithm must subtype `AbstractTreeType`. A subtype goes in the `alg` field of a [`NetworkEstimator`](@ref), and [`calc_mst`](@ref) runs the algorithm that it selects.
 
 # Related
 
@@ -13,19 +13,18 @@ All concrete and/or abstract types implementing specific MST algorithms (e.g., K
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 13.1.4.1.
-  - $(ref_dict[:mantegna1999])
+  - $(ref_dict[:mantegna1999]) Page 194, for the minimum spanning tree of the distances of Equation 2.
 """
 abstract type AbstractTreeType <: AbstractPhylogenyAlgorithm end
 """
-    const Tree_SimMat = Union{<:AbstractNonNegativeSimilarityMatrixAlgorithm,
-                              <:AbstractTreeType}
+    const Tree_SimMat = Union{AbstractNonNegativeSimilarityMatrixAlgorithm,
+                              AbstractTreeType}
 
-Alias for a tree or similarity matrix algorithm.
+Union of the tree algorithms and the non-negative similarity algorithms.
 
-Matches either an [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref) or an [`AbstractTreeType`](@ref). Used for dispatch in phylogeny estimation where either a spanning tree or a similarity matrix approach may be used.
+It is the bound of the `alg` field of a [`NetworkEstimator`](@ref), and of the `alg` argument of [`calc_weighted_adjacency`](@ref). A tree algorithm selects a minimum spanning tree, and a similarity algorithm selects a PMFG.
 
-The similarity half is the **narrow** family, not [`AbstractSimilarityMatrixAlgorithm`](@ref): the similarity branch builds a PMFG, whose consumers cannot take a negative weight. So [`MaximumDistanceSimilarity`](@ref), [`ExponentialSimilarity`](@ref), [`GeneralExponentialSimilarity`](@ref) and [`ComplementSimilarity`](@ref) match, and [`AngularSimilarity`](@ref) does not.
+The similarity members come from [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref), and not from the wider [`AbstractSimilarityMatrixAlgorithm`](@ref). The similarity branch builds a PMFG, and the consumers of a PMFG cannot take a negative weight. [`MaximumDistanceSimilarity`](@ref), [`ExponentialSimilarity`](@ref), [`GeneralExponentialSimilarity`](@ref) and [`ComplementSimilarity`](@ref) are members, and [`AngularSimilarity`](@ref) is not.
 
 # Related
 
@@ -34,14 +33,13 @@ The similarity half is the **narrow** family, not [`AbstractSimilarityMatrixAlgo
   - [`AbstractTreeType`](@ref)
   - [`NetworkEstimator`](@ref)
 """
-const Tree_SimMat = Union{<:AbstractNonNegativeSimilarityMatrixAlgorithm,
-                          <:AbstractTreeType}
+const Tree_SimMat = Union{AbstractNonNegativeSimilarityMatrixAlgorithm, AbstractTreeType}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Grows the minimum spanning tree by taking the lightest edge that joins two components.
+Grows the minimum spanning tree with the lightest edge that joins two components, one edge at a time.
 
-`KruskalTree` specifies the use of [Kruskal's algorithm](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.kruskal_mst) for constructing a minimum spanning tree from a graph.
+`KruskalTree` selects [Kruskal's algorithm](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.kruskal_mst) for [`calc_mst`](@ref), which calls `Graphs.kruskal_mst`.
 
 # Fields
 
@@ -76,7 +74,7 @@ KruskalTree
 
 # References
 
-  - $(ref_dict[:kruskal1956])
+  - $(ref_dict[:kruskal1956]) Page 49, Construction A.
 """
 @concrete struct KruskalTree <: AbstractTreeType
     """
@@ -98,9 +96,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Grows the minimum spanning tree by joining every component to its own lightest neighbour at once.
+Grows the minimum spanning tree with one edge from every component to its lightest neighbour, in each round.
 
-`BoruvkaTree` specifies the use of [Boruvka's algorithm](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.boruvka_mst) for constructing a minimum spanning tree from a graph.
+`BoruvkaTree` selects [Boruvka's algorithm](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.boruvka_mst) for [`calc_mst`](@ref), which calls `Graphs.boruvka_mst`.
 
 # Fields
 
@@ -136,6 +134,7 @@ BoruvkaTree
 # References
 
   - $(ref_dict[:boruvka1926])
+  - $(ref_dict[:nesetril2001]) Section 2, for an English translation, and Section 4, for the step that joins each vertex to its nearest neighbour.
 """
 @concrete struct BoruvkaTree <: AbstractTreeType
     """
@@ -157,9 +156,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Grows the minimum spanning tree outward from a single starting vertex.
+Grows the minimum spanning tree outward from one first vertex.
 
-`PrimTree` specifies the use of [Prim's algorithm](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.prim_mst) for constructing a minimum spanning tree from a graph.
+`PrimTree` selects [Prim's algorithm](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.prim_mst) for [`calc_mst`](@ref), which calls `Graphs.prim_mst`.
+
+Construction B of [kruskal1956](@cite), one year before [prim1957](@cite), grows the tree from a fixed set of vertices. With one vertex in that set, it is the same algorithm.
 
 # Fields
 
@@ -194,7 +195,8 @@ PrimTree
 
 # References
 
-  - $(ref_dict[:prim1957])
+  - $(ref_dict[:prim1957]) Pages 1391-1392, Principles 1 and 2, and the variant that grows a single fragment.
+  - $(ref_dict[:kruskal1956]) Page 49, Construction B.
 """
 @concrete struct PrimTree <: AbstractTreeType
     """
@@ -210,35 +212,35 @@ PrimTree
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
 end
-function PrimTree(; args::Tuple = (), kwargs::NamedTuple = (;))
+function PrimTree(; args::Tuple = (), kwargs::NamedTuple = (;))::PrimTree
     return PrimTree(args, kwargs)
 end
 """
     calc_mst(alg::AbstractTreeType, g::Graphs.AbstractGraph)
 
-Compute the minimum spanning tree (MST) of a graph using the specified algorithm.
+Compute the minimum spanning tree of a graph with the algorithm that `alg` selects.
 
-This function dispatches to the appropriate MST computation from `Graphs.jl` based on the type of `alg`. Supported algorithms include Kruskal, Boruvka, and Prim.
+The type of `alg` selects one of three routines of `Graphs.jl`.
 
 # Algorithm
 
- 1. Select the `Graphs.jl` spanning-tree routine that the type of `alg` names.
- 2. Splat `alg.args` and `alg.kwargs` into that call. [`assert_tree_args`](@ref) refused every entry that could re-weight or re-orient the search, so the tree is minimised over the weights `g` already carries.
- 3. Read the edge vector out of the answer. `Graphs.boruvka_mst` answers with a named tuple whose first field holds it, and the other two routines answer with the vector itself.
+ 1. Select the spanning tree routine of `Graphs.jl` that the type of `alg` names.
+ 2. Splat `alg.args` and `alg.kwargs` into that call. The constructor of `alg` called [`assert_tree_args`](@ref), which refuses every entry that can re-weight or re-orient the search. The routine then minimises the tree over the weights that `g` carries.
+ 3. Return the vector of edges. `Graphs.boruvka_mst` returns a named tuple whose first field holds the vector, and the other two routines return the vector.
 
 # Arguments
 
-  - `alg`: MST algorithm to use.
+  - `alg`: Minimum spanning tree algorithm.
 
-      + `alg::KruskalTree`: Computes the MST using Kruskal's algorithm.
-      + `alg::BoruvkaTree`: Computes the MST using Boruvka's algorithm.
-      + `alg::PrimTree`: Computes the MST using Prim's algorithm.
+      + `alg::KruskalTree`: Kruskal's algorithm, through `Graphs.kruskal_mst`.
+      + `alg::BoruvkaTree`: Boruvka's algorithm, through `Graphs.boruvka_mst`.
+      + `alg::PrimTree`: Prim's algorithm, through `Graphs.prim_mst`.
 
-  - `g::Graphs.AbstractGraph`: Graph to compute the MST on.
+  - `g::Graphs.AbstractGraph`: Weighted graph to span.
 
 # Returns
 
-  - `tree::Vector`: Vector of edges representing the MST.
+  - `tree::Vector`: Edges of the minimum spanning tree.
 
 # Related
 

@@ -226,7 +226,7 @@ isa(res3.retcode, OptimisationSuccess)
 The stacked areas show the weights at each of the 25 points of the surface.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 plot_stacked_area_composition(res3.w, rd.nx)
 
 #=

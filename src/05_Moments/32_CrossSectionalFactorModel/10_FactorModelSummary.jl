@@ -26,7 +26,7 @@ Where:
 
 # Returns
 
-  - `v::Vector{<:Real}`: The entries of column `k` that are not `NaN`, in the order of the observations. An integer series gives a floating-point vector.
+  - `v::Vector{<:Real}`: The entries of column `k` that are not `NaN`, in the order of the observations.
 
 # Related
 
@@ -35,7 +35,7 @@ Where:
   - [`factor_model_summary`](@ref)
 """
 function factor_summary_finite_column(A::MatNum, k::Integer)
-    Tf = float_if_integer(real(eltype(A)))
+    Tf = real(eltype(A))
     v = Vector{Tf}(undef, 0)
     for t in axes(A, 1)
         a = A[t, k]
@@ -221,7 +221,7 @@ For each factor `k`:
 """
 function factor_summary_return_stats(f::MatNum, ppy::Number)
     K = size(f, 2)
-    Tr = promote_type(float_if_integer(real(eltype(f))), real(typeof(ppy)))
+    Tr = promote_type(real(eltype(f)), real(typeof(ppy)))
     Tv = typeof(sqrt(one(Tr)))
     ann_return = Vector{Tr}(undef, K)
     ann_volatility = Vector{Tv}(undef, K)
@@ -287,7 +287,7 @@ The coefficient is not defined for ``T < 2``, nor for a series with a constant h
 """
 function factor_summary_autocorrelation(f::MatNum)
     T, K = size(f)
-    Tf = typeof(sqrt(one(float_if_integer(real(eltype(f))))))
+    Tf = typeof(sqrt(one(real(eltype(f)))))
     ac = fill(Tf(NaN), K)
     if T < 2
         return ac
@@ -324,12 +324,38 @@ function factor_summary_autocorrelation(f::MatNum)
     return ac
 end
 """
-    factor_summary_returns(csfm::CrossSectionalFactorModel)
+$(DocStringExtensions.TYPEDEF)
+
+Holds the factor return history that a summary reads off a factor model block, and the position of each raw factor on the axis of that history.
+
+This type is an implementation detail and is not intended for direct use. [`factor_summary_returns`](@ref) makes it, and [`factor_model_summary`](@ref) and the factor diagnostics plots read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`factor_summary_returns`](@ref)
+  - [`factor_summary_positions`](@ref)
+"""
+@concrete struct FactorReturnHistory
+    """
+    `f`: Factor return history `observations × factors`.
+    """
+    f
+    """
+    `pos`: One entry per raw factor. Entry `k` is the column of `f` that holds raw factor `k`, or `0` when `f` holds none.
+    """
+    pos
+end
+"""
+    factor_summary_returns(csfm::CrossSectionalFactorModel) -> FactorReturnHistory
     factor_summary_returns(csfm::CrossSectionalFactorModel, csr::Nothing, fr)
     factor_summary_returns(csfm::CrossSectionalFactorModel, csr::CrossSectionalRegression,
-                           fr::Nothing)
+                           fr::Nothing) -> FactorReturnHistory
     factor_summary_returns(csfm::CrossSectionalFactorModel, csr::CrossSectionalRegression,
-                           fr::MatNum)
+                           fr::MatNum) -> FactorReturnHistory
 
 Return the factor return history that a summary reads off a factor model block, and the position of each raw factor on the axis of that history.
 
@@ -348,11 +374,11 @@ A block that carries `fr` states its factor returns on the raw axis, so the hist
 
 # Returns
 
-  - `f::MatNum`: Factor return history `observations × factors`.
-  - `pos::Vector{Int}`: One entry per raw factor. Entry `k` is the column of `f` that holds raw factor `k`, or `0` when `f` holds none.
+  - `h::FactorReturnHistory`: The history `f::MatNum`, `observations × factors`, and the positions `pos::Vector{Int}`, as [`FactorReturnHistory`](@ref) states them.
 
 # Related
 
+  - [`FactorReturnHistory`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
   - [`factor_model_summary`](@ref)
   - [`factor_summary_positions`](@ref)
@@ -364,13 +390,13 @@ function factor_summary_returns(::CrossSectionalFactorModel, ::Nothing, ::Any)
     return throw(IsNothingError("csr cannot be nothing: a factor model summary reads the factor return history of the block"))
 end
 function factor_summary_returns(csfm::CrossSectionalFactorModel, ::CrossSectionalRegression,
-                                ::Nothing)
-    return (; f = cross_sectional_factor_returns(csfm),
-            pos = factor_summary_positions(csfm))
+                                ::Nothing)::FactorReturnHistory
+    return FactorReturnHistory(cross_sectional_factor_returns(csfm),
+                               factor_summary_positions(csfm))
 end
 function factor_summary_returns(::CrossSectionalFactorModel, ::CrossSectionalRegression,
-                                fr::MatNum)
-    return (; f = fr, pos = collect(axes(fr, 2)))
+                                fr::MatNum)::FactorReturnHistory
+    return FactorReturnHistory(fr, collect(axes(fr, 2)))
 end
 """
     factor_summary_positions(csfm::CrossSectionalFactorModel)
@@ -483,7 +509,7 @@ Where:
   - [`factor_model_summary`](@ref)
 """
 function factor_summary_mapped(v::VecNum, pos::AbstractVector{Int})
-    Tf = float_if_integer(real(eltype(v)))
+    Tf = real(eltype(v))
     m = fill(Tf(NaN), length(pos))
     for k in eachindex(pos)
         j = pos[k]
@@ -589,7 +615,7 @@ The variance is not defined for an empty ``\\mathcal{N}_{tk}``. An infinite expo
 
 # Arguments
 
-  - `Ms`: Exposure history `observations × assets × factors`, unlagged.
+  - `Ms`: Exposure history `assets × factors × observations`, unlagged.
   - `t`: Position of the observation.
   - `k`: Position of the factor.
 
@@ -602,13 +628,13 @@ The variance is not defined for an empty ``\\mathcal{N}_{tk}``. An infinite expo
   - [`factor_summary_constant_exposures`](@ref)
 """
 function factor_summary_exposure_variance(Ms::Arr3Num, t::Integer, k::Integer)
-    Tf = float_if_integer(real(eltype(Ms)))
+    Tf = real(eltype(Ms))
     n = 0
     s = zero(Tf)
     lo = Tf(Inf)
     hi = -Tf(Inf)
-    for i in axes(Ms, 2)
-        a = Ms[t, i, k]
+    for i in axes(Ms, 1)
+        a = Ms[i, k, t]
         if !isnan(a)
             n += 1
             s += Tf(a)
@@ -622,8 +648,8 @@ function factor_summary_exposure_variance(Ms::Arr3Num, t::Integer, k::Integer)
     # mean the common value, so every deviation is exactly zero.
     m = clamp(s / n, lo, hi)
     q = zero(Tf)
-    for i in axes(Ms, 2)
-        a = Ms[t, i, k]
+    for i in axes(Ms, 1)
+        a = Ms[i, k, t]
         if !isnan(a)
             q += (Tf(a) - m)^2
         end
@@ -658,7 +684,7 @@ A factor with no exposure anywhere is not constant.
 
 # Arguments
 
-  - `Ms`: Exposure history `observations × assets × factors`, unlagged.
+  - `Ms`: Exposure history `assets × factors × observations`, unlagged.
 
 # Returns
 
@@ -671,8 +697,8 @@ A factor with no exposure anywhere is not constant.
   - [`factor_model_summary`](@ref)
 """
 function factor_summary_constant_exposures(Ms::Arr3Num)
-    T = size(Ms, 1)
-    K = size(Ms, 3)
+    T = size(Ms, 3)
+    K = size(Ms, 2)
     c = falses(K)
     for k in 1:K
         m = -Inf
@@ -718,7 +744,7 @@ The median is not defined for an empty ``\\mathcal{T}_{k}``, and that is the cas
 
 # Arguments
 
-  - `Ms`: Exposure history `observations × assets × factors`, unlagged.
+  - `Ms`: Exposure history `assets × factors × observations`, unlagged.
   - `csfm`: A cross-sectional factor model block.
   - `step`: Number of observations between the two cross-sections that the coefficient reads.
   - `weighting`: The [`AbstractOrthogonalityMetric`](@ref) whose weight history the coefficient reads.
@@ -736,20 +762,19 @@ The median is not defined for an empty ``\\mathcal{T}_{k}``, and that is the cas
 function factor_summary_stability(Ms::Arr3Num, csfm::CrossSectionalFactorModel;
                                   step::Integer = 21, weighting = BenchmarkWeightMetric())
     con = factor_summary_constant_exposures(Ms)
-    K = size(Ms, 3)
-    Tf = float_if_integer(real(eltype(Ms)))
-    if size(Ms, 1) <= step
+    K = size(Ms, 2)
+    Tf = real(eltype(Ms))
+    if size(Ms, 3) <= step
         return Tf[con[k] ? one(Tf) : Tf(NaN) for k in 1:K]
     end
     S = exposure_stability(csfm; step = step, weighting = weighting).X
     return Tf[con[k] ? one(Tf) : Tf(factor_summary_column_median(S, k)) for k in 1:K]
 end
 """
-    factor_summary_exposure(csfm::CrossSectionalFactorModel; step, weighting,
-                            coverage_weighting)
-    factor_summary_exposure(Ms::Nothing, csfm::CrossSectionalFactorModel; kwargs...)
-    factor_summary_exposure(Ms::Arr3Num, csfm::CrossSectionalFactorModel; step, weighting,
-                            coverage_weighting)
+    factor_summary_exposure(Ms::Nothing, csfm::CrossSectionalFactorModel, step::Integer,
+                            weighting, coverage_weighting)
+    factor_summary_exposure(Ms::Arr3Num, csfm::CrossSectionalFactorModel, step::Integer,
+                            weighting, coverage_weighting)
 
 Return the two exposure columns of a factor model summary, on the raw factor axis.
 
@@ -776,18 +801,12 @@ The two columns read different weight histories. The stability reads the history
   - [`exposure_coverage`](@ref)
   - [`factor_summary_stability`](@ref)
 """
-function factor_summary_exposure(csfm::CrossSectionalFactorModel; step::Integer = 21,
-                                 weighting = BenchmarkWeightMetric(),
-                                 coverage_weighting = RegressionWeightMetric())
-    return factor_summary_exposure(csfm.Ms, csfm; step = step, weighting = weighting,
-                                   coverage_weighting = coverage_weighting)
-end
-function factor_summary_exposure(::Nothing, ::CrossSectionalFactorModel; kwargs...)
+function factor_summary_exposure(::Nothing, ::CrossSectionalFactorModel, ::Integer, ::Any,
+                                 ::Any)
     return nothing, nothing
 end
-function factor_summary_exposure(Ms::Arr3Num, csfm::CrossSectionalFactorModel;
-                                 step::Integer = 21, weighting = BenchmarkWeightMetric(),
-                                 coverage_weighting = RegressionWeightMetric())
+function factor_summary_exposure(Ms::Arr3Num, csfm::CrossSectionalFactorModel,
+                                 step::Integer, weighting, coverage_weighting)
     stability = factor_summary_stability(Ms, csfm; step = step, weighting = weighting)
     coverage = exposure_coverage(csfm; weighting = coverage_weighting).X
     return stability, coverage
@@ -813,12 +832,27 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    FactorSummaryResult(
-        ann_return, ann_volatility, sharpe, autocorr,
-        mean_abs_t, t_rate, mean_vif, stability, coverage, ppy, nf, fam
-    ) -> FactorSummaryResult
+    FactorSummaryResult(ann_return::VecNum, ann_volatility::VecNum, sharpe::VecNum,
+                        autocorr::VecNum, mean_abs_t::Option{<:VecNum},
+                        t_rate::Option{<:VecNum}, mean_vif::Option{<:VecNum},
+                        stability::Option{<:VecNum}, coverage::Option{<:VecNum},
+                        ppy::Number, nf::Option{<:VecStr}, fam::Option{<:VecStr})
+    FactorSummaryResult(; ann_return::VecNum, ann_volatility::VecNum, sharpe::VecNum,
+                        autocorr::VecNum, mean_abs_t::Option{<:VecNum} = nothing,
+                        t_rate::Option{<:VecNum} = nothing,
+                        mean_vif::Option{<:VecNum} = nothing,
+                        stability::Option{<:VecNum} = nothing,
+                        coverage::Option{<:VecNum} = nothing, ppy::Number = 1,
+                        nf::Option{<:VecStr} = nothing, fam::Option{<:VecStr} = nothing)
 
-The arguments are the fields, in the order of their declaration. The type is a Result, so [`factor_model_summary`](@ref) builds it and a caller reads it. It has no keyword constructor, and it checks none of its values.
+The type is a Result, so [`factor_model_summary`](@ref) builds it and a caller reads it. The positional constructor checks the values. The keyword constructor takes each field by name and calls it. Its defaults are `nothing` for the five columns that can be absent and for the two labels, and `1` for `ppy`.
+
+## Validation
+
+  - Each column that is not `nothing`, and each label that is not `nothing`, holds one entry per factor, as many as `ann_return`. Otherwise, the constructor raises a `DimensionMismatch`.
+  - `ppy > 0`. Otherwise, the constructor raises a `DomainError`.
+  - No entry of `ann_volatility` or of `mean_abs_t` is negative. A `NaN` passes. Otherwise, the constructor raises a `DomainError`.
+  - Each entry of `t_rate` and of `coverage` is `NaN` or in ``[0, 1]``. Otherwise, the constructor raises a `DomainError`.
 
 # Related
 
@@ -875,6 +909,77 @@ The arguments are the fields, in the order of their declaration. The type is a R
     $(field_dict[:fd_fam])
     """
     fam
+    function FactorSummaryResult(ann_return::VecNum, ann_volatility::VecNum, sharpe::VecNum,
+                                 autocorr::VecNum, mean_abs_t::Option{<:VecNum},
+                                 t_rate::Option{<:VecNum}, mean_vif::Option{<:VecNum},
+                                 stability::Option{<:VecNum}, coverage::Option{<:VecNum},
+                                 ppy::Number, nf::Option{<:VecStr}, fam::Option{<:VecStr})
+        fs = new{typeof(ann_return), typeof(ann_volatility), typeof(sharpe),
+                 typeof(autocorr), typeof(mean_abs_t), typeof(t_rate), typeof(mean_vif),
+                 typeof(stability), typeof(coverage), typeof(ppy), typeof(nf), typeof(fam)}(ann_return,
+                                                                                            ann_volatility,
+                                                                                            sharpe,
+                                                                                            autocorr,
+                                                                                            mean_abs_t,
+                                                                                            t_rate,
+                                                                                            mean_vif,
+                                                                                            stability,
+                                                                                            coverage,
+                                                                                            ppy,
+                                                                                            nf,
+                                                                                            fam)
+        assert_factor_summary_columns(fs)
+        return fs
+    end
+end
+function FactorSummaryResult(; ann_return::VecNum, ann_volatility::VecNum, sharpe::VecNum,
+                             autocorr::VecNum, mean_abs_t::Option{<:VecNum} = nothing,
+                             t_rate::Option{<:VecNum} = nothing,
+                             mean_vif::Option{<:VecNum} = nothing,
+                             stability::Option{<:VecNum} = nothing,
+                             coverage::Option{<:VecNum} = nothing, ppy::Number = 1,
+                             nf::Option{<:VecStr} = nothing,
+                             fam::Option{<:VecStr} = nothing)::FactorSummaryResult
+    return FactorSummaryResult(ann_return, ann_volatility, sharpe, autocorr, mean_abs_t,
+                               t_rate, mean_vif, stability, coverage, ppy, nf, fam)
+end
+"""
+    assert_factor_summary_columns(fs::FactorSummaryResult)
+
+Check the columns of a [`FactorSummaryResult`](@ref) that its constructor built.
+
+The constructor builds the Result first and checks it here, so the check reads each column by its name and not by its position among twelve arguments.
+
+# Arguments
+
+  - `fs`: The summary to check.
+
+# Validation
+
+  - Each field but `ppy` is `nothing` or holds as many entries as `ann_return`. Raises a `DimensionMismatch`.
+  - `ppy > 0`. Raises a `DomainError`.
+  - The rules of [`assert_nan_or_nonneg`](@ref) on `ann_volatility` and `mean_abs_t`, and of [`assert_nan_or_closed_unit_interval`](@ref) on `t_rate` and `coverage`. An absent column is `nothing`, and those rules check nothing on it.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`FactorSummaryResult`](@ref)
+"""
+function assert_factor_summary_columns(fs::FactorSummaryResult)::Nothing
+    K = length(fs.ann_return)
+    @argcheck(all(f -> f === :ppy ||
+                       isnothing(getfield(fs, f)) ||
+                       length(getfield(fs, f)) == K, fieldnames(FactorSummaryResult)),
+              DimensionMismatch("every column and label of the summary must be nothing or hold one entry per factor, $K entries like ann_return"))
+    @argcheck(fs.ppy > zero(fs.ppy), DomainError(fs.ppy, "ppy must be positive"))
+    assert_nan_or_nonneg(fs.ann_volatility, :ann_volatility)
+    assert_nan_or_nonneg(fs.mean_abs_t, :mean_abs_t)
+    assert_nan_or_closed_unit_interval(fs.t_rate, :t_rate)
+    assert_nan_or_closed_unit_interval(fs.coverage, :coverage)
+    return nothing
 end
 """
     port_opt_view(fs::FactorSummaryResult, i, args...)
@@ -968,8 +1073,8 @@ function factor_model_summary(csfm::CrossSectionalFactorModel; ppy::Number = 1,
                                              factor_summary_return_stats(f, ppy))
     autocorr = factor_summary_mapped(factor_summary_autocorrelation(f), pos)
     mean_abs_t, t_rate, mean_vif = factor_summary_gram(csfm, threshold)
-    stability, coverage = factor_summary_exposure(csfm; step = step, weighting = weighting,
-                                                  coverage_weighting = coverage_weighting)
+    stability, coverage = factor_summary_exposure(csfm.Ms, csfm, step, weighting,
+                                                  coverage_weighting)
     return FactorSummaryResult(ann_return, ann_volatility, sharpe, autocorr, mean_abs_t,
                                t_rate, mean_vif, stability, coverage, ppy, csfm.nf,
                                csfm.fam)

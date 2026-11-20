@@ -153,3 +153,29 @@ first consequence above still holds. Such a run was sequential already, because 
 previous weights. A run whose optimiser reads no previous weights stays parallel, and its numbers do
 not move. The table of the decision now reads
 "Off (`nothing`): follows `wd`" for `pws`. Recorded by #1518, from row R102 of #1416.
+
+## Amendment (2026-10-28)
+
+**`DriftedWeights` carries no Weight Drift.** It was `DriftedWeights(; wd = SelfFinancingDrift())`,
+and it is now a singleton, `DriftedWeights()`, like `TargetWeights()`. The field had one reader,
+`held_weights_drift`, and only in the setting where the scheme drifts nothing. When the scheme
+set `wd`, the `wd` of the scheme ran, and the field of the source had no effect. So
+`wd = A, pws = DriftedWeights(; wd = B)` dropped `B` with no warning. That is a state that means
+nothing, which is the reason this ADR gave to refuse two `Bool` fields.
+
+A scheme that drifts nothing and threads the held weights now computes them under
+`SelfFinancingDrift()`, the old default of the field, so no number moves. `held_weights_drift` is
+now `public`. Its fallback on `AbstractPreviousWeightsSource` gives `SelfFinancingDrift()`. A
+source that drifts its held weights in another way is a new sibling of `TargetWeights` and
+`DriftedWeights`, with its own method. The four settings are:
+
+| `wd` of the scheme | `pws` of the scheme | Return series | The next fold starts from | Drift that runs |
+| --- | --- | --- | --- | --- |
+| `nothing` | `nothing` or `TargetWeights()` | the target weights | the target weights | none |
+| `SelfFinancingDrift()` | `nothing` or `DriftedWeights()` | the drifted holdings | the held weights | the `wd` of the scheme |
+| `SelfFinancingDrift()` | `TargetWeights()` | the drifted holdings | the target weights | the `wd` of the scheme |
+| `nothing` | `DriftedWeights()` | the target weights | the held weights | `SelfFinancingDrift()` |
+
+The docstring of `AbstractPreviousWeightsSource` holds the same table, and the schemes link it.
+Recorded by [#1860](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1860), under
+ADR 0222.

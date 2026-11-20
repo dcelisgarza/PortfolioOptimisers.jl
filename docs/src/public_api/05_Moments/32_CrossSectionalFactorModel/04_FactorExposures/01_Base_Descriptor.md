@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base descriptor, public API of PortfolioOptimisers.jl: AbstractDescriptorEstimator, descriptor, lookback, merge_states."
+Description = "Base descriptor, public API of PortfolioOptimisers.jl: AbstractDescriptorEstimator, DescriptorStepResult, descriptor, lookback, merge_states."
 ```
 
 # [Base descriptor](@id api-base-descriptor)
@@ -8,6 +8,7 @@ Description = "Base descriptor, public API of PortfolioOptimisers.jl: AbstractDe
 
 ```@docs
 AbstractDescriptorEstimator
+DescriptorStepResult
 ```
 
 ## Functions

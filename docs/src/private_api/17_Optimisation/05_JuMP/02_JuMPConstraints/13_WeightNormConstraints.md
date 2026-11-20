@@ -8,6 +8,7 @@ Description = "Weight norm constraints, private API of PortfolioOptimisers.jl: s
 set_weight_norm_2_constraints!
 set_weight_norm_p_constraints!
 set_weight_norm_inf_constraints!
+norm_epigraph!
 norm_ball_dual_norm_epigraph!
 ```
 

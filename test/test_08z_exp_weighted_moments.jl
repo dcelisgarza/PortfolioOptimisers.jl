@@ -252,6 +252,42 @@ end
                         active_mask = amsk); atol = 1e-18)
 end
 
+@testset "Exponentially weighted expected returns: debias = nothing keeps the undivided state (#2134)" begin
+    X = oracle_returns()
+    amsk = oracle_active_mask()
+    Xg = gapped(X, amsk)
+    raw = ExpWeightedExpectedReturns(; decay = EW_DECAY, min_obs = 1, debias = nothing)
+    def = ExpWeightedExpectedReturns(; decay = EW_DECAY, min_obs = 1)
+    @test def.debias === ZeroStartDebias()
+    mu = mean(raw, Xg; active_mask = amsk)
+    md = mean(def, Xg; active_mask = amsk)
+    fm = partial_fit!(def, Xg; active_mask = amsk)
+    f = isfinite.(md)
+    @test isequal(isfinite.(mu), f)
+    # The undivided state is the divided mean times the weight that the zero start removes, so
+    # it is shrunk toward zero.
+    @test isapprox(mu[f], md[f] .* (1 .- EW_DECAY .^ fm.cache.obs_count[f]); rtol = 1e-14)
+    @test all(abs.(mu[f]) .< abs.(md[f]))
+    # The fold of one observation at a time reads the same rule as the batch call.
+    fold = foldl((c, i) -> partial_fit!(c, view(Xg, i, :); active_mask = view(amsk, i, :)),
+                 axes(Xg, 1); init = raw)
+    @test isequal(mean(fold), mu)
+    # With no gap, the undivided state is the sum of the returns under unnormalised weights.
+    w = (1 - EW_DECAY) .* EW_DECAY .^ ((EW_T - 1):-1:0)
+    @test isapprox(mean(raw, X), vec(transpose(w) * X); rtol = 1e-12)
+    # The read-out allocates the copy of the state and the mask of the assets that are not
+    # ready, under each rule. It allocates no vector of the counted assets.
+    Xw = repeat(Xg, 1, 50)
+    amskw = repeat(amsk, 1, 50)
+    function readout_bytes(me)
+        st = partial_fit!(me, Xw; active_mask = amskw)
+        PortfolioOptimisers.exp_weighted_moment(st.cache, st)
+        return @allocated PortfolioOptimisers.exp_weighted_moment(st.cache, st)
+    end
+    @test readout_bytes(def) <= 2 * sizeof(Xw[1, :])
+    @test readout_bytes(raw) <= 2 * sizeof(Xw[1, :])
+end
+
 @testset "Exponentially weighted moments: the Asset Panel seam" begin
     X = oracle_returns()
     amsk = oracle_active_mask()
@@ -317,6 +353,13 @@ end
     @test isequal(cov(fitted), cov(cc, Xg; active_mask = amsk))
     @test isequal(cor(fitted), cor(cc, Xg; active_mask = amsk))
     @test isequal(cov(cc, fitted.cache), cov(fitted))
+    @test isequal(cor(cc, fitted.cache), cor(fitted))
+    # One observation at a time, with and without the active mask, is the block fit.
+    by_row = foldl((c, i) -> partial_fit!(c, Xg[i, :]; active_mask = amsk[i, :]),
+                   axes(Xg, 1); init = cc)
+    @test isequal(cov(by_row), cov(fitted))
+    no_mask = foldl((c, i) -> partial_fit!(c, Xg[i, :]), axes(Xg, 1); init = cc)
+    @test size(cov(no_mask)) == size(cov(fitted))
 
     # A copy shares no array, so a fold on one leaves the other alone.
     original = fitted.cache
@@ -503,25 +546,6 @@ end
     @test isequal(mean(one_at_a_time), mean(me, Xg))
 end
 
-@testset "Exponentially weighted moments: the pass without a callback" begin
-    X = oracle_returns()
-    amsk = oracle_active_mask()
-    Xg = gapped(X, amsk)
-
-    # Issue #877. The callback of `exp_weighted_pass!` is what makes a point-in-time series one
-    # forward pass, and every other caller wants the last cache alone. The method that takes no
-    # callback runs the same recursion, so the two caches read the same moment.
-    for est in (ExpWeightedExpectedReturns(; decay = EW_DECAY),
-                ExpWeightedVariance(; decay = EW_DECAY),
-                ExpWeightedCovariance(; decay = EW_DECAY))
-        with_f = PortfolioOptimisers.exp_weighted_pass!((args...) -> nothing, est, Xg, 1,
-                                                        amsk)
-        without_f = PortfolioOptimisers.exp_weighted_pass!(est, Xg, 1, amsk)
-        @test isequal(PortfolioOptimisers.exp_weighted_moment(with_f, est),
-                      PortfolioOptimisers.exp_weighted_moment(without_f, est))
-    end
-end
-
 @testset "The gap fill value is keyed by the estimator" begin
     # Issue #925. A consumer that holds a gapped sample and an arbitrary covariance estimator
     # asks the estimator what a gapped cell is worth to it. A plain moment estimator takes the
@@ -630,13 +654,11 @@ end
 end
 
 @testset "Exponentially weighted expected returns: the number type and the correction" begin
-    # Issue #889. The state was seeded with `eltype(X)`, so an integer sample threw
-    # `InexactError` at the first step. A mean divides, so the state now holds the type of a
-    # division: an integer sample lands in a float, and a `Float32` sample stays `Float32`.
+    # Issue #889. A mean divides, so a `Float32` sample stays `Float32`. Issue #1972 removed
+    # the integer case: integer data convert at the carrier.
     me = ExpWeightedExpectedReturns(; decay = 0.9, min_obs = 1)
-    Xi = [1 -2; -1 3; 2 -1; 0 1]
-    @test isequal(mean(me, Xi), mean(me, float.(Xi)))
-    @test eltype(mean(me, Float32.(Xi ./ 100))) === Float32
+    Xf = [1.0 -2.0; -1.0 3.0; 2.0 -1.0; 0.0 1.0]
+    @test eltype(mean(me, Float32.(Xf ./ 100))) === Float32
 
     # With one observation the mean is that observation. The correction divided by
     # `max(1 - decay^n, eps(T))`, which cut the answer when `1 - decay` fell below `eps(T)`:
@@ -826,12 +848,10 @@ end
     c2 = partial_fit!(c1, view(Xc, 21:EW_T, :))
     @test c1.cache === c2.cache
 
-    # The state takes the type of a quotient of two returns: an integer sample gives a
-    # floating-point estimate, and a `Float32` sample keeps `Float32`.
-    Xi = [1 2 3; 4 -1 2; 0 3 -2; 5 1 1; -3 2 4]
-    ci = ExpWeightedCovariance(; decay = 0.8, min_obs = 1)
-    @test isequal(cov(ci, Xi), cov(ci, float.(Xi)))
-    @test eltype(cov(ExpWeightedCovariance(; decay = 0.8f0, min_obs = 1), Float32.(Xi))) ===
+    # A `Float32` sample keeps `Float32`. Issue #1972 removed the integer case: integer
+    # data convert at the carrier.
+    Xf = [1.0 2.0 3.0; 4.0 -1.0 2.0; 0.0 3.0 -2.0; 5.0 1.0 1.0; -3.0 2.0 4.0]
+    @test eltype(cov(ExpWeightedCovariance(; decay = 0.8f0, min_obs = 1), Float32.(Xf))) ===
           Float32
 
     # A panel whose mask does not have the size of the sample is refused.
@@ -967,14 +987,12 @@ end
               var([0.01, -0.02])
     end
 
-    # An integer panel gets a floating-point state, and a `Float32` panel keeps `Float32`.
-    Xi = [1 2; 3 -1; 0 2; 2 1; -1 0]
+    # A `Float32` panel keeps `Float32`. Issue #1972 removed the integer case: integer data
+    # convert at the carrier.
+    X32 = Float32[1 2; 3 -1; 0 2; 2 1; -1 0]
     ce = ExpWeightedVariance(; decay = 0.9, min_obs = 2)
-    @test var(ce, Xi) == var(ce, float.(Xi))
-    @test isequal(PortfolioOptimisers.variance_series(ce, Xi),
-                  PortfolioOptimisers.variance_series(ce, float.(Xi)))
-    @test eltype(var(ce, Float32.(Xi))) === Float32
-    @test eltype(PortfolioOptimisers.variance_series(ce, Float32.(Xi))) === Float32
+    @test eltype(var(ce, X32)) === Float32
+    @test eltype(PortfolioOptimisers.variance_series(ce, X32)) === Float32
 
     # Under `PreCentred` the effective count is Kish's count of the weights `decay^k` over the
     # finite rows, and it is also the divisor, because the weights sum to one. Under the
@@ -995,9 +1013,34 @@ end
     @test cnt.m == cnt.n
     @test cne.n == cne.m .+ 1
     λ = exp2(-inv(40.0))
-    @test PortfolioOptimisers.exp_weighted_variance_count(λ, ones(10_000, 1), PreCentred()).n[1] ≈
+    @test PortfolioOptimisers.variance_count(λ, ones(10_000, 1), PreCentred(), nothing).n[1] ≈
           (1 + λ) / (1 - λ)
     @test round((1 + λ) / (1 - λ)) == 115
+
+    # The recursion restarts an asset where its active mask turns false, so the count of a
+    # variance that read the mask reads the rows after the last inactive row, as the variance
+    # does. Column 2 is inactive at row 4 and active again from row 5, with finite values on
+    # both sides. Column 1 stays active, so its count does not move.
+    am = trues(size(X))
+    am[4, 2] = false
+    X[4, 2] = 0.5
+    for ve in (ExpWeightedVariance(; decay = 0.9), RegimeAdjustedExpWeightedVariance(),
+               ExpWeightedCovariance(; decay = 0.9),
+               WindowedVariance(; ve = ExpWeightedVariance(; decay = 0.9), window = size(X, 1) - 1))
+        c = PortfolioOptimisers.variance_count(ve, X, am)
+        @test c.n[1] == PortfolioOptimisers.variance_count(ve, X).n[1]
+        @test c.n[2] == PortfolioOptimisers.variance_count(ve, X[5:end, 2:2]).n[1]
+        @test c.n[2] < PortfolioOptimisers.variance_count(ve, X).n[2]
+    end
+    v = PortfolioOptimisers.variance_series(ExpWeightedVariance(; decay = 0.9), X;
+                                            active_mask = am)
+    @test v[end, 2] ≈
+          PortfolioOptimisers.variance_series(ExpWeightedVariance(; decay = 0.9),
+                                              X[5:end, 2:2])[end, 1]
+    @test PortfolioOptimisers.variance_count(SimpleVariance(), X, am).n ==
+          PortfolioOptimisers.variance_count(SimpleVariance(), X).n
+    @test_throws DimensionMismatch PortfolioOptimisers.variance_count(ExpWeightedVariance(),
+                                                                      X, am[2:end, :])
 end
 
 #=
@@ -1089,7 +1132,7 @@ end
     # two estimated deviations has a non-zero mean. The factor reads it, so the recursion is
     # unbiased for returns independent in time, at one, two and five lags, with holidays. The
     # test reads the raw state: the report floors a negative HAC variance at zero, which is the
-    # floor of `NoHacFloor` and adds a positive bias to a young estimate.
+    # floor of `hac_floor = nothing` and adds a positive bias to a young estimate.
     rng = StableRNG(1509)
     μ, M, T = 0.3, 20_000, 30
     λ = 2.0^(-1 / 10)

@@ -213,3 +213,145 @@ runs on the new value. A patch that names a forwarded, aliased or computed prope
 because such a property is a view of a nested value with no storage of its own. The message names
 the path to set instead, where the property has one, and the fields otherwise. The keyword constructor of a decorated type must take every field by its
 field name.
+
+## Amendment (2026-11-12)
+
+**A `forward` rule can mark its names as settable.** The amendment of 2026-10-07 refuses a patch
+that names a forwarded property. Item 4 of the ruling of Decision 3 of map
+[#1213](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1213) needs an exception.
+A search sets a key such as `"opt.wb"` through `Accessors.set`, and `wb` is a slot of a nested
+part of `JuMPOptimiser`.
+[#2037](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/2037) builds it.
+
+`forward(loc; settable)` and `forward(loc, names...; settable)` forward as before. The patch of
+the generated `ConstructionBase.setproperties` passes a name of such a rule to the keyword
+constructor as a flat keyword, beside the fields. The type that marks a name takes that name as a
+keyword. The keyword replaces that slot of the nested part that the constructor is given, and its
+default leaves the slot as it is. `rebuild_struct` calls the constructor in the same way, so
+the two give the same value. A rule without the option keeps the refusal, so no type that the
+macro decorated before this amendment changes.
+
+The rule that reads a name decides whether a patch can set it. Each rule other than `swap` gives
+the pair of its path and its `settable` flag, in the order of the `getproperty` branches. A name
+that an earlier rule reads stays refused, even when a later `settable` rule forwards it.
+
+An option on a rule that it does not apply to is now refused. Before this amendment, the macro
+ignored `broadcast` on `forward` and `alias` with no error. `broadcast` applies to `compute` and
+`swap`, and `settable` applies to `forward`.
+
+## Amendment (2026-11-16)
+
+**The macro also generates `Base.hasproperty`, and a read through it allocates nothing.** The
+decision above names the `getproperty` and `propertynames` pair, and the amendment of 2026-10-07
+adds `ConstructionBase.setproperties`. `12058f0c14`
+([#2101](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/2101)) adds the fourth
+method. Before it, every read of a forwarded property allocated, for two causes:
+
+- A `forward(loc)` rule tested `sym in propertynames(child)`. The `propertynames` of a decorated
+  child removes its duplicate names with `unique` on each call, and allocates.
+- The own-field check read `fieldnames(T)`. For a signature with a free parameter, such as
+  `Regression{<:Any, Nothing, …}`, that expression builds a new `UnionAll` on each call.
+
+The generated `hasproperty` gives `true` for the names of `propertynames`, from one branch for
+each rule, and no other name. A `forward(loc)` rule asks `hasproperty` of the child, so a chain of
+`forward` rules runs one generated method for each link. The three methods read the field names of
+the bare name of `T`, a constant with the same field names. `propertynames` keeps its answer.
+
+Measured on a `git archive` copy of the parent of `12058f0c14`, against `dev`: `retcode` of a
+`RiskBudgetingResult` allocated 3 872 bytes, of a `FactorRiskContributionResult` 6 688 bytes,
+`re.M` of a `Regression` 2 304 bytes, and `mu` of a `HighOrderPrior` 1 664 bytes. Each allocates
+0 bytes after it.
+
+The hand-written `getproperty` and `propertynames` of `RJR_NRJR`, the results of `MeanRisk` and
+`NearOptimalCentering`, take the same `hasproperty` method by hand, because the macro does not
+decorate a `Union`. Before, `hasproperty(res, :retcode)` on a `MeanRiskResult` allocated 5 648
+bytes (R55 of [#1817](https://github.com/dcelisgarza/PortfolioOptimisers.jl/pull/1817)).
+
+## Amendment (2026-11-16, second)
+
+**The macro also generates a method of `forward_source`, and the refusal of a patch names the
+path that stores the value.** The amendment of 2026-10-07 makes the refusal of a forwarded name
+name the path of the rule. The `source` of that rule was a closure inside the generated
+`setproperties`, so it gave the path as a string, and it could not ask the source of a nested
+value. [#2129](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/2129) found that the
+path can have no storage either. `HighOrderPrior` forwards every property of `pr`, and `f_mu` is a
+computed property of the `LowOrderPrior` at `pr`. The refusal said "Set `pr.f_mu`", and that set
+gave a second refusal.
+
+The `source_branches` now make the method `forward_source(x::T, sym::Symbol)`, beside
+`getproperty`, `propertynames`, `hasproperty` and `setproperties`. It gives the same pair as the
+closure did, with the path as a tuple of symbols. A fallback method gives `nothing` for a type
+that the macro does not decorate. `forward_storage_path` walks the path one hop at a time, and it
+asks `forward_source` of the value at each hop. It puts the path of a rule in place of a hop that
+the rule reads. The walk ends at a stored field, at a settable name, or at a computed property.
+The refusal names the stored path, or the computed property with its type and the fields of that
+type.
+
+The fifth method replaces the closure, so the macro makes no more branches. The method that
+`setproperties` calls drops its `source` argument. No public name changes, and every patch that
+the macro let through before still goes through.
+
+## Amendment (2026-11-16, third)
+
+**Every JuMP optimisation Result takes its property methods from the macro, and no method is
+written on `RJR_NRJR`.** The first amendment of 2026-11-16 kept the hand-written `getproperty`,
+`propertynames` and `hasproperty` of `RJR_NRJR`, because the macro does not decorate a `Union`.
+Those three methods had no `ConstructionBase.setproperties` beside them. So `Accessors.set` and
+`Accessors.setproperties` refused every patch of a `MeanRiskResult` or a
+`NearOptimalCenteringResult` with the generic error of ConstructionBase, also a patch of a field
+([#2131](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/2131)).
+
+A census of every concrete type of the library found 27 types that change their property access.
+These two Results were the only types with no `setproperties` method. The three other subtypes of
+the union, `RiskBudgetingResult`, `RelaxedRiskBudgetingResult` and
+`FactorRiskContributionResult`, already used the macro.
+
+The two Results now declare `@forward_properties T begin forward(jr) end`, and the three methods
+on the union are gone. One mechanism serves all five subtypes. The macro gives the fifth and the
+sixth methods too, so a patch of a field rebuilds the Result through its keyword constructor, and
+the refusal of a forwarded name names the path that stores it. A new subtype of
+`RiskJuMPOptimisationResult` or `NonRiskJuMPOptimisationResult` declares its own block. The
+amendment of 2026-08-16 of ADR 0011 put the default on the union so that a new subtype forwards
+without a declaration. That reason does not hold against a type that cannot take a patch, and a
+subtype with no block fails at its first read of `res.w`.
+
+No library code patches a Result through `Accessors`. The library rebuilds a Result through
+`rebuild_struct`, and the search, the pipe routing and the pipeline context write estimators
+alone.
+
+## Amendment (2026-11-19)
+
+**A `derived` rule marks a field that the inner constructor computes, and a patch leaves it
+out.** The amendment of 2026-10-07 states the contract of `forward_setproperties`: the keyword
+constructor takes every field by its name. Two decorated types broke it
+([#2194](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/2194)), so
+`Accessors.@set` on any of their fields, and `rebuild_struct`, raised a `MethodError`.
+`PipelineResult` had no keyword constructor, and it now has one.
+`MultiPeriodPredictionResult` computes `mrd` from `pred` in its inner constructor, so its
+keyword constructor does not take `mrd`.
+
+`derived(fields...)` names such fields. The macro makes one more method for each type that it
+decorates, `forward_derived(::Type{<:T})`, which gives the names, or `()` when the block has no
+`derived` rule. The fallback for a type that the macro does not decorate gives `()` too. `forward_setproperties`
+and `rebuild_struct` leave a derived field out of the call of the keyword constructor, so the
+constructor computes it again from the new values. `assert_not_derived` refuses a patch that names
+a derived field, and the message names the fields to set. The rule adds no name and changes no
+read.
+
+The other form, a keyword `mrd = nothing` that the constructor ignores, would accept a patch of
+`mrd` and drop it with no error. So that form loses. A type with no derived field gives the empty
+tuple, the compiler folds the removal, and `rebuild_struct` allocates what it allocated before.
+A census in `test/test_05_tools.jl` compares the fields of every type with a generated
+`setproperties` method against the keyword names of its constructors.
+
+The review of the release (R75 of #1817) found the same mechanism on five types that the macro
+did not decorate: `Resume`, `LogRegimeAdjusted`, `NormalEquationsFit`,
+`CustomValueReturnForecastResult` and `TargetReturnForecastResult`. An undecorated type goes to
+the default `setproperties` of `ConstructionBase`, which calls the positional constructor with
+every field. The generic constructor of `@concrete` takes that call and skips the inner
+constructor, so the derived field kept its old value and no check ran, with no error. A search
+writes each candidate through `Accessors.set`, so a search over `x` of a `LogRegimeAdjusted`
+scored the `kappa` of the start value. Each of the five now has a block with a `derived` rule.
+`NormalEquationsFit` gets a keyword constructor for it. A second census in the same file reads
+every type of the package that has a keyword constructor and no hand-written constructor of every
+field, and demands that a `derived` rule names each field that no keyword constructor takes.

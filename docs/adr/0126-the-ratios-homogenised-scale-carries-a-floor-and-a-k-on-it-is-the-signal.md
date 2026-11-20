@@ -190,3 +190,57 @@ The test still reads a proxy. It does not see the weight bounds or the linear co
 bound that keeps every feasible portfolio at or below `rf` still takes the return form when an
 entry of `mu` is more than `rf`. The option to always take the risk form closes that gap too, but
 it moves every `MaximumRatio` answer, and #1358 did not take it.
+
+## Amendment (2026-10-27)
+
+The last Consequence above is superseded. Since #1844 the `k` of `RiskBudgeting` is `k >= 0`, the
+same bound as the `k` of `MaximumRatio`. Since #1845 it also carries a floor, by the rule of this
+ADR: `RiskBudgeting` gains a field `kmin`, placed before the fallback `fb`, under the `nothing` rule
+of `MaximumRatio`.
+
+A free `k` let the solve return `k < 0`. A row of the homogenised model, such as
+`lb k <= y <= ub k`, `y >= lt k` or `A y <= B k`, states its bound on `w = y / k` only for `k > 0`.
+So a negative `k` reversed every inequality row without a report. Under `bgt = nothing`,
+`wb = nothing` and the thresholds of `test_16c_mip_risk_budgeting.jl`, the solve returned
+`k = -194.7`, and asset 1 held a long weight of `0.005` under a long threshold of `1000`. The
+same model with `k >= 0` returns `k = 194.7` and the same weights with the opposite sign, which meet
+the threshold. The big-M rows of the indicators, `ilf <= k`, already assumed `k >= 0`. Equations
+10.8 and 10.21 of `cajas2025`, which the docstrings cite for `k`, state `k >= 0`.
+
+The free `k` had one stated use. With a positive budget, an orthant whose solution has a negative
+sum reached its normalised portfolio in the complementary orthant (Lemma 2.2 of `bai2016`). The
+lemma holds for the variance, because it needs `R(-y) = R(y)`. For a measure that is not even, such
+as `ConditionalValueatRisk`, the portfolio `-w` has a different risk (0.495 against 0.437, measured
+on ten assets) and misses the budget. A caller who wants that orthant gives `-z`.
+
+`k >= 0` alone keeps the collapse that this ADR describes for the ratio. When a positive budget
+meets an orthant whose solution has a negative sum, and no weight bound or short budget bounds the
+scale, the solve has no solution. `k` falls toward zero, and the weights grow as `1 / k`: measured,
+`k = 2.2e-6` and a gross exposure of `5.0e6`, with `OptimisationSuccess`. Before #1844 the same
+model returned `k = -0.090` and the orthant `-z`, which the caller did not ask for.
+
+**The floor (#1845).** `risk_budgeting_scale_floor` returns `rb.kmin` when the caller states it.
+Otherwise it returns `1e-4 / |b_g+|`, where `b_g+ = budget_upper_bound(opt.bgt)`, and `0` when
+`b_g+` is zero or infinite. A stated `kmin` must be non-negative, and `kmin = 0` turns the floor off and keeps only `k >= 0`,
+the model of #1844. The same change applies to `MaximumRatio`: the Decision above validates a
+stated `kmin > 0`, and since #1845 it validates `kmin >= 0`. A stated zero on either head lowers
+the bound of `k` back to `0`.
+`_set_risk_budgeting_constraints!` declares `k >= kmin`. It is a variable bound, not a row, for the
+reason that this ADR states.
+
+- `1 / b_g+` is the floor of a long-only book. The row of the logarithm `b' ln y >= 0` and the
+    weighted inequality of the arithmetic and the geometric means give `sum(y) >= 1`, also when `b`
+    does not sum to one. So no long-only model fixes `k` below `1 / b_g+`.
+- A long-short book and the factor form have no such bound, so `1e-4` is a margin with two limits,
+    measured over the `k` of 187 solves in fourteen risk budgeting test files. It must be below the
+    smallest scale that a well-posed model fixes, `k b_g+ = 0.459` (a long-short orthant of
+    `test_18zc`; the factor form fixed `1.648` or more). It must be above the scale where the solver
+    stops on a collapse, `2.2e-6`. One solve fixed `k b_g+ = 0.0025`. It is the collapse case of
+    `test_18zc`, which a short budget of `1000` stopped, and the test expects its miss.
+- With no budget, or with a budget that has no upper bound, no row ties `k` to the sum of the
+    weights, and the scale is free. The derived floor is then `0`, so it cannot bind on a free
+    scale. A zero budget does not read `k`, and it gives `0` too.
+
+On the collapse case the floor holds `k` at `1e-4` to `1.3e-5` and the gross exposure at `5.0e4`,
+with `OPTIMAL`. A `k` on the floor is the signal that no portfolio of that orthant meets the
+budget. The healthy complementary orthant of the same model fixes `k = 0.459` and is unchanged.

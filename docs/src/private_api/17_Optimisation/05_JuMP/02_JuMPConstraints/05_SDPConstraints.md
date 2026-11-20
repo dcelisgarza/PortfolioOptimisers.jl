@@ -1,5 +1,5 @@
 ```@meta
-Description = "SDP Constraints, private API of PortfolioOptimisers.jl: weights_prefix, mark_objective_variance!, mark_risk_minimised!, set_sdp_constraints!, …"
+Description = "SDP Constraints, private API of PortfolioOptimisers.jl: weights_prefix, mark_objective_variance!, mark_sdp_phylogeny!, mark_risk_minimised!, …"
 ```
 
 # [SDP Constraints: private API](@id private-api-sdp-constraints)
@@ -7,6 +7,7 @@ Description = "SDP Constraints, private API of PortfolioOptimisers.jl: weights_p
 ```@docs
 PortfolioOptimisers.weights_prefix
 PortfolioOptimisers.mark_objective_variance!
+PortfolioOptimisers.mark_sdp_phylogeny!
 PortfolioOptimisers.mark_risk_minimised!
 set_sdp_constraints!
 set_sdp_frc_constraints!

@@ -110,7 +110,7 @@ than noise alone would give. The denoiser does not use this line. It fits its ow
 the eigenvalues of the correlation matrix.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 # The eigenvalues of the sample covariance.
 plot_eigenspectrum(prs[1].second, rd)
 # The eigenvalues after `FixedDenoise`.

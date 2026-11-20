@@ -39,7 +39,7 @@ end
     X, amsk, pnl = windowed_panel_fixture()
     T = size(X, 1)
     win = (T - 39):T
-    pw = PortfolioOptimisers.asset_panel_view(pnl, win, :, nothing)
+    pw = PortfolioOptimisers.port_opt_view(pnl, win, :, nothing)
     me = ExpWeightedExpectedReturns(; decay = WM_DECAY, min_obs = 1)
     ve = ExpWeightedVariance(; decay = WM_DECAY, min_obs = 1)
     ce = ExpWeightedCovariance(; decay = WM_DECAY, min_obs = 1)
@@ -77,7 +77,7 @@ end
     idx = collect(60:3:120)
     @test isequal(cov(WindowedCovariance(; ce = ce, window = idx), X, pnl),
                   cov(ce, X[idx, :],
-                      PortfolioOptimisers.asset_panel_view(pnl, idx, :, nothing)))
+                      PortfolioOptimisers.port_opt_view(pnl, idx, :, nothing)))
     @test isequal(cov(WindowedCovariance(; ce = ce), X, pnl), cov(ce, X, pnl))
     @test isequal(cov(WindowedCovariance(; ce = ce, window = 40), X, nothing),
                   cov(ce, X[win, :], nothing))
@@ -131,6 +131,27 @@ end
     # A plain inner estimator on a panel reduces each fit to its own Coverage Universe.
     Sp = PortfolioOptimisers.variance_series(WindowedVariance(; window = 40), X, pnl)
     @test isequal(Sp[end, :], vec(var(WindowedVariance(; window = 40), X, pnl)))
+    # A row before the first entry of an index window holds `NaN`, and `Rational` has no
+    # `NaN`. The series refuses that type with a named error before it writes the row, as the
+    # `NaN` frame of a moment does. An integer window, and an index window that starts at the
+    # first observation, have no such row, so their series stays exact.
+    Xr = Rational{Int}.(rand(StableRNG(9), -5:5, 12, 3))
+    ver = SimpleVariance(; corrected = false)
+    wrr = WindowedVariance(; ve = ver, window = [3, 5, 7])
+    @test_throws ArgumentError PortfolioOptimisers.variance_series(wrr, Xr)
+    err = try
+        PortfolioOptimisers.variance_series(wrr, Xr)
+    catch e
+        e
+    end
+    @test occursin("Rational{Int64} of the variance cannot hold NaN", err.msg)
+    @test occursin("floating-point type", err.msg)
+    for window in (4, [1, 5, 7])
+        Sr = PortfolioOptimisers.variance_series(WindowedVariance(; ve = ver,
+                                                                  window = window), Xr)
+        @test eltype(Sr) <: Rational
+        @test Sr[end, :] == vec(var(WindowedVariance(; ve = ver, window = window), Xr))
+    end
 end
 
 @testset "The windowed moments at parity with the oracle's window" begin

@@ -121,7 +121,7 @@ deviations about the mean, so the two portfolios can differ.
 
 res_var = optimise(MeanRisk(; r = Variance(), opt = opt))
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 plot_stacked_bar_composition([res_var, res_bdvar], rd)
 
 #=

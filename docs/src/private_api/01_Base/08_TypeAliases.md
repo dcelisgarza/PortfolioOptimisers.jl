@@ -1,5 +1,5 @@
 ```@meta
-Description = "Type aliases, private API of PortfolioOptimisers.jl: AbstractCustomValue, Option, VecNum, VecInt, MatNum, ArrNum, Arr3Num, VecNum_MatNum, MatNum_Arr3Num, …"
+Description = "Type aliases, private API of PortfolioOptimisers.jl: AbstractCustomValue, Option, UnresolvedValue, VecNum, VecInt, MatNum, ArrNum, Arr3Num, VecNum_MatNum, …"
 ```
 
 # Type aliases: private API
@@ -9,6 +9,7 @@ Many functions and fields of `PortfolioOptimisers.jl` accept more than one type,
 ```@docs
 AbstractCustomValue
 Option{T}
+UnresolvedValue
 VecNum
 VecInt
 MatNum
@@ -24,6 +25,7 @@ PairStrNum
 DictStrNum
 MultiEstValType
 EstValType
+VectorEstValType
 PairGSCV
 DictGSCV
 GSCVKey
@@ -50,4 +52,5 @@ Dict_Vec
 Sym_Str
 Str_Vec
 Func_VecNum
+PanelTermType
 ```

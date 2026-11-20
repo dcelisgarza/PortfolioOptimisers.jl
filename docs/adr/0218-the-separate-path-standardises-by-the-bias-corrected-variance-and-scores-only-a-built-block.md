@@ -144,3 +144,51 @@ path came out of #1726.
 
 - ADR 0181, ADR 0190
 - #1726, #1729, #1730, #1736
+
+## Amendment (2026-10-27)
+
+### Context
+
+The sweep of `02_RegimeAdjustedExpWeightedCovariance_a.jl` (#631) found that the rule of Context
+item 2 freezes the block of every asset. `update_var_cor!` wrote the block only when every active
+asset had a diagonal of the correlation state above `min_val`, and else it wrote nothing. So one
+asset with no diagonal, such as an asset on the row of its first deviation under
+`VolatilityBeforeUpdate()`, kept the row of every other asset at the row before, and the next row
+scored those assets against it. On 3 assets, half-lives of about 6.6 and 13.5, two lags, and a
+third asset that lists at row 21, the block of the two old assets at row 22 was 16.9 % from the
+block that the same two assets give alone. The oracle has the same rule.
+
+### Decision
+
+`update_var_cor!` writes the row of each active asset whose diagonal of the correlation state is
+above `min_val`. It sets to zero the row and the column of every other active asset with a
+positive variance. Decision 2 then holds for each asset: `regime_block_built` reads such an
+asset as not built, and the statistic leaves it out. The other assets take their row at every
+observation.
+
+### Consequences
+
+- Without HAC, or after the warm-up, every diagonal is positive, and nothing moves. The parity
+  cases of `test_12y` and `test_08y` do not move.
+- In the warm-up under HAC, a row can now score the built assets before every asset is built.
+  On the panel of the table above, 30 seeds of 8 rows, the largest and second largest regime
+  state of the inverse-volatility direction on the separate path are now 28.7 and 4.73 under
+  `ScoreIndefiniteBlock()`, and 24.3 and 4.65 under `ClipIndefiniteBlock()`.
+  `RefuseIndefiniteWarmUp()` still scores no seed. The path with one decay does not move. The
+  statistic of row 7 of the seed with the largest score is the same: 51.4 under
+  `ScoreIndefiniteBlock()`, and 15.1 under `ClipIndefiniteBlock()`. Its state is lower now,
+  because the row before it is scored too.
+- Under `RefuseIndefiniteWarmUp()`, over 30 seeds of 40 rows of the same panel, the first scored
+  row is row 10 at least, 15.5 in the median, and 21 at most.
+
+## Amendment (2026-10-28)
+
+**`cor_vol = nothing` reads the raw variance state, and `RawVolatility` is removed (#1867).** The
+maintainer refined the rule of ADR 0222: a skipped procedure, or a trivial default, takes
+`nothing`, never a singleton that names it. `RawVolatility` skipped the bias correction of the
+variance state, so the `cor_vol` field of `RegimeAdjustedExpWeightedCovariance` is bound to
+`Option{<:AbstractCorrelationVolatility}`, and `correlation_variance(::Nothing, v, decay, K)`
+returns `v` unchanged. The default `BiasCorrectedVolatility()` and the numbers do not move. Where
+the decision above names `cor_vol = RawVolatility()` or `debias = RawStatistic()`, read
+`cor_vol = nothing` or `debias = nothing`. The removal is a clean break with no deprecation, as ADR
+0044 and ADR 0213 set.

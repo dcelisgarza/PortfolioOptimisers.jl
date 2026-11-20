@@ -15,6 +15,53 @@ Algorithm 2 at the paper's defaults.
 =#
 using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, Clarabel,
       JuMP
+
+# Two transforms of a user, in the vector and pair state shapes that the head slices and copies
+# for it. Each is the undivided form of a library transform, written as the library wrote it
+# before the transforms carried a count, so the default path of the library is compared bit
+# for bit against them.
+struct VectorMomentum{T} <: PortfolioOptimisers.AbstractGradientTransform
+    gamma1::T
+end
+struct PairAdaptiveMoment{T1, T2, T3} <: PortfolioOptimisers.AbstractGradientTransform
+    gamma1::T1
+    gamma2::T2
+    eps::T3
+end
+function PortfolioOptimisers.gradient_state_seed(::VectorMomentum, w::AbstractVector)
+    return zeros(eltype(w), length(w))
+end
+function PortfolioOptimisers.gradient_state_seed(::PairAdaptiveMoment, w::AbstractVector)
+    return (zeros(eltype(w), length(w)), zeros(eltype(w), length(w)))
+end
+function PortfolioOptimisers.transform_gradient!(grad::VectorMomentum, v::AbstractVector,
+                                                 g::AbstractVector)
+    v .= grad.gamma1 .* v .+ (1 - grad.gamma1) .* g
+    return v, copy(v)
+end
+# A transform that returns the gradient alone, as the interface of v0.33 did.
+struct GradientOnlyMomentum <: PortfolioOptimisers.AbstractGradientTransform end
+function PortfolioOptimisers.gradient_state_seed(::GradientOnlyMomentum, w::AbstractVector)
+    return zeros(eltype(w), length(w))
+end
+function PortfolioOptimisers.transform_gradient!(::GradientOnlyMomentum, v::AbstractVector,
+                                                 g::AbstractVector)
+    v .= 0.9 .* v .+ 0.1 .* g
+    return copy(v)
+end
+function PortfolioOptimisers.transform_gradient!(grad::PairAdaptiveMoment, gs::Tuple,
+                                                 g::AbstractVector)
+    v, m = gs
+    v .= grad.gamma1 .* v .+ (1 - grad.gamma1) .* g
+    m .= grad.gamma2 .* m .+ (1 - grad.gamma2) .* g .^ 2
+    return gs, v ./ (sqrt.(m) .+ grad.eps)
+end
+# A transform that keeps no state and has no method of `gradient_state_seed`.
+struct DoubledGradient <: PortfolioOptimisers.AbstractGradientTransform end
+function PortfolioOptimisers.transform_gradient!(::DoubledGradient, ::Nothing,
+                                                 g::AbstractVector)
+    return nothing, 2 .* g
+end
 @testset "Online portfolio selection: mirror descent, its geometries and schedules" begin
     po = PortfolioOptimisers
     OPS = po.OnlinePortfolioSelection
@@ -54,7 +101,16 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
     @testset "Construction and the refusals" begin
         md = MirrorDescent()
         @test md.eta == 0.05 && isa(md.proj, EntropicProjection) && md.alpha == 0
-        @test isa(md.obj, LogWealth) && isa(md.grad, PlainGradient)
+        @test isa(md.obj, LogWealth) && isnothing(md.grad)
+        # `grad = nothing` applies no transform: no state, and the gradient itself (#1867).
+        @test isnothing(po.gradient_state_seed(nothing, [0.5, 0.5]))
+        g0 = [0.25, -0.5]
+        @test po.transform_gradient!(nothing, nothing, g0) === (nothing, g0)
+        # A transform with no seed of its own keeps the state `nothing`, as the interface
+        # of `AbstractGradientTransform` states.
+        @test isnothing(po.gradient_state_seed(DoubledGradient(), [0.5, 0.5]))
+        @test libpath(ExponentiatedGradient(; grad = DoubledGradient())) ==
+              libpath(ExponentiatedGradient(; eta = 0.1))
         @test isa(ExponentiatedGradient(), MirrorDescent)
         @test isa(GradientProjection().proj, EuclideanProjection)
         @test_throws DomainError MirrorDescent(; eta = 0)
@@ -251,7 +307,10 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         for alg in (MirrorDescent(; proj = TsallisProjection(), alpha = 0.1),
                     MirrorDescent(; proj = LogBarrierProjection(), eta = SelfConfidentRate()),
                     GradientProjection(; eta = InverseSquareRootRate(; c = 0.2)),
-                    ExponentiatedGradient(; eta = DoublingTrickRate(; N = 2)), EGE(), EGA())
+                    ExponentiatedGradient(; eta = DoublingTrickRate(; N = 2)), EGE(), EGA(),
+                    EGA(; gamma1 = 0.9, gamma2 = 0.999, debias = ZeroStartDebias()),
+                    EGE(; eta = DoublingTrickRate(; N = 2), debias = ZeroStartDebias()),
+                    EGR(; gamma2 = 0.9, debias = ZeroStartDebias()))
             opt = OPS(; alg = alg)
             o = po.partial_fit!(opt, rows(rd, 1:10))
             o = po.partial_fit!(o, rows(rd, 11:17))
@@ -302,9 +361,9 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         os = po.partial_fit!(OPS(; alg = ExponentiatedGradient(; eta = sched),
                                  w0 = [0.7, 0.3]), rows(rd2, 1:6))
         @test os.cache.w == [0.7, 0.3]
-        # The restart carries the momentum's averages back to zero.
+        # The restart carries the momentum's averages and their count back to zero.
         oe = po.partial_fit!(OPS(; alg = EGE(; eta = sched)), rows(rd2, 1:6))
-        @test oe.cache.st.gs == zeros(2)
+        @test oe.cache.st.gs.v == zeros(2) && oe.cache.st.gs.k == 0
 
         # The self-confident rate reads the running excess the carrier keeps.
         sc = SelfConfidentRate(; eta_max = 0.8)
@@ -486,9 +545,13 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test isapprox(oc.cache.st.s.B,
                        po.partial_fit!(OPS(; alg = MAEG(; etas = H, window = 3)),
                                        rows(rd, 1:12)).cache.st.s.B; atol = 1e-14)
-        # The optimistic wrapper and a mixture's weighting carry the schedule too.
+        # The optimistic step and a mixture's weighting carry the schedule too.
         oo = po.partial_fit!(OPS(;
-                                 alg = OptimisticStep(; alg = MAEG(; etas = H, window = 3))),
+                                 alg = ExponentiatedGradient(;
+                                                             eta = WindowedBestRate(;
+                                                                                    etas = H,
+                                                                                    window = 3),
+                                                             predictor = LastGradient())),
                              rows(rd, 1:6))
         @test oo.cache.st.s.n == 6 && isapprox(sum(oo.cache.w), 1; atol = 1e-12)
         vo = po.port_opt_view(oo.cache.st, [2, 4])
@@ -535,19 +598,125 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test maxerr(libpath(EGR()), fill(1 / N, T, N)) < 1e-7
         # With a memory the rescaling moves.
         @test maxerr(libpath(EGR(; gamma2 = 0.9)), fill(1 / N, T, N)) > 1e-3
-        # The carriers: a vector, a vector, a pair; sliced and copied by the state's view.
-        for (alg, shape) in ((EGE(), Vector), (EGR(), Vector), (EGA(), Tuple))
+        # The carrier: the averages each transform keeps and their count, sliced and copied
+        # by the state's view.
+        for (alg, hasv, hasm) in
+            ((EGE(), true, false), (EGR(), false, true), (EGA(), true, true))
             o = po.partial_fit!(OPS(; alg = alg), rows(rd, 1:3))
-            @test isa(o.cache.st.gs, shape)
+            gs = o.cache.st.gs
+            @test isa(gs, po.GradientAverageState) && gs.k == 3
+            @test isnothing(gs.v) == !hasv && isnothing(gs.m) == !hasm
             v = po.port_opt_view(o.cache.st, [1, 3])
             @test length(v.u) == 2 && isapprox(sum(v.u), 1; atol = 1e-15)
-            @test (shape === Tuple ? length(v.gs[1]) : length(v.gs)) == 2
+            @test v.gs.k == 3
+            @test all(isnothing(a) || length(a) == 2 for a in (v.gs.v, v.gs.m))
             c = copy(o.cache.st)
-            @test c.u == o.cache.st.u && c.u !== o.cache.st.u
-            @test (shape === Tuple ? c.gs[1] !== o.cache.st.gs[1] : c.gs !== o.cache.st.gs)
+            @test c.u == o.cache.st.u && c.u !== o.cache.st.u && c.gs.k == 3
+            @test all(isnothing(a) || a !== b && a == b
+                      for (a, b) in ((c.gs.v, gs.v), (c.gs.m, gs.m)))
         end
         @test_throws ArgumentError po.merge_states(po.rule_state_seed(EGE(), ones(2) ./ 2),
                                                    po.rule_state_seed(EGE(), ones(2) ./ 2))
+    end
+
+    @testset "The zero-start debias of the momentum transforms" begin
+        zs = ZeroStartDebias()
+        # The default of each transform is the undivided form of the EGM paper, and each
+        # constructor of the entropic rule forwards the field.
+        for grad in
+            (GradientMomentum(), RootMeanSquareGradient(), AdaptiveMomentGradient())
+            @test isnothing(grad.debias)
+        end
+        @test EGE(; debias = zs).grad.debias === zs
+        @test EGR(; debias = zs).grad.debias === zs
+        @test EGA(; debias = zs).grad.debias === zs
+        # The default path is bit for bit the undivided form, across a restart too.
+        sched = DoublingTrickRate(; N = 2)
+        for (lib, user) in
+            ((EGE(), VectorMomentum(0.99)), (EGA(), PairAdaptiveMoment(0.99, 0, 1e-8)),
+             (EGA(; gamma1 = 0.9, gamma2 = 0.999), PairAdaptiveMoment(0.9, 0.999, 1e-8)),
+             (EGE(; eta = sched), VectorMomentum(0.99)))
+            @test libpath(lib) ==
+                  libpath(ExponentiatedGradient(; eta = lib.eta, grad = user))
+        end
+        # The head slices and copies the vector and the pair shapes of a user's transform.
+        for (grad, parts) in ((VectorMomentum(0.9), gs -> (gs,)),
+                              (PairAdaptiveMoment(0.9, 0.5, 1e-8), identity))
+            o = po.partial_fit!(OPS(; alg = ExponentiatedGradient(; grad = grad)),
+                                rows(rd, 1:3))
+            @test all(length(a) == 2
+                      for a in parts(po.port_opt_view(o.cache.st, [1, 3]).gs))
+            c = copy(o.cache.st)
+            @test all(a == b && a !== b
+                      for (a, b) in zip(parts(c.gs), parts(o.cache.st.gs)))
+        end
+        # A transform that returns the gradient alone fails at its first step, and does not
+        # step on the first two entries of its gradient.
+        @test_throws TypeError optimise(OPS(;
+                                            alg = ExponentiatedGradient(;
+                                                                        grad = GradientOnlyMomentum())),
+                                        rows(rd, 1:2))
+        # Algorithm 1 of the Adam paper, by hand on a short stream, at two pairs of rates.
+        G = 0.3 .* randn(StableRNG(11), 6, 3) .- 1
+        for (b1, b2) in ((0.99, 0), (0.9, 0.999))
+            grad = AdaptiveMomentGradient(; gamma1 = b1, gamma2 = b2, debias = zs)
+            gs = po.gradient_state_seed(grad, fill(1 / 3, 3))
+            m, v = zeros(3), zeros(3)
+            for t in 1:6
+                g = G[t, :]
+                m = b1 .* m .+ (1 - b1) .* g
+                v = b2 .* v .+ (1 - b2) .* g .^ 2
+                gs, gt = po.transform_gradient!(grad, gs, g)
+                @test gs.k == t
+                @test isapprox(gt, (m ./ (1 - b1^t)) ./ (sqrt.(v ./ (1 - b2^t)) .+ 1e-8);
+                               rtol = 1e-14)
+            end
+        end
+        # The corrected paths of EGE and EGR, as hand recursions.
+        v = zeros(N)
+        H = handpath((w, x, t) -> begin
+                         g = x ./ dot(w, x)
+                         v .= 0.9 .* v .+ 0.1 .* g
+                         q = w .* exp.(0.05 .* v ./ (1 - 0.9^t))
+                         q ./ sum(q)
+                     end)
+        @test maxerr(libpath(EGE(; gamma1 = 0.9, debias = zs)), H) < 1e-14
+        m = zeros(N)
+        H = handpath((w, x, t) -> begin
+                         g = x ./ dot(w, x)
+                         m .= 0.9 .* m .+ 0.1 .* g .^ 2
+                         q = w .* exp.(0.05 .* g ./ (sqrt.(m ./ (1 - 0.9^t)) .+ 1e-8))
+                         q ./ sum(q)
+                     end)
+        @test maxerr(libpath(EGR(; gamma2 = 0.9, debias = zs)), H) < 1e-14
+        # A restart of the schedule seeds the count again with the averages, so the first
+        # step after it reads the count one.
+        rd2 = ReturnsResult(; nx = nx[1:2], X = R[:, 1:2], ts = ts)
+        o = po.partial_fit!(OPS(; alg = EGE(; eta = sched, debias = zs)), rows(rd2, 1:5))
+        @test o.cache.st.gs.k == 5
+        o = po.partial_fit!(o, rows(rd2, 6:6))
+        @test o.cache.st.gs.k == 0 && o.cache.st.gs.v == zeros(2)
+        o = po.partial_fit!(o, rows(rd2, 7:7))
+        @test o.cache.st.gs.k == 1
+        # The numbers of the family's docstring. At the defaults the undivided step is below
+        # one half of the corrected one for 68 periods, and 0.63 of it after 100.
+        @test 1 - 0.99^68 < 0.5 < 1 - 0.99^69
+        @test round(1 - 0.99^100; digits = 2) == 0.63
+        first_step(grad, g) = po.transform_gradient!(grad, po.gradient_state_seed(grad, g),
+                                                     g)[2]
+        g = [-1.0, -2.0, 0.5]
+        @test first_step(GradientMomentum(), g) ≈
+              0.01 .* first_step(GradientMomentum(; debias = zs), g)
+        # At the Adam rates the uncorrected first step is about three times the corrected one.
+        r = first_step(AdaptiveMomentGradient(; gamma1 = 0.9, gamma2 = 0.999), g) ./
+            first_step(AdaptiveMomentGradient(; gamma1 = 0.9, gamma2 = 0.999, debias = zs),
+                       g)
+        # The ratio is the inverse of the factor of the table, up to eps.
+        @test all(isapprox.(r, (1 - 0.9) / sqrt(1 - 0.999); rtol = 1e-6))
+        @test round(r[1]; digits = 2) == 3.16
+        # At gamma2 = 0 the correction does not change the root-mean-square transform.
+        @test first_step(RootMeanSquareGradient(), g) ==
+              first_step(RootMeanSquareGradient(; debias = zs), g)
     end
 
     @testset "The barriers on a programme set" begin
@@ -583,7 +752,9 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                                                                    wb = WeightBounds(;
                                                                                      lb = 0.05,
                                                                                      ub = 0.4)),
-                                              3), q, wh); atol = 1e-6)
+                                              3), q, wh); atol = 5e-6)
+            # The bounded programme misses the closed form by a norm of 1.08e-6 on the
+            # second CI host kind (runs 43520317481 and 43560900102), so it compares at 5e-6.
             # A zero raw entry is pinned at zero in the programme too.
             z = po.project(proj, pset, [0.5, 0.0, 0.5], wh)
             @test abs(z[2]) < 1e-9 && isapprox(sum(z), 1; atol = 1e-8)
@@ -609,7 +780,9 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         # The one deliberate widening of `obj`: every earlier fixture in this file runs on
         # `LogWealth()`, so their agreement above is the proof it left them unchanged.
         rl = RiskLoss()
-        @test isa(rl.r, Variance) && rl.window == 20 && isa(rl.sca, SumScalariser)
+        # The default scalariser is `nothing`, which gives the sum (#2069). The checks of
+        # the constructor run under it, which the two refusals below prove.
+        @test isa(rl.r, Variance) && rl.window == 20 && isnothing(rl.sca)
         @test isa(rl.pe, EmpiricalPrior)
         @test isa(rl, po.AbstractOnlineObjective) &&
               isa(LogWealth(), po.AbstractOnlineObjective)
@@ -778,8 +951,8 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         wh2 = X[2, :] ./ sum(X[2, :])
         for mk in (o -> GradientProjection(; eta = 50, obj = o),
                    o -> AdaptiveSubgradient(; obj = o),
-                   o -> OptimisticStep(; alg = GradientProjection(; eta = 50, obj = o),
-                                       predictor = LastGradient(; at_played = false)))
+                   o -> GradientProjection(; eta = 50, obj = o,
+                                           predictor = LastGradient(; at_played = false)))
             walk(o) = optimise(OPS(; alg = mk(o)), rows(rd, 1:2)).w
             w_book = walk(trl(wq; fixed = false))
             @test maxerr(w_book, walk(trl(wh2; fixed = true))) < 1e-14
@@ -801,8 +974,8 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         whm = xg ./ sum(xg)
         for mk in (o -> GradientProjection(; eta = 50, obj = o),
                    o -> AdaptiveSubgradient(; obj = o),
-                   o -> OptimisticStep(; alg = GradientProjection(; eta = 50, obj = o),
-                                       predictor = LastGradient(; at_played = false)))
+                   o -> GradientProjection(; eta = 50, obj = o,
+                                           predictor = LastGradient(; at_played = false)))
             walk(o) = optimise(OPS(; alg = mk(o)), rdn2).w
             w_book = walk(trl(wq; fixed = false))
             @test iszero(w_book[4])
@@ -1075,7 +1248,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates
         # The sibling first-order rules read the point too: under the own point each equals
         # its own head to the ulp, and under the blend point the paths part after the
         # first row, where the blend leaves the expert's iterate.
-        for e in (OptimisticStep(; alg = GradientProjection(; eta = 0.2)),
+        for e in (GradientProjection(; eta = 0.2, predictor = LastGradient()),
                   AdaptiveSubgradient())
             mo = ExpertMixture(; experts = [e, GradientProjection(; eta = 0.4)])
             mb = ExpertMixture(; experts = [e, GradientProjection(; eta = 0.4)],
@@ -1267,6 +1440,24 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates
         @test po.rule_state_seed(mix, u).h[1] == [1, 0, 0]
         @test po.rule_state_seed(mix, u, nothing).h[1] == [1, 0, 0]
         @test isnothing(po.rule_state_seed(BuyAndHold(), u, capr))
+        # A rule whose state reads only `w` takes the set as an ignored slot (#2102).
+        @test po.rule_state_seed(MirrorDescent(), u, capr).u ==
+              po.rule_state_seed(MirrorDescent(), u).u
+        # The Expert Set of a mixture: the empty slot resolves to the bare simplex (#2111).
+        @test po.resolve_allocation_set(nothing, N, false, Float64).wb ==
+              po.resolve_allocation_set(BoundedAllocationSet(), N, false, Float64).wb
+        # The Gradient Point is the last slot of the Online Update. `nothing` is the rule's
+        # own point, and a rule with no gradient ignores a given point (#2102).
+        x = [1.1, 0.9, 1.0]
+        md = MirrorDescent()
+        s1, w1 = po.online_update!(md, po.rule_state_seed(md, u), u, x, nothing, capr)
+        s2, w2 = po.online_update!(md, po.rule_state_seed(md, u), u, x, nothing, capr,
+                                   nothing)
+        s3, w3 = po.online_update!(md, po.rule_state_seed(md, u), u, x, nothing, capr,
+                                   po.rule_state_seed(md, u).u)
+        @test w1 == w2 == w3 && s1.u == s2.u == s3.u
+        @test po.online_update!(BuyAndHold(), nothing, u, x, nothing, capr, u)[2] ==
+              po.online_update!(BuyAndHold(), nothing, u, x, nothing, capr)[2]
         # The oracle: a mixture whose experts already hold the projected allocations. The
         # head seeds on its set, so the expert weighting reads the same returns from the
         # first row, and the two mixtures agree row for row.

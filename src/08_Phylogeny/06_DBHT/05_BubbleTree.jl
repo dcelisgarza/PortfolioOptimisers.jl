@@ -1,29 +1,29 @@
 """
     BubbleHierarchy(Pred::VecNum, Sb::VecNum)
 
-Build the bubble hierarchy from the clique hierarchy and separating set information.
+Build the bubble tree from the parents of the 3-cliques and the sizes of their interiors.
 
-This function constructs the bubble hierarchy tree and the bubble membership matrix for 3-cliques, given the predicted parent indices (`Pred`) and separating set vector (`Sb`). It is a core step in the DBHT (Direct Bubble Hierarchical Tree) clustering pipeline, grouping 3-cliques into bubbles and building the adjacency structure among bubbles.
+The function puts the 3-cliques into bubbles, from the parent vector `Pred` and the interior sizes `Sb`. It builds the adjacency matrix of the bubbles and the bubble membership matrix of the 3-cliques.
 
 # Algorithm
 
  1. Take `Root`, the cliques whose entry of `Pred` is zero, and mark them in `CliqCount`.
  2. When more than one root exists, open one bubble that holds all of them, as the first column of `Mb`.
- 3. For each root `n`, open a bubble that holds `n` and its direct children — the cliques whose parent is `n` — append it as a column of `Mb`, and mark those children in `CliqCount`.
- 4. Collect as the next roots the direct children whose separating set is non-empty, `Sb[.] != 0`.
+ 3. For each root `n`, open a bubble that holds `n` and its direct children, the cliques whose parent is `n`. Append the bubble as a column of `Mb`, and mark those children in `CliqCount`.
+ 4. Collect as the next roots the direct children whose interior is not empty, where `Sb` is not zero.
  5. Repeat from step 3 until `CliqCount` marks every clique.
- 6. Build `H`: two bubbles are neighbours when at least one 3-clique belongs to both.
+ 6. Build `H`. Two bubbles are neighbours when at least one 3-clique belongs to both.
  7. Symmetrise `H` and clear its diagonal, so a bubble is not its own neighbour.
 
 # Arguments
 
-  - `Pred`: `Nc×1` vector of predicted parent indices for each 3-clique, as returned by [`BuildHierarchy`](@ref).
-  - `Sb`: `Nc×1` vector indicating the size of the separating set for each 3-clique (`Sb[n] ≠ 0` means clique `n` is separating).
+  - `Pred`: `Nc×1` vector of the parent of each 3-clique, from [`BuildHierarchy`](@ref).
+  - `Sb`: `Nc×1` vector of the number of vertices in the interior of each 3-clique. `Sb[n] ≠ 0` means that clique `n` separates the graph.
 
 # Returns
 
-  - `H::SparseMatrixCSC{Int, Int}`: `Nb×Nb` symmetric adjacency matrix representing the bubble hierarchy tree, where `Nb` is the number of bubbles.
-  - `Mb::Matrix{Int}`: `Nc×Nb` bubble membership matrix for 3-cliques. `Mb[n, bi] = 1` indicates that 3-clique `n` belongs to bubble `bi`.
+  - `H::SparseMatrixCSC{Int, Int}`: `Nb×Nb` symmetric adjacency matrix of the bubble tree, where `Nb` is the number of bubbles.
+  - `Mb::Matrix{Int}`: `Nc×Nb` bubble membership matrix of the 3-cliques. `Mb[n, bi] = 1` means that 3-clique `n` belongs to bubble `bi`.
 
 # Related
 
@@ -77,13 +77,13 @@ end
              Mb::MatNum, Mv::MatNum,
              CliqList::MatNum)
 
-Compute the directed bubble hierarchical tree (DBHT) for a Maximal Planar Graph (MPG).
+Give a direction to each edge of the bubble tree of a Maximal Planar Graph (MPG).
 
-This function assigns directions to each separating 3-clique in the undirected bubble tree of a Planar Maximally Filtered Graph (PMFG), producing the directed bubble hierarchical tree (DBHT). The direction is determined by comparing the sum of edge weights on either side of each separating clique, enabling the identification of converging and diverging bubbles.
+Each edge of the undirected bubble tree of a Planar Maximally Filtered Graph (PMFG) holds one separating 3-clique. The function gives each edge a direction, and the result is the directed bubble hierarchical tree (DBHT). The sums of the edge weights on the two sides of the clique set the direction. The directions then show the converging and the diverging bubbles.
 
 # Mathematical definition
 
-Each edge of the bubble tree carries one separating 3-clique. Cutting the edge splits the bubbles into two sides, and the mass each side draws through the clique decides the direction.
+Each edge of the bubble tree holds one separating 3-clique. A cut of the edge splits the bubbles into two sides, and the mass that each side draws through the clique sets the direction.
 
 ```math
 m(\\mathcal{V}) = \\sum_{u \\in \\mathcal{V}_{0}} \\sum_{v \\in \\mathcal{V}} R_{u,\\,v}\\,.
@@ -96,7 +96,7 @@ Where:
   - ``\\mathcal{V}``: Vertices of one side of the cut, with ``\\mathcal{V}_{0}`` removed.
   - ``m(\\mathcal{V})``: Mass the clique draws from that side.
 
-The edge is directed towards the heavier side, so a bubble that draws mass from both of its neighbours has no outgoing edge and is a converging bubble.
+The function directs the edge towards the heavier side. A bubble that is the heavier side of each of its edges has no outgoing edge, and it is a converging bubble.
 
 # Algorithm
 
@@ -105,20 +105,20 @@ The edge is directed towards the heavier side, so a bubble that draws mass from 
  3. For each row of `CliqEdge`, remove that edge from a copy of `Hb`, run [`breadth`](@ref) from bubble `1`, and mark every bubble it did not reach with `-1`.
  4. Split the two bubbles of the edge into `bleft`, the one on the reached side, and `bright`, the one on the cut side.
  5. Collect `vleft` and `vright`, the vertices of the bubbles of each side, and remove from both the three vertices `vo` of the separating clique.
- 6. Sum the PMFG weights from `vo` into each side, giving `left` and `right`, and write the heavier of the two into `Hc` as an edge directed towards the heavier side.
+ 6. Sum the PMFG weights from `vo` into each side, which gives `left` and `right`. Write the heavier of the two into `Hc` as an edge directed towards the heavier side. A tie directs the edge towards `bright`.
  7. Set `Sep[b] = 1` for a bubble with no outgoing edge in `Hc`, then set `Sep[b] = 2` for a bubble with no incoming edge that has more than one neighbour in `Hb`.
 
 # Arguments
 
   - `Rpm`: `N × N` sparse weighted adjacency matrix of the PMFG.
-  - `Hb`: `Nb×Nb` undirected bubble tree of the PMFG (as from [`BubbleHierarchy`](@ref)). A non-zero entry joins two bubbles.
-  - `Mb`: `Nc×Nb` bubble membership matrix for 3-cliques. `Mb[n, bi] = 1` indicates 3-clique `n` belongs to bubble `bi`.
-  - `Mv`: `N × Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
-  - `CliqList`: `Nc×3` matrix. Each row lists the three vertices of a 3-clique in the MPG.
+  - `Hb`: `Nb×Nb` undirected bubble tree of the PMFG, from [`BubbleHierarchy`](@ref). A non-zero entry joins two bubbles.
+  - `Mb`: `Nc×Nb` bubble membership matrix of the 3-cliques. `Mb[n, bi] = 1` means that 3-clique `n` belongs to bubble `bi`.
+  - `Mv`: `N × Nb` bubble membership matrix of the vertices. `Mv[n, bi] = 1` means that vertex `n` is a vertex of bubble `bi`.
+  - `CliqList`: `Nc×3` matrix. Each row lists the three vertices of a 3-clique of the MPG.
 
 # Returns
 
-  - `Hc::SparseMatrixCSC{Number, Int}`: `Nb×Nb` directed adjacency matrix of the DBHT. A non-zero `Hc[i, j]` is a directed edge from bubble `i` to bubble `j`, and its value is the mass of the heavier side.
+  - `Hc::SparseMatrixCSC{Float64, Int}`: `Nb×Nb` directed adjacency matrix of the DBHT. A non-zero `Hc[i, j]` is a directed edge from bubble `i` to bubble `j`, and its value is the mass of the heavier side.
   - `Sep::Vector{Int}`: `Nb×1` vector of the type of each bubble. `1` is a converging bubble, which has no outgoing edge in `Hc`. `2` is a diverging bubble, which has no incoming edge and more than one neighbour in `Hb`. `0` is every other bubble.
 
 # Related
@@ -181,13 +181,13 @@ end
                     Hb::MatNum, Mb::MatNum,
                     Mv::MatNum, CliqList::MatNum)
 
-Obtain non-discrete and discrete clusterings from the bubble topology of the Planar Maximally Filtered Graph (PMFG).
+Get a non-discrete and a discrete clustering of the vertices from the bubble tree of the Planar Maximally Filtered Graph (PMFG).
 
-This function assigns each vertex to a cluster based on the directed bubble hierarchical tree (DBHT) structure. It computes both a non-discrete cluster membership matrix and a discrete cluster assignment vector, using the converging bubbles identified in the directed bubble tree.
+Each converging bubble of the directed bubble hierarchical tree (DBHT) is one cluster. The function computes a non-discrete membership matrix, in which a vertex can belong to more than one cluster. It also computes a discrete membership vector, in which each vertex belongs to one cluster.
 
 # Mathematical definition
 
-A vertex that more than one converging bubble holds is given to the bubble whose edges bind it most tightly, per edge of that bubble.
+The function assigns a vertex that more than one converging bubble holds to the bubble of the largest ``\\chi``. ``\\chi`` is the weight that joins the vertex to the bubble, divided by the edge count of the bubble.
 
 ```math
 \\chi(v,\\, b) = \\frac{\\displaystyle\\sum_{u \\in b} R_{u,\\,v}}{3\\left(\\left|b\\right| - 2\\right)}\\,.
@@ -199,31 +199,31 @@ Where:
   - ``b``: Vertex set of a converging bubble, and ``\\left|b\\right|`` its vertex count.
   - ``\\chi(v,\\, b)``: Association of vertex ``v`` with bubble ``b``.
 
-The denominator is the edge count of a maximal planar graph on ``\\left|b\\right|`` vertices, which is the same ``3n - 6`` the PMFG itself carries. It divides out the size of the bubble, so a large bubble does not win on its size alone.
+The denominator is the edge count of a maximal planar graph on ``\\left|b\\right|`` vertices, the same ``3n - 6`` that the PMFG has. It removes the effect of the size of the bubble, so a large bubble does not win only because it is large.
 
 # Algorithm
 
- 1. Direct the bubble tree with [`DirectHb`](@ref), giving `Hc` and `Sep`.
+ 1. Direct the bubble tree with [`DirectHb`](@ref), which gives `Hc` and `Sep`.
  2. Take `indx`, the converging bubbles, `Sep .== 1`. When one or none exists, put every vertex in cluster `1`, leave `Adjv` at `0 × 0`, and stop.
- 3. For each converging bubble, run [`breadth`](@ref) on the transpose of `Hc`, and mark in column `n` of `Adjv` every vertex of every bubble it reaches. A vertex can be marked in more than one column, which is what makes `Adjv` non-discrete.
+ 3. For each converging bubble, run [`breadth`](@ref) on the transpose of `Hc`, and mark in column `n` of `Adjv` every vertex of every bubble that the search reaches. The function can mark a vertex in more than one column, so `Adjv` is non-discrete.
  4. Gather `Bubv`, the vertex membership of the converging bubbles alone. Copy into `Mdjv` the rows of `Bubv` for the vertices `cv` that exactly one converging bubble holds.
- 5. For each vertex of `uv`, which more than one holds, take the converging bubble of largest ``\\chi`` and mark it in `Mdjv`.
+ 5. For each vertex of `uv`, the vertices that more than one converging bubble holds, take the converging bubble of largest ``\\chi`` and mark it in `Mdjv`.
  6. Read the discrete assignment `Tc` off the stored entries of `Mdjv`.
- 7. For a vertex that no converging bubble holds, take the mean shortest path length `Udjv` to each converging bubble, block the bubbles that `Adjv` does not reach with `typemax`, and assign the closest of the rest.
+ 7. For a vertex that no converging bubble holds, compute `Udjv`, the mean shortest path length from the vertex to the vertices that `Mdjv` assigns to each converging bubble. Set `Udjv` to `typemax` at each cluster of `Adjv` that does not hold the vertex, and assign the vertex to the closest of the other clusters.
 
 # Arguments
 
   - `Rpm`: `N × N` sparse weighted adjacency matrix of the PMFG.
-  - `Dpm`: `N × N` shortest path lengths matrix of the PMFG.
-  - `Hb`: `Nb×Nb` undirected bubble tree of the PMFG (from [`BubbleHierarchy`](@ref)).
-  - `Mb`: `Nc×Nb` bubble membership matrix for 3-cliques. `Mb[n, bi] = 1` indicates 3-clique `n` belongs to bubble `bi`.
-  - `Mv`: `N × Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
-  - `CliqList`: `Nc×3` matrix. Each row lists the three vertices of a 3-clique in the MPG.
+  - `Dpm`: `N × N` matrix of the shortest path lengths of the PMFG.
+  - `Hb`: `Nb×Nb` undirected bubble tree of the PMFG, from [`BubbleHierarchy`](@ref).
+  - `Mb`: `Nc×Nb` bubble membership matrix of the 3-cliques. `Mb[n, bi] = 1` means that 3-clique `n` belongs to bubble `bi`.
+  - `Mv`: `N × Nb` bubble membership matrix of the vertices. `Mv[n, bi] = 1` means that vertex `n` is a vertex of bubble `bi`.
+  - `CliqList`: `Nc×3` matrix. Each row lists the three vertices of a 3-clique of the MPG.
 
 # Returns
 
-  - `Adjv::SparseMatrixCSC{Int, Int}`: `N × Nk` cluster membership matrix for vertices for non-discrete clustering via the bubble topology, `Nk` being the number of converging bubbles. `Adjv[n, k] = 1` indicates cluster membership of vertex `n` to the `k`-th non-discrete cluster, and a vertex can belong to more than one. It is `0 × 0` when step 2 of the algorithm stopped.
-  - `Tc::Vector{Int}`: `N × 1` cluster membership vector. `Tc[n] = k` indicates cluster membership of vertex `n` to the `k`-th discrete cluster. Every vertex carries exactly one.
+  - `Adjv::SparseMatrixCSC{Int, Int}`: `N × Nk` membership matrix of the non-discrete clustering, where `Nk` is the number of converging bubbles. `Adjv[n, k] = 1` means that vertex `n` belongs to the `k`-th non-discrete cluster, and a vertex can belong to more than one. It is `0 × 0` when step 2 of the algorithm stops.
+  - `Tc::Vector{Int}`: `N × 1` cluster membership vector. `Tc[n] = k` means that vertex `n` belongs to the `k`-th discrete cluster. Each vertex belongs to exactly one.
 
 # Related
 
@@ -291,13 +291,13 @@ end
     BubbleMember(Rpm::MatNum, Mv::MatNum,
                  Mc::MatNum)
 
-Assign each vertex to a specific bubble in the bubble hierarchy.
+Assign each vertex of a cluster to one bubble.
 
-This function determines the bubble membership of each vertex, resolving ambiguities when a vertex may belong to multiple bubbles. Assignment is based on the strength of connections (edge weights) between the vertex and each candidate bubble.
+A vertex can be a vertex of more than one bubble. The function assigns such a vertex to one of them, from the edge weights that join the vertex to each candidate bubble. [`HierarchyConstruct4s`](@ref) calls it once for each cluster.
 
 # Mathematical definition
 
-A vertex that more than one bubble of the cluster holds is given to the bubble whose internal weight it carries the largest fraction of.
+The function assigns a vertex that more than one bubble of the cluster holds to the bubble of the largest ``\\phi``.
 
 ```math
 \\phi(v,\\, b) = \\frac{\\displaystyle\\sum_{u \\in b} R_{u,\\,v}}{\\displaystyle\\frac{1}{2}\\sum_{u \\in b} \\sum_{u' \\in b} R_{u,\\,u'}}\\,.
@@ -309,23 +309,23 @@ Where:
   - ``b``: Vertex set of a bubble.
   - ``\\phi(v,\\, b)``: Fraction of the internal weight of bubble ``b`` that vertex ``v`` draws.
 
-The denominator is halved because the PMFG weights are symmetric and the double sum counts each edge twice. This differs from the ``\\chi`` of [`BubbleCluster8s`](@ref): that one divides by the edge **count** of a maximal planar bubble, and this one by the edge **weight** the bubble actually holds.
+The denominator has the factor one half because the PMFG weights are symmetric, and the double sum counts each edge two times. The ``\\chi`` of [`BubbleCluster8s`](@ref) is different. It divides by the edge count of a maximal planar bubble, and ``\\phi`` divides by the edge weight that the bubble holds.
 
 # Algorithm
 
- 1. Split the vertices that `Mc` marks into `v`, held by exactly one bubble, and `vu`, held by more than one.
- 2. Copy the rows of `Mc` at `v` into `Mvv`, which assigns them directly.
+ 1. Split the vertices that `Mc` marks into `v`, the vertices that exactly one bubble holds, and `vu`, the vertices that more than one bubble holds.
+ 2. Copy the rows of `Mc` at `v` into `Mvv`. Each of these vertices has one bubble, so the copy assigns it.
  3. For each vertex of `vu`, read its candidate bubbles `bub` off its row of `Mc`, score each with ``\\phi``, and mark the largest in `Mvv`.
 
 # Arguments
 
   - `Rpm`: `N × N` sparse weighted adjacency matrix of the PMFG.
-  - `Mv`: `N × Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
-  - `Mc`: `N × Nb` bubble membership matrix restricted to one cluster. `Mc[n, bi] = 1` means vertex `n` is a vertex of bubble `bi` **and** belongs to that cluster. Every other entry is zero, so a bubble that the cluster does not reach carries an empty column.
+  - `Mv`: `N × Nb` bubble membership matrix of the vertices. `Mv[n, bi] = 1` means that vertex `n` is a vertex of bubble `bi`.
+  - `Mc`: `N × Nb` bubble membership matrix of the vertices of one cluster. `Mc[n, bi] = 1` means that vertex `n` is a vertex of bubble `bi` and that it belongs to the cluster. Every other entry is zero, so a bubble that holds no vertex of the cluster has an empty column.
 
 # Returns
 
-  - `Mvv::Matrix{Int}`: `N × Nb` matrix where `Mvv[n, bi] = 1` if vertex `n` is assigned to bubble `bi`. Each row of it carries at most one non-zero, which is what makes the assignment discrete.
+  - `Mvv::Matrix{Int}`: `N × Nb` matrix. `Mvv[n, bi] = 1` when the function assigns vertex `n` to bubble `bi`. Each row has at most one non-zero entry, so the assignment is discrete.
 
 # Related
 

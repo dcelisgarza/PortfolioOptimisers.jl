@@ -1,8 +1,14 @@
 ```@meta
-Description = "Cross-Sectional Idiosyncratic Diagnostics, public API of PortfolioOptimisers.jl: standardised_idio_returns, idio_calibration, idio_tail_rate, idio_kurtosis, …"
+Description = "Cross-Sectional Idiosyncratic Diagnostics, public API of PortfolioOptimisers.jl: IdioCalibrationSummaryResult, standardised_idio_returns, idio_calibration, …"
 ```
 
 # [Cross-Sectional Idiosyncratic Diagnostics](@id api-cross-sectional-idiosyncratic-diagnostics)
+
+## Types
+
+```@docs
+IdioCalibrationSummaryResult
+```
 
 ## Functions
 

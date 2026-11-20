@@ -49,7 +49,7 @@ what keeps the JuMP families cheap.
     w, t, p = 60, 20, 3
     batch_cv = IndexWalkForward(w, t; purged_size = p, expand_train = true)
     online_cv = OnlineIndexWalkForward(w, t; purged_size = p)
-    rows(d, i) = po.pipeline_data_view(d, i)
+    rows(d, i) = po.port_opt_view(d, i, :)
     weight_tol(pipe) = isa(pipe.steps[end], po.JuMPOptimisationEstimator) ? 1e-5 : 1e-10
     same_carrier(a, b) = isequal(a.nx, b.nx) &&
                          isequal(a.ts, b.ts) &&
@@ -107,7 +107,7 @@ what keeps the JuMP families cheap.
         end
         # The public door reads a hand-stepped pipeline out and predicts on a window.
         spipe = stepped(prices_pipe, pr, blocks)
-        pred = po.fit_and_predict(spipe, pr; test_idx = 84:100)
+        pred = po.fit_and_predict(spipe, pr, nothing, 84:100)
         @test isapprox(pred.res.w, fit(prices_pipe, rows(pr, 1:80)).w; atol = 1e-5)
         # The state and the Fold Context render only where set.
         @test !occursin("cache", sprint(show, MIME"text/plain"(), prices_pipe))
@@ -190,6 +190,19 @@ what keeps the JuMP families cheap.
                              po.partial_fit!(PriceGapFill(), rows(pr, 71:160)).cache)
         @test isequal(gm.v, po.partial_fit!(PriceGapFill(), pr).cache.v)
         @test gm.te == ts[end]
+        # A copy of a state aliases nothing.
+        gs = po.partial_fit!(PriceGapFill(), pr).cache
+        gc = copy(gs)
+        @test isequal(gc.v, gs.v) && gc.held == gs.held && gc.te == gs.te
+        @test gc.v !== gs.v && gc.held !== gs.held && gc.nx !== gs.nx
+        # The gap counts of a filter add over blocks, and the copy aliases nothing.
+        fa = po.partial_fit!(MissingDataFilter(), rows(pr, 1:70)).cache
+        fb = po.partial_fit!(MissingDataFilter(), rows(pr, 71:160)).cache
+        fm = po.merge_states(fa, fb)
+        @test fm.miss == fa.miss .+ fb.miss && fm.n == fa.n + fb.n == 160
+        @test fm.miss == po.partial_fit!(MissingDataFilter(), pr).cache.miss
+        fc = copy(fm)
+        @test fc.miss == fm.miss && fc.miss !== fm.miss && fc.n == fm.n
         # The two window-valued configurations and a caller's algorithm answer `false`.
         @test !po.supports_partial_fit(PriceGapFill(; fill = MeanValue()))
         @test !po.supports_partial_fit(MissingDataFilter(; row_thr = 0.5))
@@ -370,7 +383,7 @@ what keeps the JuMP families cheap.
             @test isnothing(fold.train)
             train = fit(pipes[1], rows(pr, cvr.train_idx[fold.i])).ctx.returns
             @test same_carrier(fit(fold.est).ctx.returns, train)
-            return po.fit_and_predict(fold.est, fold.rd; test_idx = fold.test)
+            return po.fit_and_predict(fold.est, fold.rd, nothing, fold.test)
         end
         @test seen == 1:n
         # The multiple-randomised form views the data and folds the pipeline afresh per
@@ -932,5 +945,32 @@ what keeps the JuMP families cheap.
         @test isequal(R, hcat(Matrix(rfb.X), Matrix(rfb.F), collect(rfb.B)))
         R[1, 1] = 99.0
         @test Matrix(rfb.X)[1, 1] != 99.0
+    end
+
+    @testset "An Online(pipe) step with a schedule resolves at each fold, and the loop sizes it (R60 of #1817)" begin
+        # Since #2106 a pipeline asks each step `is_time_dependent`, so an `Online(pipe)`
+        # step answers for the pipeline that it wraps. At v0.33 the step answered `false`, and
+        # each fold ran the `default`. The step now gives the answer of `Online(pipe)` run
+        # alone, and the fold count of its schedule is checked as for a bare step.
+        X4 = randn(StableRNG(1), 150, 4) ./ 100
+        rd4 = ReturnsResult(; nx = ["A", "B", "C", "D"], X = X4,
+                            ts = Date(2024, 1, 1) .+ Day.(0:149))
+        sched = TimeDependent([EqualWeighted(), InverseVolatility(), EqualWeighted()];
+                              default = EqualWeighted())
+        inner = Pipeline(; steps = (EmpiricalPrior(), sched))
+        outer = Pipeline(; steps = (EmpiricalPrior(), po.Online(inner)))
+        @test po.is_time_dependent(outer)
+        cv3 = OnlineIndexWalkForward(60, 30)
+        a = cross_val_predict(outer, rd4, cv3)
+        d = cross_val_predict(po.Online(inner), rd4, cv3)
+        @test length(a.pred) == length(d.pred) == 3
+        @test all(isapprox(pa.res.w, pd.res.w; atol = 1e-14)
+                  for (pa, pd) in zip(a.pred, d.pred))
+        @test isa(a.pred[2].res, po.NaiveOptimisationResult) &&
+              a.pred[2].res.w != fill(0.25, 4)
+        # Four folds and three entries: the named refusal of the schedule, as for `Online(inner)`.
+        cv4 = OnlineIndexWalkForward(30, 30)
+        @test_throws DimensionMismatch cross_val_predict(po.Online(inner), rd4, cv4)
+        @test_throws DimensionMismatch cross_val_predict(outer, rd4, cv4)
     end
 end

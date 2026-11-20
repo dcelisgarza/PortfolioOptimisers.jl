@@ -23,7 +23,7 @@ $(DocStringExtensions.FIELDS)
         nf::Option{<:VecStr} = nothing,
         F::Option{<:SampleBufferState} = nothing,
         nb::Option{<:VecStr} = nothing,
-        B::Option{<:Union{<:SampleBufferState, <:AbstractVector}} = nothing,
+        B::Option{<:Union{SampleBufferState, AbstractVector}} = nothing,
         ne::Option{<:VecStr} = nothing,
         E::Option{<:SampleBufferState} = nothing,
         ts::Option{<:AbstractVector} = nothing,
@@ -40,7 +40,7 @@ Keywords correspond to the struct's fields. The defaults give the empty seed tha
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, its fields are subset to the selected assets:
+[`port_opt_view`](@ref) takes the view of its fields at the selected assets:
 
   - `nx`, `X`, `pnl`: Sliced to the selected assets.
   - `nb`, `B`: Sliced when the benchmark is a matrix over the assets, and copied unchanged when it is a single column.
@@ -99,27 +99,47 @@ When [`port_opt_view`](@ref) is called on this type, its fields are subset to th
     $(field_dict[:pf_max_history])
     """
     max_history
+    function ReturnsBufferState(nx::Option{<:VecStr}, X::Option{<:SampleBufferState},
+                                nf::Option{<:VecStr}, F::Option{<:SampleBufferState},
+                                nb::Option{<:VecStr},
+                                B::Option{<:Union{SampleBufferState, AbstractVector}},
+                                ne::Option{<:VecStr}, E::Option{<:SampleBufferState},
+                                ts::Option{<:AbstractVector}, pnl::Option{<:AssetPanel},
+                                max_history::Option{<:Integer})
+        if !isnothing(max_history)
+            @argcheck(max_history > 0,
+                      DomainError(max_history,
+                                  "max_history is the number of observations the state keeps, so it must be positive. Pass `nothing`, the default, to keep every observation folded."))
+        end
+        if !isnothing(pnl)
+            @argcheck(panel_is_static(pnl),
+                      ArgumentError("a ReturnsBufferState pins a static Asset Panel and never a time-varying one: the masks of a time-varying panel are per-observation, so they travel into the returns buffer beside the rows they explain and optimise(opt) with no data rebuilds the panel from them."))
+        end
+        return new{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(nb), typeof(B),
+                   typeof(ne), typeof(E), typeof(ts), typeof(pnl), typeof(max_history)}(nx,
+                                                                                        X,
+                                                                                        nf,
+                                                                                        F,
+                                                                                        nb,
+                                                                                        B,
+                                                                                        ne,
+                                                                                        E,
+                                                                                        ts,
+                                                                                        pnl,
+                                                                                        max_history)
+    end
 end
 function ReturnsBufferState(; nx::Option{<:VecStr} = nothing,
                             X::Option{<:SampleBufferState} = nothing,
                             nf::Option{<:VecStr} = nothing,
                             F::Option{<:SampleBufferState} = nothing,
                             nb::Option{<:VecStr} = nothing,
-                            B::Option{<:Union{<:SampleBufferState, <:AbstractVector}} = nothing,
+                            B::Option{<:Union{SampleBufferState, AbstractVector}} = nothing,
                             ne::Option{<:VecStr} = nothing,
                             E::Option{<:SampleBufferState} = nothing,
                             ts::Option{<:AbstractVector} = nothing,
                             pnl::Option{<:AssetPanel} = nothing,
                             max_history::Option{<:Integer} = nothing)::ReturnsBufferState
-    if !isnothing(max_history)
-        @argcheck(max_history > 0,
-                  DomainError(max_history,
-                              "max_history is the number of observations the state keeps, so it must be positive. Pass `nothing`, the default, to keep every observation folded."))
-    end
-    if !isnothing(pnl)
-        @argcheck(panel_is_static(pnl),
-                  ArgumentError("a ReturnsBufferState pins a static Asset Panel and never a time-varying one: the masks of a time-varying panel are per-observation, so they travel into the returns buffer beside the rows they explain and optimise(opt) with no data rebuilds the panel from them."))
-    end
     return ReturnsBufferState(nx, X, nf, F, nb, B, ne, E, ts, pnl, max_history)
 end
 """

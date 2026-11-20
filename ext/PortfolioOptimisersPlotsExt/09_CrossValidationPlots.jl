@@ -1,14 +1,14 @@
 ## plot_cv_scores
 function PortfolioOptimisers.plot_cv_scores(r::PortfolioOptimisers.BaseRM_VecBaseRM,
                                             mpred::MultiPeriodPredictionResult;
-                                            sca::Scalariser = SumScalariser(), kwargs...)
-    scores = [expected_risk(r, p; sca = sca) for p in mpred.pred]
+                                            sca::Option{<:Scalariser} = nothing, kwargs...)
+    scores = [expected_risk(sca, r, p) for p in mpred.pred]
     return PortfolioOptimisers.plot_cv_scores(scores, 1:length(scores); kwargs...)
 end
 function PortfolioOptimisers.plot_cv_scores(r::PortfolioOptimisers.BaseRM_VecBaseRM,
                                             ppred::PopulationPredictionResult;
-                                            sca::Scalariser = SumScalariser(), kwargs...)
-    scores = [expected_risk(r, m; sca = sca) for m in ppred.pred]
+                                            sca::Option{<:Scalariser} = nothing, kwargs...)
+    scores = [expected_risk(sca, r, m) for m in ppred.pred]
     return PortfolioOptimisers.plot_cv_scores(scores, 1:length(scores); kwargs...)
 end
 ## plot_turnover
@@ -26,44 +26,32 @@ end
 ## Weight stability across folds
 ## ────────────────────────────────────────────────────────────────────────────
 
-function PortfolioOptimisers.plot_weight_stability(mpred::MultiPeriodPredictionResult;
-                                                   N::Option{<:Number} = nothing, kwargs...)
-    folds = mpred.pred
-    w_mat = hcat(getproperty.(getproperty.(folds, :res), :w)...)
-    nx = let rd1 = folds[1].rd
-        isnothing(rd1.nx) ? string.(1:size(w_mat, 1)) : string.(rd1.nx)
+# The rows of `prediction_weights` sit on the union of the names of the folds or the paths, so
+# a fold that holds other assets than the first fold boxes each weight under its own name. A
+# row that is `NaN` at every name is a portfolio that failed to solve, and it holds no weight,
+# so it is absent from every box. With no row left, the figure draws the axes alone.
+function weight_stability_boxplot(nx::AbstractVector, W::MatNum, N::Option{<:Number},
+                                  title::AbstractString; kwargs...)
+    W = W[[!all(isnan, r) for r in eachrow(W)], :]
+    if isempty(W)
+        return plot(; title = title, ylabel = "Weight", legend = false, kwargs...)
     end
-    M, K = size(w_mat)
-    mean_abs = vec(mean(abs, w_mat; dims = 2))
+    M = size(W, 2)
+    mean_abs = vec(mean(abs, W; dims = 1))
     N, idx = relevant_assets(mean_abs, M, N)
     top_idx = sort(view(idx, 1:N))
-    labels = nx[top_idx]
-    data = w_mat[top_idx, :]
-    return boxplot(data'; xticks = (1:N, labels), title = "Weight Stability",
+    return boxplot(W[:, top_idx]; xticks = (1:N, string.(nx[top_idx])), title = title,
                    ylabel = "Weight", legend = false, xrotation = 60, kwargs...)
+end
+function PortfolioOptimisers.plot_weight_stability(mpred::MultiPeriodPredictionResult;
+                                                   N::Option{<:Number} = nothing, kwargs...)
+    nx, W, _ = prediction_weights(mpred)
+    return weight_stability_boxplot(nx, W, N, "Weight Stability"; kwargs...)
 end
 function PortfolioOptimisers.plot_weight_stability(ppred::PopulationPredictionResult;
                                                    N::Option{<:Number} = nothing, kwargs...)
-    members = ppred.pred
-    w_mat = hcat(map(members) do m
-                     if isa(m, PredictionResult)
-                         m.res.w
-                     else
-                         vec(mean(hcat(getproperty.(getproperty.(m.pred, :res), :w)...);
-                                  dims = 2))
-                     end
-                 end...)
-    nx = let rd1 = isa(members[1], PredictionResult) ? members[1].rd : members[1].pred[1].rd
-        isnothing(rd1.nx) ? string.(1:size(w_mat, 1)) : string.(rd1.nx)
-    end
-    M, K = size(w_mat)
-    mean_abs = vec(mean(abs, w_mat; dims = 2))
-    N, idx = relevant_assets(mean_abs, M, N)
-    top_idx = sort(view(idx, 1:N))
-    labels = nx[top_idx]
-    data = w_mat[top_idx, :]
-    return boxplot(data'; xticks = (1:N, labels), title = "Population Weight Stability",
-                   ylabel = "Weight", legend = false, xrotation = 60, kwargs...)
+    nx, W, _ = prediction_weights(ppred)
+    return weight_stability_boxplot(nx, W, N, "Population Weight Stability"; kwargs...)
 end
 ## ────────────────────────────────────────────────────────────────────────────
 ## Cross-validation scores

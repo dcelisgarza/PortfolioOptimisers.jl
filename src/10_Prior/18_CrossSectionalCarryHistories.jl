@@ -3,11 +3,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Appends the rows of a block to a history, or starts the history with them.
 
-A history that a step appended to is a view of the first rows of a backing array, whose other rows are spare. The append writes the rows of the block into the spare rows in place, and gives a longer view of the same backing, so a step costs the rows of the block and no copy of the history. A backing with too few spare rows is replaced by one of twice the rows, as [`reserve_sample_buffer`](@ref) grows the backing of a [`SampleBufferState`](@ref). Each state keeps the view of its own rows, so an earlier state reads its own rows after a later step. The caller makes sure that the state is the newest one of its lineage, with [`cross_sectional_carry_own`](@ref), so no append writes a row that another state reads.
+The rows lie on the observation axis that [`observation_axis`](@ref) names: the first axis of a vector or a matrix, and the last axis of an exposure history. A history that a step appended to is a view of the first rows of a backing array, whose other rows are spare. The append writes the rows of the block into the spare rows in place, and gives a longer view of the same backing, so a step costs the rows of the block and no copy of the history. A backing with too few spare rows is replaced by one of twice the rows, as [`reserve_sample_buffer`](@ref) grows the backing of a [`SampleBufferState`](@ref). Each state keeps the view of its own rows, so an earlier state reads its own rows after a later step. The caller makes sure that the state is the newest one of its lineage, with [`cross_sectional_carry_own`](@ref), so no append writes a row that another state reads.
 
 # Arguments
 
-  - `a`: The history, or `nothing`.
+  - `a`: The history, or `nothing`. A history of Descriptor scores is a [`PanelScores`](@ref), and it appends field by field.
   - `b`: The rows of the block.
 
 # Returns
@@ -25,36 +25,75 @@ function cross_sectional_fold_append(::Nothing, b)
 end
 function cross_sectional_fold_append(a::AbstractArray{<:Any, D},
                                      b::AbstractArray{<:Any, D}) where {D}
-    n = size(a, 1)
-    k = n + size(b, 1)
+    d = observation_axis(a)
+    n = size(a, d)
+    k = n + size(b, d)
     T = promote_type(eltype(a), eltype(b))
     P = cross_sectional_spare_backing(a, T, k)
     if isnothing(P)
-        P = similar(b, T, (2 * k, Base.tail(size(a))...))
-        selectdim(P, 1, 1:n) .= a
+        P = similar(b, T, Base.setindex(size(a), 2 * k, d))
+        selectdim(P, d, 1:n) .= a
     end
-    selectdim(P, 1, (n + 1):k) .= b
-    return view(P, Base.OneTo(k), ntuple(_ -> Colon(), D - 1)...)
+    selectdim(P, d, (n + 1):k) .= b
+    return selectdim(P, d, Base.OneTo(k))
+end
+# The Descriptor scores that the carry holds append and trim field by field.
+function cross_sectional_fold_append(a::PanelScores, b::PanelScores)::PanelScores
+    return PanelScores(cross_sectional_fold_append(a.S, b.S),
+                       cross_sectional_fold_append(a.w, b.w),
+                       cross_sectional_fold_append(a.g, b.g))
+end
+function cross_sectional_window_trim(P::PanelScores, n::Option{<:Integer})::PanelScores
+    return PanelScores(cross_sectional_window_trim(P.S, n),
+                       cross_sectional_window_trim(P.w, n),
+                       cross_sectional_window_trim(P.g, n))
 end
 function cross_sectional_fold_append(a::FactorFamilyBasis, b::FactorFamilyBasis)
-    return FactorFamilyBasis(; fnm = a.fnm, fi = a.fi, di = a.di,
-                             ratios = cross_sectional_fold_append(a.ratios, b.ratios),
-                             K = a.K)
+    return rebuild_struct(a, (; ratios = cross_sectional_fold_append(a.ratios, b.ratios)))
 end
 function cross_sectional_fold_append(a::CrossSectionalRegression,
                                      b::CrossSectionalRegression)
     return CrossSectionalRegression(; f = cross_sectional_fold_append(a.f, b.f),
                                     eps = cross_sectional_fold_append(a.eps, b.eps),
-                                    n = cross_sectional_fold_append(a.n, b.n), b = nothing,
+                                    n = cross_sectional_fold_append(a.n, b.n),
+                                    edof = cross_sectional_fold_append(a.edof, b.edof),
+                                    b = nothing,
                                     h1 = cross_sectional_fold_append(a.h1, b.h1),
                                     dc = cross_sectional_fold_append(a.dc, b.dc))
 end
 """
-    cross_sectional_fold_join(Ms, obs, b::AbstractArray, bo::Nothing) -> NamedTuple
+$(DocStringExtensions.TYPEDEF)
+
+The exposure history of the estimated factors and the observed factors, after a block joined them.
+
+This type is an implementation detail and is not intended for direct use. [`cross_sectional_fold_join`](@ref) and [`cross_sectional_fold_split`](@ref) make it. [`cross_sectional_fold_histories`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`cross_sectional_fold_join`](@ref)
+  - [`cross_sectional_fold_split`](@ref)
+  - [`cross_sectional_fold_histories`](@ref)
+"""
+@concrete struct FoldHistories
+    """
+    `Ms`: The exposure history of the estimated factors.
+    """
+    Ms
+    """
+    `obs`: The observed factors of the history, an [`ObservedStack`](@ref), or `nothing`.
+    """
+    obs
+end
+"""
+    cross_sectional_fold_join(Ms, obs, b::AbstractArray, bo::Nothing) -> FoldHistories
     cross_sectional_fold_join(Ms::Nothing, obs::Nothing, b::AbstractArray{<:Any, 3},
-                              bo::NamedTuple) -> NamedTuple
-    cross_sectional_fold_join(Ms::AbstractArray{<:Any, 3}, obs::NamedTuple,
-                              b::AbstractArray{<:Any, 3}, bo::NamedTuple) -> NamedTuple
+                              bo::ObservedStack) -> FoldHistories
+    cross_sectional_fold_join(Ms::AbstractArray{<:Any, 3}, obs::ObservedStack,
+                              b::AbstractArray{<:Any, 3}, bo::ObservedStack) -> FoldHistories
 
 Appends the rows of a block to the exposure history and to the observed factors that the carry fold of a Cross-Sectional Factor Prior carries.
 
@@ -63,32 +102,33 @@ The call with no data reads the exposure history with the observed exposures aft
 # Arguments
 
   - `Ms`: The exposure history of the estimated factors, or `nothing` before the first block.
-  - `obs`: The observed factors `(; Z, R, lv, nf, fam)` of the history, or `nothing`.
+  - `obs`: The observed factors of the history, an [`ObservedStack`](@ref), or `nothing`.
   - `b`: The exposures of the estimated factors of the block.
-  - `bo`: The observed factors of the block, or `nothing` without an observed factor, when the method over `Nothing` appends `b` alone.
+  - `bo`: The observed factors of the block, an [`ObservedStack`](@ref), or `nothing` without an observed factor, when the method over `Nothing` appends `b` alone.
 
 # Returns
 
-  - `h::NamedTuple`: `(; Ms, obs)`, the two histories followed by the rows of the block.
+  - `h::FoldHistories`: The two histories followed by the rows of the block.
 
 # Related
 
+  - [`FoldHistories`](@ref)
   - [`cross_sectional_fold_append`](@ref)
   - [`cross_sectional_joined_exposures`](@ref)
   - [`cross_sectional_fold_histories`](@ref)
 """
 function cross_sectional_fold_join(Ms, obs, b::AbstractArray, ::Nothing)
-    return (; Ms = cross_sectional_fold_append(Ms, b), obs = obs)
+    return FoldHistories(cross_sectional_fold_append(Ms, b), obs)
 end
 function cross_sectional_fold_join(::Nothing, ::Nothing, b::AbstractArray{<:Any, 3},
-                                   bo::NamedTuple)
-    return cross_sectional_fold_split(cat(b, bo.Z; dims = 3), size(b, 3), bo.R, bo)
+                                   bo::ObservedStack)
+    return cross_sectional_fold_split(cat(b, bo.Z; dims = 2), size(b, 2), bo.R, bo)
 end
-function cross_sectional_fold_join(Ms::AbstractArray{<:Any, 3}, obs::NamedTuple,
-                                   b::AbstractArray{<:Any, 3}, bo::NamedTuple)
+function cross_sectional_fold_join(Ms::AbstractArray{<:Any, 3}, obs::ObservedStack,
+                                   b::AbstractArray{<:Any, 3}, bo::ObservedStack)
     J = cross_sectional_fold_append(cross_sectional_joined_exposures(Ms, obs.Z),
-                                    cat(b, bo.Z; dims = 3))
-    return cross_sectional_fold_split(J, size(b, 3),
+                                    cat(b, bo.Z; dims = 2))
+    return cross_sectional_fold_split(J, size(b, 2),
                                       cross_sectional_fold_append(obs.R, bo.R), obs)
 end
 """
@@ -96,40 +136,44 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Splits a joined exposure history into the history of the estimated factors and the observed factors.
 
-Both histories are views of the backing of `J` with a `Base.OneTo` row index, so the next append finds the spare rows of the backing, as [`cross_sectional_spare_backing`](@ref) states. A view of a view would carry a `UnitRange` row index, which marks no backing of the library.
+Both histories are views of the backing of `J` with a `Base.OneTo` index on the observation axis, so the next append finds the spare rows of the backing, as [`cross_sectional_spare_backing`](@ref) states. A view of a view would carry a `UnitRange` index there, which marks no backing of the library.
 
 # Arguments
 
-  - `J`: The joined exposure history, `observations × assets × factors`, the estimated factors first.
+  - `J`: The joined exposure history, `assets × factors × observations`, the estimated factors first.
   - `K`: The number of estimated factors.
   - `R`: The observed returns of the history.
-  - `o`: The observed factors whose names and family labels the history keeps.
+  - `o`: The observed factors, an [`ObservedStack`](@ref), whose names and family labels the history keeps.
 
 # Returns
 
-  - `h::NamedTuple`: `(; Ms, obs)`, as [`cross_sectional_fold_join`](@ref) states it.
+  - `h::FoldHistories`: The two histories, as [`cross_sectional_fold_join`](@ref) states it.
 
 # Related
 
+  - [`FoldHistories`](@ref)
   - [`cross_sectional_fold_join`](@ref)
 """
 function cross_sectional_fold_split(J::AbstractArray{<:Any, 3}, K::Integer,
-                                    R::AbstractMatrix, o::NamedTuple)
+                                    R::AbstractMatrix, o::ObservedStack)
     P = parent(J)
-    k = Base.OneTo(size(J, 1))
-    return (; Ms = view(P, k, :, 1:K),
-            obs = (; Z = view(P, k, :, (K + 1):size(P, 3)), R = R, lv = o.lv, nf = o.nf,
-                   fam = o.fam))
+    k = Base.OneTo(size(J, 3))
+    return FoldHistories(view(P, :, 1:K, k),
+                         rebuild_struct(o,
+                                        (; Z = view(P, :, (K + 1):size(P, 2), k), R = R)))
 end
 """
     cross_sectional_spare_backing(a::AbstractArray, T::Type, k::Integer)
     cross_sectional_spare_backing(a::SubArray{<:Any, <:Any, <:Union{Array, BitArray},
                                                <:Tuple{Base.OneTo{Int}, Vararg{Base.Slice}}},
                                   T::Type, k::Integer)
+    cross_sectional_spare_backing(a::SubArray{<:Any, 3, <:Array,
+                                               <:Tuple{Base.Slice, Base.Slice, Base.OneTo{Int}}},
+                                  T::Type, k::Integer)
 
 Returns the backing array of a history when it holds `k` rows of element type `T`, or `nothing`.
 
-[`cross_sectional_fold_append`](@ref) makes every backing, and gives a view of its first rows with a `Base.OneTo` row index. Only such a view has a backing that the append can write into. Any other array, a history that a fit of every observation made or a view of the caller's data, has none, so the append copies it into a new backing.
+[`cross_sectional_fold_append`](@ref) makes every backing, and gives a view of its first rows with a `Base.OneTo` index on the observation axis: the first axis of a vector or a matrix, and the last axis of an exposure history. Only such a view has a backing that the append can write into. Any other array, a history that a fit of every observation made or a view of the caller's data, has none, so the append copies it into a new backing.
 
 # Arguments
 
@@ -154,6 +198,13 @@ function cross_sectional_spare_backing(a::SubArray{<:Any, <:Any, <:Union{Array, 
                                        k::Integer) where {T}
     P = parent(a)
     return eltype(P) === T && size(P, 1) >= k ? P : nothing
+end
+function cross_sectional_spare_backing(a::SubArray{<:Any, 3, <:Array,
+                                                   <:Tuple{Base.Slice, Base.Slice,
+                                                           Base.OneTo{Int}}}, ::Type{T},
+                                       k::Integer) where {T}
+    P = parent(a)
+    return eltype(P) === T && size(P, 3) >= k ? P : nothing
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -214,64 +265,14 @@ end
     cross_sectional_move_basis(unseen::AbstractUnseenMemberRule,
                                cre::AbstractCrossSectionalRegressionEstimator, st, families)
         -> nothing
+    cross_sectional_move_basis(fcb::FactorFamilyBasis, families::AbstractVector{<:Pair},
+                               nf::VecStr) -> Option{<:FactorFamilyBasis}
 
 Returns the basis of the fitted observations under the dropped members that moved, when the move folds on the carry fold of a Cross-Sectional Factor Prior, and `nothing` otherwise.
 
 The zero-sum condition of a family is the same set of factor returns for every dropped member. So a regression that minimises the weighted squared residuals gives the same raw factor returns in every basis, on each observation whose design has full rank. [`ZeroUnseenMember`](@ref) makes every observation with an Unseen Member identified, so its answer does not depend on the dropped member. [`SolvedUnseenMember`](@ref) keeps such an observation rank-deficient, and a dependent factor set makes an observation rank-deficient under every rule. The answer of a rank-deficient observation depends on the dropped member under every [`AbstractCrossSectionalSolveAlgorithm`](@ref) that answers it: the answer of least norm reads the coordinates of the basis, and so does the pivot of [`DependentColumnDrop`](@ref). So [`cross_sectional_move_solve`](@ref) solves it again in the new basis. A [`CrossSectionalTargetRegression`](@ref) fits a target, and a target can penalise its coefficients, so its answer can depend on the basis. [`is_basis_invariant`](@ref) answers for the target. A target that answers `true`, such as [`LinearModel`](@ref), gives the same raw factor returns in every basis on an observation of full rank, as a least-squares fit does. [`GeneralisedLinearModel`](@ref) answers `true`: its iterative fit takes the same iterates in every basis, so it gives the same raw factor returns to rounding. On a rank-deficient observation the answer of a target depends on the basis too, under each solve algorithm of the target, and [`cross_sectional_move_solve`](@ref) solves such an observation again through the target. So a move folds under [`CrossSectionalLinearRegression`](@ref), and under a target that answers `true`, with the two Unseen Member rules of the library. Every other pair fits every observation again.
 
-# Algorithm
-
-The method that Julia selects is the algorithm.
-
- 1. Under [`ZeroUnseenMember`](@ref) or [`SolvedUnseenMember`](@ref), with [`CrossSectionalLinearRegression`](@ref), rewrite the basis with [`cross_sectional_rebase`](@ref).
- 2. Under the same rules, with [`CrossSectionalTargetRegression`](@ref), rewrite the basis as step 1 does when [`is_basis_invariant`](@ref) answers `true` for `cre.tgt`, and answer `nothing` otherwise.
- 3. Under any other pair, answer `nothing`.
-
-# Arguments
-
-  - `unseen`: The Unseen Member rule of the prior.
-  - `cre`: The cross-sectional regression estimator of the prior.
-  - `st`: The state, whose `fcb` is the basis of the last fit.
-  - `families`: The families with their dropped members named.
-
-# Returns
-
-  - `fcb::Option{<:FactorFamilyBasis}`: The basis under `families`, or `nothing` when the move does not fold.
-
-# Related
-
-  - [`cross_sectional_fold_move`](@ref)
-  - [`cross_sectional_rebase`](@ref)
-  - [`cross_sectional_move_solve`](@ref)
-  - [`AbstractUnseenMemberRule`](@ref)
-  - [`is_basis_invariant`](@ref)
-"""
-function cross_sectional_move_basis(::Union{ZeroUnseenMember, SolvedUnseenMember},
-                                    ::CrossSectionalLinearRegression,
-                                    st::CrossSectionalCarryState,
-                                    families::AbstractVector{<:Pair})
-    return cross_sectional_rebase(st.fcb, families, st.nf)
-end
-function cross_sectional_move_basis(::Union{ZeroUnseenMember, SolvedUnseenMember},
-                                    cre::CrossSectionalTargetRegression,
-                                    st::CrossSectionalCarryState,
-                                    families::AbstractVector{<:Pair})
-    if !is_basis_invariant(cre.tgt)
-        return nothing
-    end
-    return cross_sectional_rebase(st.fcb, families, st.nf)
-end
-function cross_sectional_move_basis(::AbstractUnseenMemberRule,
-                                    ::AbstractCrossSectionalRegressionEstimator, ::Any,
-                                    ::Any)
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Rewrites a Factor Family Basis with new dropped members, from its own ratios.
-
-The ratio of a member is its benchmark-weighted exposure over the exposure of the dropped member. So the ratios under a new dropped member ``k^{\\prime}`` are the old ratios over the old ratio of ``k^{\\prime}``, and the ratio of the old dropped member ``k`` is the inverse of that ratio. The function reads no exposure, and its ratios equal the ratios of [`factor_family_basis`](@ref) to rounding.
+The method on a [`FactorFamilyBasis`](@ref) rewrites the basis from its own ratios. The ratio of a member is its benchmark-weighted exposure over the exposure of the dropped member. So the ratios under a new dropped member ``k^{\\prime}`` are the old ratios over the old ratio of ``k^{\\prime}``, and the ratio of the old dropped member ``k`` is the inverse of that ratio. The method reads no exposure, and its ratios equal the ratios of [`factor_family_basis`](@ref) to rounding.
 
 # Mathematical definition
 
@@ -288,37 +289,71 @@ Where:
   - $(math_dict[:r_tj_fcb])
   - ``r^{\\prime}_{t}(j)``: Ratio of member ``j`` at observation ``t`` under the new dropped member ``k^{\\prime}``.
 
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Under [`ZeroUnseenMember`](@ref) or [`SolvedUnseenMember`](@ref), with [`CrossSectionalLinearRegression`](@ref), rewrite the basis `st.fcb` with the method on a [`FactorFamilyBasis`](@ref).
+ 2. Under the same rules, with [`CrossSectionalTargetRegression`](@ref), rewrite the basis as step 1 does when [`is_basis_invariant`](@ref) answers `true` for `cre.tgt`, and answer `nothing` otherwise.
+ 3. Under any other pair, answer `nothing`.
+ 4. On a [`FactorFamilyBasis`](@ref), find the position of each new dropped member in its family, and rewrite the ratios of each family with [`cross_sectional_rebase_family`](@ref). Answer `nothing` when a family answers `nothing`.
+
 # Arguments
 
+  - `unseen`: The Unseen Member rule of the prior.
+  - `cre`: The cross-sectional regression estimator of the prior.
+  - `st`: The state, whose `fcb` is the basis of the last fit.
+  - `families`: Pairs of `family label => dropped member`, in the order of the families of the basis, each member named.
   - `fcb`: The Factor Family Basis.
-  - `families`: Pairs of `family label => dropped member`, in the order of `fcb.fnm`, each member named.
   - `nf`: Names of the raw factor axis.
 
 # Returns
 
-  - `fcb::Option{<:FactorFamilyBasis}`: The basis with the new dropped members, or `nothing` when a new dropped member has a zero benchmark-weighted exposure at an observation, where [`factor_family_basis`](@ref) refuses it.
+  - `fcb::Option{<:FactorFamilyBasis}`: The basis under `families`, or `nothing` when the move does not fold, or when a new dropped member has a zero benchmark-weighted exposure at an observation, where [`factor_family_basis`](@ref) refuses it.
 
 # Related
 
-  - [`cross_sectional_rebase_family`](@ref)
   - [`cross_sectional_fold_move`](@ref)
+  - [`cross_sectional_rebase_family`](@ref)
+  - [`cross_sectional_move_solve`](@ref)
+  - [`AbstractUnseenMemberRule`](@ref)
+  - [`is_basis_invariant`](@ref)
   - [`FactorFamilyBasis`](@ref)
 """
-function cross_sectional_rebase(fcb::FactorFamilyBasis, families::AbstractVector{<:Pair},
-                                nf::VecStr)
+function cross_sectional_move_basis(::Union{ZeroUnseenMember, SolvedUnseenMember},
+                                    ::CrossSectionalLinearRegression,
+                                    st::CrossSectionalCarryState,
+                                    families::AbstractVector{<:Pair})
+    return cross_sectional_move_basis(st.fcb, families, st.nf)
+end
+function cross_sectional_move_basis(::Union{ZeroUnseenMember, SolvedUnseenMember},
+                                    cre::CrossSectionalTargetRegression,
+                                    st::CrossSectionalCarryState,
+                                    families::AbstractVector{<:Pair})
+    if !is_basis_invariant(cre.tgt)
+        return nothing
+    end
+    return cross_sectional_move_basis(st.fcb, families, st.nf)
+end
+function cross_sectional_move_basis(::AbstractUnseenMemberRule,
+                                    ::AbstractCrossSectionalRegressionEstimator, ::Any,
+                                    ::Any)
+    return nothing
+end
+function cross_sectional_move_basis(fcb::FactorFamilyBasis,
+                                    families::AbstractVector{<:Pair}, nf::VecStr)
     di = map(j -> findfirst(isequal(last(families[j])), view(nf, fcb.fi[j])),
              eachindex(fcb.fi))
     blocks = map(j -> cross_sectional_rebase_family(fcb, j, di[j]), eachindex(fcb.fi))
     if any(isnothing, blocks)
         return nothing
     end
-    return FactorFamilyBasis(; fnm = fcb.fnm, fi = fcb.fi, di = di,
-                             ratios = reduce(hcat, blocks), K = fcb.K)
+    return rebuild_struct(fcb, (; di = di, ratios = reduce(hcat, blocks)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Returns the block of the ratios of one Factor Family under a new dropped member, as [`cross_sectional_rebase`](@ref) states it.
+Returns the block of the ratios of one Factor Family under a new dropped member, as [`cross_sectional_move_basis`](@ref) states it.
 
 # Algorithm
 
@@ -338,7 +373,7 @@ Returns the block of the ratios of one Factor Family under a new dropped member,
 
 # Related
 
-  - [`cross_sectional_rebase`](@ref)
+  - [`cross_sectional_move_basis`](@ref)
 """
 function cross_sectional_rebase_family(fcb::FactorFamilyBasis, j::Integer, d::Integer)
     col = family_retained_indices(fcb, j)[3]
@@ -349,6 +384,33 @@ function cross_sectional_rebase_family(fcb::FactorFamilyBasis, j::Integer, d::In
         return nothing
     end
     return R[:, axes(R, 2) .!= d] ./ rho
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The factors that are not empty in each of the two regression passes of the carry fold of a Cross-Sectional Factor Prior.
+
+This type is an implementation detail and is not intended for direct use. [`cross_sectional_move_marks`](@ref) and [`cross_sectional_move_row_marks`](@ref) make it. [`cross_sectional_rebase_state`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`cross_sectional_move_marks`](@ref)
+  - [`cross_sectional_move_row_marks`](@ref)
+  - [`cross_sectional_rebase_state`](@ref)
+"""
+@concrete struct FactorMarks
+    """
+    `lv1`: The marks of the first pass.
+    """
+    lv1
+    """
+    `lv`: The marks of the last pass.
+    """
+    lv
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -365,10 +427,11 @@ A factor outside a Factor Family that moved keeps its column of the design, so i
 
 # Returns
 
-  - `marks::NamedTuple`: `lv1` and `lv`, the marks of the two passes on the new reduced axis.
+  - `marks::FactorMarks`: The marks of the two passes on the new reduced axis.
 
 # Related
 
+  - [`FactorMarks`](@ref)
   - [`cross_sectional_fold_move`](@ref)
   - [`cross_sectional_move_row_marks`](@ref)
   - [`cross_sectional_live_factors`](@ref)
@@ -395,7 +458,7 @@ function cross_sectional_move_marks(pe::CrossSectionalFactorPrior,
         lv1[mv] .|= r.lv1[mv]
         lv[mv] .|= r.lv[mv]
     end
-    return (; lv1 = lv1, lv = lv)
+    return FactorMarks(lv1, lv)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -413,10 +476,11 @@ The function runs the steps of [`cross_sectional_fold_regression`](@ref) that th
 
 # Returns
 
-  - `marks::NamedTuple`: `lv1` and `lv`, the marks of the observation in the two passes.
+  - `marks::FactorMarks`: The marks of the observation in the two passes.
 
 # Related
 
+  - [`FactorMarks`](@ref)
   - [`cross_sectional_move_marks`](@ref)
   - [`cross_sectional_live_factors`](@ref)
 """
@@ -425,7 +489,7 @@ function cross_sectional_move_row_marks(pe::CrossSectionalFactorPrior,
                                         fcb::FactorFamilyBasis, s::Integer)
     t = s + pe.lag
     sl = factor_basis_slice(fcb, s:s)
-    B = st.Ms[s:s, :, :]
+    B = st.Ms[:, :, s:s]
     Zl = reduce_exposures(sl, B)
     Xr = something(st.Xl, st.X)[t:t, :]
     mcl = cross_sectional_rows(st.mcap, s:s)
@@ -435,8 +499,8 @@ function cross_sectional_move_row_marks(pe::CrossSectionalFactorPrior,
     W = st.W[s:s, :]
     Z1 = unseen_member_design(pe.unseen, sl, B, Zl, W1).Z
     Z = unseen_member_design(pe.unseen, sl, B, Zl, W).Z
-    return (; lv1 = cross_sectional_live_factors(Z1, Xr, W1),
-            lv = cross_sectional_live_factors(Z, Xr, W))
+    return FactorMarks(cross_sectional_live_factors(Z1, Xr, W1),
+                       cross_sectional_live_factors(Z, Xr, W))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -520,7 +584,7 @@ end
 function cross_sectional_rebase_state(pe::CrossSectionalFactorPrior,
                                       st::CrossSectionalCarryState, fcb::FactorFamilyBasis,
                                       m::Integer)
-    Tf = size(st.Ms, 1) - m
+    Tf = size(st.Ms, 3) - m
     r = (pe.lag + 1):Tf
     z = (Tf - pe.lag + 1):Tf
     fr = cross_sectional_expand(st.fcb, r, pe.lag, st.csr.f)
@@ -530,18 +594,20 @@ function cross_sectional_rebase_state(pe::CrossSectionalFactorPrior,
     dc = isnothing(st.csr.dc) ? nothing : zeros(Bool, size(f))
     cross_sectional_move_solve(pe, st, (; fcb = fcb, f = f, lv = marks.lv, dc = dc))
     cb = cross_sectional_observed_block(st.obs, 1:Tf, r,
-                                        buffer_fit_count(st.buf) - size(st.Ms, 1))
+                                        buffer_fit_count(st.buf) - size(st.Ms, 3))
     fo = cross_sectional_fold_factor_returns(f, marks.lv, cb)
-    (; eps, n, b, h1) = st.csr
+    # A move solves an observation again on the same span, so its residuals and its count stay.
+    (; eps, n, edof, b, h1) = st.csr
     return cross_sectional_carry_with(st,
                                       (;
                                        families = cross_sectional_dropped_names(pe.families,
                                                                                 fcb, st.nf),
                                        fcb = fcb,
                                        Z = reduce_exposures(factor_basis_slice(fcb, z),
-                                                            st.Ms[z, :, :]),
+                                                            st.Ms[:, :, z]),
                                        csr = CrossSectionalRegression(; f = f, eps = eps,
-                                                                      n = n, b = b, h1 = h1,
+                                                                      n = n, edof = edof,
+                                                                      b = b, h1 = h1,
                                                                       dc = cross_sectional_bit_mask(dc)),
                                        lv1 = marks.lv1, lv = marks.lv,
                                        pe = cross_sectional_refold_factors(pe.pe, fo,
@@ -588,11 +654,11 @@ function cross_sectional_move_solve(pe::CrossSectionalFactorPrior,
     Xs = something(st.Xl, st.X)
     for s in axes(f, 1)
         sl = factor_basis_slice(fcb, s:s)
-        B = view(st.Ms, s:s, :, :)
+        B = view(st.Ms, :, :, s:s)
         W = view(st.W, s:s, :)
         ud = unseen_member_design(pe.unseen, sl, B, reduce_exposures(sl, B), W)
         idx = findall(>(zero(eltype(W))), view(W, 1, :))
-        A = view(ud.Z, 1, idx, lv) .* sqrt.(view(W, 1, idx))
+        A = view(ud.Z, idx, lv, 1) .* sqrt.(view(W, 1, idx))
         nz = map(c -> any(!iszero, c), eachcol(A))
         # A solve again writes its own mask over this one.
         cross_sectional_move_dropped!(dc, s, lv, nz)
@@ -758,7 +824,7 @@ function cross_sectional_step_factors(pe::CrossSectionalFactorPrior,
                                       st::CrossSectionalCarryState,
                                       csr::CrossSectionalRegression,
                                       lv::AbstractVector{Bool})
-    Tf = size(st.Ms, 1)
+    Tf = size(st.Ms, 3)
     if lv != st.lv
         cb = cross_sectional_observed_block(st.obs, 1:Tf, (pe.lag + 1):Tf,
                                             buffer_fit_count(st.buf) - Tf)
@@ -794,8 +860,9 @@ Appends the observed factors to the fitted factors of the carry fold of a Cross-
 
 # Returns
 
+  - `(r, ca)::Tuple`:
   - `r::UnitRange`: The fitted observations among the observations after the warm-up.
-  - `ca::NamedTuple`: The answer of [`cross_sectional_observed_append`](@ref).
+  - `ca::AppendedFactorModel`: The answer of [`cross_sectional_observed_append`](@ref).
 
 # Related
 
@@ -804,10 +871,10 @@ Appends the observed factors to the fitted factors of the carry fold of a Cross-
 """
 function cross_sectional_carry_append(pe::CrossSectionalFactorPrior,
                                       st::CrossSectionalCarryState)
-    Tf = size(st.Ms, 1)
+    Tf = size(st.Ms, 3)
     r = (pe.lag + 1):Tf
     cb = cross_sectional_observed_block(st.obs, 1:Tf, r, buffer_fit_count(st.buf) - Tf)
-    ca = cross_sectional_observed_append(cb, st.csr.f, st.Z[end, :, :],
-                                         view(st.Ms, r, :, :), st.nf, st.fam, st.fcb)
-    return (; r = r, ca = ca)
+    ca = cross_sectional_observed_append(cb, st.csr.f, view(st.Z, :, :, size(st.Z, 3)),
+                                         view(st.Ms, :, :, r), st.nf, st.fam, st.fcb)
+    return r, ca
 end

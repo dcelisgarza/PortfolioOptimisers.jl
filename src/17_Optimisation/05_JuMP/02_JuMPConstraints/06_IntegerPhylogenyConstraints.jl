@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add the integer phylogeny rows, which cap the number of held assets in each row of an [`IntegerPhylogeny`](@ref).
 
-Each [`IntegerPhylogeny`](@ref) entry of `plgs` adds its rows on the held binary of the asset bundle. [`mip_indicators`](@ref) returns the bundle that [`set_mip_constraints!`](@ref) registered, and [`held_bin`](@ref) returns its held binary. An entry of another kind adds no row here. The method for `plgs = nothing` adds nothing, and the main method adds nothing when no MIP builder ran.
+Each [`IntegerPhylogeny`](@ref) entry of `plgs` adds its rows on the held binary of the asset bundle. [`mip_indicators`](@ref) returns the bundle that [`set_mip_constraints!`](@ref) registered for the same `prefix`, which is the bundle of the weights unless that call declared its own, and [`held_bin`](@ref) returns its held binary. An entry of another kind adds no row here. The method for `plgs = nothing` adds nothing, and the main method adds nothing when no MIP builder ran.
 
 [`set_mip_constraints!`](@ref) runs a builder that declares a held binary whenever `plgs` holds an [`IntegerPhylogeny`](@ref), so the bundle is present whenever a row is due. The lean sign-bit builder registers a [`SignIndicators`](@ref), which has no held binary, and it never runs beside an integer phylogeny. The head calls this function after the risk and the return rows, beside [`set_sdp_phylogeny_constraints!`](@ref). It reads no mark that a later builder writes, so the position is a grouping and not a dependency.
 
@@ -29,6 +29,7 @@ Where:
 
   - $(arg_dict[:model])
   - `plgs::Option{<:PlC_VecPlC}`: The phylogeny constraint result, a vector of them, or `nothing`.
+  - $(arg_dict[:prefix_kw])
 
 # Validation
 
@@ -47,8 +48,9 @@ Where:
   - [`set_sdp_phylogeny_constraints!`](@ref)
   - [`IntegerPhylogeny`](@ref)
 """
-function set_iplg_constraints!(model::JuMP.Model, plgs::PlC_VecPlC)
-    ind = mip_indicators(model)
+function set_iplg_constraints!(model::JuMP.Model, plgs::PlC_VecPlC;
+                               prefix::Symbol = Symbol(""))
+    ind = mip_indicators(model, prefix)
     if isnothing(ind)
         return nothing
     end
@@ -62,12 +64,12 @@ function set_iplg_constraints!(model::JuMP.Model, plgs::PlC_VecPlC)
         B = pl.B
         @argcheck(size(A, 2) == length(ib),
                   DimensionMismatch("entry $i of the integer phylogeny has $(size(A, 2)) columns, but the model has $(length(ib)) assets"))
-        state_set!(model, Symbol(""), :card_plg_, i,
+        state_set!(model, prefix, :card_plg_, i,
                    JuMP.@constraint(model, sc * (A * ib ⊖ B) <= 0))
     end
     return nothing
 end
-function set_iplg_constraints!(::JuMP.Model, ::Nothing)
+function set_iplg_constraints!(::JuMP.Model, ::Nothing; prefix::Symbol = Symbol(""))
     return nothing
 end
 """
@@ -158,7 +160,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add the integer phylogeny rows on the factor weights of a [`FactorRiskContribution`](@ref) model.
 
-The asset builder [`set_iplg_constraints!`](@ref) reads the held binary of the asset bundle. This builder declares a held binary of its own, one bit for each factor, through [`declare_held_indicators!`](@ref) in the [`FactorMIPSpace`](@ref). The gate rows of that call force the weight of a factor to zero when its bit is zero. Each [`IntegerPhylogeny`](@ref) entry of `plgs` then adds its rows on the factor bits. A factor weight is free in sign, so its gate needs a bound on each side, and [`factor_weight_bounds`](@ref) derives both from the asset weight bounds.
+The asset builder [`set_iplg_constraints!`](@ref) reads the held binary of the asset bundle. This builder declares a held binary of its own, one bit for each factor, through the [`HeldIndicators`](@ref) method of [`declare_mip_indicators!`](@ref) in the [`FactorMIPSpace`](@ref). The gate rows of [`mip_wb`](@ref) on those bits force the weight of a factor to zero when its bit is zero. Each [`IntegerPhylogeny`](@ref) entry of `plgs` then adds its rows on the factor bits. A factor weight is free in sign, so its gate needs a bound on each side, and [`factor_weight_bounds`](@ref) derives both from the asset weight bounds.
 
 The builder adds nothing when `plgs` holds no [`IntegerPhylogeny`](@ref). The head calls it after [`assemble_jump_model!`](@ref), beside [`set_sdp_frc_phylogeny_constraints!`](@ref). When the budget ``k`` is a variable, the gate reads the big-M constant `ss`. An asset MIP builder registered it if one ran. If none ran, this builder registers it from the asset weight bounds, as the asset builder does.
 
@@ -232,7 +234,7 @@ The rows `frc_card_plg_<i>` read the bits ``\\boldsymbol{b}`` and never the gate
   - [`set_iplg_constraints!`](@ref): Adds the same rows on the asset weights.
   - [`set_sdp_frc_phylogeny_constraints!`](@ref)
   - [`factor_weight_bounds`](@ref)
-  - [`declare_held_indicators!`](@ref)
+  - [`declare_mip_indicators!`](@ref)
   - [`FactorMIPSpace`](@ref)
   - [`IntegerPhylogeny`](@ref)
 """
@@ -249,7 +251,10 @@ function set_frc_iplg_constraints!(model::JuMP.Model, plgs::Option{<:PlC_VecPlC}
         set_mip_ss_expr!(model, ss, wb::WeightBounds)
     end
     sp = FactorMIPSpace()
-    ib = held_bin(declare_held_indicators!(model, sp, fwb, mip_wx!(model, sp), ss))
+    w1 = mip_wx!(model, sp)
+    ind = declare_mip_indicators!(model, sp, HeldIndicators, fwb, w1, ss)
+    mip_wb(model, sp, fwb, w1, ind)
+    ib = held_bin(ind)
     sc = get_constraint_scale(model)
     for (i, pl) in enumerate(plgs)
         if !isa(pl, IntegerPhylogeny)

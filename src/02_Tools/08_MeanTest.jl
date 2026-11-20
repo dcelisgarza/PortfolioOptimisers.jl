@@ -11,7 +11,7 @@ In order to implement a new Mean Test that works seamlessly with the library, su
 
 ## Test method
 
-  - `mean_test(mt::AbstractMeanTestEstimator, c::VecNum, window::Real, rng) -> NamedTuple`: Tests the mean of `c` against zero.
+  - `mean_test(mt::AbstractMeanTestEstimator, c::VecNum, window::Real, rng) -> MeanTestResult`: Tests the mean of `c` against zero.
 
 ### Arguments
 
@@ -22,7 +22,7 @@ In order to implement a new Mean Test that works seamlessly with the library, su
 
 ### Returns
 
-  - `res::NamedTuple`: `(; t_stat, p_value, mean_ci_lower, mean_ci_upper)`.
+  - `res::MeanTestResult`: The t-statistic, the p-value and the confidence interval of the mean. The method builds it with the constructor of [`MeanTestResult`](@ref), which checks the values. A test that cannot answer gives `NaN` in each field that it cannot compute.
 
 ## Generator method
 
@@ -33,6 +33,7 @@ In order to implement a new Mean Test that works seamlessly with the library, su
   - [`OverlapMeanTest`](@ref)
   - [`WildBootstrapMeanTest`](@ref)
   - [`mean_test`](@ref)
+  - [`MeanTestResult`](@ref)
   - [`mean_test_rng`](@ref)
   - [`exposure_ic_summary`](@ref)
   - [`forecast_ic_summary`](@ref)
@@ -568,7 +569,7 @@ julia> round(nd; digits = 3), round(nu; digits = 3)
 
 # References
 
-  - $(ref_dict[:satterthwaite1946])
+  - $(ref_dict[:satterthwaite1946]) Section 2, Equation 6, page 111.
 """
 struct NullMomentLaw <: AbstractOverlapStudentLaw end
 """
@@ -916,7 +917,7 @@ $(DocStringExtensions.FIELDS)
         law::AbstractOverlapStudentLaw = NullMomentLaw(),
         q::Real = 0.05,
         min_obs::Option{<:Integer} = nothing,
-        min_periods::Option{<:Real} = nothing,
+        min_periods::Option{<:Integer} = nothing,
     ) -> OverlapMeanTest
 
 Keywords correspond to the struct's fields.
@@ -931,9 +932,14 @@ The law [`NullMomentLaw`](@ref) is the default because it holds the level of the
 # Examples
 
 ```jldoctest
-julia> PortfolioOptimisers.mean_test(OverlapMeanTest(), [0.1, -0.2, 0.3, 0.2, NaN, 0.1], 1,
-                                     nothing)
-(t_stat = 1.1952286093343938, p_value = 0.29801481173121036, mean_ci_lower = -0.132294063538519, mean_ci_upper = 0.332294063538519)
+julia> res = PortfolioOptimisers.mean_test(OverlapMeanTest(), [0.1, -0.2, 0.3, 0.2, NaN, 0.1], 1,
+                                           nothing);
+
+julia> (res.t_stat, res.p_value)
+(1.1952286093343938, 0.29801481173121036)
+
+julia> (res.mean_ci_lower, res.mean_ci_upper)
+(-0.132294063538519, 0.332294063538519)
 ```
 
 # Related
@@ -948,7 +954,7 @@ julia> PortfolioOptimisers.mean_test(OverlapMeanTest(), [0.1, -0.2, 0.3, 0.2, Na
 
 # References
 
-  - $(ref_dict[:satterthwaite1946])
+  - $(ref_dict[:satterthwaite1946]) Section 2, Equation 6, page 111.
 """
 @concrete struct OverlapMeanTest <: AbstractMeanTestEstimator
     """
@@ -968,7 +974,7 @@ julia> PortfolioOptimisers.mean_test(OverlapMeanTest(), [0.1, -0.2, 0.3, 0.2, Na
     """
     min_periods
     function OverlapMeanTest(law::AbstractOverlapStudentLaw, q::Real,
-                             min_obs::Option{<:Integer}, min_periods::Option{<:Real})
+                             min_obs::Option{<:Integer}, min_periods::Option{<:Integer})
         assert_mean_test_rules(q, min_obs, min_periods)
         return new{typeof(law), typeof(q), typeof(min_obs), typeof(min_periods)}(law, q,
                                                                                  min_obs,
@@ -977,7 +983,7 @@ julia> PortfolioOptimisers.mean_test(OverlapMeanTest(), [0.1, -0.2, 0.3, 0.2, Na
 end
 function OverlapMeanTest(; law::AbstractOverlapStudentLaw = NullMomentLaw(), q::Real = 0.05,
                          min_obs::Option{<:Integer} = nothing,
-                         min_periods::Option{<:Real} = nothing)::OverlapMeanTest
+                         min_periods::Option{<:Integer} = nothing)::OverlapMeanTest
     return OverlapMeanTest(law, q, min_obs, min_periods)
 end
 """
@@ -1037,7 +1043,7 @@ $(DocStringExtensions.FIELDS)
         n_sim::Integer = 1_999,
         q::Real = 0.05,
         min_obs::Option{<:Integer} = nothing,
-        min_periods::Option{<:Real} = nothing,
+        min_periods::Option{<:Integer} = nothing,
         rng::Random.AbstractRNG = Random.default_rng(),
         seed::Option{<:Integer} = nothing,
     ) -> WildBootstrapMeanTest
@@ -1138,7 +1144,7 @@ true
                                    alg::AbstractBootstrapDraws, b::Real,
                                    span::AbstractMeanTestSpan, ddof::Integer,
                                    n_sim::Integer, q::Real, min_obs::Option{<:Integer},
-                                   min_periods::Option{<:Real}, rng::Random.AbstractRNG,
+                                   min_periods::Option{<:Integer}, rng::Random.AbstractRNG,
                                    seed::Option{<:Integer})
         assert_bootstrap_draws(kernel, alg)
         @argcheck(zero(b) < b <= one(b),
@@ -1162,14 +1168,14 @@ function WildBootstrapMeanTest(; kernel::AbstractLongRunKernel = BartlettKernel(
                                span::AbstractMeanTestSpan = FiniteEntrySpan(),
                                ddof::Integer = 0, n_sim::Integer = 1_999, q::Real = 0.05,
                                min_obs::Option{<:Integer} = nothing,
-                               min_periods::Option{<:Real} = nothing,
+                               min_periods::Option{<:Integer} = nothing,
                                rng::Random.AbstractRNG = Random.default_rng(),
                                seed::Option{<:Integer} = nothing)::WildBootstrapMeanTest
     return WildBootstrapMeanTest(kernel, alg, b, span, ddof, n_sim, q, min_obs, min_periods,
                                  rng, seed)
 end
 """
-    assert_mean_test_rules(q::Real, min_obs::Option{<:Integer}, min_periods::Option{<:Real})
+    assert_mean_test_rules(q::Real, min_obs::Option{<:Integer}, min_periods::Option{<:Integer})
 
 Refuse a significance level or a minimum-data rule that no series can meet.
 
@@ -1194,7 +1200,7 @@ Refuse a significance level or a minimum-data rule that no series can meet.
   - [`WildBootstrapMeanTest`](@ref)
 """
 function assert_mean_test_rules(q::Real, min_obs::Option{<:Integer},
-                                min_periods::Option{<:Real})::Nothing
+                                min_periods::Option{<:Integer})::Nothing
     assert_unit_interval(q, :q)
     if !isnothing(min_obs)
         @argcheck(min_obs >= 2, DomainError(min_obs, "min_obs must be >= 2"))
@@ -1234,9 +1240,86 @@ function mean_test_rng(mt::WildBootstrapMeanTest)
     return resolve_rng(mt.rng, mt.seed)
 end
 """
-    mean_test(mt::OverlapMeanTest, c::VecNum, window::Real, rng) -> NamedTuple
+$(DocStringExtensions.TYPEDEF)
+
+The answer of a **Mean Test** for one series: the t-statistic, the two-sided p-value and the confidence interval of the mean, under the null hypothesis that the mean is zero.
+
+[`mean_test`](@ref) returns it, and a new Mean Test builds it in its own `mean_test` method, as the `# Interfaces` section of [`AbstractMeanTestEstimator`](@ref) states. So the type is the contract of the interface, and its constructor checks the values that a test gives. A test that cannot answer, for a series with too few entries or a long-run variance that is not positive, gives `NaN` in each field that it cannot compute. A caller reads the fields by name, as `res.p_value` or `(; t_stat, p_value) = res`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    MeanTestResult(t_stat::Real, p_value::Real, mean_ci_lower::Real, mean_ci_upper::Real)
+    MeanTestResult(; t_stat::Real, p_value::Real, mean_ci_lower::Real, mean_ci_upper::Real)
+
+The positional constructor checks the values. The keyword constructor takes each field by name, with no default, and calls it.
+
+## Validation
+
+  - `p_value` is `NaN` or in ``[0, 1]``. Otherwise, the constructor raises a `DomainError`.
+  - `mean_ci_lower <= mean_ci_upper` when both bounds are numbers. Otherwise, the constructor raises a `DomainError`. A `NaN` bound passes.
+
+# Examples
+
+```jldoctest
+julia> res = PortfolioOptimisers.MeanTestResult(; t_stat = 2.5, p_value = 0.04,
+                                                mean_ci_lower = 0.01, mean_ci_upper = 0.09);
+
+julia> res.p_value
+0.04
+
+julia> PortfolioOptimisers.MeanTestResult(2.5, 1.5, 0.01, 0.09)
+ERROR: DomainError with 1.5:
+p_value must be NaN or in [0, 1]
+[...]
+```
+
+# Related
+
+  - [`mean_test`](@ref)
+  - [`AbstractMeanTestEstimator`](@ref)
+  - [`OverlapMeanTest`](@ref)
+  - [`WildBootstrapMeanTest`](@ref)
+"""
+@concrete struct MeanTestResult <: AbstractResult
+    """
+    t-statistic of the mean, the mean over its long-run standard error.
+    """
+    t_stat
+    """
+    Two-sided p-value of the null hypothesis that the mean is zero, against the law that the Mean Test reads.
+    """
+    p_value
+    """
+    Lower bound of the confidence interval of the mean, at the level `q` of the Mean Test.
+    """
+    mean_ci_lower
+    """
+    Upper bound of the confidence interval of the mean, at the level `q` of the Mean Test.
+    """
+    mean_ci_upper
+    function MeanTestResult(t_stat::Real, p_value::Real, mean_ci_lower::Real,
+                            mean_ci_upper::Real)
+        @argcheck(isnan(p_value) || zero(p_value) <= p_value <= one(p_value),
+                  DomainError(p_value, "p_value must be NaN or in [0, 1]"))
+        @argcheck(!(mean_ci_lower > mean_ci_upper),
+                  DomainError(mean_ci_lower,
+                              "mean_ci_lower <= mean_ci_upper must hold. Got\nmean_ci_lower => $mean_ci_lower\nmean_ci_upper => $mean_ci_upper"))
+        return new{typeof(t_stat), typeof(p_value), typeof(mean_ci_lower),
+                   typeof(mean_ci_upper)}(t_stat, p_value, mean_ci_lower, mean_ci_upper)
+    end
+end
+function MeanTestResult(; t_stat::Real, p_value::Real, mean_ci_lower::Real,
+                        mean_ci_upper::Real)::MeanTestResult
+    return MeanTestResult(t_stat, p_value, mean_ci_lower, mean_ci_upper)
+end
+"""
+    mean_test(mt::OverlapMeanTest, c::VecNum, window::Real, rng) -> MeanTestResult
     mean_test(mt::WildBootstrapMeanTest, c::VecNum, window::Real,
-              rng::Random.AbstractRNG) -> NamedTuple
+              rng::Random.AbstractRNG) -> MeanTestResult
 
 Return the t-statistic, the two-sided p-value and the confidence interval of the mean of a series, under the null hypothesis that the mean is zero.
 
@@ -1255,11 +1338,12 @@ The test reads the entries of `c` at which it is finite. A `NaN` entry is in no 
 
 # Returns
 
-  - `res::NamedTuple`: `(; t_stat, p_value, mean_ci_lower, mean_ci_upper)`.
+  - `res::MeanTestResult`: The t-statistic, the p-value and the confidence interval of the mean, see [`MeanTestResult`](@ref).
 
 # Related
 
   - [`AbstractMeanTestEstimator`](@ref)
+  - [`MeanTestResult`](@ref)
   - [`mean_test_rng`](@ref)
   - [`exposure_ic_factor_summary`](@ref)
 """
@@ -1269,7 +1353,7 @@ function mean_test(mt::OverlapMeanTest, c::VecNum, window::Real, ::Any)
     Ts = typeof(sqrt(one(m)))
     nan = Ts(NaN)
     if !mean_test_answers(mt, m, n, T, window)
-        return (; t_stat = nan, p_value = nan, mean_ci_lower = nan, mean_ci_upper = nan)
+        return MeanTestResult(nan, nan, nan, nan)
     end
     P = length(d)
     lags = ceil(Int, window) - 1
@@ -1283,12 +1367,11 @@ function mean_test(mt::OverlapMeanTest, c::VecNum, window::Real, ::Any)
     nd, nu = overlap_student_law(mt.law, f, window, n, Ts)
     t = min(nd, nu) > zero(nd) ? studentised_mean(m, Q, n, nd) : nan
     if !isfinite(t)
-        return (; t_stat = t, p_value = nan, mean_ci_lower = nan, mean_ci_upper = nan)
+        return MeanTestResult(t, nan, nan, nan)
     end
     D = Distributions.TDist(nu)
     h = Distributions.quantile(D, 1 - mt.q / 2) * sqrt(Q / nd) / sqrt(Ts(n))
-    return (; t_stat = t, p_value = 2 * Distributions.ccdf(D, abs(t)),
-            mean_ci_lower = m - h, mean_ci_upper = m + h)
+    return MeanTestResult(t, 2 * Distributions.ccdf(D, abs(t)), m - h, m + h)
 end
 function mean_test(mt::WildBootstrapMeanTest, c::VecNum, window::Real,
                    rng::Random.AbstractRNG)
@@ -1297,26 +1380,25 @@ function mean_test(mt::WildBootstrapMeanTest, c::VecNum, window::Real,
     Ts = typeof(sqrt(one(m)))
     nan = Ts(NaN)
     if !mean_test_answers(mt, m, n, T, window)
-        return (; t_stat = nan, p_value = nan, mean_ci_lower = nan, mean_ci_upper = nan)
+        return MeanTestResult(nan, nan, nan, nan)
     end
     B = mt.b * T
     buf = similar(d, length(d) + 1)
     nd = n - mt.ddof
     if nd <= 0
-        return (; t_stat = nan, p_value = nan, mean_ci_lower = nan, mean_ci_upper = nan)
+        return MeanTestResult(nan, nan, nan, nan)
     end
     Q, ats = wild_bootstrap_statistics(mt.kernel, mt.alg, mt.n_sim, d, f, n, nd, B, buf,
                                        rng)
     t = studentised_mean(m, Q, n, nd)
     if !isfinite(t)
-        return (; t_stat = t, p_value = nan, mean_ci_lower = nan, mean_ci_upper = nan)
+        return MeanTestResult(t, nan, nan, nan)
     end
     at = abs(t)
     K = count(x -> !(x < at), ats)
     k = mt.n_sim + 1 - bootstrap_exceedance_cap(mt.q, mt.n_sim)
     h = partialsort!(ats, k) * sqrt(Q / nd) / sqrt(Ts(n))
-    return (; t_stat = t, p_value = (1 + K) / (mt.n_sim + 1), mean_ci_lower = m - h,
-            mean_ci_upper = m + h)
+    return MeanTestResult(t, (1 + K) / (mt.n_sim + 1), m - h, m + h)
 end
 """
     bootstrap_exceedance_cap(q::Real, M::Integer) -> Int
@@ -1463,7 +1545,7 @@ A series whose spread is round-off of its mean is constant: every entry of `d` i
   - [`round_off_unit`](@ref)
 """
 function mean_test_centred(c::VecNum, span::AbstractMeanTestSpan)
-    Tm = float_if_integer(real(eltype(c)))
+    Tm = real(eltype(c))
     n, s, i1, i2 = finite_sum_bounds(c, Tm)
     m = n > 0 ? s / n : Tm(NaN)
     P = iszero(n) ? 0 : i2 - i1 + 1
@@ -1601,5 +1683,5 @@ end
 export OverlapMeanTest, WildBootstrapMeanTest, BartlettKernel, QuadraticSpectralKernel,
        FiniteEntrySpan, FullGridSpan, BandCountLaw, NullMomentLaw
 public AbstractMeanTestEstimator, AbstractLongRunKernel, AbstractMeanTestSpan,
-       AbstractBootstrapDraws, AbstractOverlapStudentLaw, mean_test, mean_test_rng,
-       long_run_kernel_weight, mean_test_span_length, overlap_student_law
+       AbstractBootstrapDraws, AbstractOverlapStudentLaw, MeanTestResult, mean_test,
+       mean_test_rng, long_run_kernel_weight, mean_test_span_length, overlap_student_law

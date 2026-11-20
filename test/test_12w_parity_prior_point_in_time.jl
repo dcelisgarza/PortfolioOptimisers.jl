@@ -33,8 +33,10 @@ end
 function PortfolioOptimisers.prior(pe::ScaledWeightsPrior, X::PortfolioOptimisers.MatNum,
                                    args...; kwargs...)
     pr = prior(pe.pe, X, args...; kwargs...)
+    # A constant multiple of the weights moves no Kish count, so the counts of the moments
+    # forward with the new weights.
     return PortfolioOptimisers.forward_prior(pr; w = pweights(pe.s .* pr.w.values),
-                                             ens = nothing, kld = nothing)
+                                             ens = nothing, eoc = pr.eoc, kld = nothing)
 end
 
 @testset "The prior on a point-in-time panel, at parity (#1384)" begin
@@ -45,17 +47,16 @@ end
                "style2" => mpass("style2")]
     pe = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
                         ce = RegimeAdjustedExpWeightedCovariance(; centring = PreCentred(),
-                                                                 debias = RawStatistic(),
+                                                                 debias = nothing,
                                                                  regime_lohi_mult = (0.7,
                                                                                      1.6)))
-    ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
-                                           debias = RawStatistic(),
+    ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(), debias = nothing,
                                            regime_lohi_mult = (0.7, 1.6), min_val = 0.0)
     est(; kw...) = CrossSectionalFactorPrior(; lambda = 1, factors = factors, pe = pe,
                                              ve = ve, kw...)
     load(c, o) = parity_load("CrossSectionalFactorPrior", c, o)
     loadv(c, o) = vec(load(c, o))
-    flat(Ms) = reshape(permutedims(Ms, (1, 3, 2)), size(Ms, 1), :)
+    flat(Ms) = reshape(permutedims(Ms, (3, 2, 1)), size(Ms, 3), :)
     fxs = parity_small_panel()
     fxl = parity_large_panel()
     prs = prior(est(; minra = 5), fxs.rd)
@@ -243,7 +244,11 @@ end
         @test isequal(pc.fpr.X, prs.fpr.X[(end - 29):end, :])
         @test isequal(pc.o_X, prs.o_X[(end - 29):end, :])
         @test isequal(pc.mu, prs.mu) && isequal(pc.sigma, prs.sigma)
-        @test pc.ens == size(prs.X, 1)
+        # The cap states the counts of the moments, which read every observation of the
+        # fit. The default estimators are exponentially weighted, so each count is the Kish
+        # count of their weights, below the number of observations (#1893).
+        @test pc.eoc == prs.eoc
+        @test all(c -> c < size(prs.X, 1), pc.eoc)
     end
 
     @testset "The scenario weights are divided by their sum (#1509)" begin
@@ -369,7 +374,7 @@ end
         # leaves the whole history cold.
         rows(T) = PO.port_opt_view(fxs.rd, 1:T, :)
         ve60 = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
-                                                 debias = RawStatistic(),
+                                                 debias = nothing,
                                                  regime_lohi_mult = (0.7, 1.6),
                                                  min_val = 0.0, min_obs = 60)
         @test_throws PO.IsNonFiniteError prior(est(; minra = 5), rows(40))
@@ -671,12 +676,12 @@ end
         p1 = rec_fit(rd; factors = facs, bp = 0.0, wa = eqw(),
                      neutralise = ["momentum" => ["size"]])
         E0, E1 = p0.rr.Ms, p1.rr.Ms
-        @test abs(cor(E0[end, :, 2], E0[end, :, 3])) > 0.65
+        @test abs(cor(E0[:, 2, end], E0[:, 3, end])) > 0.65
         cv(a, b) = mean((a .- mean(a)) .* (b .- mean(b)))
-        @test all(t -> abs(cv(E1[t, :, 2], E1[t, :, 3])) < 1e-10, axes(E1, 1))
-        @test all(t -> abs(mean(E1[t, :, 3])) < 1e-10 && abs(std(E1[t, :, 3]) - 1) < 1e-10,
-                  axes(E1, 1))
-        @test isapprox(E1[:, :, 2], E0[:, :, 2]; rtol = 1e-10)
+        @test all(t -> abs(cv(E1[:, 2, t], E1[:, 3, t])) < 1e-10, axes(E1, 3))
+        @test all(t -> abs(mean(E1[:, 3, t])) < 1e-10 && abs(std(E1[:, 3, t]) - 1) < 1e-10,
+                  axes(E1, 3))
+        @test isapprox(E1[:, 2, :], E0[:, 2, :]; rtol = 1e-10)
         n = size(fhat(p0), 1)
         @test cor(fhat(p0)[:, 2], fs[(end - n + 1):end]) > 0.98
         @test cor(fhat(p0)[:, 3], fmo[(end - n + 1):end]) > 0.98
@@ -899,9 +904,9 @@ end
         neu = rec_fit(rd; neutralise = ["style" => ["industry"]], kw...)
         ctl = rec_fit(rd; kw...)
         E, W = neu.rr.Ms, neu.rr.bw
-        @test all(abs(sum(W[t, :] .* E[t, :, s] .* E[t, :, j])) < 1e-8
-                  for t in axes(E, 1), s in 5:6, j in 2:4)
-        @test all(s -> maximum(abs, E[:, :, s] - ctl.rr.Ms[:, :, s]) > 0.01, 5:6)
+        @test all(abs(sum(W[t, :] .* E[:, s, t] .* E[:, j, t])) < 1e-8
+                  for t in axes(E, 3), s in 5:6, j in 2:4)
+        @test all(s -> maximum(abs, E[:, s, :] - ctl.rr.Ms[:, s, :]) > 0.01, 5:6)
     end
 
     @testset "14a and 14b. A spanned and an orthogonal alpha" begin

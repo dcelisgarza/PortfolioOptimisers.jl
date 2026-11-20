@@ -1,5 +1,5 @@
 ```@meta
-Description = "EW beta descriptors (a), public API of PortfolioOptimisers.jl: EWBeta, descriptor, merge_states, EWMarketBeta."
+Description = "EW beta descriptors (a), public API of PortfolioOptimisers.jl: EWBeta, descriptor, EWMarketBeta."
 ```
 
 # [EW beta descriptors (a)](@id api-ew-beta-descriptors)
@@ -14,7 +14,6 @@ EWBeta
 
 ```@docs
 descriptor(de::EWBeta, rd::ReturnsResult)
-merge_states(::PortfolioOptimisers.EWBlockState, ::PortfolioOptimisers.EWBlockState)
 EWMarketBeta
 ```
 

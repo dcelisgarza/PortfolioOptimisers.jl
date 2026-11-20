@@ -76,10 +76,6 @@
                                                alg = DependentVariableTracking())],
                   obj = MinimumRisk(), opt = opt3)
 
-    Skewness{MaxRiskMeasureSettings{Float64, Nothing, Bool},
-             SimpleVariance{SimpleExpectedReturns{Nothing}, Nothing, Bool}, Matrix{Float64},
-             Nothing, Vector{Float64}}
-
     @testset "[A, Tracking(A)] — $name / $(nameof(typeof(alg)))" for (name, A, o, wv, rdx,
                                                                       ckeys) in cases,
                                                                      alg in

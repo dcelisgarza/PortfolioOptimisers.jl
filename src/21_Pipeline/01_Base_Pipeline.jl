@@ -7,10 +7,82 @@ A pipeline reifies an end-to-end workflow — price preprocessing, prices-to-ret
 
 All concrete pipeline estimators should subtype `AbstractPipelineEstimator`.
 
+# Interfaces
+
+To add a pipeline estimator, subtype `AbstractPipelineEstimator` and implement the following method. Its result subtypes [`AbstractPipelineResult`](@ref) and follows the interface of that type.
+
+## `fit`
+
+  - `fit(pipe::MyPipeline, data::Prices_RR) -> AbstractPipelineResult`: Fits the workflow on `data`.
+
+### Arguments
+
+  - `pipe`: The instance of the subtype.
+  - `data::Prices_RR`: Price data or returns data.
+
+### Returns
+
+  - `res::AbstractPipelineResult`: The fitted result of the workflow.
+
+A pipeline that folds observations one at a time also implements `fit(pipe::MyPipeline)` with no data. It reads the fitted result out of the partial-fit state of the pipeline.
+
+With `fit`, the subtype gets three methods that the library defines on `AbstractPipelineEstimator`:
+
+  - The method `fit_and_predict(pipe, data, train_idx, test_idx, cols)` fits the pipeline over the rows `train_idx` and predicts over `test_idx`. When `train_idx` is `nothing`, it calls `fit(pipe)` with no data.
+  - The methods of `port_opt_view` and `optimise` raise an `ArgumentError`. A pipeline is a workflow, not an optimiser, so a meta-optimiser cannot hold one.
+
+The shape of [`Pipeline`](@ref) is a linear list of steps, not a graph of steps. A subtype can have a different shape, which the library does not define. These functions read the steps, the names or the `cache` of a `Pipeline`, so their methods stay on `Pipeline` alone:
+
+  - The cross-validation and the search: `cross_val_predict`, `search_cross_validation`, `pipeline_lens` and `fit_predict`.
+  - The online updates: `partial_fit!`, `fit(pipe)` with no data, `update_online_estimator` and `held_timestamps`.
+  - The schedules: `is_time_dependent`, `needs_previous_weights`, `factory` and `assert_time_dependent_fold_count`.
+  - A pipeline as the step of another pipeline: `run_step`, `pipe_reads` and `pipe_writes`.
+
+### Examples
+
+```jldoctest
+julia> struct MyPipeline{T} <: PortfolioOptimisers.AbstractPipelineEstimator
+           opt::T
+       end
+
+julia> struct MyPipelineResult{T} <: PortfolioOptimisers.AbstractPipelineResult
+           res::T
+       end
+
+julia> function StatsBase.fit(pipe::MyPipeline, rd::ReturnsResult)
+           return MyPipelineResult(optimise(pipe.opt, rd))
+       end
+
+julia> function StatsBase.predict(res::MyPipelineResult, rd::ReturnsResult, args...; kwargs...)
+           return predict(res.res, rd, args...; kwargs...)
+       end
+
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\", \"C\"],
+                          X = [0.01 0.02 -0.01; -0.02 0.01 0.03; 0.03 -0.01 0.02;
+                               0.01 0.0 -0.02; -0.01 0.02 0.01; 0.02 0.01 0.0]);
+
+julia> pipe = MyPipeline(InverseVolatility());
+
+julia> fit(pipe, rd).res.w
+3-element Vector{Float64}:
+ 0.2787151260257324
+ 0.44390013800777395
+ 0.2773847359664937
+
+julia> pred = PortfolioOptimisers.fit_and_predict(pipe, rd, 1:4, 5:6);
+
+julia> pred.res.w
+3-element Vector{Float64}:
+ 0.28877552525205813
+ 0.461137533888465
+ 0.25008694085947697
+```
+
 # Related
 
   - [`AbstractEstimator`](@ref)
   - [`AbstractPipelineResult`](@ref)
+  - [`Pipeline`](@ref)
   - [`PipelineContext`](@ref)
   - [`PipelineStep`](@ref)
 """
@@ -24,10 +96,72 @@ Pipeline results carry the fitted per-step results of executing an [`AbstractPip
 
 All concrete pipeline results should subtype `AbstractPipelineResult`.
 
+# Interfaces
+
+To add a pipeline result, subtype `AbstractPipelineResult` and implement the following method. The `fit` of an [`AbstractPipelineEstimator`](@ref) returns it.
+
+## `predict`
+
+  - `predict(res::MyPipelineResult, data::Prices_RR, test_idx, cols; kwargs...) -> PredictionResult`: Applies the fitted workflow to the rows `test_idx` and the columns `cols` of `data`.
+
+### Arguments
+
+  - `res`: The instance of the subtype.
+  - `data::Prices_RR`: Price data or returns data.
+  - `test_idx`: The rows to predict over. A vector of windows gives one prediction for each window.
+  - `cols`: The columns of `data`.
+
+### Keyword Arguments
+
+  - The keywords of the `predict` of an optimisation result: `wd`, `hwd`, `fa`, `store_weight_path`, `strict` and `w_prev`.
+
+### Returns
+
+  - `pred::PredictionResult`: The prediction, or a vector of predictions for a vector of windows.
+
+With `predict`, the subtype gets the method `fit_and_predict(res, data, train_idx, test_idx, cols)` that the library defines on `AbstractPipelineResult`. It ignores `train_idx`, and calls `predict(res, data, test_idx, cols)` with the keywords above. [`PipelineResult`](@ref) keeps its two methods for a vector of windows, because a method on `AbstractPipelineResult` with that signature is ambiguous with the `predict` of `PipelineResult`.
+
+### Examples
+
+```jldoctest
+julia> struct MyPipeline{T} <: PortfolioOptimisers.AbstractPipelineEstimator
+           opt::T
+       end
+
+julia> struct MyPipelineResult{T} <: PortfolioOptimisers.AbstractPipelineResult
+           res::T
+       end
+
+julia> function StatsBase.fit(pipe::MyPipeline, rd::ReturnsResult)
+           return MyPipelineResult(optimise(pipe.opt, rd))
+       end
+
+julia> function StatsBase.predict(res::MyPipelineResult, rd::ReturnsResult, args...; kwargs...)
+           return predict(res.res, rd, args...; kwargs...)
+       end
+
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\", \"C\"],
+                          X = [0.01 0.02 -0.01; -0.02 0.01 0.03; 0.03 -0.01 0.02;
+                               0.01 0.0 -0.02; -0.01 0.02 0.01; 0.02 0.01 0.0]);
+
+julia> res = fit(MyPipeline(InverseVolatility()), rd);
+
+julia> predict(res, rd, 5:6).rd.X
+2-element Vector{Float64}:
+ 0.008864698859563092
+ 0.010013303900592387
+
+julia> PortfolioOptimisers.fit_and_predict(res, rd, nothing, 5:6).rd.X
+2-element Vector{Float64}:
+ 0.008864698859563092
+ 0.010013303900592387
+```
+
 # Related
 
   - [`AbstractResult`](@ref)
   - [`AbstractPipelineEstimator`](@ref)
+  - [`PipelineResult`](@ref)
 """
 abstract type AbstractPipelineResult <: AbstractResult end
 """
@@ -187,7 +321,7 @@ Keywords correspond to the struct's fields.
 
   - [`pipe_constraint_targets`](@ref)
   - [`constraint_targets`](@ref)
-  - [`run_constraint_step`](@ref)
+  - [`run_step`](@ref)
 """
 @concrete struct TargetedConstraint <: AbstractConstraintResult
     """
@@ -228,7 +362,7 @@ $(DocStringExtensions.FIELDS)
         prior::Option{<:AbstractPriorResult} = nothing,
         phylogeny::Option{<:AbstractPhylogenyResult} = nothing,
         uncertainty::Option{<:PipelineUncertaintySets} = nothing,
-        constraints::Option{<:Union{<:AbstractConstraintResult, <:AbstractVector{<:AbstractConstraintResult}}} = nothing,
+        constraints::Option{<:Union{AbstractConstraintResult, AbstractVector{<:AbstractConstraintResult}}} = nothing,
         opt::Option{<:OptimisationResult} = nothing,
     ) -> PipelineContext
 
@@ -274,8 +408,8 @@ Keywords correspond to the struct's fields.
                              prior::Option{<:AbstractPriorResult},
                              phylogeny::Option{<:AbstractPhylogenyResult},
                              uncertainty::Option{<:PipelineUncertaintySets},
-                             constraints::Option{<:Union{<:AbstractConstraintResult,
-                                                         <:AbstractVector{<:AbstractConstraintResult}}},
+                             constraints::Option{<:Union{AbstractConstraintResult,
+                                                         AbstractVector{<:AbstractConstraintResult}}},
                              opt::Option{<:OptimisationResult})
         return new{typeof(prices), typeof(returns), typeof(prior), typeof(phylogeny),
                    typeof(uncertainty), typeof(constraints), typeof(opt)}(prices, returns,
@@ -289,8 +423,8 @@ function PipelineContext(; prices::Option{<:AbstractPricesResult} = nothing,
                          prior::Option{<:AbstractPriorResult} = nothing,
                          phylogeny::Option{<:AbstractPhylogenyResult} = nothing,
                          uncertainty::Option{<:PipelineUncertaintySets} = nothing,
-                         constraints::Option{<:Union{<:AbstractConstraintResult,
-                                                     <:AbstractVector{<:AbstractConstraintResult}}} = nothing,
+                         constraints::Option{<:Union{AbstractConstraintResult,
+                                                     AbstractVector{<:AbstractConstraintResult}}} = nothing,
                          opt::Option{<:OptimisationResult} = nothing)::PipelineContext
     return PipelineContext(prices, returns, prior, phylogeny, uncertainty, constraints, opt)
 end
@@ -356,6 +490,8 @@ Return the [`PipelineContext`](@ref) slot a pipeline step writes.
 
 The estimator's family determines the slot via dispatch on the existing abstract-type taxonomy. Estimators whose family cannot be inferred must be wrapped in a [`PipelineStep`](@ref); the fallback method throws an `ArgumentError` saying so.
 
+A precomputed optimisation result writes `:opt` and reads `:returns`, as an optimisation estimator does. [`run_step`](@ref) writes it to `:opt` as it is. A fold of a [`TimeDependent`](@ref) schedule puts such a result in the place of the schedule, and the constructor of the [`Pipeline`](@ref) checks the slots of that fold.
+
 # Arguments
 
   - `est`: The step estimator.
@@ -389,7 +525,7 @@ pipe_writes(::AbstractConstraintEstimator) = :constraints
 function pipe_writes(ce::JuMPConstraintEstimator)
     return throw(ArgumentError("a $(Base.typename(typeof(ce)).wrapper) is configuration for the JuMP model rather than a value computed from data, so it is not a pipeline step; pass it to the optimiser's own field (`ccnt` for a CustomJuMPConstraint, `bgt`/`sbgt`/`gbgt` for a budget constraint) instead"))
 end
-pipe_writes(::OptimisationEstimator) = :opt
+pipe_writes(::Union{OptimisationEstimator, NonFiniteAllocationOptimisationResult}) = :opt
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -405,7 +541,7 @@ Constraint estimators read `:returns` — the minimal [`UniverseSets`](@ref) a b
 
 # Returns
 
-  - `slots::Tuple{Vararg{Symbol}}`: Subset of [`PIPELINE_SLOTS`](@ref).
+  - `slots::Union{Tuple{Vararg{Symbol}}, AbstractVector{<:Symbol}}`: Subset of [`PIPELINE_SLOTS`](@ref). A [`PipelineStep`](@ref) returns its `reads` in the form that it holds, a tuple or a vector.
 
 # Examples
 
@@ -430,7 +566,9 @@ pipe_reads(::AbstractPhylogenyEstimator) = (:returns,)
 pipe_reads(::AbstractUncertaintySetEstimator) = (:returns,)
 pipe_reads(::AbstractConstraintEstimator) = (:returns,)
 pipe_reads(::ExposureConstraintEstimator) = (:returns, :prior)
-pipe_reads(::OptimisationEstimator) = (:returns,)
+function pipe_reads(::Union{OptimisationEstimator, NonFiniteAllocationOptimisationResult})
+    return (:returns,)
+end
 """
     const PIPELINE_THRESHOLD_TARGETS = (:lt, :st, :slt, :sst, :sglt, :sgst)
 
@@ -466,7 +604,7 @@ The [routing targets](@ref PIPELINE_ROUTING_TARGETS) a constraint family's step 
 
 This is the one declaration of the estimator → target half of the routing of a [`Pipeline`](@ref) slot into an optimiser, and it has three readers, which is why it exists as a table rather than as scattered knowledge:
 
-  - [`run_constraint_step`](@ref) resolves the target and pairs it with the computed value.
+  - [`run_step`](@ref) resolves the target and pairs it with the computed value.
   - [`pipe_required_targets`](@ref) hands it to [`assert_routable`](@ref), so a step whose target the terminal optimiser cannot receive is refused when the [`Pipeline`](@ref) is built rather than after the first fold has run.
   - [`PipelineStep`](@ref) validates a declared target against it.
 
@@ -493,12 +631,12 @@ julia> PortfolioOptimisers.pipe_constraint_targets(WeightBoundsEstimator())
 
 # Related
 
-  - [`run_constraint_step`](@ref)
+  - [`run_step`](@ref)
   - [`pipe_required_targets`](@ref)
   - [`PIPELINE_ROUTING_TARGETS`](@ref)
 """
 pipe_constraint_targets(::AbstractConstraintEstimator) = ()
-pipe_constraint_targets(::WeightBoundsEstimator) = (:wb,)
+pipe_constraint_targets(::AbstractWeightBoundsEstimator) = (:wb,)
 pipe_constraint_targets(::LinearConstraintEstimator) = (:lcse,)
 pipe_constraint_targets(::ExposureConstraintEstimator) = (:lcse,)
 pipe_constraint_targets(::AbstractCentralityConstraint) = (:cte,)
@@ -519,15 +657,14 @@ A target is *routing intent*, not a slot. It is needed by exactly the steps whos
 
 `nothing` is the remaining accepted value and means "no annotation", which is what every step of every other family carries.
 
-The allowlist is applied at construction, beside the one on `writes`, so a mistyped target is refused where it is written rather than by [`run_uncertainty_step`](@ref) after the pipeline has already fitted the steps before it. [`run_uncertainty_step`](@ref) and [`run_constraint_step`](@ref) keep their own checks, because an unwrapped estimator reaches them with `target = nothing` and because an annotation legal for one family is not legal for another.
+The allowlist is applied at construction, beside the one on `writes`, so a mistyped target is refused where it is written rather than by [`run_step`](@ref) after the pipeline has already fitted the steps before it. The uncertainty-set and the constraint methods of `run_step` keep their own checks, because an unwrapped estimator reaches them with `target = nothing` and because an annotation legal for one family is not legal for another.
 
 Internal machinery — not part of the user-facing API.
 
 # Related
 
   - [`PipelineStep`](@ref)
-  - [`run_uncertainty_step`](@ref)
-  - [`run_constraint_step`](@ref)
+  - [`run_step`](@ref)
   - [`pipe_constraint_targets`](@ref)
   - [`pipe_required_targets`](@ref)
   - [`PIPELINE_ROUTING_TARGETS`](@ref)
@@ -553,9 +690,9 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     PipelineStep(;
-        est::Union{<:AbstractEstimator, <:Function},
+        est::Union{AbstractEstimator, Function},
         writes::Symbol,
-        reads::Tuple{Vararg{Symbol}} = (),
+        reads::Union{Tuple{Vararg{Symbol}}, AbstractVector{<:Symbol}} = (),
         target::Option{Symbol} = nothing,
     ) -> PipelineStep
 
@@ -597,7 +734,7 @@ ExcessSource()
     """
     est
     """
-    Slots the step requires to be populated before it runs (a subset of [`PIPELINE_SLOTS`](@ref), as a tuple).
+    Slots the step requires to be populated before it runs (a subset of [`PIPELINE_SLOTS`](@ref), as a tuple or a vector, which the step keeps as given).
     """
     reads
     """
@@ -608,9 +745,9 @@ ExcessSource()
     Optional routing annotation for heterogeneous slots (one of [`PIPELINE_STEP_TARGETS`](@ref), or `nothing`).
     """
     target
-    function PipelineStep(est::Union{<:AbstractEstimator, <:Function},
-                          reads::Tuple{Vararg{Symbol}}, writes::Symbol,
-                          target::Option{Symbol})
+    function PipelineStep(est::Union{AbstractEstimator, Function},
+                          reads::Union{Tuple{Vararg{Symbol}}, AbstractVector{<:Symbol}},
+                          writes::Symbol, target::Option{Symbol})
         @argcheck(writes in PIPELINE_SLOTS,
                   ArgumentError("writes must be one of $(PIPELINE_SLOTS), got :$writes"))
         @argcheck(all(r -> r in PIPELINE_SLOTS, reads),
@@ -628,10 +765,25 @@ ExcessSource()
                                                                                target)
     end
 end
-function PipelineStep(; est::Union{<:AbstractEstimator, <:Function}, writes::Symbol,
-                      reads::Tuple{Vararg{Symbol}} = (),
+function PipelineStep(; est::Union{AbstractEstimator, Function}, writes::Symbol,
+                      reads::Union{Tuple{Vararg{Symbol}}, AbstractVector{<:Symbol}} = (),
                       target::Option{Symbol} = nothing)::PipelineStep
     return PipelineStep(est, reads, writes, target)
+end
+"""
+    obs_weights_view(ps::PipelineStep, i) -> PipelineStep
+
+Return the step with the observation weights of its estimator cut to the observations `i`, through [`obs_weights_fields`](@ref).
+
+A step of an Excess group of a [`Pipeline`](@ref) reads the returns with each gap of a vector benchmark dropped, so the fixed observation weights of its estimator must lose the same observations, see [`group_returns_view`](@ref). A callable step comes back with no change.
+
+# Related
+
+  - [`PipelineStep`](@ref)
+  - [`obs_weights_view`](@ref)
+"""
+function obs_weights_view(ps::PipelineStep, i)::PipelineStep
+    return obs_weights_fields(ps, i)
 end
 pipe_writes(ps::PipelineStep) = ps.writes
 pipe_reads(ps::PipelineStep) = ps.reads
@@ -655,3 +807,4 @@ pipe_writes(::TD_OptE_Opt_Inferable) = :opt
 pipe_reads(::TD_OptE_Opt_Inferable) = (:returns,)
 
 export PipelineStep
+public AbstractPipelineEstimator, AbstractPipelineResult

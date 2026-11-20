@@ -170,30 +170,32 @@ function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::Return
     return [StatsAPI.predict(res, rd, test_idx, cols; kwargs...) for test_idx in test_idxs]
 end
 """
-    fit_and_predict(opt, rd::ReturnsResult, cv::NonSeqCVER; cols, ex, id) -> MultiPeriodPredictionResult
-    fit_and_predict(opt, rd::ReturnsResult, cv::CombCVER; cols, ex) -> PopulationPredictionResult
-    fit_and_predict(opt, rd::ReturnsResult; train_idx = nothing, test_idx, cols) -> PredictionResult
-    fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult; test_idx, cols) -> PredictionResult
-    fit_and_predict(pipe::Pipeline, data::Prices_RR; train_idx = nothing, test_idx, cols) -> PredictionResult
-    fit_and_predict(res::PipelineResult, data::Prices_RR; test_idx, cols) -> PredictionResult
+    fit_and_predict(opt, rd::ReturnsResult, cv::NonSeqCVER, cv_res = split(cv, rd); cols, ex, id) -> MultiPeriodPredictionResult
+    fit_and_predict(opt, rd::ReturnsResult, cv::CombCVER, cv_res = split(cv, rd); cols, ex) -> PopulationPredictionResult
+    fit_and_predict(opt, rd::ReturnsResult, train_idx, test_idx, cols = :; kwargs...) -> PredictionResult
+    fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult, train_idx, test_idx, cols = :; kwargs...) -> PredictionResult
+    fit_and_predict(pipe::AbstractPipelineEstimator, data::Prices_RR, train_idx, test_idx, cols = :; kwargs...) -> PredictionResult
+    fit_and_predict(res::AbstractPipelineResult, data::Prices_RR, train_idx, test_idx, cols = :; kwargs...) -> PredictionResult
 
 Fit an optimisation estimator on training data and predict on test data using cross-validation.
 
 The method over a scheme `cv` predicts over every fold of `cv`. The methods without a scheme predict over one train/test split, or apply a result that is already fitted.
 
+The method over a scheme takes the split `cv_res` of `rd` by `cv` as its fourth argument, and the default splits `rd` there. A search splits its scheme once and passes the split to the call of each candidate. So every candidate scores the same folds, and a [`MultipleRandomised`](@ref) with no `seed` draws from its `rng` once. The scheme stays an argument, because the method reads its evaluation settings and its fold predicates.
+
 A combinatorial `cv` takes its own method, because its folds recombine into several paths and not one. That method regroups the fold predictions by path, and returns one [`MultiPeriodPredictionResult`](@ref) per path in a [`PopulationPredictionResult`](@ref).
 
-The estimator form reads `train_idx = nothing` as *the estimator holds its window*. It reads the estimator out through `optimise(opt)` in place of a fit over `port_opt_view(rd, train_idx, cols)`, and predicts over `test_idx` as before. The online arm of [`fold_loop`](@ref) reads a fold out this way. It is also the public entry for an estimator stepped by hand, warmed up with [`update_online_estimator`](@ref) and folded with [`partial_fit!`](@ref). `fit_and_predict(opt, rd; test_idx)` on a stepped estimator equals `fit_and_predict(opt, rd; train_idx, test_idx)` on the cold one over the same rows. The two arms belong to [`fit_fold_result`](@ref), and the method is defined beside them.
+The estimator form reads a `train_idx` of `nothing` as *the estimator holds its window*. It reads the estimator out through `optimise(opt)` in place of a fit over `port_opt_view(rd, train_idx, cols)`, and predicts over `test_idx` as before. The online arm of [`fold_loop`](@ref) reads a fold out this way. It is also the public entry for an estimator stepped by hand, warmed up with [`update_online_estimator`](@ref) and folded with [`partial_fit!`](@ref). `fit_and_predict(opt, rd, nothing, test_idx)` on a stepped estimator equals `fit_and_predict(opt, rd, train_idx, test_idx)` on the cold one over the same rows. The two arms belong to [`fit_fold_result`](@ref), and the method is defined beside them.
 
-The result form is fitted already, so it ignores `train_idx` and every keyword that [`predict`](@ref) does not take. The fold loop passes the same keywords to an estimator and to a result.
+The result form is fitted already, so it ignores `train_idx`. The fold loop passes the same arguments to an estimator and to a result, and the type of the estimator of the fold selects the form. Each form over one split passes its keywords to [`predict`](@ref).
 
-The two [`Pipeline`](@ref) methods take price data or returns data. The `Pipeline` method fits the pipeline over the rows `train_idx` and the columns `cols` with [`pipeline_fold_fit`](@ref), or reads a stepped pipeline out when `train_idx` is `nothing`. It then predicts over `test_idx` with [`predict(res::PipelineResult, data::AbstractPricesResult, window)`](@ref). The [`PipelineResult`](@ref) method is fitted already, and predicts over `test_idx`.
+The two pipeline methods take price data or returns data. They call only `fit` and `predict`, so they serve every [`AbstractPipelineEstimator`](@ref) and every [`AbstractPipelineResult`](@ref). The estimator method fits the pipeline over the rows `train_idx` and the columns `cols` with [`pipeline_fold_fit`](@ref), or reads a stepped pipeline out when `train_idx` is `nothing`. It then predicts over `test_idx` with [`predict(res::PipelineResult, data::AbstractPricesResult, window)`](@ref). The result method is fitted already, and predicts over `test_idx`.
 
 # Algorithm
 
 For a scheme `cv` that is not combinatorial:
 
- 1. Split `rd` with `cv`, giving `train_idx` and `test_idx`.
+ 1. Read `train_idx` and `test_idx` from `cv_res`.
  2. Check that the folds are not shuffled with [`assert_unshuffled_folds`](@ref).
  3. Read the evaluation settings of `cv` with [`fold_evaluation`](@ref), and the drift of the Held Weights record with [`held_weights_drift`](@ref).
  4. Run the folds with [`fold_loop`](@ref). Each fold fits its estimator on its training rows and predicts over its test rows, giving one [`PredictionResult`](@ref) per fold, in split order.
@@ -205,15 +207,21 @@ For a scheme `cv` that is not combinatorial:
   - `rd::ReturnsResult`: Returns data.
   - `cv::NonSeqCVER`: Non-sequential cross-validation estimator or result, such as [`KFold`](@ref).
   - `cv::CombCVER`: Combinatorial cross-validation estimator or result ([`CombinatorialCrossValidation`](@ref)).
+  - $(arg_dict[:cv_res])
+  - `train_idx::Option{<:VecInt}`: Training indices of one split, or `nothing` to read a stepped estimator out.
+  - `test_idx::VecInt_VecVecInt`: Test indices of one split, one vector or one vector per window.
+  - `cols = :`: Column selector of one split.
 
 # Keyword Arguments
 
-  - `train_idx::Option{<:VecInt}`: Training indices, or `nothing` to read a stepped estimator out.
-  - `test_idx`: Test indices, one vector or one vector per fold.
-  - `cols = :`: Column selector.
+  - `cols = :`: Column selector of the forms over a scheme.
   - `ex::FLoops.Transducers.Executor = FLoops.ThreadedEx()`: Executor of the folds that run in parallel.
   - `id = nothing`: Identifier of the path.
-  - `wd`, `hwd`, `fa`, `store_weight_path`, `strict`, `w_prev`: The keywords of [`predict`](@ref), which the methods over one split pass on.
+  - `kwargs...`: The keywords of [`predict`](@ref), `wd`, `hwd`, `fa`, `store_weight_path`, `strict` and `w_prev`, which the forms over one split pass on.
+
+# Validation
+
+  - A form over one split raises the `MethodError` of [`predict`](@ref) for a keyword that `predict` does not take.
 
 # Returns
 
@@ -227,16 +235,10 @@ For a scheme `cv` that is not combinatorial:
   - [`KFold`](@ref)
   - [`CombinatorialCrossValidation`](@ref)
 """
-function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult;
-                         test_idx::VecInt_VecVecInt, cols = :,
-                         wd::Option{<:AbstractWeightDrift} = nothing,
-                         hwd::Option{<:AbstractWeightDrift} = wd,
-                         fa::Option{<:AbstractFeeAmortisation} = nothing,
-                         store_weight_path::Bool = false, strict::Bool = false,
-                         w_prev::Option{<:VecNum_VecVecNum} = nothing, kwargs...)
-    return StatsAPI.predict(res, rd, test_idx, cols; wd = wd, hwd = hwd, fa = fa,
-                            store_weight_path = store_weight_path, strict = strict,
-                            w_prev = w_prev)
+function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
+                         ::Option{<:VecInt}, test_idx::VecInt_VecVecInt, cols = :;
+                         kwargs...)
+    return StatsAPI.predict(res, rd, test_idx, cols; kwargs...)
 end
 """
     sort_predictions(res::VecVecInt, predictions::VecPredRes) -> VecPredRes
@@ -311,7 +313,7 @@ known for every fold before the loop starts, so [`fold_loop`](@ref) resolves it 
   - [`needs_previous_weights`](@ref)
 """
 function cv_sequential_info()
-    return "Running cross-validation sequentially because the folds of the cross-validation scheme are a timeline (folds_are_time_ordered(cv) == true) and the optimiser must use the previous optimisation's weights (needs_previous_weights(opt) == true). The second fact is because somewhere within the optimisation estimator is contained at least one of the following:\n\t- Turnover and/or TurnoverEstimator,\n\t- WeightsTracking,\n\t- TurnoverRiskMeasure,\n\t- custom constraints which use asset weights,\n\t- custom objective penalties which use asset weights,\n\t- a time-dependent constraint whose entries need previous weights (e.g. a PreviousWeightsFunction).\nTo enable parallel processing please either mark the weights as fixed or remove the offending component(s). Time-dependent constraints alone do not force sequential processing."
+    return "Running cross-validation sequentially because the folds of the cross-validation scheme are a timeline (folds_are_time_ordered(cv) == true) and the optimiser must use the previous optimisation's weights (needs_previous_weights(opt) == true). The second fact is because somewhere within the optimisation estimator is contained at least one of the following:\n\t- Turnover and/or TurnoverEstimator,\n\t- BudgetCosts and/or BudgetMarketImpact,\n\t- WeightsTracking,\n\t- TurnoverRiskMeasure,\n\t- custom constraints which use asset weights,\n\t- custom objective penalties which use asset weights,\n\t- a time-dependent constraint whose entries need previous weights (e.g. a PreviousWeightsFunction).\nTo enable parallel processing please either mark the weights as fixed or remove the offending component(s). Time-dependent constraints alone do not force sequential processing."
 end
 """
     parallel_folds(fit_fold, n::Integer, ex::FLoops.Transducers.Executor,
@@ -380,7 +382,7 @@ no executor, and its sibling [`parallel_folds`](@ref) runs every other case. `El
 """
 function run_folds(fit_fold, n::Integer, ::Type{ElT} = PredictionResult;
                    pws = nothing) where {ElT}
-    @info(cv_sequential_info())
+    @info(cv_sequential_info(), maxlog = log_limit(:info), _id = @log_id())
     predictions = Vector{ElT}(undef, n)
     prev = nothing
     for i in 1:n
@@ -460,7 +462,7 @@ holds the weights that were threaded, a second time, so that a failed fold can h
 [`online_folds`](@ref), hands its callback a `Fold` of that shape. `est` has already folded
 every row of the training window through [`partial_fit!`](@ref), so a callback reads it out
 with `optimise(est)` and no returns, in place of a fit over rows the record does not carry.
-[`fit_and_predict`](@ref) takes `train_idx = nothing` for that case, so the callback of every
+[`fit_and_predict`](@ref) takes a `train_idx` of `nothing` for that case, so the callback of every
 entry point is the same under both arms.
 
 The type is immutable and every field is concretely typed at the construction site, so the
@@ -539,9 +541,47 @@ folds_are_time_ordered(::Any)::Bool = true
 folds_are_time_ordered(::NonSeqCVER)::Bool = false
 
 """
+$(DocStringExtensions.TYPEDEF)
+
+The evaluation switches of a cross-validation scheme, in one record.
+
+This type is an implementation detail and is not intended for direct use. [`fold_evaluation`](@ref) makes it. [`fold_loop`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`fold_evaluation`](@ref)
+  - [`fold_loop`](@ref)
+"""
+@concrete struct FoldEvaluation
+    """
+    `wd`: The Weight Drift.
+    """
+    wd
+    """
+    `pws`: The Previous-Weights Source.
+    """
+    pws
+    """
+    `fa`: The Fee Clock of the fold's realised series.
+    """
+    fa
+    """
+    `store_weight_path`: The flag that stores a fold's weight path.
+    """
+    store_weight_path
+    """
+    `strict`: The flag that makes a Held Gap raise rather than warn.
+    """
+    strict
+end
+"""
     fold_evaluation(cv)
 
-Read the evaluation switches of a cross-validation scheme, in one named tuple.
+Read the evaluation switches of a cross-validation scheme, in one record.
 
 Every scheme entry point reads the same settings before it runs its folds, and each scheme states them through a method of its own. A scheme that carries none of them, and a call site that holds a split result in place of the scheme that made it, reach the fallback. The fallback sets no drift, no drifted previous weights, no override of the fee clock, no stored weight path, and a Held Gap that warns.
 
@@ -549,10 +589,11 @@ The method is per type and takes the scheme itself, so inference reads the answe
 
 # Returns
 
-  - `(; wd, pws, fa, store_weight_path, strict)`: The Weight Drift, the Previous-Weights Source, the Fee Clock of the fold's realised series, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
+  - `fe::FoldEvaluation`: The Weight Drift, the Previous-Weights Source, the Fee Clock of the fold's realised series, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
 
 # Related
 
+  - [`FoldEvaluation`](@ref)
   - [`folds_are_time_ordered`](@ref)
   - [`held_weights_drift`](@ref)
   - [`override_fee_amortisation`](@ref)
@@ -562,8 +603,7 @@ The method is per type and takes the scheme itself, so inference reads the answe
   - [`fold_loop`](@ref)
 """
 function fold_evaluation(::Any)
-    return (; wd = nothing, pws = nothing, fa = nothing, store_weight_path = false,
-            strict = false)
+    return FoldEvaluation(nothing, nothing, nothing, false, false)
 end
 """
     folds_are_stepped(cv)
@@ -614,6 +654,11 @@ run. The two path-level sites, of the optimiser and of the Pipeline, pass the
 time-ordered scheme, and a `Vector{PredictionResult}` for the multi-path combinatorial scheme.
 It is positional for the reason that [`parallel_folds`](@ref) gives.
 
+`PredictionResult` is a `UnionAll`, so the loop fills a vector of an abstract element type. The
+loop does not narrow the folds. [`MultiPeriodPredictionResult`](@ref) narrows them to their one
+concrete type, which does not hold the type of the optimiser, because `res` is not a type
+parameter of [`PredictionResult`](@ref).
+
 # Algorithm
 
  1. When `est` [`is_time_dependent`](@ref), check the number of folds against its schedules with [`assert_time_dependent_fold_count`](@ref).
@@ -648,6 +693,8 @@ function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
                    ::Type{ElT} = PredictionResult; rd, train_idx, test_idx,
                    path_id = nothing, cv = nothing, fold_view = nothing,
                    pws = nothing) where {ElT}
+    # The folds are a `Vector{ElT}` with `ElT = PredictionResult`. The Result that holds them
+    # narrows them (ADR 0067, amendment of 2026-11-18).
     td_flag = is_time_dependent(est)
     if td_flag
         assert_time_dependent_fold_count(est, n)
@@ -666,8 +713,9 @@ function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
         # the same record earlier in the fold, for the schedules its step reads.
         if td_flag
             esti = update_time_dependent_estimator(esti,
-                                                   fold_context(i, n, rdi, train_idx,
-                                                                test_idx, w_prev, path_id))
+                                                   TimeDependentContext(i, n, rdi,
+                                                                        train_idx, test_idx,
+                                                                        w_prev, path_id))
         end
         if !isnothing(w_prev) && prev_w_flag
             esti = factory(esti, one_previous_portfolio(esti, w_prev))
@@ -692,19 +740,18 @@ function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
         (parallel_folds(i -> fold(i, nothing), n, ex, ElT), nothing)
     end
 end
-function fit_and_predict(opt::OptE_Opt_TD, rd::ReturnsResult, cv::NonSeqCVER; cols = :,
-                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+function fit_and_predict(opt::OptE_Opt_TD, rd::ReturnsResult, cv::NonSeqCVER,
+                         cv_res::NonSequentialCrossValidationResult = split(cv, rd);
+                         cols = :, ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          id = nothing)
-    cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
     (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)
     hwd = held_weights_drift(wd, pws)
     predictions, _ = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
                                test_idx = test_idx, cv = cv, pws = pws) do fold
-        return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
-                               test_idx = fold.test, cols = cols, wd = wd, hwd = hwd,
-                               fa = fa, store_weight_path = store_weight_path,
+        return fit_and_predict(fold.est, fold.rd, fold.train, fold.test, cols; wd = wd,
+                               hwd = hwd, fa = fa, store_weight_path = store_weight_path,
                                strict = strict, w_prev = fold.w_prev)
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)
@@ -770,3 +817,4 @@ function assert_prediction_series(A::MatNum, X::Option{<:VecNum_VecVecNum},
 end
 
 export fit, fit_predict
+public folds_are_time_ordered

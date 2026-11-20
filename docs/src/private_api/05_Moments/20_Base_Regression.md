@@ -27,6 +27,7 @@ set_row_key(re::Regression, idx::Option{<:VecInt}, ts::Option{<:VecDate})
 has_family_rebasis(rr::AbstractLoadingsRegressionResult)
 default_regression_criterion_variant
 regression_criterion_func
+RegressionPolarity
 regression_polarity
 regression_threshold
 pin_regression_choice(re::AbstractTimeSeriesRegressionEstimator, ::MatNum, ::MatNum, ::Option{<:ObsWeights} = nothing)

@@ -112,29 +112,8 @@
                                                               pe = po.Online(EmpiricalPrior())),
                                             rdx)
 
-        # An integer sample gives the weights of its float copy, in a float type, and a
-        # Float32 sample keeps Float32. Free bounds, a bound estimator and the NaN of a
-        # failed hold all threw InexactError before.
-        Xi = round.(Int, X .* 1000)
-        rdi = ReturnsResult(; nx = nx, X = Xi, ts = ts)
-        rdf = ReturnsResult(; nx = nx, X = Float64.(Xi), ts = ts)
-        sets = UniverseSets(; dict = Dict("nx" => nx))
-        wbe = WeightBoundsEstimator(; lb = "A1" => 0.07, ub = nothing)
-        for opt in (InverseVolatility(), EqualWeighted(), RandomWeighted(; seed = 1),
-                    InverseVolatility(; wb = wbe, sets = sets),
-                    EqualWeighted(; wb = wbe, sets = sets),
-                    RandomWeighted(; wb = wbe, sets = sets, seed = 1))
-            wi = optimise(opt, rdi).w
-            @test eltype(wi) === Float64
-            @test wi == optimise(opt, rdf).w
-        end
-        wpi = optimise(PreviousWeights(), rdi).w
-        @test eltype(wpi) === Float64 && all(isnan, wpi) && length(wpi) == N
-        Xb = rand(StableRNG(3), 0:1, 40, 3)
-        rdbi = ReturnsResult(; nx = nx[1:3], X = Xb, ts = ts[1:40])
-        rdbf = ReturnsResult(; nx = nx[1:3], X = Float64.(Xb), ts = ts[1:40])
-        @test optimise(BestConstantRebalancedPortfolio(), rdbi).w ≈
-              optimise(BestConstantRebalancedPortfolio(), rdbf).w
+        # A Float32 sample keeps Float32. Issue #1972 removed the integer case: integer
+        # data convert at the carrier.
         rd32 = ReturnsResult(; nx = nx, X = Float32.(X), ts = ts)
         for opt in (InverseVolatility(), EqualWeighted(),
                     BestConstantRebalancedPortfolio(; tol = 1.0f-5), PreviousWeights())
@@ -390,6 +369,13 @@ both pick the best single asset and the parity test says nothing about the fixed
               optimise(BestConstantRebalancedPortfolio(), rd).w
         @test_throws po.IsNothingError optimise(BestConstantRebalancedPortfolio(),
                                                 ReturnsResult())
+    end
+
+    @testset "A fees estimator needs the sets of every naive head (#1912)" begin
+        fe = FeesEstimator(; l = Dict("A" => 0.01))
+        @test_throws po.IsNothingError InverseVolatility(; fees = fe)
+        @test_throws po.IsNothingError RandomWeighted(; fees = fe)
+        @test_throws po.IsNothingError BestConstantRebalancedPortfolio(; fees = fe)
     end
 
     @testset "The Coverage Universe of the window" begin

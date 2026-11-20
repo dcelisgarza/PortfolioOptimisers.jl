@@ -182,7 +182,9 @@ end
     ow = pweights(collect(range(0.5, 1.5; length = size(X_ro, 1))))
     fw(w) = sum(ow .* log1p.(X_ro * w)) / sum(ow)
     res = solve_ro(MaximumReturn(), (; ret = LogarithmicReturn(), ls_ro...); r = rcap_ro)
-    @test isapprox(value(res.model[:ret]), f(res.w); atol = 1e-9)
+    # One CI host kind misses 1e-9 by 7.8e-9 since #1843 divided each bound row by the
+    # size of its bound (runs 40922127897 and 40988847855, R14 of #1817).
+    @test isapprox(value(res.model[:ret]), f(res.w); atol = 1e-8)
     @test isapprox(expected_return(LogarithmicReturn(), res.w, pr_ro), f(res.w))
     @test all(n -> n in entries_ro(res), (:t_elog_ret_1, :kret_1, :elog_ret_ret_1))
     res = solve_ro(MaximumReturn(), (; ret = LogarithmicReturn(; w = ow), ls_ro...);

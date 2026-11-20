@@ -200,11 +200,11 @@ Where:
   - [`leader_min_rows`](@ref)
   - [`forecast_min_rows`](@ref)
 """
-function fit_min_rows(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
+function fit_min_rows(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
     return maximum(f -> fit_min_rows(getfield(est, f)), fieldnames(typeof(est)); init = 1)
 end
-function fit_min_rows(v::AbstractVector{<:Union{<:AbstractEstimator,
-                                                <:StatsBase.CovarianceEstimator}})
+function fit_min_rows(v::AbstractVector{<:Union{AbstractEstimator,
+                                                StatsBase.CovarianceEstimator}})
     return maximum(fit_min_rows, v; init = 1)
 end
 function fit_min_rows(::Any)
@@ -266,7 +266,7 @@ The fit reads the Coverage Universe of the rows, as every prior does. An asset w
 
 # References
 
-  - $(ref_dict[:xi2023oldem])
+  - $(ref_dict[:xi2023oldem]) Section 3, Equations 4 to 10.
 """
 function prior(pe::LowDimensionEnsemblePrior, X::MatNum, ::Option{<:MatNum} = nothing,
                pnl::Option{<:AssetPanel} = nothing; dims::Int = 1,

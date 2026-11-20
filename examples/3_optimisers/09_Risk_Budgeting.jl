@@ -108,7 +108,7 @@ rise from the first asset to the last.
 The bar plot below draws the risk contributions of the equal-budget portfolio.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 
 plot_risk_contribution(rf, res_eq, rd)
 

@@ -1,5 +1,5 @@
 ```@meta
-Description = "EW beta descriptors (a), private API of PortfolioOptimisers.jl: EWBlockState, ew_active_returns, ew_agg_series, ew_agg_vector, ew_beta_expand, Base.copy, …"
+Description = "EW beta descriptors (a), private API of PortfolioOptimisers.jl: EWBetaShrinkage, ew_masked_mean, ew_masked_weighted_mean, ew_beta_group_prior, …"
 ```
 
 # EW beta descriptors (a): private API
@@ -7,25 +7,19 @@ Description = "EW beta descriptors (a), private API of PortfolioOptimisers.jl: E
 ## Types
 
 ```@docs
-EWBlockState
+EWBetaShrinkage
 ```
 
 ## Functions
 
 ```@docs
-ew_active_returns
-ew_agg_series
-ew_agg_vector
-ew_beta_expand
-Base.copy(x::PortfolioOptimisers.EWBlockState)
-ew_block_copy
-ew_block_rows
-ew_beta_residual_variance
-ew_beta_group_prior
-ew_beta_shrink
 ew_masked_mean
 ew_masked_weighted_mean
-assert_ew_agg_obs
+ew_beta_group_prior
+ew_beta_shrink
+ew_beta_shrink_group!
+ew_beta_variance
+ew_beta_shrinkage
 assert_ew_shrinkage_bounds
-ew_beta_output
+assert_ew_agg_obs
 ```

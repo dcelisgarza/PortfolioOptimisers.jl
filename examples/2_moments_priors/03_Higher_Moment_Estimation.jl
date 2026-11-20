@@ -113,7 +113,7 @@ with their mean,
 and the table of section 2 shows the condition number fall by many orders of magnitude.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 # The coskewness of the first prior.
 plot_coskewness(prs[1].second, rd)
 # The coskewness of the denoised prior.

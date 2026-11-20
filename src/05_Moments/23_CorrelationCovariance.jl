@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Answers both `cov` and `cor` with the wrapped estimator's correlation matrix.
+Returns the correlation matrix of the wrapped estimator from both `cov` and `cor`.
 
-Use it where a caller demands a covariance estimator but the computation wants the correlation — a clustering distance, for instance, which reads a scale-free matrix.
+Use it where a caller needs a covariance estimator but the computation needs the correlation matrix. A clustering distance is an example, because it reads a matrix that has no scale.
 
 # Fields
 
@@ -18,19 +18,23 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Validation
+
+  - $(val_dict[:ce_cov])
+
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `ce`: Recursively updated via [`factory`](@ref).
-  - `cache`: Carried unchanged via [`factory`](@ref).
+  - `ce`: Recursively updated through [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
-  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
+  - `ce`: Recursively viewed through [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -65,6 +69,7 @@ CorrelationCovariance
     @fprop @vprop cache
     function CorrelationCovariance(ce::StatsBase.CovarianceEstimator,
                                    cache::Option{<:AbstractPartialFitState})
+        assert_covariance_estimator(ce, :ce)
         return new{typeof(ce), typeof(cache)}(ce, cache)
     end
 end
@@ -77,11 +82,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of a [`CorrelationCovariance`](@ref) except `cache`.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:CorrelationCovariance, true)` to render it.
+A `cache` holds the state of an incremental fit. That state is not part of the configuration, and it prints under the estimator at each site that renders the estimator. Set `set_show_nothing_fields!(:CorrelationCovariance, true)` to render it.
 
 # Arguments
 
-  - `::CorrelationCovariance`: Correlation covariance estimator, read for its type alone.
+  - `::CorrelationCovariance`: The correlation covariance estimator. The method reads only its type.
 
 # Returns
 
@@ -98,23 +103,22 @@ show_fields(::CorrelationCovariance) = (:ce,)
     Statistics.cov(ce::CorrelationCovariance, X::MatNum; dims::Int = 1,
                    kwargs...)
 
-Compute the correlation matrix using the underlying estimator.
+Compute the correlation matrix with the wrapped estimator, and return it as the covariance matrix.
 
-This method delegates to `Statistics.cor(library_covariance_estimator(ce.ce), X; dims = dims, kwargs...)`, returning the correlation matrix as the "covariance". This is useful when a correlation matrix is required in a context that accepts a covariance estimator.
+Use this method where a context accepts a covariance estimator but needs a correlation matrix.
 
 # Algorithm
 
  1. Call `Statistics.cor(library_covariance_estimator(ce.ce), X; dims = dims, kwargs...)` and return its result.
 
-The returned matrix carries a unit diagonal, so a caller that reads the diagonal for a variance
-reads ones, not variances.
+The returned matrix has a unit diagonal. A caller that reads the diagonal as variances reads ones.
 
 # Arguments
 
-  - `ce`: Correlation covariance estimator.
+  - `ce`: The correlation covariance estimator.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the underlying estimator.
+  - `kwargs...`: More keyword arguments for the wrapped estimator.
 
 # Returns
 
@@ -131,13 +135,13 @@ end
 """
     gap_fill_value(ce::CorrelationCovariance) -> Number
 
-Answer what `ce.ce` answers, because the estimator forwards the sample and its keywords untouched.
+Return the gap fill value of `ce.ce`, because the estimator passes the sample and its keywords to `ce.ce` without change.
 
-This estimator reads no cell of the sample itself: it calls the correlation verb of `ce.ce` and answers what comes back. A gap is therefore the inner estimator's to keep or to lose.
+The estimator reads no cell of the sample. It calls `Statistics.cor` on `ce.ce` and returns the result, so `ce.ce` alone decides what a gap does to the result.
 
 # Arguments
 
-  - `ce`: Correlation covariance estimator.
+  - `ce`: The correlation covariance estimator.
 
 # Returns
 
@@ -155,9 +159,7 @@ end
     Statistics.cor(ce::CorrelationCovariance, X::MatNum; dims::Int = 1,
                    kwargs...)
 
-Compute the correlation matrix using the underlying estimator.
-
-This method delegates to `Statistics.cor(library_covariance_estimator(ce.ce), X; dims = dims, kwargs...)`.
+Compute the correlation matrix with the wrapped estimator.
 
 # Algorithm
 
@@ -167,10 +169,10 @@ This method delegates to `Statistics.cor(library_covariance_estimator(ce.ce), X;
 
 # Arguments
 
-  - `ce`: Correlation covariance estimator.
+  - `ce`: The correlation covariance estimator.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the underlying estimator.
+  - `kwargs...`: More keyword arguments for the wrapped estimator.
 
 # Returns
 
@@ -183,6 +185,10 @@ This method delegates to `Statistics.cor(library_covariance_estimator(ce.ce), X;
 """
 function Statistics.cor(ce::CorrelationCovariance, X::MatNum; dims::Int = 1, kwargs...)
     return Statistics.cor(library_covariance_estimator(ce.ce), X; dims = dims, kwargs...)
+end
+# The estimator passes `X` to `ce.ce` without change, so the count is the count of `ce.ce`.
+function effective_observation_count(ce::CorrelationCovariance, X::MatNum; kwargs...)
+    return effective_observation_count(ce.ce, X; kwargs...)
 end
 
 export CorrelationCovariance

@@ -1,5 +1,5 @@
 ```@meta
-Description = "Covariance, private API of PortfolioOptimisers.jl: show_fields, library_covariance_estimator, covariance_centre_and_estimator, CovarianceState, Base.copy, …"
+Description = "Covariance, private API of PortfolioOptimisers.jl: show_fields, densify, robust_cov, robust_cor, compat_cov, compat_cor, library_covariance_estimator, …"
 ```
 
 # Covariance: private API
@@ -8,9 +8,17 @@ The weights of a portfolio and the covariance matrix of its assets give the port
 
 ## General covariance
 
+[`GeneralCovariance`](@ref) calls a `StatsBase` covariance estimator through the functions below. They retry a call without the keywords that the estimator does not take, and they make a lazy observation matrix dense before a weighted call.
+
 ```@docs
 show_fields(::GeneralCovariance)
+densify
+robust_cov
+robust_cor
+compat_cov
+compat_cor
 library_covariance_estimator
+weighted_comoment_guard
 ```
 
 ## Covariance
@@ -18,6 +26,7 @@ library_covariance_estimator
 ```@docs
 show_fields(::Covariance)
 covariance_centre_and_estimator
+covariance_inner_estimator
 ```
 
 ## Incremental fit
@@ -41,10 +50,10 @@ With a [`CoveragePolicy`](@ref) in its `cvg` field, the estimator computes the c
 ```@docs
 PortfolioOptimisers.coverage_covariance
 PortfolioOptimisers.coverage_covariance(f, ce::Covariance{<:Any, <:Any, <:FullMoment}, ::Nothing, X::MatNum)
-PortfolioOptimisers.coverage_covariance(f, ce::Covariance{<:Any, <:Any, <:FullMoment}, cvg::CoveragePolicy, X::MatNum)
+PortfolioOptimisers.coverage_covariance(f, ce::Covariance{<:Any, <:Any, <:FullMoment, Nothing}, cvg::CoveragePolicy, X::MatNum)
 PortfolioOptimisers.coverage_covariance(f, ce::Covariance{<:Any, <:Any, <:SemiMoment}, ::Nothing, X::MatNum)
-PortfolioOptimisers.coverage_covariance(f, ce::Covariance{<:Any, <:Any, <:SemiMoment}, cvg::CoveragePolicy, X::MatNum)
-PortfolioOptimisers.coverage_covariance(ce::Union{<:GeneralCovariance, <:Covariance{<:Any, <:Any, <:FullMoment}}, ::Nothing, state::CovarianceState)
+PortfolioOptimisers.coverage_covariance(f, ce::Covariance{<:Any, <:Any, <:SemiMoment, Nothing}, cvg::CoveragePolicy, X::MatNum)
+PortfolioOptimisers.coverage_covariance(ce::Union{GeneralCovariance, Covariance{<:Any, <:Any, <:FullMoment}}, ::Nothing, state::CovarianceState)
 PortfolioOptimisers.coverage_covariance(ce::Covariance{<:Any, <:Any, <:FullMoment}, cvg::CoveragePolicy, state::CovarianceState)
 PortfolioOptimisers.coverage_correlation
 PortfolioOptimisers.coverage_policy

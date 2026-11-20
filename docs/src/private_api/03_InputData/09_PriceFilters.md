@@ -12,6 +12,5 @@ PortfolioOptimisers.empty_window_msg
 PortfolioOptimisers.clock_gap_cells
 PortfolioOptimisers.asset_gap_cells
 PortfolioOptimisers.shared_gap_rows
-PortfolioOptimisers.optional_gap_cells
 PortfolioOptimisers.benchmark_columns
 ```

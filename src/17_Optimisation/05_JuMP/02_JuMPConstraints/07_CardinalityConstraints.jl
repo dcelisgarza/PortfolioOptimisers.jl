@@ -178,6 +178,7 @@ Where:
   - `st`: The short threshold of the sub-group weights, or a vector with one entry for each matrix.
   - $(arg_dict[:ss_arg])
   - `i::Integer = 1`: The index of the matrix, which names the rows. The single-matrix method only.
+  - $(arg_dict[:prefix_kw])
 
 # Returns
 
@@ -196,7 +197,7 @@ function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                    gcard::Option{<:LinearConstraint},
                                    smtx::Option{<:MatNum}, lt::Option{<:Threshold},
                                    st::Option{<:Threshold}, ss::Option{<:Number},
-                                   i::Integer = 1)
+                                   i::Integer = 1; prefix::Symbol = Symbol(""))
     card_flag = !isnothing(card)
     gcard_flag = !isnothing(gcard)
     lt_flag = !isnothing(lt)
@@ -204,7 +205,7 @@ function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
     if !(card_flag || gcard_flag || lt_flag || st_flag)
         return nothing
     end
-    sp = SubsetMIPSpace(smtx, :s, i)
+    sp = SubsetMIPSpace(smtx, :s, i, prefix)
     sib = run_mip_builder!(model, sp, wb, lt, st, ss, lt_flag, st_flag)
     set_card_constraints!(model, sp, sib, card)
     set_gcard_constraints!(model, sp, sib, gcard)
@@ -213,11 +214,12 @@ end
 function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                    card::Option{<:VecInt}, gcard::Option{<:VecLc},
                                    smtx::VecMatNum, lt::Option{<:Bt_VecOptBt},
-                                   st::Option{<:Bt_VecOptBt}, ss::Option{<:Number})
+                                   st::Option{<:Bt_VecOptBt}, ss::Option{<:Number};
+                                   prefix::Symbol = Symbol(""))
     for (i, s) in enumerate(smtx)
         set_all_smip_constraints!(model, wb, subgroup_entry(card, i),
                                   subgroup_entry(gcard, i), s, subgroup_entry(lt, i),
-                                  subgroup_entry(st, i), ss, i)
+                                  subgroup_entry(st, i), ss, i; prefix = prefix)
     end
     return nothing
 end
@@ -259,6 +261,7 @@ Where:
   - `st`: The short threshold of the sub-group weights, or a vector with one entry for each matrix.
   - $(arg_dict[:ss_arg])
   - `i::Integer = 1`: The index of the matrix, which names the rows. The single-matrix method only.
+  - $(arg_dict[:prefix_kw])
 
 # Returns
 
@@ -275,14 +278,15 @@ Where:
 function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                    card::Option{<:Integer}, smtx::Option{<:MatNum},
                                    lt::Option{<:Threshold}, st::Option{<:Threshold},
-                                   ss::Option{<:Number}, i::Integer = 1)
+                                   ss::Option{<:Number}, i::Integer = 1;
+                                   prefix::Symbol = Symbol(""))
     card_flag = !isnothing(card)
     lt_flag = !isnothing(lt)
     st_flag = !isnothing(st)
     if !(card_flag || lt_flag || st_flag)
         return nothing
     end
-    sp = SubsetMIPSpace(smtx, :s, i)
+    sp = SubsetMIPSpace(smtx, :s, i, prefix)
     sib = run_mip_builder!(model, sp, wb, lt, st, ss, lt_flag, st_flag)
     set_card_constraints!(model, sp, sib, card)
     return nothing
@@ -290,10 +294,11 @@ end
 function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                    card::Option{<:VecInt}, smtx::VecMatNum,
                                    lt::Option{<:Bt_VecOptBt}, st::Option{<:Bt_VecOptBt},
-                                   ss::Option{<:Number})
+                                   ss::Option{<:Number}; prefix::Symbol = Symbol(""))
     for (i, s) in enumerate(smtx)
         set_scardmip_constraints!(model, wb, subgroup_entry(card, i), s,
-                                  subgroup_entry(lt, i), subgroup_entry(st, i), ss, i)
+                                  subgroup_entry(lt, i), subgroup_entry(st, i), ss, i;
+                                  prefix = prefix)
     end
     return nothing
 end
@@ -335,6 +340,7 @@ Where:
   - `st`: The short threshold of the sub-group weights, or a vector with one entry for each matrix.
   - $(arg_dict[:ss_arg])
   - `i::Integer = 1`: The index of the matrix, which names the rows. The single-matrix method only.
+  - $(arg_dict[:prefix_kw])
 
 # Returns
 
@@ -352,14 +358,14 @@ function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                     gcard::Option{<:LinearConstraint},
                                     sgmtx::Option{<:MatNum}, lt::Option{<:Threshold},
                                     st::Option{<:Threshold}, ss::Option{<:Number},
-                                    i::Integer = 1)
+                                    i::Integer = 1; prefix::Symbol = Symbol(""))
     gcard_flag = !isnothing(gcard)
     lt_flag = !isnothing(lt)
     st_flag = !isnothing(st)
     if !(gcard_flag || lt_flag || st_flag)
         return nothing
     end
-    sp = SubsetMIPSpace(sgmtx, :sg, i)
+    sp = SubsetMIPSpace(sgmtx, :sg, i, prefix)
     sib = run_mip_builder!(model, sp, wb, lt, st, ss, lt_flag, st_flag)
     set_gcard_constraints!(model, sp, sib, gcard)
     return nothing
@@ -367,10 +373,11 @@ end
 function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                     gcard::Option{<:VecLc}, sgmtx::VecMatNum,
                                     lt::Option{<:Bt_VecOptBt}, st::Option{<:Bt_VecOptBt},
-                                    ss::Option{<:Number})
+                                    ss::Option{<:Number}; prefix::Symbol = Symbol(""))
     for (i, s) in enumerate(sgmtx)
         set_sgcardmip_constraints!(model, wb, subgroup_entry(gcard, i), s,
-                                   subgroup_entry(lt, i), subgroup_entry(st, i), ss, i)
+                                   subgroup_entry(lt, i), subgroup_entry(st, i), ss, i;
+                                   prefix = prefix)
     end
     return nothing
 end
@@ -411,6 +418,7 @@ Where:
   - `st`: The short threshold of the sub-group weights of `smtx`.
   - `glt`: The long threshold of the sub-group weights of `sgmtx`.
   - `gst`: The short threshold of the sub-group weights of `sgmtx`.
+  - $(arg_dict[:prefix_kw]) A sub-group bit is a fact of one call, so the bits take it too.
   - $(arg_dict[:ss_arg])
 
 # Returns
@@ -431,12 +439,13 @@ function set_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                smtx::Option{<:MatNum_VecMatNum},
                                sgmtx::Option{<:MatNum_VecMatNum}, lt::Option{<:Bt_VecOptBt},
                                st::Option{<:Bt_VecOptBt}, glt::Option{<:Bt_VecOptBt},
-                               gst::Option{<:Bt_VecOptBt}, ss::Option{<:Number})
+                               gst::Option{<:Bt_VecOptBt}, ss::Option{<:Number};
+                               prefix::Symbol = Symbol(""))
     if smtx === sgmtx && lt === glt && st === gst
-        set_all_smip_constraints!(model, wb, card, gcard, smtx, lt, st, ss)
+        set_all_smip_constraints!(model, wb, card, gcard, smtx, lt, st, ss; prefix = prefix)
     else
-        set_scardmip_constraints!(model, wb, card, smtx, lt, st, ss)
-        set_sgcardmip_constraints!(model, wb, gcard, sgmtx, glt, gst, ss)
+        set_scardmip_constraints!(model, wb, card, smtx, lt, st, ss; prefix = prefix)
+        set_sgcardmip_constraints!(model, wb, gcard, sgmtx, glt, gst, ss; prefix = prefix)
     end
     return nothing
 end
@@ -510,11 +519,12 @@ function assert_subgroup_mip_fields(scard, smtx, slt, sst)::Nothing
     return nothing
 end
 """
-    assert_subgrouped_constraint_width(sgc, smt)
+    assert_subgrouped_constraint_width(sgc::LinearConstraint, smt::MatNum)
+    assert_subgrouped_constraint_width(sgc::LcE_Lc, smt::MatNum_ASetMatE)
 
 Refuses a precomputed sub-grouped cardinality constraint whose width is not the number of sub-groups in its selection matrix.
 
-[`set_gcard_constraints!`](@ref) multiplies the matrix `A` of each half of `sgc` by the held binary of the sub-groups, which has one entry for each row of `smt`. So every half needs one column for each row of `smt`, and it can have any number of rows. The other method accepts every other pair, such as an estimator, because the width of an estimator is not known until the optimiser resolves it.
+[`set_gcard_constraints!`](@ref) multiplies the matrix `A` of each half of `sgc` by the held binary of the sub-groups, which has one entry for each row of `smt`. So every half needs one column for each row of `smt`, and it can have any number of rows. The other method accepts a pair with an estimator in either slot, because the width of an estimator is not known until the optimiser resolves it. Any other type is a `MethodError`.
 
 # Validation
 
@@ -536,7 +546,7 @@ function assert_subgrouped_constraint_width(sgc::LinearConstraint, smt::MatNum):
     end
     return nothing
 end
-function assert_subgrouped_constraint_width(::Any, ::Any)::Nothing
+function assert_subgrouped_constraint_width(::LcE_Lc, ::MatNum_ASetMatE)::Nothing
     return nothing
 end
 """

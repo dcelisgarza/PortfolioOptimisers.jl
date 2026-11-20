@@ -6,7 +6,7 @@ measured against a hand-written recursion, the optimality conditions of the elas
 the worked step the paper prints for five assets at its defaults.
 =#
 @testset "Kernel trend pattern tracking: the path, the statistic with a memory, the step" begin
-    using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates
+    using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, StatsBase, Dates
     po = PortfolioOptimisers
     OPS = po.OnlinePortfolioSelection
 
@@ -28,30 +28,47 @@ the worked step the paper prints for five assets at its defaults.
         return P
     end
 
-    @testset "The elastic-net path at its middle point" begin
-        path = ElasticNetPath()
+    S = po.StatsAPI
+    # The coefficients of a fit, and the exact solve of a sign pattern with no weights and no
+    # intercept column, as the old two-argument polish took them.
+    enet(tgt, P, y) = S.coef(S.fit(tgt, P, y))
+    function polish(P, y, z, lam, theta)
+        n = size(P, 2)
+        return po.elastic_net_polish(P, P, y, z, fill(lam * theta, n),
+                                     fill(lam * (1 - theta), n), trues(n))
+    end
+
+    @testset "The elastic net at the middle point of its path" begin
+        path = ElasticNet()
         @test path.theta == 0.99 &&
-              path.ratio == 1e-3 &&
+              path.strength == MiddleOfPath() &&
+              path.strength.ratio == 1e-3 &&
               path.iters == 10_000 &&
-              path.tol == 1e-10
+              path.tol == 1e-10 &&
+              isnothing(path.ve) &&
+              isnothing(path.w) &&
+              isnothing(path.ic)
+        ratio = path.strength.ratio
         # Orthonormal columns have the closed form `S(Pᵀy, λϑ) / (1 + λ(1 − ϑ))`.
         Q = Matrix(qr(randn(rng, 8, 3)).Q)[:, 1:3]
         y = Q * [0.9, -0.3, 0.05] .+ 0.01 .* randn(rng, 8)
         g = Q' * y
         lmax = maximum(abs, g) / path.theta
-        lam = lmax * sqrt(path.ratio)
+        lam = lmax * sqrt(ratio)
         closed = sign.(g) .* max.(abs.(g) .- lam * path.theta, 0) ./
                  (1 + lam * (1 - path.theta))
-        z = po.elastic_net_path(path, Q, y)
+        m = S.fit(path, Q, y)
+        z = S.coef(m)
         @test isapprox(z, closed; atol = 1e-9)
+        @test m.gamma ≈ lam && S.predict(m, Q) ≈ Q * z
         # On collinear columns the optimality conditions hold at the solution: the residual
         # correlation of an active coefficient is the penalty's subgradient, and an inactive
         # one's is inside it.
         P = 1 .+ 0.02 .* randn(rng, 4, 5)
         y = P[:, end] .* (1 .+ 0.03 .* randn(rng, 4))
         lmax = maximum(abs, P' * y) / path.theta
-        lam = lmax * sqrt(path.ratio)
-        z = po.elastic_net_path(path, P, y)
+        lam = lmax * sqrt(ratio)
+        z = enet(path, P, y)
         corr = P' * (y .- P * z)
         for k in 1:5
             if iszero(z[k])
@@ -65,32 +82,29 @@ the worked step the paper prints for five assets at its defaults.
         # The middle point is sparse where the strength is felt; a zero response is zero;
         # and a pattern that is not the optimum's is refused by the polish.
         @test count(!iszero, z) < 5
-        @test po.elastic_net_path(path, P, zeros(4)) == zeros(5)
-        @test isnothing(po.elastic_net_polish(P, y, zeros(5), lam, path.theta))
-        @test isnothing(po.elastic_net_polish(P, y, -z, lam, path.theta))
-        @test po.elastic_net_polish(P, y, z, lam, path.theta) ≈ z
+        @test enet(path, P, zeros(4)) == zeros(5)
+        @test isnothing(polish(P, y, zeros(5), lam, path.theta))
+        @test isnothing(polish(P, y, -z, lam, path.theta))
+        @test polish(P, y, z, lam, path.theta) ≈ z
         # Without the polish the sweeps alone reach the same point, slowly.
-        slow = ElasticNetPath(; iters = 200_000, tol = 1e-16)
-        @test isapprox(po.elastic_net_path(slow, P, y), z; atol = 1e-8)
+        slow = ElasticNet(; iters = 200_000, tol = 1e-16)
+        @test isapprox(enet(slow, P, y), z; atol = 1e-8)
         # #1259: on collinear columns a cap of 1000 sweeps can stop before the sweeps find the
         # optimum's sign pattern, and the last sweep is tenths away from the optimum; the
         # default cap reaches the pattern and returns the polished optimum.
         rng2 = StableRNG(2)
         P = 1 .+ 0.02 .* randn(rng2, 4, 5)
         y = P[:, end] .* (1 .+ 0.03 .* randn(rng2, 4))
-        lam = maximum(abs, P' * y) / path.theta * sqrt(path.ratio)
-        zcap = po.elastic_net_path(ElasticNetPath(; iters = 1000), P, y)
-        z = po.elastic_net_path(path, P, y)
-        @test isnothing(po.elastic_net_polish(P, y, zcap, lam, path.theta))
-        @test po.elastic_net_polish(P, y, z, lam, path.theta) ≈ z
+        lam = maximum(abs, P' * y) / path.theta * sqrt(ratio)
+        zcap = enet(ElasticNet(; iters = 1000), P, y)
+        z = enet(path, P, y)
+        @test isnothing(polish(P, y, zcap, lam, path.theta))
+        @test polish(P, y, z, lam, path.theta) ≈ z
         @test maxerr(zcap, z) > 0.5
         # #1188: on this fixture the sweeps find the pattern between 2000 and 5000 sweeps,
-        # which the docstring of `ElasticNetPath` states.
-        polished(it) = !isnothing(po.elastic_net_polish(P, y,
-                                                        po.elastic_net_path(ElasticNetPath(;
-                                                                                           iters = it),
-                                                                            P, y), lam,
-                                                        path.theta))
+        # which the docstring of `ElasticNet` states.
+        polished(it) = !isnothing(polish(P, y, enet(ElasticNet(; iters = it), P, y), lam,
+                                         path.theta))
         @test !polished(2000) && polished(5000)
         # #1188: at theta = 1 the lasso's equations over a pattern with more columns than
         # observations are singular. The polish refused to solve them and threw; it now
@@ -98,10 +112,14 @@ the worked step the paper prints for five assets at its defaults.
         rng3 = StableRNG(124)
         P = 1 .+ 0.02 .* randn(rng3, 4, 5)
         y = P[:, end] .* (1 .+ 0.03 .* randn(rng3, 4))
-        lasso = ElasticNetPath(; theta = 1.0)
-        @test isnothing(po.elastic_net_polish(P, y, ones(5), 1e-3, 1.0))
-        z = po.elastic_net_path(lasso, P, y)
-        lam = maximum(abs, P' * y) * sqrt(lasso.ratio)
+        lasso = ElasticNet(; theta = 1.0)
+        @test isnothing(polish(P, y, ones(5), 1e-3, 1.0))
+        # Two identical columns and no ridge make the matrix of the equations exactly singular,
+        # whatever the rounding.
+        Pd = [1.0 1.0; 2.0 2.0; 3.0 3.0]
+        @test isnothing(polish(Pd, [1.0, 2.0, 3.0], [1.0, 1.0], 1e-3, 1.0))
+        z = enet(lasso, P, y)
+        lam = maximum(abs, P' * y) * sqrt(lasso.strength.ratio)
         corr = P' * (y .- P * z)
         for k in 1:5
             @test if iszero(z[k])
@@ -110,11 +128,254 @@ the worked step the paper prints for five assets at its defaults.
                 isapprox(corr[k], lam * sign(z[k]); atol = 1e-8)
             end
         end
-        @test_throws DomainError ElasticNetPath(; theta = 0)
-        @test_throws DomainError ElasticNetPath(; theta = 1.1)
-        @test_throws DomainError ElasticNetPath(; ratio = 1)
-        @test_throws DomainError ElasticNetPath(; iters = 0)
-        @test_throws DomainError ElasticNetPath(; tol = 0)
+        # #1885: a ridge alone has no path, so `MiddleOfPath` refuses `theta = 0`, and
+        # `FixedStrength` takes it.
+        @test_throws DomainError ElasticNet(; theta = 0)
+        @test_throws DomainError ElasticNet(; theta = 1.1)
+        @test_throws DomainError ElasticNet(; theta = -0.1)
+        @test_throws DomainError MiddleOfPath(; ratio = 1)
+        @test_throws DomainError MiddleOfPath(; ratio = 0)
+        @test_throws DomainError FixedStrength(; gamma = 0)
+        @test_throws DomainError ElasticNet(; iters = 0)
+        @test_throws DomainError ElasticNet(; tol = 0)
+        @test_throws DomainError ElasticNet(; ic = 0)
+        @test_throws DomainError InterceptColumn(0)
+        @test_throws IsEmptyError ElasticNet(; w = StatsBase.pweights(Float64[]))
+        @test ElasticNet(; theta = 0, strength = FixedStrength(; gamma = 1)).theta == 0
+    end
+
+    @testset "The elastic net as a penalised regression target (#1885)" begin
+        # The optimality conditions on the standardised, weighted design: an unpenalised
+        # column has a zero weighted correlation with the residual, an active penalised one
+        # the subgradient of the penalty, and an inactive one a correlation inside it.
+        function kkt(tgt, X, y)
+            m = S.fit(tgt, X, y)
+            b = S.coef(m)
+            lam = m.gamma
+            n = size(X, 2)
+            v = isnothing(tgt.w) ? ones(size(X, 1)) : po.glm_weights(tgt.w)
+            s = ones(n)
+            if !isnothing(tgt.ve)
+                s = map(x -> iszero(x) ? 1.0 : x, vec(std(tgt.ve, X; dims = 1)))
+                isnothing(tgt.ic) || (s[tgt.ic] = 1.0)
+            end
+            P = X ./ s'
+            z = b .* s
+            corr = P' * (v .* (y .- P * z))
+            return maximum(map(1:n) do k
+                               if k == something(tgt.ic, 0)
+                                   abs(corr[k])
+                               elseif iszero(z[k])
+                                   max(abs(corr[k]) - lam * tgt.theta, 0)
+                               else
+                                   abs(corr[k] - lam * tgt.theta * sign(z[k]) -
+                                       lam * (1 - tgt.theta) * z[k])
+                               end
+                           end)
+        end
+        rng4 = StableRNG(3)
+        Xr = randn(rng4, 30, 4)
+        yr = Xr * [0.5, -0.2, 0.0, 0.3] .+ 0.1 .* randn(rng4, 30)
+        X1 = [ones(30) Xr[:, 2:4]]
+        wv = StatsBase.pweights(rand(rng4, 30))
+        ic1 = InterceptColumn(1)
+        @test kkt(ElasticNet(), Xr, yr) < 1e-12
+        @test kkt(ElasticNet(; w = wv), Xr, yr) < 1e-12
+        @test kkt(factory(ElasticNet(), ic1), X1, yr) < 1e-12
+        @test kkt(factory(factory(ElasticNet(; ve = SimpleVariance()), wv), ic1), X1, yr) <
+              1e-12
+        @test kkt(ElasticNet(; theta = 0.5, strength = FixedStrength(; gamma = 4.0),
+                             ve = SimpleVariance()), Xr, yr) < 1e-12
+        # The standardisation divides each column by its deviation, and the fit scales the
+        # coefficients back: the same fit as on the standardised columns.
+        sd = vec(std(Xr; dims = 1))
+        fx = FixedStrength(; gamma = 2.0)
+        @test enet(ElasticNet(; strength = fx, ve = SimpleVariance()), Xr, yr) ≈
+              enet(ElasticNet(; strength = fx), Xr ./ sd', yr) ./ sd
+        # A column of zero deviation that no estimator names keeps its units.
+        Xc = [ones(30) Xr[:, 2:4]]
+        @test enet(ElasticNet(; strength = fx, ve = SimpleVariance()), Xc, yr)[1] ≈
+              enet(ElasticNet(; strength = fx), [ones(30) Xr[:, 2:4] ./ sd[2:4]'], yr)[1]
+        # The ridge at a fixed strength is the closed form.
+        ridge = ElasticNet(; theta = 0, strength = FixedStrength(; gamma = 2.0))
+        @test enet(ridge, Xr, yr) ≈ (Xr' * Xr + 2.0I) \ (Xr' * yr)
+        # The weights are scaled to their Kish count, so uniform weights give the unweighted
+        # fit, and equal weights on a subset give the fit of the subset alone.
+        fx3 = FixedStrength(; gamma = 3.0)
+        @test enet(ElasticNet(; strength = fx3, w = StatsBase.pweights(fill(0.2, 30))), Xr,
+                   yr) ≈ enet(ElasticNet(; strength = fx3), Xr, yr)
+        @test enet(ElasticNet(; strength = fx3,
+                              w = StatsBase.aweights([fill(1.0, 20); zeros(10)])), Xr, yr) ≈
+              enet(ElasticNet(; strength = fx3), Xr[1:20, :], yr[1:20])
+        # A large strength shrinks every slope to zero and leaves the intercept at the
+        # weighted mean of the response; a response that no column explains stops at the
+        # start point.
+        big = factory(ElasticNet(; strength = FixedStrength(; gamma = 1e8), w = wv), ic1)
+        @test enet(big, X1, yr) ≈ [mean(yr, wv), 0, 0, 0]
+        @test enet(factory(ElasticNet(), ic1), ones(5, 1), fill(2.0, 5)) ≈ [2.0]
+        # The verbs of the interface: `factory` carries the weights to `ve` and keeps the
+        # intercept column, an unpenalised target ignores the intercept column, and the
+        # target states its weights.
+        tw = factory(factory(ElasticNet(; ve = SimpleVariance()), ic1), wv)
+        @test tw.w === wv && tw.ve.w === wv && tw.ic == 1
+        @test po.regression_target_weights(tw) === wv
+        @test isnothing(po.regression_target_weights(ElasticNet()))
+        @test factory(LinearModel(), ic1) === LinearModel()
+        @test !po.is_basis_invariant(ElasticNet())
+        @test po.penalty_strength(fx, [1.0, -5.0], 0.5) == 2.0
+        @test po.penalty_strength(MiddleOfPath(; ratio = 0.25), [1.0, -5.0], 0.5) == 5.0
+        @test po.penalty_strength(MiddleOfPath(), Float64[], 0.5) == 0
+    end
+
+    @testset "A penalised fit states its degrees of freedom (#1899)" begin
+        rng5 = StableRNG(7)
+        n = 60
+        Xd = [ones(n) randn(rng5, n, 5)]
+        beta = [0.5, 1, -0.5, 0, 0, 0.25]
+        yd = Xd * beta .+ randn(rng5, n)
+        aw = StatsBase.aweights(rand(rng5, n))
+        ic1 = InterceptColumn(1)
+        # At theta = 0 and a strength near zero, the fit is the least-squares fit, and its
+        # scores are the scores of `LinearModel` under the same weights.
+        for w in (nothing, aw)
+            en = factory(ElasticNet(; theta = 0, strength = FixedStrength(; gamma = 1e-10),
+                                    w = w), ic1)
+            lm = isnothing(w) ? LinearModel() : factory(LinearModel(), w)
+            m = S.fit(en, Xd, yd)
+            g = S.fit(lm, Xd, yd)
+            @test isapprox(S.dof(m), S.dof(g); atol = 1e-8)
+            @test S.nobs(m) ≈ S.nobs(g) &&
+                  isapprox(S.deviance(m), S.deviance(g); rtol = 1e-9)
+            for f in (S.loglikelihood, S.aic, S.aicc, S.bic)
+                @test isapprox(f(m), f(g); atol = 1e-8)
+            end
+            @test isapprox(po.residual_count(m, Xd), n - 6; atol = 1e-8)
+            @test po.residual_count(g, Xd) === n - 6
+        end
+        # The counts against the smoother built by hand, on standardised, weighted columns.
+        tgt = factory(factory(ElasticNet(; theta = 0.6,
+                                         strength = FixedStrength(; gamma = 5.0),
+                                         ve = SimpleVariance()), aw), ic1)
+        m = S.fit(tgt, Xd, yd)
+        sd = vec(std(tgt.ve, Xd; dims = 1))
+        sd[1] = 1
+        P = Xd ./ sd'
+        v = po.glm_weights(aw)
+        A = findall(.!iszero.(S.coef(m)))
+        DA = Diagonal([k == 1 ? 0.0 : 1.0 for k in A])
+        H = P[:, A] *
+            ((P[:, A]' * (v .* P[:, A]) + m.gamma * 0.4 * DA) \ (P[:, A]' * Diagonal(v)))
+        Sm = Diagonal(sqrt.(v)) * H * Diagonal(1 ./ sqrt.(v))
+        @test m.df ≈ tr(H)
+        @test m.rdof ≈ n - tr(2Sm - Sm' * Sm)
+        @test m.rss ≈ sum(v .* (yd .- Xd * S.coef(m)) .^ 2) && m.nobs ≈ sum(v)
+        # A ridge spends fewer parameters than its columns, and its residual count is below
+        # the count of `N − tr(H)`, which overstates it.
+        rg = S.fit(ElasticNet(; theta = 0, strength = FixedStrength(; gamma = 30.0)), Xd,
+                   yd)
+        Hr = Xd * ((Xd' * Xd + 30.0I) \ Xd')
+        @test rg.df ≈ tr(Hr) && rg.df < 6
+        @test rg.rdof ≈ n - tr(2Hr - Hr' * Hr) && rg.rdof < n - rg.df
+        # At theta = 1, an active set with more columns than rows has the rank as its count.
+        Xw = randn(StableRNG(3), 5, 8)
+        mw = S.fit(ElasticNet(; theta = 1.0, strength = FixedStrength(; gamma = 1e-4),
+                              iters = 2000), Xw, randn(StableRNG(4), 5))
+        @test count(!iszero, S.coef(mw)) == 8
+        @test mw.df ≈ 5 && isapprox(mw.rdof, 0; atol = 1e-10)
+        # A zero active set spends nothing.
+        m0 = S.fit(ElasticNet(; strength = FixedStrength(; gamma = 1e12)), Xd[:, 2:end], yd)
+        @test m0.df == 0 && m0.rdof == n
+        # The gradient of the strength against a central difference in `g`.
+        mp = MiddleOfPath()
+        g = [0.3, -1.2, 0.5]
+        hg = 1e-6
+        fd = [(po.penalty_strength(mp, g .+ hg .* (1:3 .== k), 0.7) -
+               po.penalty_strength(mp, g .- hg .* (1:3 .== k), 0.7)) / (2hg) for k in 1:3]
+        @test po.penalty_strength_gradient(mp, g, 0.7) ≈ fd
+        @test po.penalty_strength_gradient(FixedStrength(; gamma = 1.0), g, 0.7) == zeros(3)
+        @test isempty(po.penalty_strength_gradient(mp, Float64[], 0.7))
+        # The divergence of the fit by central differences. Under `MiddleOfPath` the count
+        # with `StrengthDivergence()` is the divergence at each draw, and the trace alone is
+        # above it. Under `FixedStrength` the trace is the divergence, and the rule adds zero.
+        function divergence(tgt, X, y; h = 1e-6)
+            return sum(eachindex(y)) do i
+                e = h .* (eachindex(y) .== i)
+                (S.predict(S.fit(tgt, X, y .+ e), X)[i] -
+                 S.predict(S.fit(tgt, X, y .- e), X)[i]) / (2h)
+            end
+        end
+        rng6 = StableRNG(11)
+        for theta in (0.5, 0.99), _ in 1:3
+            yy = Xd * beta .+ randn(rng6, n)
+            plain = factory(ElasticNet(; theta = theta), ic1)
+            full = factory(ElasticNet(; theta = theta, sdiv = StrengthDivergence()), ic1)
+            d = divergence(plain, Xd, yy)
+            @test isapprox(S.fit(full, Xd, yy).df, d; atol = 1e-6)
+            @test S.fit(plain, Xd, yy).df > d
+            @test S.fit(full, Xd, yy).rdof == S.fit(plain, Xd, yy).rdof
+        end
+        wve = factory(factory(ElasticNet(; theta = 0.7, ve = SimpleVariance()), aw), ic1)
+        wvs = factory(factory(ElasticNet(; theta = 0.7, ve = SimpleVariance(),
+                                         sdiv = StrengthDivergence()), aw), ic1)
+        @test isapprox(S.fit(wvs, Xd, yd).df, divergence(wve, Xd, yd); atol = 1e-6)
+        nic = ElasticNet(; theta = 0.7, sdiv = StrengthDivergence())
+        @test isapprox(S.fit(nic, Xd, yd).df, divergence(ElasticNet(; theta = 0.7), Xd, yd);
+                       atol = 1e-6)
+        fx = FixedStrength(; gamma = 3.0)
+        fx0 = factory(ElasticNet(; theta = 0.7, strength = fx), ic1)
+        fx1 = factory(ElasticNet(; theta = 0.7, strength = fx, sdiv = StrengthDivergence()),
+                      ic1)
+        @test S.fit(fx1, Xd, yd).df == S.fit(fx0, Xd, yd).df
+        @test isapprox(S.fit(fx0, Xd, yd).df, divergence(fx0, Xd, yd); atol = 1e-6)
+        # `factory` keeps the rule.
+        @test factory(factory(fx1, aw), ic1).sdiv === StrengthDivergence()
+    end
+
+    @testset "The stepwise search reads a penalised fit under aic, aicc and bic (#1899)" begin
+        rng7 = StableRNG(5)
+        n = 60
+        F = randn(rng7, n, 5)
+        Xs = hcat(F * [1.0, -0.5, 0, 0, 0.25] .+ randn(rng7, n),
+                  F * [0.3, 0, 0, 1.0, 0] .+ randn(rng7, n))
+        # The valid pairs construct, and a refused pair is a `MethodError`, through the
+        # keyword and the positional constructor alike.
+        for c in (:aic, :aicc, :bic)
+            @test StepwiseRegression(; crit = c, tgt = ElasticNet()).tgt == ElasticNet()
+        end
+        for c in (:r2, :adjr2, PValue())
+            @test_throws MethodError StepwiseRegression(; crit = c, tgt = ElasticNet())
+            @test StepwiseRegression(; crit = c).tgt == LinearModel()
+        end
+        @test_throws MethodError StepwiseRegression(; tgt = ElasticNet())
+        @test_throws MethodError StepwiseRegression(Val(:r2), ForwardSelection(),
+                                                    ElasticNet(), BatchChoice(), nothing,
+                                                    nothing)
+        # Each search runs, names the intercept to the target, and writes the residual count
+        # of the fit of each asset into `edof`, a real count.
+        for c in (:aic, :aicc, :bic), alg in (ForwardSelection(), BackwardElimination())
+            re = StepwiseRegression(; crit = c, alg = alg, tgt = ElasticNet())
+            r = regression(re, Xs, F)
+            @test eltype(r.edof) == Float64
+            for i in 1:2
+                inc = po.stepwise_factor_set(re, Xs[:, i], F, i)
+                m = S.fit(factory(ElasticNet(), InterceptColumn(1)), [ones(n) F[:, inc]],
+                          Xs[:, i])
+                @test r.edof[i] ≈ m.rdof &&
+                      n - 1 - length(inc) <= r.edof[i] <= n - m.df + 1e-10
+                @test r.b[i] ≈ S.coef(m)[1]
+            end
+        end
+        # An unpenalised target keeps its integer count.
+        rl = regression(StepwiseRegression(; crit = :aic), Xs, F)
+        @test eltype(rl.edof) == Int &&
+              rl.edof == [n - 1 - count(!iszero, rl.M[i, :]) for i in 1:2]
+        # A selected factor that the penalty sets to zero keeps its place in the set, with a
+        # zero in its row, and the intercept stays at the mean of the asset.
+        big = ElasticNet(; strength = FixedStrength(; gamma = 1e10))
+        rb = regression(StepwiseRegression(; crit = :bic, tgt = big,
+                                           included = [[1, 2], [4]]), Xs, F)
+        @test all(iszero, rb.M) && rb.b ≈ vec(mean(Xs; dims = 1))
+        @test rb.edof ≈ [n - 1, n - 1]
     end
 
     @testset "The trend-reverting fraction" begin
@@ -131,15 +392,16 @@ the worked step the paper prints for five assets at its defaults.
         @test po.trend_reverting_fraction(ones(Float32, 2, 3)) === 0.0f0
         X32 = Float32.(0.02 .* randn(StableRNG(5), 20, 4))
         k32 = KernelTrendPattern(; nu = 0.5f0,
-                                 path = ElasticNetPath(; theta = 0.99f0, ratio = 1.0f-3,
-                                                       tol = 1.0f-6))
+                                 tgt = ElasticNet(; theta = 0.99f0,
+                                                  strength = MiddleOfPath(; ratio = 1.0f-3),
+                                                  tol = 1.0f-6))
         @test eltype(vec(mean(PriceLevelExpectedReturns(; alg = k32), X32))) == Float32
     end
 
     @testset "The statistic: the hand recursion, the fold, the batch and the memory" begin
         w, nu = 5, 0.5
         alg = KernelTrendPattern(; window = w, nu = nu)
-        @test alg.window == 5 && alg.nu == 0.5 && alg.path == ElasticNetPath()
+        @test alg.window == 5 && alg.nu == 0.5 && alg.tgt == ElasticNet()
         @test po.folds(alg) && isnothing(po.window_rows(alg)) && po.memory_rows(alg) == 2w
         @test po.rows_needed(alg) == 1
         # The paper's three states, row by row, on the levels the memory reaches; the
@@ -155,7 +417,7 @@ the worked step the paper prints for five assets at its defaults.
             ptilde = vec(maximum(Pw; dims = 1))
             y = nu .* ptilde .+ (1 - nu) .* (t == 1 ? phat : phat ./ X[t, :])
             Pt = permutedims(Pw)
-            yhat = max.(Pt * po.elastic_net_path(alg.path, Pt, y), 0)
+            yhat = max.(Pt * enet(alg.tgt, Pt, y), 0)
             lam = po.trend_reverting_fraction(P)
             c = min.(lam ./ (2 .* X[t, :]), 1)
             phat = c .* ptilde .+ (1 .- c) .* yhat
@@ -181,14 +443,14 @@ the worked step the paper prints for five assets at its defaults.
         P1 = levels(X[1:1, :])
         y1 = nu .* vec(maximum(P1; dims = 1)) .+ (1 - nu)
         Pt1 = permutedims(P1)
-        @test isapprox(1 .+ vec(mean(one_row)),
-                       max.(Pt1 * po.elastic_net_path(alg.path, Pt1, y1), 0); atol = 1e-12)
+        @test isapprox(1 .+ vec(mean(one_row)), max.(Pt1 * enet(alg.tgt, Pt1, y1), 0);
+                       atol = 1e-12)
         # A flat panel is shrunk alike in every asset: the middle of the path takes
         # `sqrt(ratio)` off the regression of ones on ones, the ridge share a little more,
         # and the recursion compounds it to the fixed point `p̂ = s (ν + (1 − ν) p̂)`, so the
         # centred forecast is zero.
         flat = vec(mean(me, zeros(12, N)))
-        shrink = 1 - sqrt(alg.path.ratio)
+        shrink = 1 - sqrt(alg.tgt.strength.ratio)
         @test isapprox(flat, fill(shrink * nu / (1 - shrink * (1 - nu)) - 1, N);
                        atol = 5e-4)
         @test maxerr(flat, fill(flat[1], N)) < 1e-12
@@ -271,17 +533,28 @@ the worked step the paper prints for five assets at its defaults.
         @test po.rows_needed(KernelTrendTracking(; me = PriceLevelExpectedReturns())) == 4
         @test po.port_opt_view(KernelTrendTracking(; eta = 3, q = 4), [1, 2]).q == 4
         # The paper's constructor addresses every parameter.
-        k = KernelTrendPatternTracking(; window = 3, nu = 0.4, theta = 0.9, iters = 50,
-                                       tol = 1e-6, q = 5, eta = 900)
+        k = KernelTrendPatternTracking(; window = 3, nu = 0.4, theta = 0.9, ratio = 1e-2,
+                                       iters = 50, tol = 1e-6, q = 5, eta = 900)
         @test k.me.alg.window == 3 &&
               k.me.alg.nu == 0.4 &&
-              k.me.alg.path.theta == 0.9 &&
-              k.me.alg.path.iters == 50 &&
-              k.me.alg.path.tol == 1e-6 &&
+              k.me.alg.tgt.theta == 0.9 &&
+              k.me.alg.tgt.strength.ratio == 1e-2 &&
+              k.me.alg.tgt.iters == 50 &&
+              k.me.alg.tgt.tol == 1e-6 &&
               k.q == 5 &&
               k.eta == 900
         @test isa(KernelTrendPatternTracking().me.alg, KernelTrendPattern)
-        @test KernelTrendPatternTracking().me.alg.path == ElasticNetPath()
+        @test KernelTrendPatternTracking().me.alg.tgt == ElasticNet()
+        # #1885: the regression of the intermediate state is a swappable target. Ordinary
+        # least squares on the same window runs, and differs from the elastic net.
+        ols = PriceLevelExpectedReturns(; alg = KernelTrendPattern(; tgt = LinearModel()))
+        mo = vec(mean(ols, R[1:18, :]))
+        @test all(isfinite, mo) && length(mo) == N
+        @test maxerr(mo,
+                     vec(mean(PriceLevelExpectedReturns(; alg = KernelTrendPattern()),
+                              R[1:18, :]))) > 1e-6
+        @test sum(optimise(OPS(; alg = KernelTrendTracking(; me = ols)), rows(rd, 1:18)).w) ≈
+              1
     end
 
     @testset "The head's verbs" begin
@@ -325,7 +598,6 @@ the worked step the paper prints for five assets at its defaults.
     @testset "Show" begin
         @test occursin("KernelTrendTracking",
                        sprint(show, MIME("text/plain"), KernelTrendPatternTracking()))
-        @test occursin("ElasticNetPath",
-                       sprint(show, MIME("text/plain"), KernelTrendPattern()))
+        @test occursin("ElasticNet", sprint(show, MIME("text/plain"), KernelTrendPattern()))
     end
 end

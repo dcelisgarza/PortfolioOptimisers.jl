@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Lets the allocation drift with the market and never trades it, the buy-and-hold benchmark (BAH).
 
-It is the benchmark of the online selection survey [lihoi2014](@cite). From the uniform Start Allocation it is the uniform buy-and-hold portfolio, which [lihoi2014](@citet) use as the market index. The rule keeps no state and reads no rows.
+It is the benchmark of Section 3.1.1 of the online selection survey [lihoi2014](@cite). From the uniform Start Allocation it is the uniform buy-and-hold portfolio, which [lihoi2014](@citet) call the usual market index. The rule keeps no state and reads no rows.
 
 # Mathematical definition
 
@@ -27,7 +27,7 @@ Where:
 
 The entries of ``\\hat{\\boldsymbol{w}}_t`` are non-negative and sum to one. So on the simplex the projection returns ``\\hat{\\boldsymbol{w}}_t`` unchanged, and the rule never trades. The weight of asset ``i`` after period ``t`` is then ``w_{1,i} \\prod_{s \\leq t} x_{s,i}``, divided by the sum of that product over the assets.
 
-As the weighting of an [`ExpertMixture`](@ref), the rule reads the expert-return vector ``\\boldsymbol{r}_t`` in place of ``\\boldsymbol{x}_t``. Its step is then ``\\boldsymbol{p}_{t+1} \\propto \\boldsymbol{p}_t \\odot \\boldsymbol{r}_t``, the wealth-weighted mixture. It is a buy and hold over the experts, the combination that Section 3.5.2 of [lihoi2014](@cite) describes. It is the default weighting of the mixture.
+As the weighting of an [`ExpertMixture`](@ref), the rule reads the expert-return vector ``\\boldsymbol{r}_t`` in place of ``\\boldsymbol{x}_t``. Its step is then ``\\boldsymbol{p}_{t+1} \\propto \\boldsymbol{p}_t \\odot \\boldsymbol{r}_t``, the wealth-weighted mixture. It is a buy and hold over the experts. Equation 1.3 of [cover1991](@cite) states it for constant rebalanced portfolios, and Section 3.5.2 of [lihoi2014](@cite) describes it for any experts. It is the default weighting of the mixture.
 
 # Algorithm
 
@@ -61,7 +61,8 @@ BuyAndHold
 
 # References
 
-  - $(ref_dict[:lihoi2014])
+  - $(ref_dict[:lihoi2014]) Sections 3.1.1 and 3.5.2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:cover1991]) Section 1, Equations 1.3 and 1.6.
 """
 @concrete struct BuyAndHold <: AbstractOnlinePortfolioSelectionAlgorithm
     """
@@ -76,7 +77,7 @@ function BuyAndHold(; proj::EuclideanProjection = EuclideanProjection())::BuyAnd
     return BuyAndHold(proj)
 end
 function online_update!(alg::BuyAndHold, st, w::AbstractVector, x::AbstractVector, ::Any,
-                        set::AbstractAllocationSet)
+                        set::AbstractAllocationSet, ::Option{<:AbstractVector} = nothing)
     wh = price_adjusted_allocation(w, x)
     return st, project(alg.proj, set, wh, wh)
 end
@@ -119,7 +120,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     ConstantRebalancedPortfolio(;
-        w::Option{<:AbstractVector} = nothing,
+        w::Option{<:VecNum} = nothing,
         proj::EuclideanProjection = EuclideanProjection()
     ) -> ConstantRebalancedPortfolio
 
@@ -158,7 +159,7 @@ ConstantRebalancedPortfolio
 
 # References
 
-  - $(ref_dict[:cover1991])
+  - $(ref_dict[:cover1991]) Section 1, Equation 1.1.
 """
 @concrete struct ConstantRebalancedPortfolio <: AbstractOnlinePortfolioSelectionAlgorithm
     """
@@ -169,8 +170,7 @@ ConstantRebalancedPortfolio
     $(field_dict[:proj])
     """
     proj
-    function ConstantRebalancedPortfolio(w::Option{<:AbstractVector},
-                                         proj::EuclideanProjection)
+    function ConstantRebalancedPortfolio(w::Option{<:VecNum}, proj::EuclideanProjection)
         if !isnothing(w)
             assert_nonempty_nonneg_finite_val(w, :w)
             s = sum(w)
@@ -181,7 +181,7 @@ ConstantRebalancedPortfolio
         return new{typeof(w), typeof(proj)}(w, proj)
     end
 end
-function ConstantRebalancedPortfolio(; w::Option{<:AbstractVector} = nothing,
+function ConstantRebalancedPortfolio(; w::Option{<:VecNum} = nothing,
                                      proj::EuclideanProjection = EuclideanProjection())::ConstantRebalancedPortfolio
     return ConstantRebalancedPortfolio(w, proj)
 end
@@ -189,7 +189,8 @@ function port_opt_view(alg::ConstantRebalancedPortfolio, i, args...)
     return ConstantRebalancedPortfolio(; w = renormalised_view(alg.w, i), proj = alg.proj)
 end
 function online_update!(alg::ConstantRebalancedPortfolio, st, w::AbstractVector,
-                        x::AbstractVector, ::Any, set::AbstractAllocationSet)
+                        x::AbstractVector, ::Any, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
     q = isnothing(alg.w) ? fill(one(eltype(w)) / length(w), length(w)) : alg.w
     return st, project(alg.proj, set, q, price_adjusted_allocation(w, x))
 end
@@ -272,7 +273,7 @@ Where:
 
 At ``M = A_t`` and ``\\eta = 0`` this is the update of Figure 1 of [agarwal2006](@cite). [agarwal2006](@citet) mix the uniform allocation into the projected point, ``(1 - \\eta) \\boldsymbol{p}_t + \\eta \\boldsymbol{1} / N``. The rule mixes before the projection instead, so the answer stays in an Allocation Set whose bounds the uniform allocation breaks. On the simplex at ``\\eta = 0`` the two norms give one answer whenever ``\\delta A_t^{-1} \\boldsymbol{b}_t`` lies in the simplex.
 
-Theorem 1 of [agarwal2006](@cite) bounds the regret against the best constant rebalanced portfolio in hindsight. If the market variability is ``\\alpha > 0``, then ``\\eta = 0``, ``\\beta = \\alpha / (8 \\sqrt{N})`` and ``\\delta = 1`` give a regret of at most ``(10 N^{1.5} / \\alpha) \\log(N T / \\alpha^2)``. The rule at these values under the Gram norm is the algorithm of [agarwal2006](@cite), so the bound holds for it. With no assumption on the market, [agarwal2006](@citet) choose ``\\eta`` and ``\\beta`` from ``T`` and bound the regret by ``22 N^{1.25} \\sqrt{T \\log(N T)}``. That bound needs the mix after the projection of [agarwal2006](@cite), so the rule does not carry it. The package claims neither bound under the Euclidean default.
+Theorem 1 of [agarwal2006](@cite) bounds the regret against the best constant rebalanced portfolio in hindsight. If the market variability is ``\\alpha > 0``, then ``\\eta = 0``, ``\\beta = \\alpha / (8 \\sqrt{N})`` and ``\\delta = 1`` give a regret of at most ``(10 N^{1.5} / \\alpha) \\log(N T / \\alpha^2)``. The rule at these values under the Gram norm is the algorithm of [agarwal2006](@cite), so the bound holds for it. With no assumption on the market, [agarwal2006](@citet) choose ``\\eta`` and ``\\beta`` from ``T`` and bound the regret by ``22 N^{1.25} \\sqrt{T \\log(N T)}``. That bound needs the mix after the projection of [agarwal2006](@cite), so the rule does not carry it. For ``\\eta > 0`` the gradient of [agarwal2006](@cite) is taken at the point before the mix, and the rule takes it at the allocation that it played. The package claims neither bound under the Euclidean default.
 
 # Algorithm
 
@@ -294,7 +295,7 @@ $(DocStringExtensions.FIELDS)
         beta::Real = 1,
         delta::Real = 0.125,
         eta::Real = 0,
-        proj::Union{<:EuclideanProjection, <:GramProjection} = EuclideanProjection()
+        proj::Union{EuclideanProjection, GramProjection} = EuclideanProjection()
     ) -> NewtonStep
 
 Keywords correspond to the struct's fields. The defaults `beta = 1`, `delta = 1/8` and `eta = 0` are the values of the experiments of [agarwal2006](@cite). The `proj` slot takes the Gram geometry of Theorem 1 of [agarwal2006](@cite), or the Euclidean geometry.
@@ -325,7 +326,7 @@ NewtonStep
 
 # References
 
-  - $(ref_dict[:agarwal2006])
+  - $(ref_dict[:agarwal2006]) Section 3, Figure 1 and Theorem 1, Section 4 and Section 4.7.
 """
 @concrete struct NewtonStep <: AbstractOnlinePortfolioSelectionAlgorithm
     """
@@ -346,8 +347,7 @@ NewtonStep
     proj
     function NewtonStep(beta::T1, delta::T2, eta::T3,
                         proj::T4) where {T1 <: Real, T2 <: Real, T3 <: Real,
-                                         T4 <:
-                                         Union{<:EuclideanProjection, <:GramProjection}}
+                                         T4 <: Union{EuclideanProjection, GramProjection}}
         @argcheck(beta > zero(beta), DomainError(beta, "beta must be positive"))
         @argcheck(delta > zero(delta), DomainError(delta, "delta must be positive"))
         @argcheck(zero(eta) <= eta < one(eta), DomainError(eta, "eta must be in [0, 1)"))
@@ -355,19 +355,21 @@ NewtonStep
     end
 end
 function NewtonStep(; beta::Real = 1, delta::Real = 0.125, eta::Real = 0,
-                    proj::Union{<:EuclideanProjection, <:GramProjection} = EuclideanProjection())::NewtonStep
+                    proj::Union{EuclideanProjection, GramProjection} = EuclideanProjection())::NewtonStep
     return NewtonStep(beta, delta, eta, proj)
 end
 function projection_geometry(::NewtonStep)
     # The Start Allocation is projected at `A_0 = I`, where the Gram norm is the Euclidean.
     return EuclideanProjection()
 end
-function rule_state_seed(::NewtonStep, w::AbstractVector)
+function rule_state_seed(::NewtonStep, w::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
     N = length(w)
     return NewtonStepState(0, Matrix{eltype(w)}(LinearAlgebra.I, N, N), zeros(eltype(w), N))
 end
 function online_update!(alg::NewtonStep, st::NewtonStepState, w::AbstractVector,
-                        x::AbstractVector, ::Any, set::AbstractAllocationSet)
+                        x::AbstractVector, ::Any, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
     g = x ./ LinearAlgebra.dot(w, x)
     st.A .+= g * transpose(g)
     st.b .+= (1 + inv(alg.beta)) .* g
@@ -383,7 +385,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the step-length rules of the passive aggressive mean reversion rule.
 
-The three variants of [li2012pamr](@cite), [`NoSlack`](@ref), [`LinearSlack`](@ref) and [`QuadraticSlack`](@ref), differ in one formula for the step length ``\\tau_t``. [`PassiveAggressiveMeanReversion`](@ref) holds one of them in its `slack` field.
+The three variants of [li2012pamr](@cite), PAMR, PAMR-1 and PAMR-2, differ in one formula for the step length ``\\tau_t``. [`PassiveAggressiveMeanReversion`](@ref) holds the rule in its `slack` field: `nothing` for PAMR, [`LinearSlack`](@ref) for PAMR-1 and [`QuadraticSlack`](@ref) for PAMR-2.
 
 # Interfaces
 
@@ -405,7 +407,7 @@ To implement a new step-length rule, subtype `AbstractPassiveAggressiveSlack` an
 
 # Examples
 
-A rule that takes half the step of `NoSlack`.
+A rule that takes half the step of PAMR, the step of `slack = nothing`.
 
 ```jldoctest
 julia> struct HalfSlack <: PortfolioOptimisers.AbstractPassiveAggressiveSlack end
@@ -423,7 +425,6 @@ HalfSlack()
 
 # Related
 
-  - [`NoSlack`](@ref)
   - [`LinearSlack`](@ref)
   - [`QuadraticSlack`](@ref)
   - [`PassiveAggressiveMeanReversion`](@ref)
@@ -431,55 +432,13 @@ HalfSlack()
 
 # References
 
-  - $(ref_dict[:li2012pamr])
+  - $(ref_dict[:li2012pamr]) Pages 221–258. $(ref_dict[:no_original_source])
 """
 abstract type AbstractPassiveAggressiveSlack <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Takes the full step that brings the hinge loss of the period to zero, the step-length rule of PAMR.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\tau_t &= \\frac{\\ell_t}{\\lVert \\boldsymbol{x}_t - \\bar{x}_t \\boldsymbol{1} \\rVert^2}\\,.
-\\end{align}
-```
-
-Where:
-
-  - $(math_dict[:tau_t_pa])
-  - $(math_dict[:ell_t_pa])
-  - $(math_dict[:xbar_t_pa])
-  - $(math_dict[:x_t_rel])
-  - $(math_dict[:w_t_iter])
-  - $(math_dict[:eps_cw])
-  - $(math_dict[:t_period])
-
-It is the limit of the steps of [`LinearSlack`](@ref) and [`QuadraticSlack`](@ref) as ``C \\to \\infty``.
-
-# Examples
-
-```jldoctest
-julia> NoSlack()
-NoSlack()
-```
-
-# Related
-
-  - [`AbstractPassiveAggressiveSlack`](@ref)
-  - [`PassiveAggressiveMeanReversion`](@ref)
-
-# References
-
-  - $(ref_dict[:li2012pamr])
-"""
-struct NoSlack <: AbstractPassiveAggressiveSlack end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Caps the step of `NoSlack` at the aggressiveness `C`, the step-length rule of PAMR-1.
+Caps the step of PAMR, the step of `slack = nothing`, at the aggressiveness `C`, the step-length rule of PAMR-1.
 
 # Mathematical definition
 
@@ -528,11 +487,11 @@ LinearSlack
 
   - [`AbstractPassiveAggressiveSlack`](@ref)
   - [`PassiveAggressiveMeanReversion`](@ref)
-  - [`NoSlack`](@ref): the limit as ``C \\to \\infty``.
+  - [`passive_aggressive_step`](@ref): the step of `nothing` is the limit as ``C \\to \\infty``.
 
 # References
 
-  - $(ref_dict[:li2012pamr])
+  - $(ref_dict[:li2012pamr]) Pages 221–258. $(ref_dict[:no_original_source])
 """
 @concrete struct LinearSlack <: AbstractPassiveAggressiveSlack
     """
@@ -550,7 +509,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Softens the step of `NoSlack` by adding `1 / (2C)` to its denominator, the step-length rule of PAMR-2.
+Softens the step of PAMR, the step of `slack = nothing`, by adding `1 / (2C)` to its denominator, the step-length rule of PAMR-2.
 
 # Mathematical definition
 
@@ -599,11 +558,11 @@ QuadraticSlack
 
   - [`AbstractPassiveAggressiveSlack`](@ref)
   - [`PassiveAggressiveMeanReversion`](@ref)
-  - [`NoSlack`](@ref): the limit as ``C \\to \\infty``.
+  - [`passive_aggressive_step`](@ref): the step of `nothing` is the limit as ``C \\to \\infty``.
 
 # References
 
-  - $(ref_dict[:li2012pamr])
+  - $(ref_dict[:li2012pamr]) Pages 221–258. $(ref_dict[:no_original_source])
 """
 @concrete struct QuadraticSlack <: AbstractPassiveAggressiveSlack
     """
@@ -619,17 +578,19 @@ function QuadraticSlack(; C::Real = 500)::QuadraticSlack
     return QuadraticSlack(C)
 end
 """
-    passive_aggressive_step(::NoSlack, loss::Real, denom::Real)
+    passive_aggressive_step(::Nothing, loss::Real, denom::Real)
     passive_aggressive_step(slack::LinearSlack, loss::Real, denom::Real)
     passive_aggressive_step(slack::QuadraticSlack, loss::Real, denom::Real)
 
 Returns the step length of a passive-aggressive update under each step-length rule.
 
+`nothing` takes the full step that brings the hinge loss of the period to zero, the step-length rule of PAMR. It is the limit of the steps of [`LinearSlack`](@ref) and [`QuadraticSlack`](@ref) as ``C \\to \\infty``. Section 3.3.2 of [lihoi2014](@cite) restates the problem of this step as Equation 7, with the closed form of ``\\tau_t``.
+
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\tau_t &= \\frac{\\ell_t}{\\lVert \\boldsymbol{x}_t - \\bar{x}_t \\boldsymbol{1} \\rVert^2} && \\text{under } \\mathrm{NoSlack}\\,, \\\\
+\\tau_t &= \\frac{\\ell_t}{\\lVert \\boldsymbol{x}_t - \\bar{x}_t \\boldsymbol{1} \\rVert^2} && \\text{under } \\mathrm{nothing}\\,, \\\\
 \\tau_t &= \\min\\left( C, \\frac{\\ell_t}{\\lVert \\boldsymbol{x}_t - \\bar{x}_t \\boldsymbol{1} \\rVert^2} \\right) && \\text{under } \\mathrm{LinearSlack}\\,, \\\\
 \\tau_t &= \\frac{\\ell_t}{\\lVert \\boldsymbol{x}_t - \\bar{x}_t \\boldsymbol{1} \\rVert^2 + \\frac{1}{2C}} && \\text{under } \\mathrm{QuadraticSlack}\\,.
 \\end{align}
@@ -648,13 +609,20 @@ Where:
 
 # Arguments
 
-  - `slack`: The step-length rule.
+  - `slack`: The step-length rule, or `nothing` for PAMR.
   - `loss`: ``\\ell_t``, the hinge loss of the period, non-negative.
   - `denom`: ``\\lVert \\boldsymbol{x}_t - \\bar{x}_t \\boldsymbol{1} \\rVert^2``, the squared norm of the centred price relative, positive.
 
 # Returns
 
   - `tau::Real`: The step length ``\\tau_t``.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.passive_aggressive_step(nothing, 0.2, 0.1)
+2.0
+```
 
 # Related
 
@@ -663,9 +631,10 @@ Where:
 
 # References
 
-  - $(ref_dict[:li2012pamr])
+  - $(ref_dict[:li2012pamr]) Pages 221–258. $(ref_dict[:no_original_source])
+  - $(ref_dict[:lihoi2014]) Section 3.3.2, Equation 7.
 """
-function passive_aggressive_step(::NoSlack, loss::Real, denom::Real)
+function passive_aggressive_step(::Nothing, loss::Real, denom::Real)
     return loss / denom
 end
 function passive_aggressive_step(slack::LinearSlack, loss::Real, denom::Real)
@@ -707,9 +676,9 @@ Where:
 
 The step length ``\\tau_t`` is the step of the step-length rule. It is zero when every entry of ``\\boldsymbol{x}_t`` is equal, because then ``\\lVert \\boldsymbol{x}_t - \\bar{x}_t \\boldsymbol{1} \\rVert = 0``. [li2012pamr](@citet) set it to zero in that case too.
 
-The entries of ``\\boldsymbol{x}_t - \\bar{x}_t \\boldsymbol{1}`` sum to zero, so ``\\boldsymbol{q}`` keeps the budget of one. Under [`NoSlack`](@ref) with ``\\ell_t > 0``, the gross return of ``\\boldsymbol{q}`` over period ``t`` is exactly ``\\epsilon``. So, by Proposition 1 of [li2012pamr](@cite), ``\\boldsymbol{q}`` solves the first problem of [li2012pamr](@cite) without the non-negativity constraint. The projection onto the simplex is the normalisation step of Algorithm 1 of [li2012pamr](@cite).
+The entries of ``\\boldsymbol{x}_t - \\bar{x}_t \\boldsymbol{1}`` sum to zero, so ``\\boldsymbol{q}`` keeps the budget of one. Under `slack = nothing` with ``\\ell_t > 0``, the gross return of ``\\boldsymbol{q}`` over period ``t`` is exactly ``\\epsilon``. So, by Proposition 1 of [li2012pamr](@cite), ``\\boldsymbol{q}`` solves the first problem of [li2012pamr](@cite) without the non-negativity constraint. The projection onto the simplex is the normalisation step of Algorithm 1 of [li2012pamr](@cite).
 
-[li2012pamr](@citet) take ``\\epsilon \\geq 0``. The experiments of [li2012pamr](@cite) choose ``\\epsilon \\leq 1`` because the gross return of a period is near one. With a threshold above one, the rule moves only after a period whose gross return is above the threshold.
+Section 3.3.2 of [lihoi2014](@cite) restates the problem of PAMR as Equation 7, with ``0 \\leq \\epsilon \\leq 1``. [li2012pamr](@citet) take ``\\epsilon \\geq 0``. The experiments of [li2012pamr](@cite) choose ``\\epsilon \\leq 1`` because the gross return of a period is near one. With a threshold above one, the rule moves only after a period whose gross return is above the threshold.
 
 # Algorithm
 
@@ -728,11 +697,11 @@ $(DocStringExtensions.FIELDS)
 
     PassiveAggressiveMeanReversion(;
         eps::Real = 0.5,
-        slack::AbstractPassiveAggressiveSlack = NoSlack(),
+        slack::Option{<:AbstractPassiveAggressiveSlack} = nothing,
         proj::EuclideanProjection = EuclideanProjection()
     ) -> PassiveAggressiveMeanReversion
 
-Keywords correspond to the struct's fields. `NoSlack()`, `LinearSlack(; C)` and `QuadraticSlack(; C)` are PAMR, PAMR-1 and PAMR-2 of [li2012pamr](@cite). The default `eps = 0.5` is the value of the experiments of [li2012pamr](@cite).
+Keywords correspond to the struct's fields. `nothing`, `LinearSlack(; C)` and `QuadraticSlack(; C)` are PAMR, PAMR-1 and PAMR-2 of [li2012pamr](@cite). The default `eps = 0.5` is the value of the experiments of [li2012pamr](@cite).
 
 ## Validation
 
@@ -744,7 +713,7 @@ Keywords correspond to the struct's fields. `NoSlack()`, `LinearSlack(; C)` and 
 julia> PassiveAggressiveMeanReversion()
 PassiveAggressiveMeanReversion
     eps ┼ Float64: 0.5
-  slack ┼ NoSlack()
+  slack ┼ nothing
    proj ┴ EuclideanProjection()
 ```
 
@@ -759,6 +728,7 @@ PassiveAggressiveMeanReversion
 # References
 
   - $(ref_dict[:li2012pamr])
+  - $(ref_dict[:lihoi2014]) Section 3.3.2, Equation 7. $(ref_dict[:no_original_source])
 """
 @concrete struct PassiveAggressiveMeanReversion <: AbstractOnlinePortfolioSelectionAlgorithm
     """
@@ -766,7 +736,7 @@ PassiveAggressiveMeanReversion
     """
     eps
     """
-    The step-length rule. It is one of the three variants of [li2012pamr](@cite).
+    The step-length rule, or `nothing` for PAMR. It is one of the three variants of [li2012pamr](@cite).
     """
     slack
     """
@@ -774,19 +744,20 @@ PassiveAggressiveMeanReversion
     """
     proj
     function PassiveAggressiveMeanReversion(eps::Real,
-                                            slack::AbstractPassiveAggressiveSlack,
+                                            slack::Option{<:AbstractPassiveAggressiveSlack},
                                             proj::EuclideanProjection)
         @argcheck(eps >= zero(eps), DomainError(eps, "eps must be non-negative"))
         return new{typeof(eps), typeof(slack), typeof(proj)}(eps, slack, proj)
     end
 end
 function PassiveAggressiveMeanReversion(; eps::Real = 0.5,
-                                        slack::AbstractPassiveAggressiveSlack = NoSlack(),
+                                        slack::Option{<:AbstractPassiveAggressiveSlack} = nothing,
                                         proj::EuclideanProjection = EuclideanProjection())::PassiveAggressiveMeanReversion
     return PassiveAggressiveMeanReversion(eps, slack, proj)
 end
 function online_update!(alg::PassiveAggressiveMeanReversion, st, w::AbstractVector,
-                        x::AbstractVector, ::Any, set::AbstractAllocationSet)
+                        x::AbstractVector, ::Any, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
     dev = x .- Statistics.mean(x)
     denom = sum(abs2, dev)
     loss = max(zero(eltype(w)), LinearAlgebra.dot(w, x) - alg.eps)
@@ -884,7 +855,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Makes every first-order expert of a mixture read its gradient at the blend that the mixture played, while it steps from its own iterate.
 
-This is the shared gradient of Algorithm 4 of [zhang2018ader](@cite) and of Algorithm 2 of [zhao2020sword](@cite). [zhang2018ader](@citet) and [zhao2020sword](@citet) state their dynamic-regret bounds on it. [`Ader`](@ref) and [`Sword`](@ref) build the mixture on it. The mixture passes the blend through the seven-argument [`online_update!`](@ref). [`MirrorDescent`](@ref), [`OptimisticStep`](@ref) and [`AdaptiveSubgradient`](@ref) read it, and the hint of `OptimisticStep` stays the hint of its predictor. A rule with no gradient takes its six-argument update and ignores the point.
+This is the shared gradient of the improved Ader of Section 3.4 of [zhang2018ader](@cite): the meta-algorithm sends the gradient at the blend to every expert (Algorithm 3, Step 9, and Algorithm 4, Step 4). The experts of [zhao2020sword](@citet) read the gradient at their own iterates (Algorithms 2 and 4), and that work reads the gradient at the blend only for the linearised loss of its meta-algorithm (Equations 10 and 13). So the choice of this point for [`Sword`](@ref) is a choice of the library. [`Ader`](@ref) and [`Sword`](@ref) build the mixture on it. The mixture passes the blend through the last slot of [`online_update!`](@ref). [`MirrorDescent`](@ref) and [`AdaptiveSubgradient`](@ref) read it. The hint of a [`MirrorDescent`](@ref) rule with a `predictor` stays the hint of its predictor. A rule with no gradient ignores the point.
 
 # Mathematical definition
 
@@ -914,13 +885,12 @@ BlendPoint()
   - [`ExpertMixture`](@ref)
   - [`OwnPoint`](@ref)
   - [`MirrorDescent`](@ref)
-  - [`OptimisticStep`](@ref)
   - [`AdaptiveSubgradient`](@ref)
 
 # References
 
-  - $(ref_dict[:zhang2018ader])
-  - $(ref_dict[:zhao2020sword])
+  - $(ref_dict[:zhang2018ader]) Section 3.4, Algorithms 3 and 4.
+  - $(ref_dict[:zhao2020sword]) Algorithms 2 and 4, Equations 10 and 13.
 """
 struct BlendPoint <: AbstractAlgorithm end
 """
@@ -977,7 +947,7 @@ Under [`BlendPoint`](@ref) with [`ExponentiatedGradient`](@ref) as the weighting
  1. Compute `r`, the expert-return vector, from the held allocations `st.h`. `st` is the state of the rule: what the rule keeps from one update to the next, here an [`ExpertMixtureState`](@ref).
  2. Compute `point`, the Gradient Point, with [`gradient_point`](@ref).
  3. Take the Online Update of every expert from its own state and allocation, with `point`. Store the new state and allocation in `st.st` and `st.h`.
- 4. Resolve the Expert Set with [`expert_allocation_set`](@ref). Take the Online Update of the weighting from `st.pst` and `st.p`, on `r`, over that set, giving `pst` and `p`.
+ 4. Resolve the Expert Set with [`resolve_allocation_set`](@ref). Take the Online Update of the weighting from `st.pst` and `st.p`, on `r`, over that set, giving `pst` and `p`.
  5. Compute the blend `q`, the sum of `p[k] .* h` over the experts.
  6. Project `q` onto `set` with [`blend_projection`](@ref) in `alg.proj`, from the Price-Adjusted Allocation of `w` over `x`, giving `wn`.
  7. Return a new state of the rule with the count raised by one, which holds the new `pst` and `p`, and `wn`.
@@ -1047,11 +1017,11 @@ ExpertMixture
 
 # References
 
-  - $(ref_dict[:lihoi2014])
-  - $(ref_dict[:cover1991])
+  - $(ref_dict[:lihoi2014]) Section 3.5.2.
+  - $(ref_dict[:cover1991]) Section 1, Equations 1.3 and 1.6.
   - $(ref_dict[:coverordentlich1996])
-  - $(ref_dict[:zhang2018ader])
-  - $(ref_dict[:zhao2020sword])
+  - $(ref_dict[:zhang2018ader]) Section 3.4, Equation 12 and Algorithms 3 and 4.
+  - $(ref_dict[:zhao2020sword]) Algorithms 1 and 2, Equations 10 and 13.
 """
 @concrete struct ExpertMixture <: AbstractOnlinePortfolioSelectionAlgorithm
     """
@@ -1109,9 +1079,8 @@ function ExpertMixture(;
     return ExpertMixture(experts, alg, eset, proj, grad, p0)
 end
 function port_opt_view(alg::ExpertMixture, i, args...)
-    return ExpertMixture(; experts = [port_opt_view(e, i, args...) for e in alg.experts],
-                         alg = alg.alg, eset = alg.eset, proj = alg.proj, grad = alg.grad,
-                         p0 = alg.p0)
+    return rebuild_struct(alg,
+                          (; experts = [port_opt_view(e, i, args...) for e in alg.experts]))
 end
 function assert_rule_admits_set(alg::ExpertMixture, set::AbstractAllocationSet)::Nothing
     for e in alg.experts
@@ -1149,7 +1118,7 @@ The start is `p0`, or the uniform weights when `p0` is `nothing`. The projection
 
  1. Set `p0` to `alg.p0`, or to the uniform vector of length `K` in `datatype` when `alg.p0` is `nothing`.
  2. When `alg.p0` and `alg.eset` are both `nothing`, return `p0`.
- 3. Otherwise, resolve the Expert Set with [`expert_allocation_set`](@ref). Project `p0` onto it in the geometry of `alg.alg`, from `p0`, and return the projection.
+ 3. Otherwise, resolve the Expert Set with [`resolve_allocation_set`](@ref). Project `p0` onto it in the geometry of `alg.alg`, from `p0`, and return the projection.
 
 # Arguments
 
@@ -1164,13 +1133,13 @@ The start is `p0`, or the uniform weights when `p0` is `nothing`. The projection
 # Related
 
   - [`ExpertMixture`](@ref)
-  - [`expert_allocation_set`](@ref)
+  - [`resolve_allocation_set`](@ref)
   - [`project`](@ref)
 """
 function expert_start_weights(alg::ExpertMixture, K::Integer, datatype::DataType)
     p0 = something(alg.p0, fill(one(datatype) / K, K))
     return project(projection_geometry(alg.alg),
-                   expert_allocation_set(alg.eset, K, datatype), p0, p0)
+                   resolve_allocation_set(alg.eset, K, false, datatype), p0, p0)
 end
 # No start and no set: the uniform start needs no projection.
 function expert_start_weights(::ExpertMixture{<:Any, <:Any, Nothing, <:Any, <:Any, Nothing},
@@ -1214,7 +1183,8 @@ function expert_start_allocation(alg::ConstantRebalancedPortfolio, w::AbstractVe
     return promote_type(eltype(w), eltype(alg.w)).(alg.w)
 end
 function online_update!(alg::ExpertMixture, st::ExpertMixtureState, w::AbstractVector,
-                        x::AbstractVector, rows, set::AbstractAllocationSet)
+                        x::AbstractVector, rows, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
     r = [LinearAlgebra.dot(h, x) for h in st.h]
     point = gradient_point(alg.grad, w)
     for (k, e) in enumerate(alg.experts)
@@ -1222,7 +1192,7 @@ function online_update!(alg::ExpertMixture, st::ExpertMixtureState, w::AbstractV
     end
     # The weighting moves on the Expert Set, the bare simplex over the experts by default.
     pst, p = online_update!(alg.alg, st.pst, st.p, r, nothing,
-                            expert_allocation_set(alg.eset, length(r), eltype(w)))
+                            resolve_allocation_set(alg.eset, length(r), false, eltype(w)))
     q = zeros(eltype(w), length(w))
     for (k, h) in enumerate(st.h)
         q .+= p[k] .* h
@@ -1235,9 +1205,9 @@ end
     gradient_point(grad::OwnPoint, w::AbstractVector)
     gradient_point(grad::BlendPoint, w::AbstractVector)
 
-Returns the Gradient Point that an [`ExpertMixture`](@ref) passes to its experts through the seven-argument [`online_update!`](@ref).
+Returns the Gradient Point that an [`ExpertMixture`](@ref) passes to its experts through the last slot of [`online_update!`](@ref).
 
-Under [`OwnPoint`](@ref) the point is `nothing`, so every expert takes its own six-argument update. Under [`BlendPoint`](@ref) it is the blend `w` that the mixture played.
+Under [`OwnPoint`](@ref) the point is `nothing`, so every expert reads its gradient at its own point. Under [`BlendPoint`](@ref) it is the blend `w` that the mixture played.
 
 # Arguments
 
@@ -1258,36 +1228,6 @@ function gradient_point(::OwnPoint, ::AbstractVector)
 end
 function gradient_point(::BlendPoint, w::AbstractVector)
     return w
-end
-"""
-    expert_allocation_set(eset::Nothing, K::Integer, datatype::DataType)
-    expert_allocation_set(eset::BoundedAllocationSet, K::Integer, datatype::DataType)
-
-Resolves the Expert Set over `K` experts.
-
-A mixture that holds no Expert Set gets the bare simplex over the experts. A mixture that holds one gets its bounds, a scalar bound broadcast over the experts and a vector bound read with one entry per expert.
-
-# Arguments
-
-  - `eset`: The Expert Set of the mixture, or `nothing`.
-  - `K`: The number of experts.
-  - `datatype`: The numeric type of the bounds.
-
-# Returns
-
-  - `set::BoundedAllocationSet`: The resolved Expert Set.
-
-# Related
-
-  - [`ExpertMixture`](@ref)
-  - [`BoundedAllocationSet`](@ref)
-  - [`resolve_allocation_set`](@ref)
-"""
-function expert_allocation_set(::Nothing, K::Integer, datatype::DataType)
-    return resolve_allocation_set(BoundedAllocationSet(), K, false, datatype)
-end
-function expert_allocation_set(eset::BoundedAllocationSet, K::Integer, datatype::DataType)
-    return resolve_allocation_set(eset, K, false, datatype)
 end
 """
     UniversalPortfolio(;
@@ -1383,9 +1323,9 @@ julia> length(up.experts)
 
 # References
 
-  - $(ref_dict[:cover1991])
+  - $(ref_dict[:cover1991]) Section 1, Equations 1.3 and 1.7, and Section 8.
   - $(ref_dict[:coverordentlich1996])
-  - $(ref_dict[:agarwal2006])
+  - $(ref_dict[:agarwal2006]) Section 4 and Section 4.7.
 """
 function UniversalPortfolio(; N::Integer, n_experts::Integer = 2000, alpha::Num_VecNum = 1,
                             rng::Random.AbstractRNG = Random.default_rng(),
@@ -1408,7 +1348,7 @@ function UniversalPortfolio(; N::Integer, n_experts::Integer = 2000, alpha::Num_
     experts = [ConstantRebalancedPortfolio(; w = B[:, k], proj = proj) for k in 1:n_experts]
     return ExpertMixture(; experts = experts, alg = alg, eset = eset)
 end
-export BuyAndHold, ConstantRebalancedPortfolio, NewtonStep, NoSlack, LinearSlack,
-       QuadraticSlack, PassiveAggressiveMeanReversion, OwnPoint, BlendPoint, ExpertMixture,
+export BuyAndHold, ConstantRebalancedPortfolio, NewtonStep, LinearSlack, QuadraticSlack,
+       PassiveAggressiveMeanReversion, OwnPoint, BlendPoint, ExpertMixture,
        UniversalPortfolio
 public AbstractPassiveAggressiveSlack, passive_aggressive_step

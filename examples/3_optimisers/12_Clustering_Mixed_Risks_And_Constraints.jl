@@ -114,7 +114,7 @@ column follows that measure and the `Min` column follows the other. The next plo
 eight allocations of sections 2 and 3.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 plot_stacked_bar_composition([hrp_sum, hrp_max, hrp_min, hrp_lse, herc_sum, herc_max,
                               herc_min, herc_lse], rd)
 

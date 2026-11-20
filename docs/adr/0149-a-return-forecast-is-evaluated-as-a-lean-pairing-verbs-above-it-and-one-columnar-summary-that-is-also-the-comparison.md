@@ -543,3 +543,17 @@ The oracle states the plain statistic. The parity fixtures of `test_08x` and `te
 t-statistic pass `mt = OverlapMeanTest()`, and new testsets pin the default against a hand
 computation, the bootstrap against a computation draw by draw on both paths, the interval against
 the p-value, and the size against a no-skill series that is persistent past the overlap.
+
+## Amendment (2026-11-02)
+
+**The summary of one evaluation gives scalar fields.** The decision *One columnar summary is also
+the comparison* made a single evaluation the length-1 case of the summary.
+[ADR 0227](0227-a-performance-summary-gives-one-entry-for-each-series-and-its-shape-follows-the-type-of-the-input.md)
+states one rule for every columnar summary of the library: the shape follows the type of the
+input. `forecast_evaluation_summary(fe)` now gives scalar fields, equal to entry 1 of the vector
+method on `[fe]`, and each quantile spread becomes a vector over the tail fractions. The vector
+method gives vectors, also for a vector of one. `covariance_forecast_summary(cfer)` takes the same
+rule. The summary is still the comparison: a vector of evaluations is one call, and a caller who
+wants a table of one evaluation passes `[fe]`. Issue
+[#1934](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1934) made the change. It
+breaks the two released methods for one item, because a length-1 vector became a scalar.

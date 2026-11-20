@@ -22,7 +22,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ### Returns
 
-  - `L::Array{<:Real}`: The Factor Exposure, `observations × assets` for a member producing one factor, `observations × assets × factors` for a member expanding one Panel Field into many, `NaN` wherever the active mask is `false`.
+  - `L::Array{<:Real}`: The Factor Exposure, `observations × assets` for a member producing one factor, `assets × factors × observations` for a member expanding one Panel Field into many, `NaN` wherever the active mask is `false`.
 
 ## `lookback` (optional)
 
@@ -48,7 +48,7 @@ abstract type AbstractExposureEstimator <: AbstractEstimator end
 
 Compute the Factor Exposure of a [`ReturnsResult`](@ref).
 
-This is the verb every Exposure Estimator answers. A member that produces one factor returns an `observations × assets` matrix, and a member that expands one Panel Field into many returns an `observations × assets × factors` array. Every member follows two conventions: the value at an observation uses information up to and including that observation, and every cell where the active mask of the Asset Panel is `false` is `NaN`.
+This is the verb every Exposure Estimator answers. A member that produces one factor returns an `observations × assets` matrix, and a member that expands one Panel Field into many returns an `assets × factors × observations` array. Every member follows two conventions: the value at an observation uses information up to and including that observation, and every cell where the active mask of the Asset Panel is `false` is `NaN`.
 
 [`DerivedExposure`](@ref) reads the exposure of another factor, so it answers a three-argument method and refuses this one. The caller that holds the factor list computes the factors in dependency order and passes the source exposure.
 
@@ -149,7 +149,7 @@ function exposure_benchmark_weights(rd::ReturnsResult, name::AbstractString;
         t = minimum(first, blank)
         nx = [rd.nx[last(k)] for k in blank if first(k) == t]
         strict_diagnostic("the benchmark weight \"$name\" is not finite on $(length(blank)) active cell(s) of the Asset Panel, first at observation $t for the assets $nx. An active cell is in the estimation set of its observation, so the weight is unknown there, and it reads as zero, which takes the asset out of that set. Fill the Panel Field, or set the active mask to false where the asset carries no weight. Under strict = true such a cell raises this message as an error.",
-                          strict)
+                          strict; id = @log_id(name))
     end
     return W
 end
@@ -194,77 +194,6 @@ function exposure_weight_fill!(W::AbstractMatrix{<:Real},
     return blank
 end
 """
-    exposure_group_labels(rd::ReturnsResult, group::Nothing) -> nothing
-    exposure_group_labels(rd::ReturnsResult, group::AbstractString) -> Matrix{Int}
-
-Return the group labels the cross-sectional transforms of an exposure partition each observation by.
-
-A member that names no grouping field transforms each observation as one cross-section, and a member that names one transforms each group of the observation on its own.
-
-# Arguments
-
-  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
-  - `group`: Name of the categorical Panel Field to group by, or `nothing`.
-
-# Validation
-
-  - The rules of [`cross_sectional_groups`](@ref).
-
-# Returns
-
-  - `groups::Option{<:Matrix{Int}}`: The group labels, `observations × assets`, or `nothing`.
-
-# Related
-
-  - [`CompositeExposure`](@ref)
-  - [`DerivedExposure`](@ref)
-  - [`cross_sectional_groups`](@ref)
-  - [`CS_MISSING_GROUP`](@ref)
-"""
-function exposure_group_labels(::ReturnsResult, ::Nothing)::Nothing
-    return nothing
-end
-function exposure_group_labels(rd::ReturnsResult, group::AbstractString)::Matrix{Int}
-    return cross_sectional_groups(rd.pnl, group)
-end
-"""
-    exposure_transform(ct::Nothing, X::MatNum, w::Option{<:MatNum},
-                       groups::Option{<:AbstractMatrix{<:Integer}}) -> MatNum
-    exposure_transform(ct::AbstractCrossSectionalTransform, X::MatNum, w::Option{<:MatNum},
-                       groups::Option{<:AbstractMatrix{<:Integer}}) -> Matrix{<:Real}
-
-Apply one optional cross-sectional transform slot of an Exposure Estimator.
-
-An exposure holds its outlier slot and its scoring slot as `Option{<:AbstractCrossSectionalTransform}`, where `nothing` says that the step is skipped. This is the one place that reading is written, so a member states its two slots and never its two branches.
-
-# Arguments
-
-  - `ct`: The cross-sectional transform, or `nothing`.
-  - `X`: Data matrix `observations × assets`.
-  - `w`: Benchmark weight matrix `observations × assets`, or `nothing`.
-  - `groups`: Group label matrix `observations × assets`, or `nothing`.
-
-# Returns
-
-  - `Y::MatNum`: `X` itself when `ct` is `nothing`, the transformed matrix otherwise.
-
-# Related
-
-  - [`CompositeExposure`](@ref)
-  - [`DerivedExposure`](@ref)
-  - [`cross_sectional_transform`](@ref)
-  - [`AbstractCrossSectionalTransform`](@ref)
-"""
-function exposure_transform(::Nothing, X::MatNum, ::Option{<:MatNum},
-                            ::Option{<:AbstractMatrix{<:Integer}})::MatNum
-    return X
-end
-function exposure_transform(ct::AbstractCrossSectionalTransform, X::MatNum,
-                            w::Option{<:MatNum},
-                            groups::Option{<:AbstractMatrix{<:Integer}})::MatNum
-    return cross_sectional_transform(ct, X; w = w, groups = groups)
-end
-"""
     exposure_active_fill!(L::AbstractMatrix{<:Number}, pnl::AssetPanel) -> nothing
     exposure_active_fill!(L::AbstractArray{<:Number, 3}, pnl::AssetPanel) -> nothing
 
@@ -274,12 +203,12 @@ An asset that is not listed at an observation has no Factor Exposure there, what
 
 # Arguments
 
-  - `L`: The Factor Exposure, `observations × assets` or `observations × assets × factors`, changed in place. Its element type must hold `NaN`.
+  - `L`: The Factor Exposure, `observations × assets` or `assets × factors × observations`, changed in place. Its element type must hold `NaN`.
   - `pnl`: The Asset Panel whose active mask is read.
 
 # Validation
 
-  - The first two axes of `L` match the active mask. Raises a `DimensionMismatch`.
+  - The asset axis and the observation axis of `L` match the active mask. Raises a `DimensionMismatch`.
   - `eltype(L)` holds `NaN`, through [`nan_fill_value`](@ref). Raises an `ArgumentError`.
 
 # Returns
@@ -298,11 +227,11 @@ function exposure_active_fill!(L::AbstractMatrix{<:Number}, pnl::AssetPanel)::No
 end
 function exposure_active_fill!(L::AbstractArray{<:Number, 3}, pnl::AssetPanel)::Nothing
     amsk = pnl.amsk
-    @argcheck(size(L)[1:2] == size(amsk),
-              DimensionMismatch("a one-hot Factor Exposure is observations × assets × factors, so its first two axes must match the active mask of the Asset Panel, got size(L) = $(size(L)) and size(pnl.amsk) = $(size(amsk))"))
+    @argcheck((size(L, 3), size(L, 1)) == size(amsk),
+              DimensionMismatch("a one-hot Factor Exposure is assets × factors × observations, so its asset axis and its observation axis must match the active mask of the Asset Panel, got size(L) = $(size(L)) and size(pnl.amsk) = $(size(amsk))"))
     nan = nan_fill_value(L)
     for k in CartesianIndices(L)
-        if !amsk[k[1], k[2]]
+        if !amsk[k[3], k[1]]
             L[k] = nan
         end
     end

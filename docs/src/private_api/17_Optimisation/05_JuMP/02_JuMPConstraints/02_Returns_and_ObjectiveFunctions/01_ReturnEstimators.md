@@ -9,9 +9,12 @@ VecJRE
 JRE_VecJRE
 ArithRetMu
 resolve_deferred_quantities(rt::ArithmeticReturn, pr::AbstractPriorResult)
-no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool)
-no_bounds_returns_settings
+no_bounds_returns_estimator
+resolved_expected_return
+ucs_expected_return
+ucs_returns_estimator
 unit_scale_returns_estimator
+no_return_expr_returns_estimator
 no_bounds_optimiser
 PortfolioOptimisers.reader_frames(::ArithmeticReturn, ::AbstractString, ::Bool)
 ```

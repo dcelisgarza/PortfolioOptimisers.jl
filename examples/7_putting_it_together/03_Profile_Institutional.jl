@@ -29,7 +29,7 @@ three shape this mandate's choices.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, HiGHS,
-      StatsPlots, GraphRecipes
+      StatsPlots
 
 resfmt = (v, i, j) -> begin
     return if j == 1
@@ -100,7 +100,7 @@ of the next section. The tracking error does not show in either table.
 
 The mandate invests \$10,000,000. We round the target to whole shares with
 [`DiscreteAllocation`](@ref), which solves a mixed-integer problem in
-[HiGHS](https://github.com/jump-dev/HiGHS.jl). The title of the table prints the cash left over,
+[HiGHS](https://jump.dev/JuMP.jl/stable/packages/HiGHS/). The title of the table prints the cash left over,
 the cost of rounding to whole shares.
 =#
 

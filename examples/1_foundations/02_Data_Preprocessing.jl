@@ -213,7 +213,7 @@ A heatmap of the missing prices shows the three kinds of gap. The wide band is a
 listing, the short block is asset 2's halt, and the scattered dots are the single-day gaps.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 heatmap(1:N, 1:T, Float64.(ismissing.(vals)); xlabel = "Asset", ylabel = "Day",
         colorbar_title = "missing", title = "Missing prices by asset and day", yflip = true)
 

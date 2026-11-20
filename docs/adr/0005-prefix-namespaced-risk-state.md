@@ -145,3 +145,42 @@ and as a bound the tracking stays one-sided; that defect is outside this decisio
 present removed it. A head that minimises a variance builds the programme it built before.
 `test/test_27_prefix_registration.jl` covers the owner, the nested chain and each role, and
 `test/test_67b_constrained_update.jl` covers the set's ceilings in both models.
+
+## Amendment (2026-11-13): a later Constraint Block takes the namespace `blk_i_`, and `:aset_` is gone
+
+The amendment of 2026-09-24 names one more build that registers weights that it did not make: a
+programme Allocation Set in a leader's model, under `:aset_`. That prefix is gone.
+[ADR 0237](0237-a-constraint-block-holds-the-feasible-set-of-a-programme-and-the-entry-of-a-head-takes-a-list-of-blocks.md)
+gives the model of a JuMP head a list of Constraint Blocks. Block `i` after the first takes the
+Model State namespace `blk_i_`, so the set of a leader re-solve takes `blk_2_` (#2044, #2047).
+Phase 1 of the builder registers the weights of the model under that namespace with
+`w_owner = Symbol("")`. So `weights_prefix` keeps `W`, `variance_flag` and `rc_variance` with the
+weights, as the amendment of 2026-09-24 decided. Every builder with a fixed name takes the prefix
+of its block (#2041). The rule of the owner does not change.
+
+## Amendment (2026-11-16): a semidefinite phylogeny marks the weights
+
+The marks of the weights take a third entry, `sdp_phylogeny`. Phase 1 of each Constraint Block
+sets it on `weights_prefix` with `mark_sdp_phylogeny!` when the phylogeny `plr` of the block holds a
+`SemiDefinitePhylogeny`, and `sdp_variance_flag!` reads it beside `rc_variance`. So every
+variance on the weights takes the semidefinite formulation when any block on them holds a
+semidefinite phylogeny, and not only when the block of its own builder holds one (#2126).
+
+`assemble_jump_model!` also marks each block after the first before phase 1 of the head. A
+tracking error of the head builds its variance in that phase, before phase 1 of a later block.
+Without the early mark, a dependent `Variance` tracking error of a leader took the second-order
+cone under a semidefinite phylogeny of the set, which that tracking mode cannot solve, so every
+re-solve failed and the rule traded nothing (R63 of #1817). The mark in phase 1 stays, for the
+block of the head and for a programme that builds one block.
+
+Before the mark, the set of a leader re-solve holds its phylogeny in the block `blk_2_`, and the
+variance of the head read the `plr` of the head alone. The variance took the second-order cone and
+marked `variance_flag`. Phase 2 of the set then built `W`, saw the mark, and omitted the penalty,
+so no term held `W` down and the rows bound nothing.
+
+The `pl` argument of `sdp_variance_flag!` stays. It reaches a namespace that owns its own weights,
+such as the inner build of `IndependentVariableTracking`, which a mark of the head does not reach.
+A `FactorRiskContribution` writes no term on the lift of the asset weights, so
+`OnlinePortfolioSelection` refuses a `FollowTheLeader` with one in its chain and a programme set
+with a semidefinite phylogeny, as the constructor of the head refuses one in `opt.ple`.
+`test/test_67c_follow_the_leader.jl` covers the re-solve, the model and the refusal.

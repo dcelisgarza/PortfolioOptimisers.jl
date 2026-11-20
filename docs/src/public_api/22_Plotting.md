@@ -80,4 +80,5 @@ plot_forecast_evaluation_summary
 plot_covariance_calibration
 plot_covariance_qlike
 plot_covariance_exceedance
+default_report_figures
 ```

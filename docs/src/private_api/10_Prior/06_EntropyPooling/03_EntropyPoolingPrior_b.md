@@ -1,8 +1,16 @@
 ```@meta
-Description = "Entropy pooling Prior (b), private API of PortfolioOptimisers.jl: ep_view_terms, ep_normalise_view_term, ep_view_formulations, ep_sbar, …"
+Description = "Entropy pooling Prior (b), private API of PortfolioOptimisers.jl: TailViewTerms, ep_view_terms, ep_normalise_view_term, ep_view_formulations, ep_sbar, …"
 ```
 
 # [Entropy pooling Prior (b): private API](@id private-api-entropy-pooling-prior-b)
+
+## Types
+
+```@docs
+TailViewTerms
+```
+
+## Functions
 
 ```@docs
 ep_view_terms
@@ -14,14 +22,10 @@ ep_cvar_formulation
 ep_evar_formulation
 ep_rlvar_formulation
 ep_sequential_sides
-ep_add_cvar_view!
-ep_add_evar_view!
 ep_add_grid_tail_view!
-ep_add_rlvar_view!
 ep_tail_view_prior_args
 ep_normalise_tail_view
 ep_add_tail_view!
-ep_tail_views!
 ep_check_tail_window(tv::IntegerConditionalValueatRiskViewConstraint, w::VecNum)
 ```
 

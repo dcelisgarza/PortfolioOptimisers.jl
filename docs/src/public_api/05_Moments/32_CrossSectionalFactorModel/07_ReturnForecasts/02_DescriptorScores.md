@@ -12,6 +12,7 @@ EstimationMaskWeights
 BlockRegressionWeights
 neutralisation_base_weights
 DescriptorScores
+DescriptorScoresResult
 ```
 
 ## Functions

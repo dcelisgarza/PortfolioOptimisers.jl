@@ -1,5 +1,5 @@
 ```@meta
-Description = "Observation weights, private API of PortfolioOptimisers.jl: ObsWeights, ScenarioProbabilities, scenario_probabilities."
+Description = "Observation weights, private API of PortfolioOptimisers.jl: ObsWeights, ScenarioProbabilities, scenario_probabilities, observation_weight_count, …"
 ```
 
 # Observation weights: private API
@@ -8,4 +8,17 @@ Description = "Observation weights, private API of PortfolioOptimisers.jl: ObsWe
 ObsWeights
 ScenarioProbabilities
 scenario_probabilities
+observation_weight_count
+weighted_moment_guard
+observed_sample
+assert_observation_mask
+observed_weights
+has_positive_weight
+```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
 ```

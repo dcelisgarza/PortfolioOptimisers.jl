@@ -49,7 +49,12 @@
     # Files that build a DIFFERENT `JuMP.Model` — not the portfolio model, so the Model
     # State vocabulary does not apply to them at all.
     other_models = ["16_RiskMeasures/07_OWARiskMeasures_a.jl",        # OWA weight fitting
-                    "17_Optimisation/07_FiniteAllocation/02_DiscreteFiniteAllocation.jl"]  # allocation MIP
+                    "17_Optimisation/07_FiniteAllocation/02_DiscreteFiniteAllocation.jl",  # allocation MIP
+                    # The value solve of each measure, whose duals give its Worst-Case
+                    # Distribution (#1835).
+                    "16_RiskMeasures/06_XatRisk/03_EntropicXatRisk.jl",
+                    "16_RiskMeasures/06_XatRisk/04_RelativisticXatRisk.jl",
+                    "16_RiskMeasures/06_XatRisk/05_PowerNormXatRisk.jl"]
 
     # Strip `#` line comments, `\"\"\"` docstrings and `#=` block comments so prose mentions
     # of a key (e.g. "stored as model[:W]") and dead legacy code do not trip the lock.

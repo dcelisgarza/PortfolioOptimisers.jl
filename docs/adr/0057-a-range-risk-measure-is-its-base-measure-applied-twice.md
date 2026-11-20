@@ -109,3 +109,59 @@ on #1212). The DR-CVaR gain tail still reaches `1 - X` through `set_asset_return
 `-X` under its `gain_` prefix, so no result changes. The key `:nXap1` has no builder now.
 ADR [0037](0037-model-state-accessor-interface.md) records the same deletion for four accessor
 pairs.
+
+## Amendment (2026-10-29) — an OWA range is spelled only as `OrderedWeightsArrayRange`
+
+The verdict of #1894 removes the two fused range builders,
+`OrderedWeightsArrayConditionalValueatRiskRange` and `OrderedWeightsArrayTailGiniRange` (#1896).
+An OWA range is now spelled only as `OrderedWeightsArrayRange`, and the aliases `OWA_RG`,
+`OWA_CVaR_RG` and `OWA_TG_RG` build it with one builder or function per tail.
+
+The reason is the approximate formulation. Under `ApproxOrderedWeightsArray`, this ADR builds
+each tail through the single-tail seam, and the two tails are a tighter relaxation than one
+`OrderedWeightsArray` over the fused vector. In a minimum-risk `MeanRisk` on seeded returns
+with `T = 100` and `N = 8`, the fused optimum had an exact risk 4.6 % (CVaR range), 2.1 % (tail
+Gini range) and 9.6 % (`owa_rg`) above the exact optimum. The two tails reached the exact
+optimum for the CVaR range and for the range, and came to 0.2 % above it for the tail Gini
+range. Under `ExactOrderedWeightsArray` and `SortingNetworkOrderedWeightsArray`, the two
+spellings give the same model. The fused functions `owa_rg`, `owa_cvarrg`, `owa_wcvarrg` and
+`owa_tgrg` stay, and their docstrings state the gap.
+
+`OrderedWeightsArrayRange` loses its `rev` field and keyword. `w2` defaults to `nothing`, and
+only then does the constructor store the reversal of `w1`: `reverse(w1)` for a vector and
+`reverse ∘ w1` for a callable. A `w2` that the caller gives is stored as given, so the caller
+gives it reversed. The stored `w2` is never `nothing`, so a positional rebuild reverses nothing
+a second time.
+
+## Amendment (2026-11-14) — the one builder is a method of `set_risk_constraints!`
+
+The decision above names `set_range_risk_constraints!(model, i, r, name, opt, pr, args...)` as
+the one builder, and each range method of `set_risk_constraints!` as one call of it with a key.
+The rulings of #2072 read that builder as a second name for the job of `set_risk_constraints!`:
+a helper that holds a part of the job of a function for several forms of input. The ruling
+"One owner, one name" gives each form to the owner as a method, and "Several methods share one
+body" writes one method on the abstract type of the family (#2120).
+
+The reason of this ADR is unchanged. A range declares its two tails once in `range_tails`, and
+the single-tail seam builds them. Only the name of the builder and the place of the key change:
+
+- `RangeRiskMeasure <: RiskMeasure` is the abstract type of the Range variants. All nine
+    `…Range` types subtype it, the fused ones and `Range` too.
+- `set_risk_constraints!(model, i, r::RangeRiskMeasure, opt, pr, args...)` holds the body of
+    the old builder. A fused formulation keeps its own method, which is more specific.
+- `range_risk_key(r)` is a public contract with one method for each formulation that
+    decomposes. It gives the Model State key of the sum, by the convention
+    `<base>_range_risk_`. Three keys move to that convention: `:drcvar_risk_range_` is now
+    `:drcvar_range_risk_`, `:evar_risk_range_` is now `:evar_range_risk_`, and `:genvar_range_`
+    is now `:genvar_range_risk_`.
+- `OrderedWeightsArrayRange` under `ApproxOrderedWeightsArray` checks `w1` and `w2` under their
+    names, and `GenericValueatRiskRange` of two `DistributionValueatRisk` tails builds the cone
+    that the tails share. Each of the two holds a copy of the six lines of the build, and its
+    `# Algorithm` states that the copy agrees with the method for a `RangeRiskMeasure`.
+- `range_tails` takes its throwing fallback on `RangeRiskMeasure`. A measure that is not a range
+    has no method, so a call raises a `MethodError`. A range that fuses still raises the
+    `ArgumentError` that names its type.
+
+A new range that decomposes now costs a `range_tails` method and a one-line `range_risk_key`
+method, and a range of a user takes the same path. Before this amendment, a range of a user had
+no builder of its own to call.

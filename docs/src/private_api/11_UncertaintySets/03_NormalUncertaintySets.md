@@ -1,12 +1,13 @@
 ```@meta
-Description = "Normal Uncertainty Sets, private API of PortfolioOptimisers.jl: commutation_matrix, choose_scaling_parameter, normal_mu_error_sample, …"
+Description = "Normal Uncertainty Sets, private API of PortfolioOptimisers.jl: commutation_matrix, choose_scaling_parameter, normal_sigma_scaling, normal_mu_error_sample, …"
 ```
 
 # Normal Uncertainty Sets: private API
 
 ```@docs
 commutation_matrix
-choose_scaling_parameter(ue::NormalUncertaintySet, pr::AbstractPriorResult)
+choose_scaling_parameter(ue::NormalUncertaintySet, pr::AbstractPriorResult, k::Integer)
+normal_sigma_scaling
 normal_mu_error_sample
 normal_sigma_error_sample
 mu_asymptotic_cov

@@ -1,8 +1,15 @@
 ```@meta
-Description = "Estimated regime bias, private API of PortfolioOptimisers.jl: estimated_term_factor, estimated_bias_lattice, lattice_det_step, estimated_bias_point!, …"
+Description = "Estimated regime bias, private API of PortfolioOptimisers.jl: EstimatedBiasLattice, EstimatedBiasIntegrals, estimated_term_factor, estimated_bias_lattice, …"
 ```
 
 # [Estimated regime bias: private API](@id private-api-estimated-regime-bias)
+
+## Types
+
+```@docs
+EstimatedBiasLattice
+EstimatedBiasIntegrals
+```
 
 ## Functions
 

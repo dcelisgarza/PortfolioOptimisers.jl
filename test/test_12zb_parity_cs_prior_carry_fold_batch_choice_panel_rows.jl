@@ -78,7 +78,7 @@ end
 # A test-local target that fits as a `LinearModel` and keeps the default answer of
 # `is_basis_invariant`, so a move of the dropped member under it fits every observation again
 # (#1614).
-struct BasisBoundTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+struct BasisBoundTarget <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget end
 function PortfolioOptimisers.factory(::BasisBoundTarget, w::PortfolioOptimisers.ObsWeights)
     return factory(LinearModel(), w)
 end
@@ -173,7 +173,7 @@ end
         unseen_rows(st) = [s
                            for s in axes(st.W, 1)
                            if !isnothing(po.unseen_member_change(st.fcb,
-                                                                 view(st.Ms, s, :, :),
+                                                                 view(st.Ms, :, :, s),
                                                                  view(st.W, s, :) .> 0, s))]
         # Row 226 is the fitted observation 225, and the step before the move fits it. Under
         # `SolvedUnseenMember()` its answer depends on the dropped member (#1613).
@@ -186,7 +186,7 @@ end
         b = batch(pe, 2, dl, de)
         # The columns of the old answer that the new basis keeps are not the batch answer at
         # that row, and the row that the move solves again is.
-        Tf = size(s1.Ms, 1)
+        Tf = size(s1.Ms, 3)
         fr = po.cross_sectional_expand(s1.fcb, (pe.lag + 1):Tf, pe.lag, s1.csr.f)
         old = fr[225, po.retained_factor_indices(b.rr.fcb)]
         @test relerr(old, b.rr.csr.f[225, :]) > 1e-3
@@ -267,7 +267,9 @@ end
             if fs === dlf
                 @test rs == (unseen === ZeroUnseenMember() ? Int[] : unseen_rows(st))
             else
-                @test unseen === SolvedUnseenMember() || length(rs) == 131
+                # 145 rows since the shrinkage weighs the sampling variance of the
+                # weighted least-squares slope (#2132), and 131 before.
+                @test unseen === SolvedUnseenMember() || length(rs) == 145
                 @test issubset(unseen === ZeroUnseenMember() ? Int[] : unseen_rows(st), rs)
             end
         end
@@ -328,10 +330,10 @@ end
         # refuses the member as the batch fit does.
         fcb = FactorFamilyBasis(; fnm = ["ind"], fi = [[1, 2, 3]], di = [1],
                                 ratios = [0.5 0.0; 0.25 2.0], K = 3)
-        @test isnothing(po.cross_sectional_rebase(fcb, ["ind" => "c"], ["a", "b", "c"]))
-        rb = po.cross_sectional_rebase(fcb, ["ind" => "b"], ["a", "b", "c"])
+        @test isnothing(po.cross_sectional_move_basis(fcb, ["ind" => "c"], ["a", "b", "c"]))
+        rb = po.cross_sectional_move_basis(fcb, ["ind" => "b"], ["a", "b", "c"])
         @test rb.di == [2] && rb.ratios ≈ [2.0 0.0; 4.0 8.0]
-        @test po.cross_sectional_rebase(fcb, ["ind" => "a"], ["a", "b", "c"]).ratios ==
+        @test po.cross_sectional_move_basis(fcb, ["ind" => "a"], ["a", "b", "c"]).ratios ==
               fcb.ratios
     end
 end
