@@ -65,9 +65,9 @@ abstract type AbstractDetoneEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Removes the `n` largest principal components, the market modes, from a covariance or correlation matrix. [`detone!`](@ref) and [`detone`](@ref) apply it.
+Removes the `n` largest principal components, the market modes, from a covariance or correlation matrix, or fewer when the `n`-th of them ties with the next one. [`detone!`](@ref) and [`detone`](@ref) apply it.
 
-In financial data, the largest principal components often show movements of the whole market, which can hide the signals of single assets. The field `n` sets how many of these components `Detone` removes, so the result shows the relations between assets that the market modes do not explain [mlp1](@cite).
+In financial data, the largest principal components often show movements of the whole market, which can hide the signals of single assets. The field `n` sets the largest number of these components that `Detone` removes, so the result shows the relations between assets that the market modes do not explain [mlp1](@cite).
 
 A detoned matrix is singular before [`posdef!`](@ref) runs under `pdm`, because the subtraction sets the removed eigenvalues to zero. Section 2.6 of [mlp1](@cite) states that this is not a problem for a clustering method, which does not invert the matrix. That section also states that a mean-variance optimisation cannot use the detoned matrix directly.
 
@@ -89,7 +89,7 @@ Where:
   - ``\\mathbf{X}``: The original correlation or covariance matrix.
   - ``\\lambda_k``: The ``k``-th eigenvalue of ``\\mathbf{X}`` in ascending order, so the sum takes the ``n`` largest.
   - ``\\boldsymbol{v}_k``: The eigenvector of ``\\lambda_k``.
-  - ``n``: The number of market modes to remove.
+  - ``n``: The number of market modes to remove. After a tie, the algorithm removes ``m < n`` modes, as the paragraph below states.
   - $(math_dict[:N])
 
 When the algorithm subtracts a set of eigenmodes, the diagonal of ``\\mathbf{C}`` falls below one. So the rescaling changes every entry of the matrix. The subtraction sets the removed eigenvalues to zero and keeps the others, so ``\\mathbf{C}`` and ``\\tilde{\\mathbf{X}}`` are positive semidefinite and singular. [`posdef!`](@ref) then runs on ``\\tilde{\\mathbf{X}}`` under `pdm`.
@@ -158,7 +158,7 @@ Detone
     """
     pdm
     """
-    Number of largest principal components to remove.
+    Largest number of leading principal components to remove. The detoner removes fewer when the last of them ties with the next eigenvalue, as [`Detone`](@ref) states.
     """
     n
     function Detone(pdm::Option{<:AbstractPosdefEstimator}, n::Integer)
@@ -172,7 +172,7 @@ end
 """
     detone!(dt::Option{<:AbstractDetoneEstimator}, X::MatNum) -> MatNum
 
-Removes the `n` largest principal components, the market modes, from a covariance or correlation matrix in place.
+Removes the `n` largest principal components, the market modes, from a covariance or correlation matrix in place, or fewer when the `n`-th of them ties with the next one.
 
 When the diagonal of `X` is not all ones, the function converts `X` to a correlation matrix, applies the algorithm, and scales the result back to a covariance.
 
@@ -182,7 +182,7 @@ A matrix with no leading mode that stands above the next one, such as the identi
 
   - $(arg_dict[:odt])
 
-      + `::Detone`: Removes the `dt.n` largest principal components from `X` in place.
+      + `::Detone`: Removes at most the `dt.n` largest principal components from `X` in place.
       + `::Nothing`: Returns `X` unchanged.
 
   - $(arg_dict[:sigrhoX])
@@ -290,7 +290,7 @@ Out-of-place version of [`detone!`](@ref).
 # Arguments
 
   - $(arg_dict[:odt])
-      + `::Detone`: Removes the `dt.n` largest principal components from a copy of `X`.
+      + `::Detone`: Removes at most the `dt.n` largest principal components from a copy of `X`.
       + `::Nothing`: Returns `X` unchanged.
   - $(arg_dict[:sigrhoX])
 
