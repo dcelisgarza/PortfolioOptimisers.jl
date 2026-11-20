@@ -1878,7 +1878,7 @@ end
         # A transformed gradient changes the domain: at the rate 0.9 the step fails where
         # one asset holds more than 0.352 of the iterate.
         adam = po.AdaptiveMomentGradient(; gamma1 = 0.9, gamma2 = 0.999)
-        sa = po.transform_gradient!(adam, (zeros(3), zeros(3)), g)
+        sa = po.transform_gradient!(adam, po.gradient_state_seed(adam, u), g)[2]
         @test all(isapprox.(sa, -3.16; atol = 0.01))
         @test_throws DomainError po.mirror_step(LogBarrierProjection(), u, 0.9 .* sa)
         @test all(isfinite,

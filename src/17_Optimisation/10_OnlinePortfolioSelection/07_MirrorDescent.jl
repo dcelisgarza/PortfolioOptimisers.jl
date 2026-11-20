@@ -499,30 +499,42 @@ Abstract supertype for the Gradient Transforms, which change the gradient of a f
 
 A [`MirrorDescent`](@ref) rule applies its transform to the gradient of every period. Its default `grad = nothing` applies no transform, so the mirror step reads the gradient of the period as it is. The momentum transforms of Section 4.2 of [li2022egm](@cite) change the exponent of the multiplicative update, and do not change the form of the update.
 
+Each moving average of the three momentum transforms starts at zero, and the `debias` field of the transform selects how the transform reads it. The default `debias = nothing` reads the average as it is, which is the form of Equations 7, 8 and 9 of [li2022egm](@cite). [`ZeroStartDebias`](@ref) divides each average by ``1 - \\gamma^k``, so each average is the weighted mean of the gradients that it read, which is the correction of Algorithm 1 of [kingma2015](@cite). The count ``k`` is shared by all assets, and a restart of the Learning-Rate Schedule reseeds it with the averages. So, up to ``\\epsilon``, the correction multiplies the step of the ``k``-th period since the seed by one scalar:
+
+| Transform                        | Factor of the corrected step over the uncorrected step |
+|:-------------------------------- |:------------------------------------------------------ |
+| [`GradientMomentum`](@ref)       | ``1 / (1 - \\gamma_1^k)``                              |
+| [`RootMeanSquareGradient`](@ref) | ``\\sqrt{1 - \\gamma_2^k}``                            |
+| [`AdaptiveMomentGradient`](@ref) | ``\\sqrt{1 - \\gamma_2^k} / (1 - \\gamma_1^k)``        |
+
+The undivided form starts slowly. At ``\\gamma_1 = 0.99`` and ``\\gamma_2 = 0``, the defaults of [li2022egm](@cite), the first uncorrected step is ``1 - \\gamma_1 = 0.01`` of the corrected step. It stays below one half of the corrected step for the first 68 periods, and it is ``0.63`` of it after ``1 / (1 - \\gamma_1) = 100`` periods. This shrinks the early steps, when the averages read few gradients. The divided form takes each step at its full size from the first period. At ``\\gamma_2 = 0`` the factor ``\\sqrt{1 - \\gamma_2^k}`` is one, so the correction does not change [`RootMeanSquareGradient`](@ref) at its default. At the rates ``\\gamma_1 = 0.9`` and ``\\gamma_2 = 0.999`` of [kingma2015](@cite), the uncorrected first step is about three times the corrected one, because the second average is small, and [kingma2015](@cite) corrects both averages for this reason. No Learning-Rate Schedule gives these factors, so the field is the one way to reach the divided form.
+
 # Interfaces
 
 In order to implement a new transform, subtype `AbstractGradientTransform` and implement:
 
   - `gradient_state_seed(grad::AbstractGradientTransform, w::AbstractVector)`: The state the transform keeps on the Rule State before the first row, such as a moving average of the gradient, or `nothing`, the default. `w` is the Start Allocation, and the state takes its length and its element type.
-  - `transform_gradient!(grad::AbstractGradientTransform, gs, g::AbstractVector) -> AbstractVector`: The transformed gradient of the period, computed from the raw gradient `g`. It writes the state `gs` of the transform in place.
+  - `transform_gradient!(grad::AbstractGradientTransform, gs, g::AbstractVector) -> Tuple`: Returns the state of the transform after the period, and the transformed gradient of the period, computed from the raw gradient `g`. It can write the arrays of the state `gs` in place. The rule keeps the returned state, so a state that holds a count returns a new value of it.
 
-A transform whose state is not `nothing`, a vector or a pair of vectors also implements:
+A transform whose state is not `nothing`, a vector, a pair of vectors or a [`GradientAverageState`](@ref) also implements:
 
   - `gradient_state_view(gs::MyGradientState, i) -> MyGradientState`: The state of the transform, sliced to the assets `i`, as a copy.
   - `copy_gradient_state(gs::MyGradientState) -> MyGradientState`: A copy of the state of the transform that shares no array with it.
 
-The head's state already slices and copies a transform state of the other three shapes.
+The head's state already slices and copies a transform state of the other four shapes.
 
 # Related
 
   - [`GradientMomentum`](@ref)
   - [`RootMeanSquareGradient`](@ref)
   - [`AdaptiveMomentGradient`](@ref)
+  - [`GradientAverageState`](@ref)
   - [`MirrorDescent`](@ref)
 
 # References
 
   - $(ref_dict[:li2022egm]) Section 4.2.
+  - $(ref_dict[:kingma2015]) Algorithm 1.
 """
 abstract type AbstractGradientTransform <: AbstractAlgorithm end
 """
@@ -537,7 +549,7 @@ This is Equation 7 of [li2022egm](@cite). Under the entropic map it is the EGE o
 ```math
 \\begin{align}
 \\boldsymbol{v}_{t+1} &= \\gamma_1 \\boldsymbol{v}_t + (1 - \\gamma_1) \\boldsymbol{g}_t\\,, \\\\
-\\hat{\\boldsymbol{g}}_t &= \\boldsymbol{v}_{t+1}\\,.
+\\hat{\\boldsymbol{g}}_t &= \\begin{cases} \\boldsymbol{v}_{t+1} & \\text{under } \\texttt{debias = nothing} \\\\ \\dfrac{\\boldsymbol{v}_{t+1}}{1 - \\gamma_1^{k}} & \\text{under } \\texttt{debias = ZeroStartDebias()} \\end{cases}\\,.
 \\end{align}
 ```
 
@@ -547,8 +559,9 @@ Where:
   - $(math_dict[:gamma1_mom])
   - $(math_dict[:g_t_loss])
   - $(math_dict[:ghat_t])
+  - $(math_dict[:k_mom])
 
-The average starts at zero, so the first transformed gradient is ``(1 - \\gamma_1) \\boldsymbol{g}_1``. [li2022egm](@citet) apply no bias correction, and neither does this transform.
+The average starts at zero, so under the default `debias = nothing` the first transformed gradient is ``(1 - \\gamma_1) \\boldsymbol{g}_1``. [li2022egm](@citet) apply no bias correction, and the default follows them. [`ZeroStartDebias`](@ref) gives the corrected average, whose first value is ``\\boldsymbol{g}_1``. [`AbstractGradientTransform`](@ref) compares the two forms.
 
 # Fields
 
@@ -556,9 +569,9 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    GradientMomentum(; gamma1::Real = 0.99) -> GradientMomentum
+    GradientMomentum(; gamma1::Real = 0.99, debias::Option{<:AbstractZeroStartDebias} = nothing) -> GradientMomentum
 
-Keywords correspond to the struct's fields. The default comes from Section 5.5.1 of [li2022egm](@cite).
+Keywords correspond to the struct's fields. The default `gamma1` comes from Section 5.5.1 of [li2022egm](@cite), and the default `debias` is the undivided form of Equation 7.
 
 ## Validation
 
@@ -569,32 +582,40 @@ Keywords correspond to the struct's fields. The default comes from Section 5.5.1
 ```jldoctest
 julia> GradientMomentum()
 GradientMomentum
-  gamma1 ┴ Float64: 0.99
+  gamma1 ┼ Float64: 0.99
+  debias ┴ nothing
 ```
 
 # Related
 
   - [`AbstractGradientTransform`](@ref)
   - [`AdaptiveMomentGradient`](@ref)
+  - [`ZeroStartDebias`](@ref)
   - [`EGE`](@ref)
 
 # References
 
   - $(ref_dict[:li2022egm]) Section 4.2.1, Equation 7. Section 4.3, Theorem 1. Section 5.5.1.
+  - $(ref_dict[:kingma2015]) Algorithm 1.
 """
 @concrete struct GradientMomentum <: AbstractGradientTransform
     """
     The decay of the moving average of the gradient, in `[0, 1)`.
     """
     gamma1
-    function GradientMomentum(gamma1::Real)
+    """
+    $(field_dict[:grad_debias])
+    """
+    debias
+    function GradientMomentum(gamma1::Real, debias::Option{<:AbstractZeroStartDebias})
         @argcheck(zero(gamma1) <= gamma1 < one(gamma1),
                   DomainError(gamma1, "gamma1 must be in [0, 1)"))
-        return new{typeof(gamma1)}(gamma1)
+        return new{typeof(gamma1), typeof(debias)}(gamma1, debias)
     end
 end
-function GradientMomentum(; gamma1::Real = 0.99)::GradientMomentum
-    return GradientMomentum(gamma1)
+function GradientMomentum(; gamma1::Real = 0.99,
+                          debias::Option{<:AbstractZeroStartDebias} = nothing)::GradientMomentum
+    return GradientMomentum(gamma1, debias)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -610,19 +631,22 @@ This is Equation 8 of [li2022egm](@cite). Under the entropic map it is the EGR o
 ```math
 \\begin{align}
 \\boldsymbol{m}_{t+1} &= \\gamma_2 \\boldsymbol{m}_t + (1 - \\gamma_2) \\boldsymbol{g}_t^2\\,, \\\\
-\\hat{\\boldsymbol{g}}_t &= \\frac{\\boldsymbol{g}_t}{\\sqrt{\\boldsymbol{m}_{t+1}} + \\epsilon}\\,.
+\\hat{\\boldsymbol{m}}_{t+1} &= \\begin{cases} \\boldsymbol{m}_{t+1} & \\text{under } \\texttt{debias = nothing} \\\\ \\dfrac{\\boldsymbol{m}_{t+1}}{1 - \\gamma_2^{k}} & \\text{under } \\texttt{debias = ZeroStartDebias()} \\end{cases}\\,, \\\\
+\\hat{\\boldsymbol{g}}_t &= \\frac{\\boldsymbol{g}_t}{\\sqrt{\\hat{\\boldsymbol{m}}_{t+1}} + \\epsilon}\\,.
 \\end{align}
 ```
 
 Where:
 
   - $(math_dict[:m_t_mom])
+  - $(math_dict[:mhat_mom])
   - $(math_dict[:gamma2_mom])
   - $(math_dict[:g_t_loss])
   - $(math_dict[:ghat_t])
   - $(math_dict[:eps_mom])
+  - $(math_dict[:k_mom])
 
-The square, the root and the division are per asset. At ``\\gamma_2 = 0``, ``\\hat{\\boldsymbol{g}}_t = \\boldsymbol{g}_t / (\\lvert \\boldsymbol{g}_t \\rvert + \\epsilon)``.
+The square, the root and the division are per asset. At ``\\gamma_2 = 0``, ``\\hat{\\boldsymbol{g}}_t = \\boldsymbol{g}_t / (\\lvert \\boldsymbol{g}_t \\rvert + \\epsilon)`` under both values of `debias`. [li2022egm](@citet) apply no bias correction, and the default `debias = nothing` follows them. [`AbstractGradientTransform`](@ref) compares the two forms.
 
 # Fields
 
@@ -630,9 +654,9 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    RootMeanSquareGradient(; gamma2::Real = 0, eps::Real = 1e-8) -> RootMeanSquareGradient
+    RootMeanSquareGradient(; gamma2::Real = 0, eps::Real = 1e-8, debias::Option{<:AbstractZeroStartDebias} = nothing) -> RootMeanSquareGradient
 
-Keywords correspond to the struct's fields. The default `gamma2` comes from Section 5.5.1 of [li2022egm](@cite), and the default `eps` from Section 4.2.2.
+Keywords correspond to the struct's fields. The default `gamma2` comes from Section 5.5.1 of [li2022egm](@cite), the default `eps` from Section 4.2.2, and the default `debias` is the undivided form of Equation 8.
 
 ## Validation
 
@@ -644,18 +668,21 @@ Keywords correspond to the struct's fields. The default `gamma2` comes from Sect
 julia> RootMeanSquareGradient()
 RootMeanSquareGradient
   gamma2 ┼ Int64: 0
-     eps ┴ Float64: 1.0e-8
+     eps ┼ Float64: 1.0e-8
+  debias ┴ nothing
 ```
 
 # Related
 
   - [`AbstractGradientTransform`](@ref)
   - [`AdaptiveMomentGradient`](@ref)
+  - [`ZeroStartDebias`](@ref)
   - [`EGR`](@ref)
 
 # References
 
   - $(ref_dict[:li2022egm]) Section 4.2.2, Equation 8. Section 5.5.1.
+  - $(ref_dict[:kingma2015]) Algorithm 1.
 """
 @concrete struct RootMeanSquareGradient <: AbstractGradientTransform
     """
@@ -666,23 +693,28 @@ RootMeanSquareGradient
     The constant added to the root of the average before the division.
     """
     eps
-    function RootMeanSquareGradient(gamma2::Real, eps::Real)
+    """
+    $(field_dict[:grad_debias])
+    """
+    debias
+    function RootMeanSquareGradient(gamma2::Real, eps::Real,
+                                    debias::Option{<:AbstractZeroStartDebias})
         @argcheck(zero(gamma2) <= gamma2 < one(gamma2),
                   DomainError(gamma2, "gamma2 must be in [0, 1)"))
         @argcheck(eps > zero(eps), DomainError(eps, "eps must be positive"))
-        return new{typeof(gamma2), typeof(eps)}(gamma2, eps)
+        return new{typeof(gamma2), typeof(eps), typeof(debias)}(gamma2, eps, debias)
     end
 end
-function RootMeanSquareGradient(; gamma2::Real = 0,
-                                eps::Real = 1e-8)::RootMeanSquareGradient
-    return RootMeanSquareGradient(gamma2, eps)
+function RootMeanSquareGradient(; gamma2::Real = 0, eps::Real = 1e-8,
+                                debias::Option{<:AbstractZeroStartDebias} = nothing)::RootMeanSquareGradient
+    return RootMeanSquareGradient(gamma2, eps, debias)
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Divides the moving average of the gradient by the root of the moving average of its square, per asset.
 
-This is Equation 9 of [li2022egm](@cite), with both averages of [`GradientMomentum`](@ref) and [`RootMeanSquareGradient`](@ref) and no bias correction. Under the entropic map it is the EGA of [li2022egm](@citet). Algorithm 1 of [kingma2015](@cite) divides bias-corrected averages, with the decay rates ``\\beta_1 = 0.9`` and ``\\beta_2 = 0.999`` and the offset ``\\epsilon = 10^{-8}`` as defaults. This transform applies no correction, and its decay rates default to those of [li2022egm](@cite).
+This is Equation 9 of [li2022egm](@cite), with both averages of [`GradientMomentum`](@ref) and [`RootMeanSquareGradient`](@ref). Under the entropic map it is the EGA of [li2022egm](@citet), which applies no bias correction, and the default `debias = nothing` follows it. Algorithm 1 of [kingma2015](@cite) divides both averages by their bias, with the decay rates ``\\beta_1 = 0.9`` and ``\\beta_2 = 0.999`` and the offset ``\\epsilon = 10^{-8}`` as defaults. `AdaptiveMomentGradient(; gamma1 = 0.9, gamma2 = 0.999, debias = ZeroStartDebias())` is that algorithm. The decay rates default to those of [li2022egm](@cite). [`AbstractGradientTransform`](@ref) compares the two forms.
 
 # Mathematical definition
 
@@ -690,7 +722,8 @@ This is Equation 9 of [li2022egm](@cite), with both averages of [`GradientMoment
 \\begin{align}
 \\boldsymbol{v}_{t+1} &= \\gamma_1 \\boldsymbol{v}_t + (1 - \\gamma_1) \\boldsymbol{g}_t\\,, \\\\
 \\boldsymbol{m}_{t+1} &= \\gamma_2 \\boldsymbol{m}_t + (1 - \\gamma_2) \\boldsymbol{g}_t^2\\,, \\\\
-\\hat{\\boldsymbol{g}}_t &= \\frac{\\boldsymbol{v}_{t+1}}{\\sqrt{\\boldsymbol{m}_{t+1}} + \\epsilon}\\,.
+(\\hat{\\boldsymbol{v}}_{t+1}, \\hat{\\boldsymbol{m}}_{t+1}) &= \\begin{cases} (\\boldsymbol{v}_{t+1}, \\boldsymbol{m}_{t+1}) & \\text{under } \\texttt{debias = nothing} \\\\ \\left(\\dfrac{\\boldsymbol{v}_{t+1}}{1 - \\gamma_1^{k}}, \\dfrac{\\boldsymbol{m}_{t+1}}{1 - \\gamma_2^{k}}\\right) & \\text{under } \\texttt{debias = ZeroStartDebias()} \\end{cases}\\,, \\\\
+\\hat{\\boldsymbol{g}}_t &= \\frac{\\hat{\\boldsymbol{v}}_{t+1}}{\\sqrt{\\hat{\\boldsymbol{m}}_{t+1}} + \\epsilon}\\,.
 \\end{align}
 ```
 
@@ -698,11 +731,14 @@ Where:
 
   - $(math_dict[:v_t_mom])
   - $(math_dict[:m_t_mom])
+  - $(math_dict[:vhat_mom])
+  - $(math_dict[:mhat_mom])
   - $(math_dict[:gamma1_mom])
   - $(math_dict[:gamma2_mom])
   - $(math_dict[:g_t_loss])
   - $(math_dict[:ghat_t])
   - $(math_dict[:eps_mom])
+  - $(math_dict[:k_mom])
 
 At the default ``\\gamma_2 = 0``, which Section 5.5.1 of [li2022egm](@cite) recommends, the divisor is ``\\lvert \\boldsymbol{g}_t \\rvert + \\epsilon``. The step then reads the momentum in units of the size of the current gradient.
 
@@ -712,9 +748,9 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    AdaptiveMomentGradient(; gamma1::Real = 0.99, gamma2::Real = 0, eps::Real = 1e-8) -> AdaptiveMomentGradient
+    AdaptiveMomentGradient(; gamma1::Real = 0.99, gamma2::Real = 0, eps::Real = 1e-8, debias::Option{<:AbstractZeroStartDebias} = nothing) -> AdaptiveMomentGradient
 
-Keywords correspond to the struct's fields. The defaults come from Sections 4.2.2 and 5.5.1 of [li2022egm](@cite).
+Keywords correspond to the struct's fields. The defaults of `gamma1`, `gamma2` and `eps` come from Sections 4.2.2 and 5.5.1 of [li2022egm](@cite), and the default `debias` is the undivided form of Equation 9.
 
 ## Validation
 
@@ -727,7 +763,8 @@ julia> AdaptiveMomentGradient()
 AdaptiveMomentGradient
   gamma1 ┼ Float64: 0.99
   gamma2 ┼ Int64: 0
-     eps ┴ Float64: 1.0e-8
+     eps ┼ Float64: 1.0e-8
+  debias ┴ nothing
 ```
 
 # Related
@@ -735,6 +772,7 @@ AdaptiveMomentGradient
   - [`AbstractGradientTransform`](@ref)
   - [`GradientMomentum`](@ref)
   - [`RootMeanSquareGradient`](@ref)
+  - [`ZeroStartDebias`](@ref)
   - [`EGA`](@ref)
 
 # References
@@ -755,18 +793,56 @@ AdaptiveMomentGradient
     The constant added to the root of the second average before the division.
     """
     eps
-    function AdaptiveMomentGradient(gamma1::Real, gamma2::Real, eps::Real)
+    """
+    $(field_dict[:grad_debias])
+    """
+    debias
+    function AdaptiveMomentGradient(gamma1::Real, gamma2::Real, eps::Real,
+                                    debias::Option{<:AbstractZeroStartDebias})
         @argcheck(zero(gamma1) <= gamma1 < one(gamma1),
                   DomainError(gamma1, "gamma1 must be in [0, 1)"))
         @argcheck(zero(gamma2) <= gamma2 < one(gamma2),
                   DomainError(gamma2, "gamma2 must be in [0, 1)"))
         @argcheck(eps > zero(eps), DomainError(eps, "eps must be positive"))
-        return new{typeof(gamma1), typeof(gamma2), typeof(eps)}(gamma1, gamma2, eps)
+        return new{typeof(gamma1), typeof(gamma2), typeof(eps), typeof(debias)}(gamma1,
+                                                                                gamma2, eps,
+                                                                                debias)
     end
 end
-function AdaptiveMomentGradient(; gamma1::Real = 0.99, gamma2::Real = 0,
-                                eps::Real = 1e-8)::AdaptiveMomentGradient
-    return AdaptiveMomentGradient(gamma1, gamma2, eps)
+function AdaptiveMomentGradient(; gamma1::Real = 0.99, gamma2::Real = 0, eps::Real = 1e-8,
+                                debias::Option{<:AbstractZeroStartDebias} = nothing)::AdaptiveMomentGradient
+    return AdaptiveMomentGradient(gamma1, gamma2, eps, debias)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Holds the moving averages of a momentum Gradient Transform, and the count of the steps since their seed.
+
+[`GradientMomentum`](@ref) keeps the gradient average `v` alone, [`RootMeanSquareGradient`](@ref) keeps the squared-gradient average `m` alone, and [`AdaptiveMomentGradient`](@ref) keeps both. The transform writes each average in place, and returns a new state with the next count. A restart of the Learning-Rate Schedule seeds the state again, so the count restarts with the averages. The period count of the Rule State does not restart, so it cannot give the count. The `debias` field of the transform reads the count, and under `debias = nothing` no step reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`AbstractGradientTransform`](@ref)
+  - [`gradient_state_seed`](@ref)
+  - [`ZeroStartDebias`](@ref)
+"""
+@concrete struct GradientAverageState
+    """
+    The count of the steps since the seed, zero at the seed.
+    """
+    k
+    """
+    The gradient average, or `nothing` for a transform that keeps none.
+    """
+    v
+    """
+    The squared-gradient average, or `nothing` for a transform that keeps none.
+    """
+    m
 end
 """
     gradient_state_seed(::Nothing, w::AbstractVector)
@@ -776,7 +852,7 @@ end
 
 Seeds the state that a Gradient Transform keeps on the Rule State before the first row.
 
-The seed is `nothing` for no transform, `grad = nothing`, the zero average for [`GradientMomentum`](@ref), the zero squared average for [`RootMeanSquareGradient`](@ref), and the pair of both for [`AdaptiveMomentGradient`](@ref).
+The seed is `nothing` for no transform, `grad = nothing`. For each momentum transform it is a [`GradientAverageState`](@ref) at the count zero, with a zero vector for each average that the transform keeps.
 
 # Related
 
@@ -787,23 +863,23 @@ function gradient_state_seed(::Nothing, ::AbstractVector)
     return nothing
 end
 function gradient_state_seed(::GradientMomentum, w::AbstractVector)
-    return zeros(eltype(w), length(w))
+    return GradientAverageState(0, zeros(eltype(w), length(w)), nothing)
 end
 function gradient_state_seed(::RootMeanSquareGradient, w::AbstractVector)
-    return zeros(eltype(w), length(w))
+    return GradientAverageState(0, nothing, zeros(eltype(w), length(w)))
 end
 function gradient_state_seed(::AdaptiveMomentGradient, w::AbstractVector)
-    return (zeros(eltype(w), length(w)), zeros(eltype(w), length(w)))
+    return GradientAverageState(0, zeros(eltype(w), length(w)), zeros(eltype(w), length(w)))
 end
 """
     transform_gradient!(::Nothing, ::Nothing, g::AbstractVector)
-    transform_gradient!(grad::GradientMomentum, v::AbstractVector, g::AbstractVector)
-    transform_gradient!(grad::RootMeanSquareGradient, m::AbstractVector, g::AbstractVector)
-    transform_gradient!(grad::AdaptiveMomentGradient, gs::Tuple, g::AbstractVector)
+    transform_gradient!(grad::GradientMomentum, gs::GradientAverageState, g::AbstractVector)
+    transform_gradient!(grad::RootMeanSquareGradient, gs::GradientAverageState, g::AbstractVector)
+    transform_gradient!(grad::AdaptiveMomentGradient, gs::GradientAverageState, g::AbstractVector)
 
-Computes the transformed gradient of the period, and writes the updated state of the transform in place.
+Returns the state of the transform after the period, and the transformed gradient of the period.
 
-`grad = nothing` applies no transform and returns `g` itself. [`GradientMomentum`](@ref) returns a copy of the updated average `v`. [`RootMeanSquareGradient`](@ref) returns `g` over the root of the updated squared average `m`, plus `eps`. [`AdaptiveMomentGradient`](@ref) returns the updated `v` over that root plus `eps`. The type docstrings state the formulas.
+`grad = nothing` applies no transform, and returns `nothing` and `g` itself. Each momentum transform writes its averages in place, and returns a [`GradientAverageState`](@ref) with the next count. It multiplies each average by the mean that [`zero_start_mean`](@ref) reads out of a unit state under its `debias` field. The count is shared by all assets, so this is one scalar per average, and it is exactly one under `nothing`. [`GradientMomentum`](@ref) returns that gradient average as a new vector. [`RootMeanSquareGradient`](@ref) returns `g` over the root of that squared average, plus `eps`. [`AdaptiveMomentGradient`](@ref) returns that gradient average over the same root plus `eps`. The type docstrings state the formulas.
 
 # Related
 
@@ -812,29 +888,40 @@ Computes the transformed gradient of the period, and writes the updated state of
   - [`MirrorDescent`](@ref)
 """
 function transform_gradient!(::Nothing, ::Nothing, g::AbstractVector)
-    return g
+    return nothing, g
 end
-function transform_gradient!(grad::GradientMomentum, v::AbstractVector, g::AbstractVector)
-    v .= grad.gamma1 .* v .+ (1 - grad.gamma1) .* g
-    return copy(v)
-end
-function transform_gradient!(grad::RootMeanSquareGradient, m::AbstractVector,
+function transform_gradient!(grad::GradientMomentum, gs::GradientAverageState,
                              g::AbstractVector)
-    m .= grad.gamma2 .* m .+ (1 - grad.gamma2) .* g .^ 2
-    return g ./ (sqrt.(m) .+ grad.eps)
+    k, v = gs.k + 1, gs.v
+    v .= grad.gamma1 .* v .+ (1 - grad.gamma1) .* g
+    # The count is shared by all assets, so the scale of a unit state is one scalar, and it is
+    # exactly one under `nothing`.
+    cv = zero_start_mean(grad.debias, one(eltype(v)), grad.gamma1, k)
+    return GradientAverageState(k, v, nothing), v .* cv
 end
-function transform_gradient!(grad::AdaptiveMomentGradient, gs::Tuple, g::AbstractVector)
-    v, m = gs
+function transform_gradient!(grad::RootMeanSquareGradient, gs::GradientAverageState,
+                             g::AbstractVector)
+    k, m = gs.k + 1, gs.m
+    m .= grad.gamma2 .* m .+ (1 - grad.gamma2) .* g .^ 2
+    cm = zero_start_mean(grad.debias, one(eltype(m)), grad.gamma2, k)
+    return GradientAverageState(k, nothing, m), g ./ (sqrt.(m .* cm) .+ grad.eps)
+end
+function transform_gradient!(grad::AdaptiveMomentGradient, gs::GradientAverageState,
+                             g::AbstractVector)
+    k, v, m = gs.k + 1, gs.v, gs.m
     v .= grad.gamma1 .* v .+ (1 - grad.gamma1) .* g
     m .= grad.gamma2 .* m .+ (1 - grad.gamma2) .* g .^ 2
-    return v ./ (sqrt.(m) .+ grad.eps)
+    cv = zero_start_mean(grad.debias, one(eltype(v)), grad.gamma1, k)
+    cm = zero_start_mean(grad.debias, one(eltype(m)), grad.gamma2, k)
+    return GradientAverageState(k, v, m), (v .* cv) ./ (sqrt.(m .* cm) .+ grad.eps)
 end
 """
     gradient_state_view(gs::Nothing, i)
     gradient_state_view(gs::AbstractVector, i)
     gradient_state_view(gs::Tuple, i)
+    gradient_state_view(gs::GradientAverageState, i)
 
-Slices the state of a Gradient Transform to the assets `i`, as a copy.
+Slices the state of a Gradient Transform to the assets `i`, as a copy. A [`GradientAverageState`](@ref) keeps its count.
 
 # Related
 
@@ -850,10 +937,15 @@ end
 function gradient_state_view(gs::Tuple, i)
     return (gs[1][i], gs[2][i])
 end
+function gradient_state_view(gs::GradientAverageState, i)
+    return GradientAverageState(gs.k, gradient_state_view(gs.v, i),
+                                gradient_state_view(gs.m, i))
+end
 """
     copy_gradient_state(gs::Nothing)
     copy_gradient_state(gs::AbstractVector)
     copy_gradient_state(gs::Tuple)
+    copy_gradient_state(gs::GradientAverageState)
 
 Copies the state of a Gradient Transform, so that the copy shares no array with it.
 
@@ -870,6 +962,9 @@ function copy_gradient_state(gs::AbstractVector)
 end
 function copy_gradient_state(gs::Tuple)
     return (copy(gs[1]), copy(gs[2]))
+end
+function copy_gradient_state(gs::GradientAverageState)
+    return GradientAverageState(gs.k, copy_gradient_state(gs.v), copy_gradient_state(gs.m))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1639,11 +1734,12 @@ function online_update!(alg::MirrorDescent, st::MirrorDescentState, w::AbstractV
     alpha = mixing_share(alg.eta, t, alg.alpha)
     xm = mixed_relatives(x, alpha)
     g = loss_gradient(factory(alg.obj, wh), something(point, st.u), xm, rows)
-    q = mirror_step(alg.proj, st.u, eta .* transform_gradient!(alg.grad, st.gs, g))
+    gs, gt = transform_gradient!(alg.grad, st.gs, g)::Tuple
+    q = mirror_step(alg.proj, st.u, eta .* gt)
     u = project(alg.proj, set, q, wh)
     s = statistic_after_step(alg.eta, st.s, w, x)
     played = played_allocation(u, alpha)
-    return MirrorDescentState(t, u, st.w0, s, st.gs),
+    return MirrorDescentState(t, u, st.w0, s, gs),
            iszero(alpha) ? played : reprojection(alg.proj, set, played, wh)
 end
 """
@@ -1804,7 +1900,7 @@ function GradientProjection(; eta::Union{Real, AbstractLearningRateSchedule} = 0
                          obj = obj, grad = grad, predictor = predictor)
 end
 """
-    EGE(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, gamma1::Real = 0.99, alpha::Real = 0)
+    EGE(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, gamma1::Real = 0.99, debias::Option{<:AbstractZeroStartDebias} = nothing, alpha::Real = 0)
 
 Builds the exponentiated gradient with the momentum of an exponential moving average, [`ExponentiatedGradient`](@ref) under [`GradientMomentum`](@ref) (EGE).
 
@@ -1820,7 +1916,8 @@ MirrorDescent
       alpha ┼ Int64: 0
         obj ┼ LogWealth()
        grad ┼ GradientMomentum
-            │   gamma1 ┴ Float64: 0.99
+            │   gamma1 ┼ Float64: 0.99
+            │   debias ┴ nothing
   predictor ┴ nothing
 ```
 
@@ -1837,12 +1934,14 @@ MirrorDescent
   - $(ref_dict[:helmbold1998]) Section 4, Theorem 4.1.
 """
 function EGE(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, gamma1::Real = 0.99,
+             debias::Option{<:AbstractZeroStartDebias} = nothing,
              alpha::Real = 0)::MirrorDescent
     return ExponentiatedGradient(; eta = eta, alpha = alpha,
-                                 grad = GradientMomentum(; gamma1 = gamma1))
+                                 grad = GradientMomentum(; gamma1 = gamma1,
+                                                         debias = debias))
 end
 """
-    EGR(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, gamma2::Real = 0, eps::Real = 1e-8, alpha::Real = 0)
+    EGR(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, gamma2::Real = 0, eps::Real = 1e-8, debias::Option{<:AbstractZeroStartDebias} = nothing, alpha::Real = 0)
 
 Builds the exponentiated gradient with a root-mean-square scale on the gradient, [`ExponentiatedGradient`](@ref) under [`RootMeanSquareGradient`](@ref) (EGR).
 
@@ -1859,7 +1958,8 @@ MirrorDescent
         obj ┼ LogWealth()
        grad ┼ RootMeanSquareGradient
             │   gamma2 ┼ Int64: 0
-            │      eps ┴ Float64: 1.0e-8
+            │      eps ┼ Float64: 1.0e-8
+            │   debias ┴ nothing
   predictor ┴ nothing
 ```
 
@@ -1875,17 +1975,18 @@ MirrorDescent
   - $(ref_dict[:li2022egm]) Section 4.2.2, Equation 8. Section 5.5.1.
 """
 function EGR(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, gamma2::Real = 0,
-             eps::Real = 1e-8, alpha::Real = 0)::MirrorDescent
+             eps::Real = 1e-8, debias::Option{<:AbstractZeroStartDebias} = nothing,
+             alpha::Real = 0)::MirrorDescent
     return ExponentiatedGradient(; eta = eta, alpha = alpha,
-                                 grad = RootMeanSquareGradient(; gamma2 = gamma2,
-                                                               eps = eps))
+                                 grad = RootMeanSquareGradient(; gamma2 = gamma2, eps = eps,
+                                                               debias = debias))
 end
 """
-    EGA(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, gamma1::Real = 0.99, gamma2::Real = 0, eps::Real = 1e-8, alpha::Real = 0)
+    EGA(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, gamma1::Real = 0.99, gamma2::Real = 0, eps::Real = 1e-8, debias::Option{<:AbstractZeroStartDebias} = nothing, alpha::Real = 0)
 
 Builds the exponentiated gradient with an adaptive-moment scale on the gradient, [`ExponentiatedGradient`](@ref) under [`AdaptiveMomentGradient`](@ref) (EGA).
 
-This is the EGA of Equation 9 of [li2022egm](@cite).
+This is the EGA of Equation 9 of [li2022egm](@cite). `EGA(; gamma1 = 0.9, gamma2 = 0.999, debias = ZeroStartDebias())` is the exponentiated gradient under the bias-corrected averages of Algorithm 1 of [kingma2015](@cite), as [`AdaptiveMomentGradient`](@ref) states.
 
 # Examples
 
@@ -1899,7 +2000,8 @@ MirrorDescent
        grad ┼ AdaptiveMomentGradient
             │   gamma1 ┼ Float64: 0.99
             │   gamma2 ┼ Int64: 0
-            │      eps ┴ Float64: 1.0e-8
+            │      eps ┼ Float64: 1.0e-8
+            │   debias ┴ nothing
   predictor ┴ nothing
 ```
 
@@ -1915,10 +2017,13 @@ MirrorDescent
   - $(ref_dict[:li2022egm]) Section 4.2.3, Equation 9. Section 5.5.1.
 """
 function EGA(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, gamma1::Real = 0.99,
-             gamma2::Real = 0, eps::Real = 1e-8, alpha::Real = 0)::MirrorDescent
+             gamma2::Real = 0, eps::Real = 1e-8,
+             debias::Option{<:AbstractZeroStartDebias} = nothing,
+             alpha::Real = 0)::MirrorDescent
     return ExponentiatedGradient(; eta = eta, alpha = alpha,
                                  grad = AdaptiveMomentGradient(; gamma1 = gamma1,
-                                                               gamma2 = gamma2, eps = eps))
+                                                               gamma2 = gamma2, eps = eps,
+                                                               debias = debias))
 end
 """
     MAEG(; etas::AbstractVector{<:Real} = 0.001:0.001:0.2, window::Integer = 30, alpha::Real = 0)
@@ -1999,6 +2104,6 @@ export MirrorDescent, ExponentiatedGradient, GradientProjection, EGE, EGR, EGA, 
        RiskLoss, InverseSquareRootRate, DoublingTrickRate, SelfConfidentRate,
        WindowedBestRate, MAEG, AEG, GradientMomentum, RootMeanSquareGradient,
        AdaptiveMomentGradient
-public AbstractGradientTransform, gradient_state_seed, transform_gradient!,
-       gradient_state_view, copy_gradient_state, AbstractOnlineObjective, loss_gradient,
-       AbstractGradientPredictor
+public AbstractGradientTransform, GradientAverageState, gradient_state_seed,
+       transform_gradient!, gradient_state_view, copy_gradient_state,
+       AbstractOnlineObjective, loss_gradient, AbstractGradientPredictor

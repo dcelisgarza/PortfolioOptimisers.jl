@@ -449,7 +449,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the bias correction of an exponentially weighted mean that starts at zero. The rule selects how the estimator reads its mean out of the state of the recursion.
 
-The state of the recursion starts at zero, so after ``n`` valid inputs its weights sum to ``1 - \\lambda^{n}`` and not to one. Two estimators hold a rule, or `nothing` for the undivided state, in their `debias` field: [`ExpWeightedExpectedReturns`](@ref) and [`EWMean`](@ref), with its preset [`EWMomentum`](@ref). [`ZeroStartDebias`](@ref) divides the state by the sum of its weights, and its docstring gives the reason for each form. This file declares the root with the other roots, because the estimators bind their field to it before the members load.
+The state of the recursion starts at zero, so after ``n`` valid inputs its weights sum to ``1 - \\lambda^{n}`` and not to one. Two estimators hold a rule, or `nothing` for the undivided state, in their `debias` field: [`ExpWeightedExpectedReturns`](@ref) and [`EWMean`](@ref), with its preset [`EWMomentum`](@ref). The three momentum Gradient Transforms hold one too: [`GradientMomentum`](@ref), [`RootMeanSquareGradient`](@ref) and [`AdaptiveMomentGradient`](@ref). The default of each holder is the form that its literature states: the estimators divide, and the transforms keep `nothing`. [`ZeroStartDebias`](@ref) divides the state by the sum of its weights, and its docstring gives the reason for each form. This file declares the root with the other roots, because the estimators bind their field to it before the members load.
 
 # Interfaces
 

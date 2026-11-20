@@ -17,6 +17,9 @@ unique_key_dict!(math_dict, :math_dict,
                  :gamma1_mom => "``\\gamma_1``: Momentum decay, the weight the gradient average keeps on its past, in ``[0, 1)``.",#
                  :gamma2_mom => "``\\gamma_2``: Squared-gradient decay, the weight the squared-gradient average keeps on its past, in ``[0, 1)``.",#
                  :eps_mom => "``\\epsilon``: Positive offset added to the root of the squared-gradient average before the division.",#
+                 :vhat_mom => "``\\hat{\\boldsymbol{v}}_{t+1}``: Gradient average that the step reads, divided by ``1 - \\gamma_1^k`` under [`ZeroStartDebias`](@ref).",#
+                 :mhat_mom => "``\\hat{\\boldsymbol{m}}_{t+1}``: Squared-gradient average that the division reads, divided by ``1 - \\gamma_2^k`` under [`ZeroStartDebias`](@ref).",#
+                 :k_mom => "``k``: Steps taken since the seed of the averages, one at the first step and again at the first step after a restart of the schedule.",#
                  :Sigma_t_cw => "``\\Sigma_t``: Diagonal belief covariance over the weights at period ``t``.",#
                  :M_t_cw => "``M_t = \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle``: Gross return of the allocation over period ``t``.",#
                  :V_t_cw => "``V_t = \\boldsymbol{x}_t^\\intercal \\Sigma_t \\boldsymbol{x}_t``: Variance of the belief along the price relative.",#
