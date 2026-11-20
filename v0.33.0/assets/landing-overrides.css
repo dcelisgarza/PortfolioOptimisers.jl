@@ -1,0 +1,149 @@
+/* ==========================================================================
+ * Customisation for the DocumenterLandingPage landing page (docs/src/index.md)
+ * ==========================================================================
+ *
+ * Wired in through `assets = ["assets/landing-overrides.css"]` in docs/make.jl.
+ *
+ * LOAD ORDER (verified against a build): Documenter emits this file BEFORE the
+ * plugin's own landing.css. That splits the variables into two groups.
+ *
+ *   Group A - the four override variables below. The plugin never defines
+ *   them. It reads each one with a fallback, for example
+ *   `var(--landing-glow-filter, blur(40px))`. A plain `:root` block wins, and
+ *   the load order does not matter.
+ *
+ *   Group B - the palette variables. The plugin DOES define them, on `:root`
+ *   and on one block per theme, and its stylesheet loads after this one. A
+ *   plain `:root` block here loses. Use `:root:root` instead, which outranks
+ *   every plugin selector. See the palette section below.
+ *
+ * Everything is commented out except the glow filter.
+ * ========================================================================== */
+
+/* --------------------------------------------------------------------------
+ * GROUP A - hero name and glow. A plain `:root` block is enough.
+ * -------------------------------------------------------------------------- */
+:root {
+    /* THE GLOW DISC BEHIND THE LOGO.
+     * The plugin draws a disc the full width of the logo box, fills it with a
+     * two-stop gradient in the theme accent at about 0.5 alpha, and blurs it by
+     * 40px. Adding `opacity()` to the filter dims the disc and keeps the
+     * per-theme hues, so one number controls all six themes.
+     *
+     *   opacity(0.20)  barely there
+     *   opacity(0.35)  soft - the value set here
+     *   opacity(0.50)  half the shipped strength
+     *   blur(40px)     alone: the shipped strength
+     *
+     * A larger blur spreads the same ink over more area, so it also reads
+     * softer. `blur(0px)` gives a hard-edged disc. */
+    --landing-glow-filter: blur(40px) opacity(0.2);
+
+    /* REPLACE THE GLOW ENTIRELY. Any `background` value works. This discards
+     * the per-theme hues, so whatever you set applies to all six themes.
+     * Uncomment ONE of these. */
+    /* --landing-glow: none; */                                  /* no glow at all */
+    /* --landing-glow: radial-gradient(circle, #2e63b840, transparent 70%); */
+    /* --landing-glow: linear-gradient(-45deg, #2e63b840 50%, #89459940 50%); */
+
+    /* THE PACKAGE NAME ABOVE THE HEADLINE.
+     * The plugin paints it with a gradient: `--landing-name-background` is
+     * clipped to the text, and `--landing-name-color` must be `transparent` for
+     * the gradient to show through.
+     *
+     * A solid name in the theme accent instead of the gradient: */
+    /* --landing-name-color: currentcolor; */
+    /* --landing-name-background: none; */
+
+    /* A gradient of your own. Set the colour to `transparent` as well. */
+    /* --landing-name-color: transparent; */
+    /* --landing-name-background: linear-gradient(120deg, #2e63b8, #92418e); */
+}
+
+/* --------------------------------------------------------------------------
+ * GROUP B - the palette. `:root:root` is REQUIRED here.
+ *
+ * The plugin defines these on `:root` for the light theme and on
+ * `html.theme--<name>` for the other five. Because its stylesheet loads after
+ * this one, a plain `:root` block loses the tie. `:root:root` carries two
+ * pseudo-classes and outranks every plugin selector, in every theme.
+ *
+ *   --landing-surface           tile and alt-button background
+ *   --landing-surface-2         the square badge behind a feature icon
+ *   --landing-border            tile borders
+ *   --landing-accent            the name and the brand button
+ *   --landing-accent-contrast   the text on the brand button
+ * -------------------------------------------------------------------------- */
+/*
+:root:root {
+    --landing-accent: #2e63b8;
+    --landing-accent-contrast: #fff;
+    --landing-surface: #f5f5f5;
+    --landing-surface-2: #dbdee0;
+    --landing-border: #e0e0e0;
+}
+*/
+
+/* To change ONE theme only, name it. This also outranks the plugin, so no
+ * doubling is needed. The six theme selectors are:
+ *
+ *   :root                             documenter-light (the default)
+ *   html.theme--documenter-dark
+ *   html.theme--catppuccin-latte
+ *   html.theme--catppuccin-frappe
+ *   html.theme--catppuccin-macchiato
+ *   html.theme--catppuccin-mocha
+ */
+/*
+html.theme--documenter-dark:root {
+    --landing-accent: #1abc9c;
+    --landing-glow-filter: blur(48px) opacity(0.25);
+}
+*/
+
+/* ==========================================================================
+ * LIGHT AND DARK LOGOS
+ *
+ * Documenter ships `.docs-light-only` and `.docs-dark-only` classes, and every
+ * theme stylesheet hides one of them. Nothing below is CSS you write: the two
+ * logos are configured elsewhere. This section records where.
+ *
+ * 1. THE SIDEBAR LOGO. No configuration at all. Drop a second file next to the
+ *    first and Documenter finds it by name:
+ *
+ *        docs/src/assets/logo.svg        <- used by the light themes
+ *        docs/src/assets/logo-dark.svg   <- used by the dark themes
+ *
+ *    Accepted extensions: svg, png, webp, gif, jpg, jpeg. The dark file must
+ *    be named `logo-dark`, and it is optional. Without it both themes use
+ *    `logo.svg`. This repository ships `logo.svg` only.
+ *
+ * 2. THE HERO LOGO ON THE LANDING PAGE. Add an `image.dark` key to the YAML
+ *    block at the top of docs/src/index.md. The plugin then emits both files
+ *    and lets the theme hide the wrong one:
+ *
+ *        hero:
+ *          image:
+ *            src: /logo.svg          # light themes
+ *            dark: /logo-dark.svg    # dark themes, optional
+ *            alt: PortfolioOptimisers
+ *
+ *    The leading slash matters. The plugin remaps a root-relative bare
+ *    filename into the site's `assets/` directory.
+ *
+ * 3. A FEATURE TILE ICON. An icon is normally an emoji, but it can be an image
+ *    with the same two variants. In docs/src/index.md:
+ *
+ *        features:
+ *          - icon:
+ *              light: /icon-priors.svg
+ *              dark: /icon-priors-dark.svg
+ *              alt: Priors
+ *              width: 48             # optional, 48 by default
+ *              height: 48            # optional, 48 by default
+ *              wrap: true            # optional, puts it in the badge box
+ *            title: Priors and views
+ *            details: ...
+ *
+ *    A single `src` key replaces both variants and applies to every theme.
+ * ========================================================================== */
