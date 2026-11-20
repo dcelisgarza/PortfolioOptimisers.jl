@@ -282,6 +282,20 @@ dropped every asset with one gap. The inner estimator now reads the window.
     @test isapprox(PO.variance_series(WindowedVariance(; window = 4), permutedims(R), pnl;
                                       dims = 2), permutedims(ref); rtol = 1e-12,
                    nans = true)
+    # A static panel has no mask and no observation axis to cut, so each row reads it as no
+    # mask: the window is reduced to the assets whose returns are finite.
+    pnf = PO.AssetPanel(; pf = [PO.NumericPanelField(; name = "mcap", vals = ones(3))])
+    refn = fill(NaN, size(X))
+    for t in axes(X, 1)
+        rows = max(1, t - 3):t
+        c = vec(all(isfinite, R[rows, :]; dims = 1))
+        if any(c)
+            refn[t, c] = vec(Statistics.var(R[rows, c]; dims = 1))
+        end
+    end
+    @test isnothing(PO.windowed_mask_panel(pnf, 1:4))
+    @test isapprox(PO.variance_series(WindowedVariance(; window = 4), R, pnf), refn;
+                   rtol = 1e-12, nans = true)
     # One fit over a sample that covers no asset still raises.
     @test_throws PO.IsEmptyError var(SimpleVariance(), R, pnl)
     # The probe reads the rows of the innermost fit: through a window with no window of its own,
