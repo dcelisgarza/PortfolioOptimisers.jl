@@ -667,7 +667,8 @@ end
 const USAGE = """
 usage: sweep_check.jl [--base <ref>] [--file <path>]... [--all] [--fetch] [--out <dir>]
 
-  --base <ref>  the ref the branch is measured against. Default: origin/main.
+  --base <ref>  the ref the branch is measured against. Default: the landing base of
+                ADR 0240, which `code_health/gate_stamp.sh base` prints.
   --file <path> check this path, whatever the diff says. Repeatable.
   --all         check every file under `src/` and `ext/`.
   --fetch       read the tracker too, through `code_health/sweep_issues.sh dump`.
@@ -675,7 +676,9 @@ usage: sweep_check.jl [--base <ref>] [--file <path>]... [--all] [--fetch] [--out
 """
 
 function parse_options(args)
-    base, all, fetch, out = "origin/main", false, false, PLAN_DIR
+    base = readchomp(Cmd(`bash $(joinpath(@__DIR__, "gate_stamp.sh")) base`;
+                         dir = dirname(@__DIR__)))
+    all, fetch, out = false, false, PLAN_DIR
     files = String[]
     i = 1
     while i <= length(args)

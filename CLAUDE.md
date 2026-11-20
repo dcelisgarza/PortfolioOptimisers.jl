@@ -24,16 +24,33 @@ name.
 
 ## Parallel sessions
 
-- **Work in your own worktree, and land it through its own pull request** (ADR 0240). Create the
-  worktree with the `EnterWorktree` tool before your first edit. It starts at `origin/main`.
-  Commit there, and push the branch as `agents/<issue>-<slug>`, with
-  `git push origin HEAD:agents/<issue>-<slug>`. The push runs the CI. Open one pull request into
-  `main`, and turn on auto-merge with `gh pr merge <number> --auto --squash`. A pull request that
-  needs a ruling of the maintainer opens as a draft, with no auto-merge. Then leave with
-  `ExitWorktree` `remove`. When `git status --short` is empty and `git branch -r --contains HEAD`
-  lists the remote copy of your branch, pass `discard_changes: true`.
-- **Keep a pull request to one feature or one fix.** A second feature is a second branch from
-  `origin/main`. A rebase is necessary only when GitHub shows a conflict with `main`.
+- **Land the work by the route that its issue states** (ADR 0240). The issue holds a
+  `**Lands on:**` line. When it has none, add the line before your first edit. Choose the route
+  from this table, unless the maintainer names one:
+
+  | `**Lands on:**` | For | Branch |
+  | --- | --- | --- |
+  | `own branch` | a standalone feature, an important correctness fix, a large performance fix | `agents/<issue>-<slug>` from `origin/main` |
+  | `dev-fixes` | a sweep sub-issue, an ergonomics change, a small performance fix, an unusual composition bug, a docs fix | `dev-fixes`, shared |
+  | `map #<map>` | a ticket of a map whose tickets make sense on `main` only together | `agents/<map>-<slug>`, shared |
+
+  Write the line in each issue that you file, from the same table.
+- **Work in your own worktree.** Create it with the `EnterWorktree` tool before your first edit.
+  For a shared branch, reset the new worktree to `origin/<branch>` before you edit. Then run
+  `bash code_health/gate_stamp.sh base origin/<branch>`, so that the gates measure against it.
+  Leave with `ExitWorktree` `remove`. When `git status --short` is empty and
+  `git branch -r --contains HEAD` lists the remote branch that you pushed to, pass
+  `discard_changes: true`.
+- **Own branch.** Push with `git push origin HEAD:agents/<issue>-<slug>`. The push runs the CI.
+  Open one pull request into `main`, and turn on auto-merge with
+  `gh pr merge <number> --auto --squash`. A pull request that needs a ruling of the maintainer
+  opens as a draft, with no auto-merge. Keep the pull request to one feature or one fix. A rebase
+  is necessary only when GitHub shows a conflict with `main`.
+- **Shared branch.** Commit, rebase onto `origin/<branch>`, and push with
+  `git push origin HEAD:<branch>` as a fast-forward. Never force-push it. When `origin` has no
+  `dev-fixes`, create it with `git push origin origin/main:refs/heads/dev-fixes`, and open a draft
+  pull request into `main`. The maintainer merges `dev-fixes` as a batch. A map branch gets one
+  draft pull request too. The session that lands the last ticket of the map turns on auto-merge.
 - **Never commit a change you did not make.** Check `git status`, and stage the files you edited
   by name, never with `git add -A`.
 - **Do not edit a file at the same time as another session.** The session that finishes last
@@ -79,7 +96,7 @@ name.
 - **File an issue when the fix is large, or when it needs the maintainer's decision.** Give the
   reproduction, the file and the line, the cause, the fix you would make, and the reason you did
   not make it. Name the work that found it in the issue, and name the issue in the pull request,
-  the commit or the report of that work.
+  the commit or the report of that work. Write its `**Lands on:**` line (§ *Parallel sessions*).
 - **A name or an interface that a library precedent settles is not the maintainer's decision**,
   and a breaking change is not either (`.github/instructions/julia-source-code.instructions.md`
   § *A design is chosen by the standing test*). A case that the same mechanism reaches belongs to
@@ -109,15 +126,15 @@ steps 3 and 4. Defer a feature whose design is not settled, as `sweep-conform` s
   comment that cites a source file of another repository names the package, the commit and the
   path in prose. `test/test_64_docs_page_metadata_census.jl` fails on a link to an external
   repository.
-- **A session that works an issue commits without being asked.** It commits, pushes its branch
-  and opens its pull request as § *Parallel sessions* states. Any other session commits only when
-  asked.
+- **A session that works an issue commits without being asked.** It commits and pushes by the
+  route of its issue, as § *Parallel sessions* states. Any other session commits only when asked.
 - **Assign the issue to your `gh` account before your first edit**, with
   `gh issue edit <number> --add-assignee @me`. An issue that you fix, close, or leave open with a
   part of the work done carries your account.
 - **The merge of the pull request closes the issue that it resolves**, for every kind of issue: a
   defect, a feature, a sweep sub-issue, a map. Name the issue in the commit message, for example
-  `Fix #493: …`, and write `Closes #493` in the body of the pull request. A squash merge puts
+  `Fix #493: …`. On your own branch, also write `Closes #493` in the body of the pull request.
+  On a shared branch, the issue closes when the batch merges. A squash merge puts
   every commit message into the commit on `main`, and a closing keyword there closes the issue.
   So a commit of a part of the work names `Part of #493: …`, with no closing keyword, and the
   issue stays open while a part of the work remains.

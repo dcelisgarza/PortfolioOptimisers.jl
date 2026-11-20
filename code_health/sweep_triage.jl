@@ -287,8 +287,8 @@ number_or_dash(x) = x === nothing ? "—" : string(x)
 """
     body_of(candidate, commit) -> String
 
-The sub-issue of ADR 0084. It mirrors the child map that owns it, one file wide: the fixed
-`ROUTING` block, a Destination naming the file and its measured row, the six conditions of #404
+The sub-issue of ADR 0084. It mirrors the child map that owns it, one file wide: the
+`**Lands on:**` line of ADR 0240, the fixed `ROUTING` block, a Destination naming the file and its measured row, the six conditions of #404
 restated compactly (condition 2 names the original source of a formulation and the standard note
 of `.github/instructions/julia-docstrings.instructions.md` § *The original source*), the sentence that the committed files are the authority, and Notes that point
 at #404 without copying a rule.
@@ -302,6 +302,8 @@ run needs comes from a committed file or from the tracker's own metadata.
 """
 function body_of(c::Candidate, commit::AbstractString)
     io = IOBuffer()
+    # The route of ADR 0240. A sweep ticket can wait for the batch of `dev-fixes`.
+    println(io, "**Lands on:** dev-fixes\n")
     println(io, ROUTING)
     println(io, "## Destination\n")
     if reopens(c)

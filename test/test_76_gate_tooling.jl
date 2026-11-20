@@ -387,6 +387,52 @@ end
         @test occursin("code_health/gate_stamp.sh drop jet size", out)
     end
 
+    @testset "the landing base of ADR 0240 is stored once and guards the shared branch" begin
+        #=
+        A session on the shared branch `dev-fixes` measures its gates against that branch, not
+        `origin/main`. `base <ref>` stores the landing base in the git directory, every stamp and
+        check reads it, and the guard protects `dev-fixes` beside `agents/*`. An empty
+        `GATE_STAMP_REF` stands for a session that sets no override.
+        =#
+        dir, c0, c1, _ = fixture_repo()
+        stored = (; GATE_STAMP_REF = "")
+        @test stamp(dir, "base"; stored...) == (0, "origin/main\n")
+        code, out = stamp(dir, "base", "origin/nowhere"; stored...)
+        @test code == 2
+        @test occursin("names no commit", out)
+        @test stamp(dir, "base", "a", "b"; stored...)[1] == 2
+        # The shared branch plays `origin/dev-fixes`.
+        git(dir, "update-ref", "refs/remotes/origin/dev-fixes", "trunk")
+        @test first(stamp(dir, "base", "origin/dev-fixes"; stored...)) == 0
+        @test stamp(dir, "base"; stored...) == (0, "origin/dev-fixes\n")
+        # `GATE_STAMP_REF` still overrides the stored base.
+        @test stamp(dir, "base") == (0, "trunk\n")
+        @test first(stamp(dir, "record", "jet"; stored...)) == 0
+        @test readchomp(joinpath(dir, ".git", "gate_stamps")) == "jet\t$c0"
+
+        # The shared branch moves in `src/a/`, the directory the push changes.
+        git(dir, "checkout", "-q", "trunk")
+        put(dir, "src/a/three.jl", "three = 3\n")
+        c3 = commit(dir, "c3")
+        git(dir, "checkout", "-q", "work")
+        git(dir, "update-ref", "refs/remotes/origin/dev-fixes", c3)
+        shared = (; stored..., PRE_COMMIT_TO_REF = c1,
+                  PRE_COMMIT_REMOTE_BRANCH = "refs/heads/dev-fixes")
+        code, out = stamp(dir, "check"; shared...)
+        @test code == 1
+        @test occursin("jet, measured on $(c0[1:10])", out)
+        # A name that only starts with `dev-fixes` is not the shared branch.
+        @test first(stamp(dir, "check"; shared...,
+                          PRE_COMMIT_REMOTE_BRANCH = "refs/heads/dev-fixes2")) == 0
+
+        # A push to `dev-fixes` from a worktree with another landing base is refused, whatever
+        # its stamps say.
+        code, out = stamp(dir, "check"; shared..., GATE_STAMP_REF = c3)
+        @test code == 1
+        @test occursin("This push lands on dev-fixes, and the landing base is $c3.", out)
+        @test occursin("code_health/gate_stamp.sh base origin/dev-fixes", out)
+    end
+
     @testset "a push that changes src/ needs the required gates or a waiver" begin
         dir, c0, c1, c2 = fixture_repo()
         push = (; GATE_STAMP_REF = c2, PRE_COMMIT_TO_REF = c1,
@@ -1229,6 +1275,8 @@ end
             c = ST.Candidate("src/a.jl", ST.ChildMap(9, 423, open, "Risk measures"), 3, 10,
                              1)
             body = ST.body_of(c, "abc")
+            # A sweep ticket states its route of ADR 0240 when the job files it.
+            @test startswith(body, "**Lands on:** dev-fixes\n")
             @test occursin("This file is not swept yet.", body)
             @test !occursin("This file is swept.", body)
             @test occursin(open ? "after that map was charted" : "after that map closed",

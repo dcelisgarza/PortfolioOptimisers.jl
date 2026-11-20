@@ -723,12 +723,13 @@ git_text(args...) = readchomp(Cmd(`git $args`; dir = REPO_ROOT))
     patch_report(dir, tags) -> (lines, clean)
 
 One `PATCH` line for each `.jl` file under `src/` or `ext/` that the working tree changes against
-its merge-base with `origin/main` (`GATE_STAMP_REF`), with the added lines that CI reads as a miss.
+its merge-base with the landing base of ADR 0240, which `code_health/gate_stamp.sh base` prints
+(`origin/main` unless the worktree stored another), with the added lines that CI reads as a miss.
 `tags` maps a path relative to the repository to its [`coverage_tags`](@ref). `clean` is true when
 every changed file lies under `dir` and no added line is a miss.
 """
 function patch_report(dir::AbstractString, tags::AbstractDict)
-    ref = get(ENV, "GATE_STAMP_REF", "origin/main")
+    ref = readchomp(Cmd(`bash code_health/gate_stamp.sh base`; dir = REPO_ROOT))
     base = try
         git_text("merge-base", ref, "HEAD")
     catch

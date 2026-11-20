@@ -41,7 +41,8 @@ julia -t 1 --project=docs docs/doctest_files.jl --fix src/01_Base/11_VecScalar.j
   without `--fix` records the stamp `doctest-files`.
 
 - **The pre-push guard asks for the scoped run.** When `bash code_health/gate_stamp.sh reach`
-  names `doctest-files`, run `docs/doctest_files.jl --against origin/main` before the push. The
+  names `doctest-files`, run `docs/doctest_files.jl --against <base>` before the push, with the
+  landing base that `bash code_health/gate_stamp.sh base` prints (ADR 0240). The
   guard takes it as it takes a scoped run of JET. A change to docstring prose outside every
   `jldoctest` block needs no doctest run.
 - **The scoped run does not see every block.** A change in one file can change what a block in

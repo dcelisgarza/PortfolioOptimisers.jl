@@ -135,12 +135,20 @@ We try to keep a linear history in this repo, so it is important to keep your br
 
 ### How a change reaches `main`
 
-Each feature or fix reaches `main` through its own pull request, and the pull request merges by squash. The decision is ADR 0240.
+Each issue states its route in a `**Lands on:**` line, and every pull request merges by squash. The decision is ADR 0240.
 
-- A branch of this repository is named `agents/<issue>-<slug>`. A push to it runs the full CI, and the pull request shows those checks. A merge into `main` waits for them (ADR 0220).
+| `**Lands on:**` | For                                                                                                      | Branch                                              |
+|:----------------|:---------------------------------------------------------------------------------------------------------|:----------------------------------------------------|
+| `own branch`    | a standalone feature, an important correctness fix, a large performance fix                              | `agents/<issue>-<slug>`, with its own pull request  |
+| `dev-fixes`     | a sweep sub-issue, an ergonomics change, a small performance fix, an unusual composition bug, a docs fix | `dev-fixes`, which the maintainer merges as a batch |
+| `map #<map>`    | a ticket of a map whose tickets make sense on `main` only together                                       | `agents/<map>-<slug>`, one pull request for the map |
+
+The maintainer can name another route for an issue.
+
+- A push to a branch of this repository runs the full CI, and the pull request shows those checks. A merge into `main` waits for them (ADR 0220).
 - A branch of a fork gets no push checks in this repository, so its pull request cannot merge. The maintainer pushes the branch of a fork to an `agents/` branch here, and the pull request from that branch merges.
 - The base of a pull request need not be current. Rebase only when GitHub shows a conflict with `main`.
-- Write `Closes #<issue>` in the body of the pull request. The merge closes the issue.
+- Name the issue in the commit message, as `Fix #<issue>: …`. A squash copies each commit message into `main`, so the merge closes the issue. A pull request of its own also writes `Closes #<issue>` in its body.
 
 ## When a code-health gate turns red
 

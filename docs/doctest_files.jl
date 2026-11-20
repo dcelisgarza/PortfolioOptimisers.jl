@@ -16,7 +16,8 @@ the gate stamp `doctest`.
 
 The full run of the `run-doctests` skill checks every docstring of the module and the manual pages
 under `docs/src`, which takes about nine minutes. This script checks the docstrings that the named
-files hold, and nothing else. A green run of `--against origin/main` records the stamp
+files hold, and nothing else. A green run of `--against <base>`, with the landing base of ADR 0240
+that `bash code_health/gate_stamp.sh base` prints, records the stamp
 `doctest-files`, which the push guard requires of a branch whose change to `src/` reaches a
 doctest. The guard takes the scoped run as it takes a scoped run of JET. A change in one file can
 change what a block in another file prints, and the doctest job of CI, which runs every block, is
