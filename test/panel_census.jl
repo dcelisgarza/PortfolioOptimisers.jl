@@ -180,6 +180,10 @@ const CENSUS_EXEMPT = Dict{Symbol, String}(
                                            :coverage_panel_moment => "a step of the moments with a Coverage Policy",
                                            :coverage_series_frame => "a step of variance_series",
                                            :windowed_series_row => "a step of variance_series on a windowed estimator",
+                                           :coverage_variance_series => "a step of variance_series: the reduce-and-expand series, whose case is below",
+                                           :panel_series_row => "a step of variance_series on a windowed estimator or a composite",
+                                           :windowed_mask_panel => "a cut of the two masks to the rows of a window, with no Panel Field",
+                                           :covers_an_asset => "a step of panel_series_row: the masks alone, through coverage_keyword_flags",
                                            :prior_forecast_location => "a step of forecast_location on a prior",
                                            # Steps of the fit of the Cross-Sectional Factor Prior, whose `prior` has a case below.
                                            :cross_sectional_benchmark_stage => "a step of prior on a CrossSectionalFactorPrior",
@@ -215,6 +219,8 @@ const CENSUS_EXEMPT = Dict{Symbol, String}(
                                            # Masks: the active mask and the estimation mask, and no cell value.
                                            :coverage_keyword_reduction => "a step of the moments on a panel: the active mask, through coverage_mask, whose case is below",
                                            :coverage_mask_source => "chooses the active mask coverage_mask reads, whose case is below",
+                                           :coverage_flags => "a step of coverage_mask: the active mask and the returns, whose case is below",
+                                           :coverage_keyword_flags => "a step of coverage_keyword_reduction: the active mask, through coverage_flags",
                                            :benchmark_estimation_mask => "narrows the estimation mask to the finite benchmark returns",
                                            # An export of every stored cell. FeatureDistance reads the stack of feature_matrix
                                            # beside the readable mask.

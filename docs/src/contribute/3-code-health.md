@@ -220,9 +220,9 @@ A baseline can lag `dev`. When another commit raised a number and did not record
 script therefore takes one of two scopes after its verb.
 
 ```bash
-julia --project=code_health code_health/complexity.jl check --against origin/dev
+julia --project=code_health code_health/complexity.jl check --against origin/main
 julia --project=code_health code_health/size.jl check --files src/10_Prior/01_Base_Prior.jl
-julia --project=code_health code_health/jet.jl refresh --accept-rise --against origin/dev
+julia --project=code_health code_health/jet.jl refresh --accept-rise --against origin/main
 ```
 
 `--against <ref>` answers for the files your branch changes since its merge-base with `<ref>`:

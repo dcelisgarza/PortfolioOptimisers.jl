@@ -8,12 +8,17 @@
 #     code_health/gate_stamp.sh waive <gate> <reason>   push without a required gate, for a reason
 #     code_health/gate_stamp.sh readers <file>          the gates that read a shared ledger file
 #     code_health/gate_stamp.sh reach                   the gates the change of the worktree reaches
+#     code_health/gate_stamp.sh base [<ref>]            print, or store, the landing base
 #     code_health/gate_stamp.sh check                   the pre-push guard of .pre-commit-config.yaml
 #
-# A gate measures a tree: the merge-base of the branch with origin/dev, plus the branch. When a
-# sibling commit lands on origin/dev and the branch rebases onto it, the tree changes, and a gate
+# The landing base is the branch the worktree lands on (ADR 0240): origin/main for a branch of its
+# own, or the shared branch, such as origin/dev-fixes. `base <ref>` stores it in the git directory
+# of the worktree, and it defaults to origin/main.
+#
+# A gate measures a tree: the merge-base of the branch with the landing base, plus the branch. When
+# a sibling commit lands on the base and the branch rebases onto it, the tree changes, and a gate
 # measured before the rebase measured a program nobody will ship. `check` refuses the push when
-# origin/dev changed, after a gate measured the tree, a file the branch also changes, or a file in
+# the base changed, after a gate measured the tree, a file the branch also changes, or a file in
 # the same directory under src/ or ext/. Re-run the gates it names on the rebased tree, or `drop`
 # the stamp of a gate the change cannot reach. Run `check` by hand after each rebase: it answers
 # before the push does.
@@ -38,7 +43,7 @@
 #     and a change to the code need the doctest stamp, and a changed literal does not need `jet`.
 #     `waive` records the reason a gate does not apply.
 #   - The doctest stamp is the scoped one, `doctest-files`, as JET and the other gates take a
-#     scoped run. `docs/doctest_files.jl --against origin/dev` runs the blocks of the changed
+#     scoped run. `docs/doctest_files.jl --against origin/main` runs the blocks of the changed
 #     files, and the full run of `--all` covers it too. A change can alter what a block of another
 #     file prints. The doctest job of CI runs every block and stays the gate for that case.
 #   - `coverage` is required of a `code` change alone. `test/run_files.jl --coverage=<dir>` records
@@ -52,23 +57,25 @@
 #
 # Stamps live in the git directory of the worktree, so each worktree has its own and none is
 # committed. The guard acts only in a worktree under `.claude/worktrees/`, where parallel sessions
-# work. The `dev` checkout of the maintainer records and checks nothing.
+# work. The checkout of the maintainer records and checks nothing.
 #
 # Environment:
-#   GATE_STAMP_REF       the ref a gate is measured against. Default: origin/dev.
-#   GATE_STAMP_BRANCH    the remote branch the guard protects. Default: refs/heads/dev.
+#   GATE_STAMP_REF       the ref a gate is measured against. Default: the landing base, which
+#                        is origin/main when `base` stored none.
+#   GATE_STAMP_BRANCH    the globs, split on spaces, of the remote branches the guard protects,
+#                        the branches of ADR 0240. Default: refs/heads/agents/* refs/heads/dev-fixes.
 #   GATE_STAMP_REQUIRED  the gates a push that changes src/ or ext/ needs. Default:
 #                        "jet size complexity perf doctest coverage". The tests set it empty.
 #   GATE_STAMP_FORCE     any value acts outside .claude/worktrees/ too. The tests use it.
-#   PRE_COMMIT_FROM_REF, PRE_COMMIT_TO_REF, PRE_COMMIT_REMOTE_BRANCH
-#                        set by pre-commit for a pre-push hook: the remote tip, the pushed tip,
-#                        and the branch pushed to.
+#   PRE_COMMIT_TO_REF, PRE_COMMIT_REMOTE_BRANCH
+#                        set by pre-commit for a pre-push hook: the pushed tip and the branch
+#                        pushed to.
 
 set -euo pipefail
 
 usage() {
     echo "usage: gate_stamp.sh record <gate>... | list | drop <gate>... | waive <gate> <reason>" \
-        "| readers <file> | reach | check" >&2
+        "| readers <file> | reach | base [<ref>] | check" >&2
     exit 2
 }
 
@@ -78,7 +85,14 @@ gitdir=$(git rev-parse --absolute-git-dir)
 stamps="$gitdir/gate_stamps"
 waivers="$gitdir/gate_waivers"
 pushed="$gitdir/gate_pushed"
-ref=${GATE_STAMP_REF:-origin/dev}
+basefile="$gitdir/gate_base"
+if [ -n "${GATE_STAMP_REF:-}" ]; then
+    ref=$GATE_STAMP_REF
+elif [ -s "$basefile" ]; then
+    ref=$(cat "$basefile")
+else
+    ref=origin/main
+fi
 required=${GATE_STAMP_REQUIRED-jet size complexity perf doctest coverage}
 
 acts() {
@@ -129,6 +143,22 @@ waive() {
     next=$(without "$waivers" "$gate")
     next+=$'\n'"$gate"$'\t'"$*"
     printf '%s\n' "$next" | sed '/^$/d' >"$waivers"
+}
+
+# Print the landing base, or store a new one. The landing base is the branch the worktree lands on
+# (ADR 0240): `origin/main` for a branch of its own, `origin/dev-fixes` or `origin/agents/<map>-…`
+# for a shared branch. Every stamp and every check reads it.
+landing_base() {
+    if [ $# -eq 0 ]; then
+        echo "$ref"
+        return 0
+    fi
+    [ $# -eq 1 ] || usage
+    if ! git rev-parse --verify --quiet "$1^{commit}" >/dev/null; then
+        echo "gate_stamp.sh: $1 names no commit. Fetch it first: git fetch origin <branch>." >&2
+        return 2
+    fi
+    printf '%s\n' "$1" >"$basefile"
 }
 
 list() {
@@ -278,20 +308,40 @@ moved_files() {
         sort -u
 }
 
-# Refuse the push when a stamp's base and the remote tip differ in a file the push changes, or in a
-# src/ or ext/ directory the push changes, or when a push that changes src/ or ext/ lacks a stamp of
-# a required gate. A plain run, outside pre-commit, checks HEAD against the ref.
+# Refuse the push when a stamp's base and the tip of the ref differ in a file the push changes, or in
+# a src/ or ext/ directory the push changes, or when a push that changes src/ or ext/ lacks a stamp
+# of a required gate. A plain run, outside pre-commit, checks HEAD against the ref.
+#
+# The tip that counts is the tip of the landing base. On a branch of its own, the base is the branch
+# the pull request merges into, and not the remote tip of the pushed branch, which its first push
+# does not have. On a shared branch, the base is the shared branch itself.
 check() {
     acts || return 0
-    local protected=${GATE_STAMP_BRANCH:-refs/heads/dev}
-    [ "${PRE_COMMIT_REMOTE_BRANCH:-$protected}" = "$protected" ] || return 0
-    local from=${PRE_COMMIT_FROM_REF:-$(git rev-parse "$ref")}
-    local to=${PRE_COMMIT_TO_REF:-$(git rev-parse HEAD)}
-    # A new remote branch has no tip, and a tip this clone has not fetched makes the push a
-    # non-fast-forward that git refuses by itself.
-    case "$from" in
-    0000000000000000000000000000000000000000) return 0 ;;
-    esac
+    local protected=${GATE_STAMP_BRANCH:-refs/heads/agents/* refs/heads/dev-fixes}
+    if [ -n "${PRE_COMMIT_REMOTE_BRANCH:-}" ]; then
+        local glob globs hit_branch=0
+        # `read -a` splits the list on spaces and expands no pathname. Each glob is unquoted in
+        # the pattern, so `case` reads it as a glob.
+        read -r -a globs <<<"$protected"
+        # shellcheck disable=SC2254
+        for glob in "${globs[@]}"; do
+            case "$PRE_COMMIT_REMOTE_BRANCH" in
+            $glob) hit_branch=1 ;;
+            esac
+        done
+        [ "$hit_branch" = 1 ] || return 0
+        # A push to the shared branch measures against it. A worktree with another landing base
+        # measured a tree that this push does not land on.
+        if [ "$PRE_COMMIT_REMOTE_BRANCH" = refs/heads/dev-fixes ] && [ "$ref" != origin/dev-fixes ]; then
+            echo "This push lands on dev-fixes, and the landing base is $ref. Run"
+            echo "  code_health/gate_stamp.sh base origin/dev-fixes"
+            echo "then rebase onto origin/dev-fixes, and run the gates again."
+            return 1
+        fi
+    fi
+    local from to
+    from=$(git rev-parse "$ref")
+    to=${PRE_COMMIT_TO_REF:-$(git rev-parse HEAD)}
     git cat-file -e "$from^{commit}" 2>/dev/null || return 0
 
     # The branch's own files run from the merge-base, so a branch not yet rebased does not count
@@ -337,7 +387,7 @@ check() {
                 fi
             done)
             if [ -n "$hit" ]; then
-                stale+="  $gate, measured on ${base:0:10}. Since then origin/dev changed:"$'\n'
+                stale+="  $gate, measured on ${base:0:10}. Since then $ref changed:"$'\n'
                 stale+=$(printf '%s\n' "$hit" | sed 's/^/      /')$'\n'
                 names+=" $gate"
             fi
@@ -388,6 +438,7 @@ readers)
     readers "$1"
     ;;
 reach) reach ;;
+base) landing_base "$@" ;;
 check) check ;;
 *) usage ;;
 esac
