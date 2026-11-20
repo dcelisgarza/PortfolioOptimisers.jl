@@ -700,5 +700,141 @@ function variance_count(ce::PortfolioOptimisersCovariance{<:Any,
                         X::MatNum, amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
     return variance_count(ce.ce, X, amsk)
 end
+"""
+    Statistics.var(ce::PortfolioOptimisersCovariance{<:Any,
+                                                     <:MatrixProcessing{<:Any, <:Any, <:Any,
+                                                                        Nothing}}, X::MatNum;
+                   dims::Int = 1, kwargs...)
+    Statistics.var(ce::PortfolioOptimisersCovariance{<:Any,
+                                                     <:MatrixProcessing{<:Any, <:Any, <:Any,
+                                                                        Nothing}}, X::MatNum,
+                   pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    Statistics.std(ce::PortfolioOptimisersCovariance{<:Any,
+                                                     <:MatrixProcessing{<:Any, <:Any, <:Any,
+                                                                        Nothing}}, X::MatNum;
+                   dims::Int = 1, kwargs...)
+    Statistics.std(ce::PortfolioOptimisersCovariance{<:Any,
+                                                     <:MatrixProcessing{<:Any, <:Any, <:Any,
+                                                                        Nothing}}, X::MatNum,
+                   pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+
+Compute the variance vector or the standard deviation vector of a [`PortfolioOptimisersCovariance`](@ref) whose [`MatrixProcessing`](@ref) has no custom `alg` step. The method reads the inner estimator `ce.ce`, and it runs no matrix processing.
+
+The repair, the denoising and the detoning of [`MatrixProcessing`](@ref) act on the correlation, and each one gives the diagonal back without change. So the diagonal of the processed matrix is the variance of `ce.ce`, and [`variance_count`](@ref) reads the count of `ce.ce` by the same rule. The root method reads the diagonal of the processed covariance instead. On a fit where the covariance is `NaN`, such as a fit on one observation, the positive definite repair of that root raises. A custom `alg` step can change the diagonal, so a composite with one takes the root method.
+
+# Algorithm
+
+ 1. Call the same verb on `library_covariance_estimator(ce.ce)`, with `X`, with `pnl` when it is given, and with `dims` and `kwargs...`.
+
+# Arguments
+
+  - `ce`: The composite covariance estimator with a processing step that has no custom `alg` step.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - `kwargs...`: More keyword arguments for the inner covariance estimator, `active_mask` too.
+
+# Validation
+
+  - The inner estimator checks `dims` and the sample, as its own method of the verb states.
+
+# Returns
+
+  - `val::Matrix{<:Number}`: The variance vector or the standard deviation vector of `ce.ce`. Its shape is `(1, N)` if `dims == 1`, or `(N, 1)` if `dims == 2`.
+
+# Related
+
+  - [`PortfolioOptimisersCovariance`](@ref)
+  - [`MatrixProcessing`](@ref)
+  - [`variance_count`](@ref)
+  - [`var(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+  - [`variance_series(ce::PortfolioOptimisersCovariance{<:Any, <:MatrixProcessing{<:Any, <:Any, <:Any, Nothing}}, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+"""
+function Statistics.var(ce::PortfolioOptimisersCovariance{<:Any,
+                                                          <:MatrixProcessing{<:Any, <:Any,
+                                                                             <:Any,
+                                                                             Nothing}},
+                        X::MatNum; dims::Int = 1, kwargs...)
+    return Statistics.var(library_covariance_estimator(ce.ce), X; dims = dims, kwargs...)
+end
+function Statistics.var(ce::PortfolioOptimisersCovariance{<:Any,
+                                                          <:MatrixProcessing{<:Any, <:Any,
+                                                                             <:Any,
+                                                                             Nothing}},
+                        X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    return Statistics.var(library_covariance_estimator(ce.ce), X, pnl; dims = dims,
+                          kwargs...)
+end
+function Statistics.std(ce::PortfolioOptimisersCovariance{<:Any,
+                                                          <:MatrixProcessing{<:Any, <:Any,
+                                                                             <:Any,
+                                                                             Nothing}},
+                        X::MatNum; dims::Int = 1, kwargs...)
+    return Statistics.std(library_covariance_estimator(ce.ce), X; dims = dims, kwargs...)
+end
+function Statistics.std(ce::PortfolioOptimisersCovariance{<:Any,
+                                                          <:MatrixProcessing{<:Any, <:Any,
+                                                                             <:Any,
+                                                                             Nothing}},
+                        X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    return Statistics.std(library_covariance_estimator(ce.ce), X, pnl; dims = dims,
+                          kwargs...)
+end
+"""
+    variance_series(ce::PortfolioOptimisersCovariance{<:Any,
+                                                      <:MatrixProcessing{<:Any, <:Any, <:Any,
+                                                                         Nothing}}, X::MatNum;
+                    dims::Int = 1, kwargs...)
+    variance_series(ce::PortfolioOptimisersCovariance{<:Any,
+                                                      <:MatrixProcessing{<:Any, <:Any, <:Any,
+                                                                         Nothing}}, X::MatNum,
+                    pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+
+Compute the point-in-time variance series of a [`PortfolioOptimisersCovariance`](@ref) whose [`MatrixProcessing`](@ref) has no custom `alg` step, as the variance series of its inner estimator `ce.ce`.
+
+The variance of the composite is the variance of `ce.ce`, as [`var(ce::PortfolioOptimisersCovariance{<:Any, <:MatrixProcessing{<:Any, <:Any, <:Any, Nothing}}, X::MatNum; dims::Int = 1, kwargs...)`](@ref) states. So the series of the composite is the series of `ce.ce`, and an inner estimator with a series of its own, such as the one forward pass of [`ExpWeightedCovariance`](@ref), keeps it. Row `1` is a fit on one observation, so an inner estimator that needs two observations gives `NaN` in that row, as the root method states.
+
+# Algorithm
+
+ 1. Call [`variance_series`](@ref) on `library_covariance_estimator(ce.ce)`, with `X`, with `pnl` when it is given, and with `dims` and `kwargs...`.
+
+# Arguments
+
+  - `ce`: The composite covariance estimator with a processing step that has no custom `alg` step.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - `kwargs...`: More keyword arguments for the inner estimator, `active_mask` and `estimation_mask` too.
+
+# Validation
+
+  - The inner estimator checks `dims` and the sample, as its own method of [`variance_series`](@ref) states.
+
+# Returns
+
+  - `val::Matrix{<:Number}`: The variance series of `ce.ce`. Its shape is `(T, N)` if `dims == 1`, or `(N, T)` if `dims == 2`.
+
+# Related
+
+  - [`PortfolioOptimisersCovariance`](@ref)
+  - [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+  - [`variance_count`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function variance_series(ce::PortfolioOptimisersCovariance{<:Any,
+                                                           <:MatrixProcessing{<:Any, <:Any,
+                                                                              <:Any,
+                                                                              Nothing}},
+                         X::MatNum; dims::Int = 1, kwargs...)
+    return variance_series(library_covariance_estimator(ce.ce), X; dims = dims, kwargs...)
+end
+function variance_series(ce::PortfolioOptimisersCovariance{<:Any,
+                                                           <:MatrixProcessing{<:Any, <:Any,
+                                                                              <:Any,
+                                                                              Nothing}},
+                         X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    return variance_series(library_covariance_estimator(ce.ce), X, pnl; dims = dims,
+                           kwargs...)
+end
 
 export PortfolioOptimisersCovariance

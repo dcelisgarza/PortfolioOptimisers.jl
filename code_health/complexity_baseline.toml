@@ -5,7 +5,7 @@
 julia = "1.13.4"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "f8a48313c4"
+commit = "5bf69c6f14"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 6, cog_sum = 4, arg_sum = 16, macros = [] }
@@ -88,7 +88,7 @@ commit = "f8a48313c4"
 "src/03_InputData/22_PanelRoundTrip.jl" = { cyc = 7, cog = 10, arg = 6, cyc_sum = 88, cog_sum = 73, arg_sum = 72, macros = [] }
 "src/04_MatrixProcessing/01_PosdefMatrix.jl" = { cyc = 4, cog = 4, arg = 3, cyc_sum = 36, cog_sum = 22, arg_sum = 24, macros = [] }
 "src/04_MatrixProcessing/02_Denoise.jl" = { cyc = 4, cog = 6, arg = 7, cyc_sum = 19, cog_sum = 13, arg_sum = 30, macros = [] }
-"src/04_MatrixProcessing/03_Detone.jl" = { cyc = 4, cog = 4, arg = 2, cyc_sum = 9, cog_sum = 5, arg_sum = 8, macros = [] }
+"src/04_MatrixProcessing/03_Detone.jl" = { cyc = 6, cog = 6, arg = 2, cyc_sum = 11, cog_sum = 7, arg_sum = 8, macros = [] }
 "src/04_MatrixProcessing/04_MatrixProcessing.jl" = { cyc = 5, cog = 5, arg = 6, cyc_sum = 43, cog_sum = 11, arg_sum = 122, macros = [] }
 "src/04_MatrixProcessing/05_MatrixSquareRoot.jl" = { cyc = 6, cog = 7, arg = 2, cyc_sum = 13, cog_sum = 10, arg_sum = 12, macros = [] }
 "src/05_Moments/01_Base_Moments.jl" = { cyc = 19, cog = 26, arg = 9, cyc_sum = 109, cog_sum = 119, arg_sum = 106, macros = ["@define_pretty_show"] }

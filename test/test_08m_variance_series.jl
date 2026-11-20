@@ -619,3 +619,63 @@ removed the integer case: integer data convert at the carrier.
         @test eltype(PO.variance_series(ce, X32)) == Float32
     end
 end
+#=
+Issue #2211. The variance of a `PortfolioOptimisersCovariance` with no custom `alg` step is the
+variance of its inner estimator, because the repair, the denoising and the detoning give the
+diagonal back. The root method fitted `var` of the composite on each window, and that `var` ran
+the positive definite repair on the `NaN` covariance of a fit on one observation, which raised.
+`WindowedCovariance()` wraps such a composite by default, so its series raised too.
+=#
+struct ProbeMatrixProcessing2211 <: PO.AbstractMatrixProcessingAlgorithm end
+@testset "a composite with no custom step reads the diagonal of its inner estimator (#2211)" begin
+    X = 0.01 .* randn(StableRNG(78), 40, 3)
+    amsk = trues(size(X))
+    amsk[1:6, 2] .= false
+    emsk = trues(size(X))
+    emsk[10:12, 3] .= false
+    mps = (MatrixProcessing(), MatrixProcessing(; dn = Denoise(), dt = Detone()))
+    for inner in (Covariance(), ExpWeightedCovariance(; decay = 0.9),
+                  StatsBase.SimpleCovariance(; corrected = true)), mp in mps
+
+        ce = PortfolioOptimisersCovariance(; ce = inner, mp = mp)
+        lib = PO.library_covariance_estimator(inner)
+        s = PO.variance_series(ce, X)
+        @test isequal(s, PO.variance_series(lib, X))
+        # Row 1 is a fit on one observation, so a corrected fit is NaN there, as the root
+        # method states.
+        @test all(isnan, s[1, :])
+        Xt = permutedims(X)
+        @test isequal(PO.variance_series(ce, Xt; dims = 2),
+                      PO.variance_series(lib, Xt; dims = 2))
+        @test PO.variance_series(ce, Xt; dims = 2) ≈ permutedims(s) nans = true rtol = 1e-12
+        @test isequal(PO.variance_series(ce, X, nothing),
+                      PO.variance_series(lib, X, nothing))
+        @test isequal(var(ce, X), var(lib, X))
+        @test isequal(std(ce, X; dims = 2), std(lib, X; dims = 2))
+        @test isequal(var(ce, X, nothing), var(lib, X, nothing))
+        @test isequal(std(ce, X, nothing), std(lib, X, nothing))
+    end
+    # The masks reach the inner estimator.
+    ew = ExpWeightedCovariance(; decay = 0.9)
+    ce = PortfolioOptimisersCovariance(; ce = ew)
+    @test isequal(PO.variance_series(ce, X; active_mask = amsk, estimation_mask = emsk),
+                  PO.variance_series(ew, X; active_mask = amsk, estimation_mask = emsk))
+    @test isequal(var(ce, X; active_mask = amsk), var(ew, X; active_mask = amsk))
+    # On a fit where the repair runs, the forward equals the diagonal of the processed matrix.
+    ce = PortfolioOptimisersCovariance(; mp = MatrixProcessing(; dn = Denoise()))
+    @test vec(var(ce, X)) ≈ LinearAlgebra.diag(cov(ce, X)) rtol = 1e-12
+    # The default `WindowedCovariance` wraps a composite, and each window reads its variance.
+    sw = PO.variance_series(WindowedCovariance(; window = 10), X)
+    @test all(isnan, sw[1, :])
+    @test isequal(sw,
+                  PO.variance_series(WindowedCovariance(; window = 10, ce = Covariance()),
+                                     X))
+    # A custom step can change the diagonal, so a composite with one keeps the root method.
+    calg = PortfolioOptimisersCovariance(;
+                                         mp = MatrixProcessing(;
+                                                               alg = ProbeMatrixProcessing2211()))
+    @test which(PO.variance_series, Tuple{typeof(calg), Matrix{Float64}}) ==
+          which(PO.variance_series, Tuple{PO.AbstractCovarianceEstimator, PO.MatNum})
+    @test which(var, Tuple{typeof(calg), Matrix{Float64}}) ==
+          which(var, Tuple{PO.AbstractCovarianceEstimator, PO.MatNum})
+end

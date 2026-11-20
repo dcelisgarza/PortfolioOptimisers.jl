@@ -481,6 +481,33 @@ end
             @test LinearAlgebra.isposdef(sigma[p, p])
         end
     end
+    @testset "Ticket 2212: Detone removes only the leading modes that are one subspace" begin
+        # The identity has no leading mode, so `eigen` gave a basis vector, the remainder had a
+        # zero variance, and the rescale divided by it. The matrix now comes back.
+        I4 = Matrix(1.0LinearAlgebra.I, 4, 4)
+        @test isequal(detone!(Detone(), copy(I4)), I4)
+        @test isequal(detone!(Detone(; n = 3), copy(I4)), I4)
+        S4 = Matrix(LinearAlgebra.Diagonal([0.5, 1.0, 2.0, 4.0]))
+        @test detone!(Detone(), copy(S4)) ≈ S4
+        # `Denoise` gives the identity when it finds no signal, and the pair raised on clean
+        # data. The diagonal of the covariance returns.
+        Xn = 0.01 .* randn(StableRNG(78), 40, 6) .+ 0.003 .* randn(StableRNG(1), 40, 1)
+        mp = MatrixProcessing(; dn = Denoise(), dt = Detone())
+        sigma = cov(PortfolioOptimisersCovariance(; mp = mp), Xn)
+        @test all(isfinite, sigma)
+        @test LinearAlgebra.diag(sigma) ≈ LinearAlgebra.diag(cov(Covariance(), Xn))
+        # One leading mode stands above a tie, so `n = 2` removes that mode alone.
+        C = [1.0 0.5 0.5 0.5; 0.5 1.0 0.5 0.5; 0.5 0.5 1.0 0.5; 0.5 0.5 0.5 1.0]
+        @test detone(Detone(; n = 2), C) ≈ detone(Detone(; n = 1), C)
+        # The market mode holds all of the variance of the first two assets, so each keeps a
+        # unit row, and removing every mode leaves the identity.
+        C3 = [1.0 1.0 0.0; 1.0 1.0 0.0; 0.0 0.0 1.0]
+        @test detone(Detone(), C3) ≈ Matrix(1.0LinearAlgebra.I, 3, 3)
+        @test detone(Detone(; pdm = nothing, n = 4), C) ≈ Matrix(1.0LinearAlgebra.I, 4, 4)
+        S = StatsBase.cor2cov(copy(C), [0.5, 1.0, 1.5, 2.0])
+        @test detone(Detone(; n = 4), S) ≈
+              Matrix(LinearAlgebra.Diagonal(LinearAlgebra.diag(S)))
+    end
     @testset "Ticket 447: matrix_processing! applies mp.order" begin
         rng = StableRNG(90210)
         Xd = randn(rng, 120, 6)

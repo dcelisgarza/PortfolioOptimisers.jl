@@ -833,6 +833,19 @@ scenario mean.
             end
         end
     end
+    @testset "A composite variance estimator fits as its inner estimator (#2211)" begin
+        # The variance of the composite is the variance of `ce.ce`, so the prior with the
+        # composite as `ve` reads the series of `ce.ce`. It raised before on the fit of row 1.
+        csv(ve) = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(),
+                                            minra = 5, ve = ve)
+        for inner in (Covariance(), ExpWeightedCovariance())
+            pc = prior(csv(PortfolioOptimisersCovariance(; ce = inner)), rd)
+            pn = prior(csv(inner), rd)
+            @test isequal(pc.rr.vs, pn.rr.vs)
+            @test isequal(pc.sigma, pn.sigma)
+            @test isequal(pc.mu, pn.mu)
+        end
+    end
 end
 
 @testset "A constrained Factor Family re-bases the fit" begin

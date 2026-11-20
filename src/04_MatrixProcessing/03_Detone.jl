@@ -94,6 +94,8 @@ Where:
 
 When the algorithm subtracts a set of eigenmodes, the diagonal of ``\\mathbf{C}`` falls below one. So the rescaling changes every entry of the matrix. The subtraction sets the removed eigenvalues to zero and keeps the others, so ``\\mathbf{C}`` and ``\\tilde{\\mathbf{X}}`` are positive semidefinite and singular. [`posdef!`](@ref) then runs on ``\\tilde{\\mathbf{X}}`` under `pdm`.
 
+The ``n`` largest eigenmodes are one subspace only when ``\\lambda_{N-n+1} > \\lambda_{N-n}``. When the two eigenvalues are equal, the eigenvectors in the subtraction are an arbitrary choice from a larger subspace, and the result depends on that choice. The identity is such a matrix, and [`Denoise`](@ref) gives the identity when it finds no signal. So the algorithm removes the largest number ``m \\leq n`` of leading modes that is one subspace, and it gives the matrix back when no such ``m`` exists. A covariance then comes back to within the rounding of its conversion to a correlation and back. A tie is a difference of not more than ``N \\varepsilon \\max_k \\lvert \\lambda_k \\rvert``, the rounding bound of the decomposition. An asset whose remainder ``C_{ii}`` is not more than that bound has all of its variance in the removed modes, so it has no correlation after the subtraction. Its row and column of ``\\tilde{\\mathbf{X}}`` are zero, with a one on the diagonal. So the diagonal of a covariance returns without change, and ``n = N`` gives the identity.
+
 Equation 5 of [kim2005](@cite) splits a correlation matrix into the market mode, the group modes and the noise modes, and the subtraction at ``n = 1`` removes the first of those parts. That work does not rescale. Section 2.6 of [mlp1](@cite) states detoning. It subtracts the market components, usually one but possibly more, and rescales the remainder to a unit diagonal. A search of the literature found no earlier work that states the rescale. That section detones a denoised matrix, and this estimator detones the matrix that it gets.
 
 # Algorithm
@@ -102,15 +104,14 @@ Equation 5 of [kim2005](@cite) splits a correlation matrix into the market mode,
 
  1. Read `dt.n` into `n`, and check that `0 < n <= size(X, 2)`.
  2. When `X` has a zero variance, set its row and column to zero and detone the block of the positive variances with a recursive call, through [`zero_variance_block!`](@ref), and return `X`. A zero variance has no correlation, so step 4 cannot standardise it. The recursive call checks `dt.n` against the size of the block.
- 3. Decrement `n` by one. `n` counts the modes to remove, and steps 6 and 7 slice `(end - n):end`, which is a window of the original `dt.n` columns. So `dt.n = 1` removes the single largest component, which is the market mode.
- 4. Read the diagonal of `X` into `s`. When any entry of `s` is not one, `X` is a covariance matrix. Then replace `s` with its square roots and convert `X` to a correlation matrix with `StatsBase.cov2cor!`. The test is `any(!isone, s)`, so it is the value of the diagonal that decides, never the type of `X`.
- 5. Eigendecompose `X` into the ascending eigenvalues `vals` and the eigenvectors `vecs`.
- 6. Take the last block of `vals`, which holds the `dt.n` largest eigenvalues.
- 7. Take the matching last columns of `vecs`.
- 8. Subtract `vecs * vals * transpose(vecs)` from `X`. The result is the remainder ``\\mathbf{C}``.
- 9. Rescale the remainder to unit diagonal with `StatsBase.cov2cor`.
-10. Repair the rescaled matrix with [`posdef!`](@ref), under `dt.pdm`.
-11. When step 4 converted a covariance matrix, convert `X` back with `StatsBase.cor2cov!`. The standard deviations are the ones read in step 4, so the original diagonal returns exactly.
+ 3. Read the diagonal of `X` into `s`. When any entry of `s` is not one, `X` is a covariance matrix. Then replace `s` with its square roots and convert `X` to a correlation matrix with `StatsBase.cov2cor!`. The test is `any(!isone, s)`, so it is the value of the diagonal that decides, never the type of `X`.
+ 4. Eigendecompose `X` into the ascending eigenvalues `vals` and the eigenvectors `vecs`. Set the tolerance `tol = N * eps(T) * maximum(abs, vals)`.
+ 5. Find `m`, the largest number in `1:n` for which `m == N`, or `vals[N - m + 1] - vals[N - m] > tol`. When no such `m` exists, skip to step 10. So `dt.n = 1` removes the single largest component, which is the market mode, when it stands above the next one.
+ 6. Subtract the `m` largest eigenmodes from `X`. The result is the remainder ``\\mathbf{C}``.
+ 7. Set the row and the column of each asset whose remainder on the diagonal is at most `tol` to zero, and its diagonal entry to one.
+ 8. Rescale the remainder to unit diagonal with `StatsBase.cov2cor`.
+ 9. Repair the rescaled matrix with [`posdef!`](@ref), under `dt.pdm`.
+10. When step 3 converted a covariance matrix, convert `X` back with `StatsBase.cor2cov!`. The standard deviations are the ones read in step 3, so the original diagonal returns exactly.
 
 # Fields
 
@@ -174,6 +175,8 @@ end
 Removes the `n` largest principal components, the market modes, from a covariance or correlation matrix in place.
 
 When the diagonal of `X` is not all ones, the function converts `X` to a correlation matrix, applies the algorithm, and scales the result back to a covariance.
+
+A matrix with no leading mode that stands above the next one, such as the identity, comes back, to within the rounding of the conversion of a covariance, as [`Detone`](@ref) states.
 
 # Arguments
 
@@ -245,7 +248,6 @@ function detone!(dt::Detone, X::MatNum)
     if zero_variance_block!((block, _) -> detone!(dt, block), X)
         return X
     end
-    n -= 1
     s = LinearAlgebra.diag(X)
     iscov = any(!isone, s)
     if iscov
@@ -253,11 +255,23 @@ function detone!(dt::Detone, X::MatNum)
         StatsBase.cov2cor!(X, s)
     end
     vals, vecs = LinearAlgebra.eigen(X)
-    vals = LinearAlgebra.Diagonal(vals)[(end - n):end, (end - n):end]
-    vecs = vecs[:, (end - n):end]
-    X .-= vecs * vals * transpose(vecs)
-    X .= StatsBase.cov2cor(X)
-    posdef!(dt.pdm, X)
+    N = length(vals)
+    tol = N * eps(eltype(vals)) * maximum(abs, vals)
+    # The `m` leading modes are one subspace only when the smallest of them stands above the next
+    # eigenvalue by more than the rounding of the decomposition. A tie leaves them arbitrary.
+    m = findlast(k -> k == N || vals[N - k + 1] - vals[N - k] > tol, 1:n)
+    if !isnothing(m)
+        idx = (N - m + 1):N
+        V = view(vecs, :, idx)
+        X .-= V * LinearAlgebra.Diagonal(view(vals, idx)) * transpose(V)
+        # The removed modes hold all the variance of such an asset, so it keeps a unit row.
+        z = LinearAlgebra.diag(X) .<= tol
+        X[z, :] .= zero(eltype(X))
+        X[:, z] .= zero(eltype(X))
+        X[view(LinearAlgebra.diagind(X), z)] .= one(eltype(X))
+        X .= StatsBase.cov2cor(X)
+        posdef!(dt.pdm, X)
+    end
     if iscov
         StatsBase.cor2cov!(X, s)
     end
