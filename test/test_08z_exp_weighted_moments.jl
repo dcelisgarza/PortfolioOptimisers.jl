@@ -275,6 +275,17 @@ end
     # With no gap, the undivided state is the sum of the returns under unnormalised weights.
     w = (1 - EW_DECAY) .* EW_DECAY .^ ((EW_T - 1):-1:0)
     @test isapprox(mean(raw, X), vec(transpose(w) * X); rtol = 1e-12)
+    # The read-out allocates the copy of the state and the mask of the assets that are not
+    # ready, under each rule. It allocates no vector of the counted assets.
+    Xw = repeat(Xg, 1, 50)
+    amskw = repeat(amsk, 1, 50)
+    function readout_bytes(me)
+        st = partial_fit!(me, Xw; active_mask = amskw)
+        PortfolioOptimisers.exp_weighted_moment(st.cache, st)
+        return @allocated PortfolioOptimisers.exp_weighted_moment(st.cache, st)
+    end
+    @test readout_bytes(def) <= 2 * sizeof(Xw[1, :])
+    @test readout_bytes(raw) <= 2 * sizeof(Xw[1, :])
 end
 
 @testset "Exponentially weighted moments: the Asset Panel seam" begin

@@ -220,9 +220,10 @@ cross-sectional transform refuses one in a Descriptor, so one infinite cell cost
 `EWMean` gains the field `debias` after `exponentiate`
 ([#2134](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/2134)), and the preset
 `EWMomentum` takes it as a keyword. The recursion starts at zero, so after `n` valid inputs its
-weights sum to `1 - λ^n`. `ZeroStartDebias()`, the default, divides the state by that sum, as the
-archetype did before. `debias = nothing` keeps the undivided state, which shrinks the momentum of a
-short history toward zero, its neutral value. Each form has a use: the division makes a late
+weights sum to `1 - λ^n`. `ZeroStartDebias()`, the default, divides the state by that sum. The
+released archetype did not divide, and v0.34 divides by default, as `EWVolatility` already did.
+`debias = nothing` keeps the undivided state of the released archetype, which shrinks the momentum
+of a short history toward zero, its neutral value. Each form has a use: the division makes a late
 listing comparable with a full history, and the shrinkage pulls a noisy signal from a short history
 toward no signal. The oracle reads the undivided state, so its momentum is reachable through a
 field. `ExpWeightedExpectedReturns` takes the same field for the same reason. `EWVolumeRatio` and

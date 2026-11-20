@@ -60,7 +60,7 @@ Where:
 
 # Returns
 
-  - `m::Number`: The mean. Under [`ZeroStartDebias`](@ref) a count of zero gives `NaN`, so every caller reads the mean only where the count reaches its warm-up, which is at least one.
+  - `m::Number`: The mean. Under [`ZeroStartDebias`](@ref) a count of zero divides by zero. Every holder keeps the state at zero there, so the mean is `NaN`, and every caller reads the mean only where the count reaches its warm-up, which is at least one.
 
 # Examples
 
@@ -463,10 +463,12 @@ The method reads the cache and does not write it, so the same cache answers this
 function exp_weighted_moment(cache::ExpWeightedExpectedReturnsState,
                              est::ExpWeightedExpectedReturns)
     mu = copy(cache.mu)
-    counted = cache.obs_count .> zero(eltype(cache.obs_count))
     # `0 < decay < 1`, so `1 - decay^n >= 1 - decay > 0` in floating point as well.
-    mu[counted] .= zero_start_mean.(Ref(est.debias), view(mu, counted), est.decay,
-                                    view(cache.obs_count, counted))
+    for (i, n) in pairs(cache.obs_count)
+        if n > zero(n)
+            mu[i] = zero_start_mean(est.debias, mu[i], est.decay, n)
+        end
+    end
     not_ready = .!cache.active .| (cache.obs_count .< est.min_obs)
     if any(not_ready)
         mu[not_ready] .= NaN
