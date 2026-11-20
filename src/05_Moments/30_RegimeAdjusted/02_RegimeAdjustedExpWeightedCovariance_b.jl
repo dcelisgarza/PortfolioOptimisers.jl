@@ -1500,6 +1500,16 @@ The recursion updates only the sub-block of the assets that are valid at each ob
 function gap_fill_value(::RegimeAdjustedExpWeightedCovariance)
     return NaN
 end
+function reads_active_mask(::Union{RegimeAdjustedExpWeightedVariance,
+                                   RegimeAdjustedExpWeightedCovariance})
+    return true
+end
+function series_folds(ce::RegimeAdjustedExpWeightedCovariance)
+    return isnothing(ce.cache)
+end
+function fold_mask_keywords(::RegimeAdjustedExpWeightedCovariance, amsk, emsk)
+    return (; active_mask = amsk, estimation_mask = emsk)
+end
 """
     Statistics.cor(
         ce::RegimeAdjustedExpWeightedCovariance,

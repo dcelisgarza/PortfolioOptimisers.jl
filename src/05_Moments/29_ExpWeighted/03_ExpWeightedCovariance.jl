@@ -544,6 +544,12 @@ The recursion moves only the entries of the assets that are valid at an observat
 function gap_fill_value(::ExpWeightedCovariance)
     return NaN
 end
+function reads_active_mask(::Union{ExpWeightedVariance, ExpWeightedCovariance})
+    return true
+end
+function series_folds(ce::ExpWeightedCovariance)
+    return isnothing(ce.cache)
+end
 """
     Statistics.cor(
         ce::ExpWeightedCovariance,

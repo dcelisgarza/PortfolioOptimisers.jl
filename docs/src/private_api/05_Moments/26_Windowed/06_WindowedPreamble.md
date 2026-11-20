@@ -12,8 +12,10 @@ windowed_inner
 windowed_rows
 windowed_keywords
 windowed_panel
+windowed_mask_panel
 windowed_series_rows
 windowed_series_row
+panel_series_row
 variance_series(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt}, X::MatNum, pnl::Option{<:AssetPanel})
 SeedWindowed
 seed_window_path(::SeedWindowed)

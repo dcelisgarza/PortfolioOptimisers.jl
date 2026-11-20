@@ -288,6 +288,39 @@ function variance_series(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int =
     return variance_series(ce, nothing, nothing, X, nothing; dims = dims, kwargs...)
 end
 """
+    reads_active_mask(ce::AbstractCovarianceEstimator) -> Bool
+    reads_active_mask(ce::Union{Covariance{<:Any, <:Any, <:Any, <:Any, <:CoveragePolicy},
+                                SimpleVariance{<:Any, <:Any, <:Any, <:CoveragePolicy}}) -> Bool
+    reads_active_mask(ce::Union{ExpWeightedVariance, ExpWeightedCovariance}) -> Bool
+    reads_active_mask(ce::Union{RegimeAdjustedExpWeightedVariance,
+                                RegimeAdjustedExpWeightedCovariance}) -> Bool
+    reads_active_mask(ce::Union{WindowedVariance, WindowedCovariance}) -> Bool
+    reads_active_mask(ce::PortfolioOptimisersCovariance) -> Bool
+
+Answer whether `ce` is a mask-aware estimator: whether the Asset Panel method of its variance reads the active mask itself, and not the Coverage Universe of the window.
+
+A plain estimator takes the reduce-and-expand root of [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref), so it answers `false`, which is the fallback. Each mask-aware family overrides the panel method and answers `true` with a method in its own file: a [`Covariance`](@ref) or a [`SimpleVariance`](@ref) with a [`CoveragePolicy`](@ref), the exponentially weighted family and the regime-adjusted family. A windowed estimator and a [`PortfolioOptimisersCovariance`](@ref) give the panel to their inner estimator, so they answer for it.
+
+[`panel_series_row`](@ref), [`covers_an_asset`](@ref) and [`assert_mask_aware_variance`](@ref) read the answer. A variance estimator of your own whose panel method of `var` and whose [`variance_series`](@ref) over an Asset Panel read the active mask adds a method that returns `true`. Then an [`EWResidualVolatility`](@ref) admits it as its `ce`, and a windowed series and a [`PortfolioOptimisersCovariance`](@ref) give it the whole window.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+
+# Returns
+
+  - `flag::Bool`: `true` for a mask-aware estimator.
+
+# Related
+
+  - [`covers_an_asset`](@ref)
+  - [`assert_mask_aware_variance`](@ref)
+  - [`CoveragePolicy`](@ref)
+"""
+function reads_active_mask(::AbstractCovarianceEstimator)
+    return false
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Holds the effective count and the divisor of a variance, for one column or for each column of the data.
@@ -566,4 +599,4 @@ end
 function Statistics.std(ve::AbstractVarianceEstimator)
     return Statistics.std(ve, partial_fit_cache(ve))
 end
-public effective_observation_count
+public effective_observation_count, reads_active_mask

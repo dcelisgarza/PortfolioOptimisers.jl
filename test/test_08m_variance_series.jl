@@ -50,6 +50,16 @@ function Statistics.var(::IvEcho, X::PO.MatNum; dims::Int = 1, iv = nothing, kwa
     @assert size(iv) == size(X)
     return sum(iv; dims = 1)
 end
+# The same answer from an estimator that holds an `ImpliedVolatility`, so the reduce-and-expand
+# route narrows its Coverage Universe by the gaps of `iv`.
+struct IvSurfaceEcho{T} <: PO.AbstractVarianceEstimator
+    ive::T
+end
+function Statistics.var(::IvSurfaceEcho, X::PO.MatNum; dims::Int = 1, iv = nothing,
+                        kwargs...)
+    @assert size(iv) == size(X)
+    return sum(iv; dims = 1)
+end
 
 @testset "the fallback refits on an expanding window" begin
     rng = StableRNG(4321)
@@ -234,6 +244,133 @@ end
     @test isequal(PO.variance_series(WindowedVariance(; ve = IvEcho(), window = 2), X;
                                      iv = ivm),
                   vcat(ivm[1:1, :], ivm[1:(end - 1), :] .+ ivm[2:end, :]))
+end
+
+#=
+Issues 2225 and 2224. A window of a plain estimator over an Asset Panel that covers no asset made
+the windowed series raise an `IsEmptyError` at its first such window, as the residual of an
+`EWResidualVolatility` does in its warm-up. Its row is now `NaN`, as the row of a window that keeps
+no observation is. And a `PortfolioOptimisersCovariance` reduced each window to its Coverage
+Universe whatever its inner estimator was, so over a mask-aware estimator its `var` and its series
+dropped every asset with one gap. The inner estimator now reads the window.
+=#
+@testset "a panel window that covers no asset is a NaN row, and the composite lets its inner estimator read the window" begin
+    X = 0.01 .* randn(StableRNG(2225), 40, 3)
+    R = copy(X)
+    R[1, :] .= NaN
+    R[1:6, 2] .= NaN
+    amsk = trues(size(X))
+    amsk[30:33, 3] .= false
+    pnl = PO.AssetPanel(;
+                        pf = [PO.NumericPanelField(; name = "mcap", vals = ones(size(X)...),
+                                                   omsk = trues(size(X)...))], amsk = amsk,
+                        emsk = amsk)
+    # The windowed series of a plain estimator, written out by hand: each window is reduced to
+    # its Coverage Universe, and a window that covers no asset is a `NaN` row.
+    ref = fill(NaN, size(X))
+    for t in axes(X, 1)
+        rows = max(1, t - 3):t
+        c = vec(all(isfinite, R[rows, :]; dims = 1) .& all(amsk[rows, :]; dims = 1))
+        if any(c)
+            ref[t, c] = vec(Statistics.var(R[rows, c]; dims = 1))
+        end
+    end
+    w4 = PO.variance_series(WindowedVariance(; window = 4), R, pnl)
+    @test isapprox(w4, ref; rtol = 1e-12, nans = true)
+    @test all(isnan, w4[1:4, :])
+    @test all(isfinite, w4[5:end, 1])
+    @test isapprox(PO.variance_series(WindowedVariance(; window = 4), permutedims(R), pnl;
+                                      dims = 2), permutedims(ref); rtol = 1e-12,
+                   nans = true)
+    # One fit over a sample that covers no asset still raises.
+    @test_throws PO.IsEmptyError var(SimpleVariance(), R, pnl)
+    # The probe reads the rows of the innermost fit: through a window with no window of its own,
+    # and through a composite inside a window.
+    @test isapprox(PO.variance_series(WindowedVariance(;
+                                                       ve = WindowedVariance(; window = 4)),
+                                      R, pnl), ref; rtol = 1e-12, nans = true)
+    poc = PortfolioOptimisersCovariance(; mp = MatrixProcessing(; pdm = nothing))
+    @test isapprox(PO.variance_series(WindowedCovariance(; ce = poc, window = 4), R, pnl),
+                   ref; rtol = 1e-12, nans = true)
+    # The composite over a plain estimator keeps the route of the plain estimator.
+    @test isapprox(PO.variance_series(poc, X, pnl),
+                   PO.variance_series(Covariance(), X, pnl); rtol = 1e-12, nans = true)
+    @test all(isnan, PO.variance_series(poc, R, pnl))
+    Rn = copy(X)
+    Rn[5, 2] = NaN
+    @test isapprox(PO.variance_series(poc, Rn, nothing),
+                   PO.variance_series(Covariance(), Rn, nothing); rtol = 1e-12, nans = true)
+    @test isapprox(PO.variance_series(poc, X), PO.variance_series(Covariance(), X);
+                   rtol = 1e-12, nans = true)
+    @test !PO.series_folds(poc)
+    @test !PO.series_folds(PortfolioOptimisersCovariance(;
+                                                         ce = WindowedCovariance(;
+                                                                                 ce = ExpWeightedCovariance())))
+    # A plain leaf that reads `iv` drops the assets with a gap in the `iv` of its window too.
+    ivs = reshape(collect(1.0:120.0), 40, 3)
+    ivs[6, 2] = NaN
+    ivref = fill(NaN, size(X))
+    for t in axes(X, 1)
+        rows = max(1, t - 1):t
+        c = vec(all(isfinite, ivs[rows, :]; dims = 1) .& all(amsk[rows, :]; dims = 1))
+        ivref[t, c] = vec(sum(ivs[rows, c]; dims = 1))
+    end
+    @test isequal(PO.variance_series(WindowedVariance(;
+                                                      ve = IvSurfaceEcho(ImpliedVolatility(;
+                                                                                           ppy = 252)),
+                                                      window = 2), X, pnl; iv = ivs), ivref)
+    # A windowed mask-aware leaf reads the masks of its window, as with the whole panel.
+    ev = ExpWeightedVariance(; min_obs = 2)
+    @test isapprox(PO.variance_series(WindowedVariance(; ve = ev, window = 10), R, pnl),
+                   permutedims(reduce(hcat,
+                                      [vec(var(ev, R[max(1, t - 9):t, :],
+                                               PO.windowed_panel(pnl, max(1, t - 9):t)))
+                                       for t in axes(R, 1)])); rtol = 1e-12, nans = true)
+    # The composite over a mask-aware estimator gives the series, the variance and the standard
+    # deviation of its inner estimator, with the panel and with no panel. Its fold gives the
+    # series of a refit at each row, with the panel and with the mask keywords.
+    for ce in (Covariance(; cvg = CoveragePolicy()), ExpWeightedCovariance(; min_obs = 3),
+               RegimeAdjustedExpWeightedCovariance(; min_obs = 3))
+        pm = PortfolioOptimisersCovariance(; ce = ce,
+                                           mp = MatrixProcessing(; pdm = nothing))
+        @test PO.series_folds(pm)
+        vs = PO.variance_series(pm, R, pnl)
+        @test count(isfinite, vs) > 90
+        refit = PO.variance_series(pm, nothing, nothing, R, nothing; active_mask = amsk,
+                                   estimation_mask = amsk)
+        @test isapprox(vs, refit; rtol = 1e-12, nans = true)
+        @test isapprox(PO.variance_series(pm, R; active_mask = amsk,
+                                          estimation_mask = amsk), refit; rtol = 1e-12,
+                       nans = true)
+        @test isapprox(PO.variance_series(pm, permutedims(R); dims = 2,
+                                          active_mask = permutedims(amsk),
+                                          estimation_mask = permutedims(amsk)),
+                       permutedims(refit); rtol = 1e-12, nans = true)
+        if ce isa RegimeAdjustedExpWeightedCovariance
+            continue
+        end
+        @test isapprox(vs, PO.variance_series(ce, R, pnl); rtol = 1e-12, nans = true)
+        @test isapprox(PO.variance_series(pm, permutedims(R), pnl; dims = 2),
+                       permutedims(vs); rtol = 1e-12, nans = true)
+        @test isapprox(PO.variance_series(pm, R, nothing),
+                       PO.variance_series(ce, R, nothing); rtol = 1e-12, nans = true)
+        @test isapprox(var(pm, R, pnl), var(ce, R, pnl); rtol = 1e-12, nans = true)
+        @test isapprox(std(pm, R, pnl), sqrt.(var(ce, R, pnl)); rtol = 1e-12, nans = true)
+        @test isapprox(var(pm, permutedims(R), pnl; dims = 2), permutedims(var(ce, R, pnl));
+                       rtol = 1e-12, nans = true)
+    end
+    # The trait names the mask-aware estimators, and a wrapper answers for its inner one.
+    pol = CoveragePolicy()
+    for (ce, flag) in ((SimpleVariance(), false), (Covariance(), false),
+                       (SimpleVariance(; cvg = pol), true), (Covariance(; cvg = pol), true),
+                       (ExpWeightedVariance(), true), (ExpWeightedCovariance(), true),
+                       (RegimeAdjustedExpWeightedVariance(), true),
+                       (RegimeAdjustedExpWeightedCovariance(), true),
+                       (WindowedVariance(; ve = ExpWeightedVariance()), true),
+                       (WindowedCovariance(), false), (PortfolioOptimisersCovariance(), false),
+                       (PortfolioOptimisersCovariance(; ce = ExpWeightedCovariance()), true))
+        @test PO.reads_active_mask(ce) == flag
+    end
 end
 
 #=

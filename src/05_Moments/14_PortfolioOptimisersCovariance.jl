@@ -7,7 +7,7 @@ Runs a covariance estimator, then applies a matrix processing step to its result
 
 !!! warning
 
-    The variance of the composite is the diagonal of its processed covariance, so each fit of `var` runs `mp`. [`variance_series`](@ref) fits `var` on the observations `1` to `t` for each row `t`. The fit of row `1` reads one observation, so its covariance is `NaN`. [`Posdef`](@ref), [`Denoise`](@ref) and [`Detone`](@ref) refuse a `NaN` matrix, so the series raises `ArgumentError: matrix contains Infs or NaNs` under the default `mp`. A [`CrossSectionalFactorPrior`](@ref) whose `ve` is the composite reads this series, and so does an [`EWVolatility`](@ref) whose `ce` is the composite. So both raise too, and so does each one with a [`WindowedCovariance`](@ref) over the composite, as `WindowedCovariance()` is. For a variance series, set no `dn` or `dt`, and remove the positive definite repair with `mp = MatrixProcessing(; pdm = nothing)` or change `pdm` to a step of your own that returns a non-finite matrix without change. The series then has `NaN` in row `1`. With no step in `mp`, the inner estimator `ce` gives the same variance to rounding, so it can be the variance estimator in place of the composite.
+    The variance of the composite is the diagonal of its processed covariance, so each fit of `var` runs `mp`. [`variance_series`](@ref) fits `var` on the observations `1` to `t` for each row `t`. The fit of row `1` reads one observation, so its covariance is `NaN`. [`Posdef`](@ref), [`Denoise`](@ref) and [`Detone`](@ref) refuse a `NaN` matrix, so the series raises `ArgumentError: matrix contains Infs or NaNs` under the default `mp`. A [`CrossSectionalFactorPrior`](@ref) whose `ve` is the composite reads this series, and so does an [`EWVolatility`](@ref) or an [`EWResidualVolatility`](@ref) whose `ce` is the composite. So both raise too, and so does each one with a [`WindowedCovariance`](@ref) over the composite, as `WindowedCovariance()` is. For a variance series, set no `dn` or `dt`, and remove the positive definite repair with `mp = MatrixProcessing(; pdm = nothing)` or change `pdm` to a step of your own that returns a non-finite matrix without change. The series then has `NaN` in row `1`. With no step in `mp`, the inner estimator `ce` gives the same variance to rounding, so it can be the variance estimator in place of the composite.
 
 # Fields
 
@@ -315,6 +315,231 @@ function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum,
     matrix_processing_block!(ce.mp, rho, X, processing_observation_count(ce, X; kwargs...);
                              kwargs...)
     return rho
+end
+"""
+    Statistics.var(ce::PortfolioOptimisersCovariance, X::MatNum,
+                   pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...) -> MatNum
+    Statistics.std(ce::PortfolioOptimisersCovariance, X::MatNum,
+                   pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...) -> MatNum
+
+Take the variance or the standard deviation of the composite over an Asset Panel from the diagonal of its processed covariance over the same panel.
+
+The variance of the composite is the diagonal of its processed covariance, as the matrix method of `var` states. Over an Asset Panel, the covariance comes from the panel method of `cov` of the composite, which lets the inner estimator choose the plain route or the mask-aware route. So this method does the same, and `mp` runs on the fit. The reduce-and-expand root of `var` would reduce the window to its Coverage Universe whatever the inner estimator is. When the composite does not fold, by [`series_folds`](@ref), [`variance_series`](@ref) over an Asset Panel fits this method at each row.
+
+# Algorithm
+
+ 1. Compute the processed covariance with the panel method of [`Statistics.cov`](@ref) of the composite, with `dims` and the keywords.
+ 2. Read its diagonal, and take its square root for `std`.
+ 3. Reshape it to a `1 × N` row vector when `dims == 1`, and to an `N × 1` column vector otherwise.
+
+# Arguments
+
+  - `ce`: The composite covariance estimator with a processing step.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - `kwargs...`: More keyword arguments for the inner estimator and for the matrix processing step.
+
+# Validation
+
+  - $(val_dict[:dims])
+
+# Returns
+
+  - `val::Matrix{<:Number}`: The variance or the standard deviation of each asset, `NaN` outside the assets that the inner estimator fits. Its shape is `(1, N)` if `dims == 1`, or `(N, 1)` if `dims == 2`.
+
+# Related
+
+  - [`PortfolioOptimisersCovariance`](@ref)
+  - [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
+  - [`reads_active_mask`](@ref)
+"""
+function Statistics.var(ce::PortfolioOptimisersCovariance, X::MatNum,
+                        pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    val = LinearAlgebra.diag(Statistics.cov(ce, X, pnl; dims = dims, kwargs...))
+    return isone(dims) ? reshape(val, 1, length(val)) : reshape(val, length(val), 1)
+end
+function Statistics.std(ce::PortfolioOptimisersCovariance, X::MatNum,
+                        pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    return sqrt.(Statistics.var(ce, X, pnl; dims = dims, kwargs...))
+end
+function reads_active_mask(ce::PortfolioOptimisersCovariance)
+    return reads_active_mask(ce.ce)
+end
+function covers_an_asset(ce::PortfolioOptimisersCovariance, X::MatNum,
+                         pnl::Option{<:AssetPanel}; kwargs...)
+    return covers_an_asset(ce.ce, X, pnl; kwargs...)
+end
+"""
+    series_folds(ce::AbstractCovarianceEstimator) -> Bool
+    series_folds(ce::Covariance{<:Any, <:Any, <:FullMoment, <:Any, <:CoveragePolicy}) -> Bool
+    series_folds(ce::Union{ExpWeightedCovariance, RegimeAdjustedExpWeightedCovariance}) -> Bool
+    series_folds(ce::PortfolioOptimisersCovariance) -> Bool
+
+Answer whether a variance series of `ce` can fold the observations one at a time, where the read after observation `t` equals the batch fit over the observations `1` to `t`.
+
+A variance series of a [`PortfolioOptimisersCovariance`](@ref) fits the processed covariance at each row. A refit reads the observations `1` to `t` again at each row `t`, so the series costs a time that grows as the square of the number of observations. A fold reads each observation one time, so [`fold_variance_series`](@ref) costs a time that grows with it. The fold is a route only where it gives the series of the refit.
+
+The fallback answers `false`. A mask-aware covariance estimator whose fold over the active mask is its batch fit, and that holds no state yet, answers `true` with a method in its own file. These are a [`Covariance`](@ref) with a [`FullMoment`](@ref) and a [`CoveragePolicy`](@ref), an [`ExpWeightedCovariance`](@ref) and a [`RegimeAdjustedExpWeightedCovariance`](@ref). A windowed estimator is not one: its fold keeps every observation after its first fold, and a row of its series fits the window alone. The composite answers `true` when it holds no state, when its `mp` runs from the shape of the sample, as [`supports_shape_processing`](@ref) states, and when its inner estimator answers `true`.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+
+# Returns
+
+  - `flag::Bool`: `true` when the series can fold.
+
+# Related
+
+  - [`fold_variance_series`](@ref)
+  - [`partial_fit!`](@ref)
+  - [`reads_active_mask`](@ref)
+"""
+function series_folds(::AbstractCovarianceEstimator)
+    return false
+end
+function series_folds(ce::PortfolioOptimisersCovariance)
+    return isnothing(ce.cache) && supports_shape_processing(ce.mp) && series_folds(ce.ce)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the variance series of a [`PortfolioOptimisersCovariance`](@ref) in one pass, with [`partial_fit!`](@ref) at each observation.
+
+[`series_folds`](@ref) answers `true` for `ce`, so the read of the fold after observation `t` is the batch fit over the observations `1` to `t`. The one-argument [`Statistics.cov`](@ref) of the composite applies `mp` to the folded matrix at each row, so each row runs `mp`, as the refit does.
+
+# Algorithm
+
+ 1. Allocate the series with the element type of `X`.
+ 2. For each observation `t`, fold row `t` of `X` into the composite, with row `t` of the masks that [`fold_mask_keywords`](@ref) gives for the inner estimator.
+ 3. Read the processed covariance with `Statistics.cov` of the folded composite, and write its diagonal into row `t`.
+ 4. Return the series.
+
+# Arguments
+
+  - `ce`: The composite covariance estimator with a processing step, which holds no state.
+  - `X`: The data matrix, oriented to `observations × assets`.
+  - `amsk`: The active mask, `observations × assets`, or `nothing`.
+  - `emsk`: The estimation mask, `observations × assets`, or `nothing`.
+  - `kwargs...`: More keyword arguments for the fold of the inner estimator.
+
+# Returns
+
+  - `val::Matrix{<:Number}`: The variance series, `observations × assets`.
+
+# Related
+
+  - [`series_folds`](@ref)
+  - [`fold_mask_keywords`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function fold_variance_series(ce::PortfolioOptimisersCovariance, X::MatNum,
+                              amsk::Option{<:AbstractMatrix{<:Bool}},
+                              emsk::Option{<:AbstractMatrix{<:Bool}}; kwargs...)
+    val = Matrix{eltype(X)}(undef, size(X)...)
+    est = ce
+    for t in axes(X, 1)
+        rows = t:t
+        est = partial_fit!(est, view(X, rows, :); dims = 1,
+                           fold_mask_keywords(ce.ce, windowed_rows(amsk, rows, 1),
+                                              windowed_rows(emsk, rows, 1))..., kwargs...)
+        val[t, :] = LinearAlgebra.diag(Statistics.cov(est))
+    end
+    return val
+end
+"""
+    fold_mask_keywords(ce::AbstractCovarianceEstimator, amsk, emsk) -> NamedTuple
+    fold_mask_keywords(ce::RegimeAdjustedExpWeightedCovariance, amsk, emsk) -> NamedTuple
+
+Give the mask keywords of one fold of `ce`, the masks that the panel method of its `cov` reads.
+
+The panel method of `cov` of most mask-aware estimators reads the active mask alone, and the fold of [`Covariance`](@ref) takes no other keyword. The regime-adjusted estimator reads the estimation mask too. So [`fold_variance_series`](@ref) gives each fold the masks of its batch fit.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `amsk`: The active mask of the fold, or `nothing`.
+  - `emsk`: The estimation mask of the fold, or `nothing`.
+
+# Returns
+
+  - `kw::NamedTuple`: The keywords of the fold.
+
+# Related
+
+  - [`fold_variance_series`](@ref)
+"""
+function fold_mask_keywords(::AbstractCovarianceEstimator, amsk, ::Any)
+    return (; active_mask = amsk)
+end
+"""
+    variance_series(ce::PortfolioOptimisersCovariance, X::MatNum; dims::Int = 1, kwargs...)
+    variance_series(ce::PortfolioOptimisersCovariance, X::MatNum, pnl::Option{<:AssetPanel};
+                    dims::Int = 1, kwargs...)
+
+Compute the point-in-time variance series of a [`PortfolioOptimisersCovariance`](@ref), the diagonal of its processed covariance over the observations `1` to `t` at each row `t`.
+
+When [`series_folds`](@ref) answers `true`, the series folds each observation one time with [`fold_variance_series`](@ref). It reads the masks from the keywords `active_mask` and `estimation_mask`, or from the Asset Panel. Otherwise the series refits the composite at each row. The matrix method takes the expanding series of [`variance_series(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt}, X::MatNum, pnl::Option{<:AssetPanel})`](@ref). The panel method fits the panel method of `Statistics.var` of the composite at each row with [`panel_series_row`](@ref), so the inner estimator chooses its route: a mask-aware one reads the window, and a plain one reduces it to its Coverage Universe. A row whose window covers no asset of a plain inner estimator is `NaN`.
+
+The reduce-and-expand series of [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref) would reduce each window whatever the inner estimator is, so the composite overrides it. The estimators that are not composites keep their own methods, and they do no work of this method.
+
+# Algorithm
+
+ 1. Orient `X`, and the masks, to `observations × assets` with [`dims_oriented`](@ref). The panel method allocates the `NaN` frame with [`coverage_series_frame`](@ref), which checks the size of the active mask.
+ 2. If [`series_folds`](@ref) answers `true`, compute the series with [`fold_variance_series`](@ref).
+ 3. Otherwise refit: the matrix method returns the expanding windowed series, and the panel method writes the row of [`panel_series_row`](@ref) on the rows `1` to `t` into each row `t`.
+ 4. Return the series, transposed when `dims == 2`.
+
+# Arguments
+
+  - `ce`: The composite covariance estimator with a processing step.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - `kwargs...`: More keyword arguments for the inner estimator, which can carry `active_mask` and `estimation_mask` in the matrix method.
+
+# Validation
+
+  - $(val_dict[:dims])
+  - The active mask of `pnl` must have the size of the oriented `X`.
+
+# Returns
+
+  - `val::Matrix{<:Number}`: The variance series, shaped as `(T, N)` if `dims == 1` or `(N, T)` if `dims == 2`.
+
+# Related
+
+  - [`series_folds`](@ref)
+  - [`fold_variance_series`](@ref)
+  - [`panel_series_row`](@ref)
+  - [`Statistics.var(ce::PortfolioOptimisersCovariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
+"""
+function variance_series(ce::PortfolioOptimisersCovariance, X::MatNum; dims::Int = 1,
+                         kwargs...)
+    if !series_folds(ce)
+        return variance_series(ce, nothing, nothing, X, nothing; dims = dims, kwargs...)
+    end
+    kw = values(kwargs)
+    X, amsk, emsk = dims_oriented(dims, X, get(kw, :active_mask, nothing),
+                                  get(kw, :estimation_mask, nothing))
+    val = fold_variance_series(ce, X, amsk, emsk;
+                               Base.structdiff(kw,
+                                               NamedTuple{(:active_mask, :estimation_mask)})...)
+    return isone(dims) ? val : permutedims(val)
+end
+function variance_series(ce::PortfolioOptimisersCovariance, X::MatNum,
+                         pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    X = dims_oriented(dims, X)
+    val, _ = coverage_series_frame(X, pnl)
+    if series_folds(ce)
+        val = fold_variance_series(ce, X, panel_moment_masks(pnl)...; kwargs...)
+    else
+        for t in axes(X, 1)
+            val[t, :] = panel_series_row(ce, nothing, 1:t, X, pnl; dims = 1, kwargs...)
+        end
+    end
+    return isone(dims) ? val : permutedims(val)
 end
 """
     Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1,

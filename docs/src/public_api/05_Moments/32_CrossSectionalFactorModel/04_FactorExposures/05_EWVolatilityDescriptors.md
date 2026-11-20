@@ -20,5 +20,4 @@ PortfolioOptimisers.partial_fit!(de::Union{EWVolatility{<:RegimeAdjustedExpWeigh
 merge_states(::PortfolioOptimisers.EWVolatilityState, ::PortfolioOptimisers.EWVolatilityState)
 EWDownsideVolatility
 EWResidualDownsideVolatility
-PortfolioOptimisers.assert_mask_aware_variance
 ```

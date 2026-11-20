@@ -66,10 +66,63 @@ Where:
   - [`expand_moment`](@ref)
   - [`investable_mask`](@ref)
   - [`AssetPanel`](@ref)
+  - [`coverage_flags`](@ref)
   - [`IsEmptyError`](@ref)
 """
-function coverage_mask(X::MatNum, ::Union{Nothing, AssetPanel{<:Any, Nothing, Nothing}};
+function coverage_mask(X::MatNum, src::Union{Nothing, AssetPanel, AbstractMatrix{<:Bool}};
                        dims::Int = 1)::Option{BitVector}
+    return coverage_sentinel(coverage_flags(X, src; dims = dims))
+end
+"""
+    coverage_flags(X::MatNum, pnl::Nothing; dims::Int = 1) -> BitVector
+    coverage_flags(X::MatNum, pnl::AssetPanel{<:Any, Nothing, Nothing};
+                   dims::Int = 1) -> BitVector
+    coverage_flags(X::MatNum, pnl::AssetPanel; dims::Int = 1) -> BitVector
+    coverage_flags(X::MatNum, amsk::AbstractMatrix{<:Bool}; dims::Int = 1) -> BitVector
+    coverage_flags(X::MatNum, iv::MatNum,
+                   pnl::Union{Nothing, AssetPanel, AbstractMatrix{<:Bool}};
+                   dims::Int = 1) -> BitVector
+    coverage_flags(X::MatNum, iv::Nothing,
+                   pnl::Union{Nothing, AssetPanel, AbstractMatrix{<:Bool}};
+                   dims::Int = 1) -> BitVector
+
+Flag each asset that is in the Coverage Universe of one fit, and refuse nothing.
+
+[`coverage_mask`](@ref) owns the rule, and it calls this function before [`coverage_sentinel`](@ref). This function returns the flags of every asset, all `false` when no asset is covered. So a caller that needs to know whether a window covers an asset, and must not raise, reads the same rule. [`coverage_keyword_flags`](@ref) is that caller.
+
+# Algorithm
+
+ 1. Orient `X`, and `iv` when it is given, to `observations × assets` with [`dims_oriented`](@ref).
+ 2. Start with one `true` flag for each asset, and set it to `false` at the first row where the return of the asset is not finite.
+ 3. Do the same for the active mask, where the call gives one, at the first row where the mask is `false`.
+ 4. Do the same for `iv`, where the call gives one, at the first row where the implied volatility is not finite.
+ 5. Return the flags.
+
+# Arguments
+
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - `amsk`: The active mask of the window, `observations × assets` whatever `dims` says.
+  - `iv`: Implied volatility surface `observations × assets`, or `nothing`.
+  - $(arg_dict[:dims])
+
+# Validation
+
+  - $(val_dict[:dims])
+  - The asset axis of the active mask, and of the oriented `iv`, must be the asset axis of the oriented `X`.
+
+# Returns
+
+  - `flags::BitVector`: `true` at every covered asset.
+
+# Related
+
+  - [`coverage_mask`](@ref)
+  - [`coverage_sentinel`](@ref)
+  - [`covers_an_asset`](@ref)
+"""
+function coverage_flags(X::MatNum, ::Union{Nothing, AssetPanel{<:Any, Nothing, Nothing}};
+                        dims::Int = 1)::BitVector
     Xo = dims_oriented(dims, X)
     cmsk = trues(size(Xo, 2))
     for i in axes(Xo, 2)
@@ -80,13 +133,12 @@ function coverage_mask(X::MatNum, ::Union{Nothing, AssetPanel{<:Any, Nothing, No
             end
         end
     end
-    return coverage_sentinel(cmsk)
+    return cmsk
 end
-function coverage_mask(X::MatNum, pnl::AssetPanel; dims::Int = 1)::Option{BitVector}
-    return coverage_mask(X, pnl.amsk; dims = dims)
+function coverage_flags(X::MatNum, pnl::AssetPanel; dims::Int = 1)::BitVector
+    return coverage_flags(X, pnl.amsk; dims = dims)
 end
-function coverage_mask(X::MatNum, amsk::AbstractMatrix{<:Bool};
-                       dims::Int = 1)::Option{BitVector}
+function coverage_flags(X::MatNum, amsk::AbstractMatrix{<:Bool}; dims::Int = 1)::BitVector
     Xo = dims_oriented(dims, X)
     @argcheck(size(Xo, 2) == size(amsk, 2),
               DimensionMismatch("the returns matrix and the active mask describe the same assets, so their asset axes must be the same length, got $(size(Xo, 2)) columns of X against $(size(amsk, 2)) of the active mask"))
@@ -107,7 +159,7 @@ function coverage_mask(X::MatNum, amsk::AbstractMatrix{<:Bool};
             end
         end
     end
-    return coverage_sentinel(cmsk)
+    return cmsk
 end
 """
     coverage_mask(X::MatNum, iv::MatNum,
@@ -146,9 +198,9 @@ Where:
 
  1. Orient `X` and `iv` to `observations × assets` with [`dims_oriented`](@ref).
  2. Check that `iv` has as many columns as `X`.
- 3. Derive the Coverage Universe of `X` with [`coverage_mask`](@ref).
+ 3. Flag the assets that `X` and the mask cover with [`coverage_flags`](@ref).
  4. Scan each column of `iv`. An asset stays in while its implied volatility is finite at every row.
- 5. Intersect the two, and hand the result to [`coverage_sentinel`](@ref) with a refusal that names the implied volatilities.
+ 5. Hand the flags to [`coverage_sentinel`](@ref) with a refusal that names the implied volatilities.
 
 # Arguments
 
@@ -178,11 +230,21 @@ Where:
 function coverage_mask(X::MatNum, iv::MatNum,
                        pnl::Union{Nothing, AssetPanel, AbstractMatrix{<:Bool}};
                        dims::Int = 1)::Option{BitVector}
+    return coverage_sentinel(coverage_flags(X, iv, pnl; dims = dims),
+                             "no asset is in the Coverage Universe of this window: every asset carries a non-finite return, an inactive row of the Asset Panel, or a non-finite implied volatility, at some observation. Check that the window holds at least one asset that is listed and quoted throughout it, and whose implied volatility series is complete over it.")
+end
+function coverage_mask(X::MatNum, ::Nothing,
+                       pnl::Union{Nothing, AssetPanel, AbstractMatrix{<:Bool}};
+                       dims::Int = 1)::Option{BitVector}
+    return coverage_mask(X, pnl; dims = dims)
+end
+function coverage_flags(X::MatNum, iv::MatNum,
+                        pnl::Union{Nothing, AssetPanel, AbstractMatrix{<:Bool}};
+                        dims::Int = 1)::BitVector
     Xo, ivo = dims_oriented(dims, X, iv)
     @argcheck(size(ivo, 2) == size(Xo, 2),
               DimensionMismatch("the returns matrix and the implied volatility surface describe the same assets, so their asset axes must be the same length, got $(size(Xo, 2)) columns of X against $(size(ivo, 2)) of iv"))
-    cmsk = coverage_mask(Xo, pnl; dims = 1)
-    imsk = isnothing(cmsk) ? trues(size(ivo, 2)) : copy(cmsk)
+    imsk = coverage_flags(Xo, pnl; dims = 1)
     for i in axes(ivo, 2)
         if !imsk[i]
             continue
@@ -194,13 +256,12 @@ function coverage_mask(X::MatNum, iv::MatNum,
             end
         end
     end
-    return coverage_sentinel(imsk,
-                             "no asset is in the Coverage Universe of this window: every asset carries a non-finite return, an inactive row of the Asset Panel, or a non-finite implied volatility, at some observation. Check that the window holds at least one asset that is listed and quoted throughout it, and whose implied volatility series is complete over it.")
+    return imsk
 end
-function coverage_mask(X::MatNum, ::Nothing,
-                       pnl::Union{Nothing, AssetPanel, AbstractMatrix{<:Bool}};
-                       dims::Int = 1)::Option{BitVector}
-    return coverage_mask(X, pnl; dims = dims)
+function coverage_flags(X::MatNum, ::Nothing,
+                        pnl::Union{Nothing, AssetPanel, AbstractMatrix{<:Bool}};
+                        dims::Int = 1)::BitVector
+    return coverage_flags(X, pnl; dims = dims)
 end
 """
     coverage_mask_source(pnl::Option{<:AssetPanel}, active_mask::Nothing, dims::Int)
@@ -421,7 +482,7 @@ A gap in `iv` puts an asset outside the Coverage Universe only of a fit that rea
 
  1. Choose the active mask with [`coverage_mask_source`](@ref).
  2. Derive the Coverage Universe from `X` and the mask, and also from `iv` when `est` reads it and the keywords carry it.
- 3. Slice `X`, `iv` and `ivpa` onto the Coverage Universe along the asset axis of `dims`. A keyword that the caller did not give stays absent.
+ 3. Slice `X`, `iv` and `ivpa` onto the Coverage Universe with [`coverage_keyword_columns`](@ref).
 
 # Arguments
 
@@ -451,7 +512,38 @@ function coverage_keyword_reduction(est, X::MatNum, pnl::Option{<:AssetPanel}, d
                                     kwargs...)
     src = coverage_mask_source(pnl, active_mask, dims)
     iv = reads_implied_volatility(est) ? get(kwargs, :iv, nothing) : nothing
-    cmsk = coverage_mask(X, iv, src; dims = dims)
+    return coverage_keyword_columns(coverage_mask(X, iv, src; dims = dims), X, dims;
+                                    kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Slice `X` and its per-asset keywords `iv` and `ivpa` onto a Coverage Universe that the caller derived.
+
+[`coverage_keyword_reduction`](@ref) derives the Coverage Universe and refuses one with no asset, then calls this function. A caller that derived the flags itself with [`coverage_keyword_flags`](@ref), and handled a window with no asset, calls it directly, so the window is scanned one time. [`panel_series_row`](@ref) is that caller.
+
+# Algorithm
+
+ 1. Slice `iv` along the asset axis of `dims` with [`coverage_columns`](@ref), and `ivpa` with [`coverage_reduced_ivpa`](@ref). A keyword that the caller did not give stays absent.
+ 2. Slice `X` the same way.
+
+# Arguments
+
+  - `cmsk`: The Coverage Universe, or `nothing` when every asset is in it.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `kwargs...`: The keywords of the call, which can carry `iv` and `ivpa`.
+
+# Returns
+
+  - `(cmsk, Xc, kw)`: The Coverage Universe, the reduced `X`, and the keywords with `iv` and `ivpa` reduced.
+
+# Related
+
+  - [`coverage_keyword_reduction`](@ref)
+  - [`coverage_keyword_flags`](@ref)
+"""
+function coverage_keyword_columns(cmsk::Option{BitVector}, X::MatNum, dims::Int; kwargs...)
     kw = values(kwargs)
     if haskey(kw, :iv)
         kw = merge(kw, (; iv = coverage_columns(kw.iv, cmsk, dims)))
@@ -460,6 +552,40 @@ function coverage_keyword_reduction(est, X::MatNum, pnl::Option{<:AssetPanel}, d
         kw = merge(kw, (; ivpa = coverage_reduced_ivpa(kw.ivpa, cmsk)))
     end
     return cmsk, coverage_columns(X, cmsk, dims), kw
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Flag each asset in the Coverage Universe of one fit of a plain estimator, by the rule of [`coverage_keyword_reduction`](@ref), and refuse nothing.
+
+The flags read the active mask of `active_mask` or of `pnl`, as [`coverage_mask_source`](@ref) chooses, and the implied volatility `iv` when [`reads_implied_volatility`](@ref) answers `true` for `est`. All flags are `false` for a window that covers no asset. [`panel_series_row`](@ref) and [`covers_an_asset`](@ref) read them.
+
+# Arguments
+
+  - `est`: The moment estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:cvg_active_mask])
+  - `kwargs...`: The keywords of the call, which can carry `iv`.
+
+# Returns
+
+  - `flags::BitVector`: `true` at every covered asset, from [`coverage_flags`](@ref).
+
+# Related
+
+  - [`coverage_flags`](@ref)
+  - [`coverage_keyword_columns`](@ref)
+"""
+function coverage_keyword_flags(est, X::MatNum, pnl::Option{<:AssetPanel}, dims::Int,
+                                active_mask::Option{<:AbstractMatrix{<:Bool}};
+                                kwargs...)::BitVector
+    return coverage_flags(X, if reads_implied_volatility(est)
+                              get(kwargs, :iv, nothing)
+                          else
+                              nothing
+                          end, coverage_mask_source(pnl, active_mask, dims); dims = dims)
 end
 """
     coverage_columns(A::Nothing, cmsk, dims::Int) -> Nothing
@@ -1202,6 +1328,8 @@ Fit a point-in-time variance series on the Coverage Universe of each expanding w
 
 A mask-aware estimator overrides this method and takes the whole window, as it overrides [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref). A [`Covariance`](@ref) or a [`SimpleVariance`](@ref) with a [`CoveragePolicy`](@ref) takes the available-case method of `variance_series`, which follows this method in the source. Either of them with no policy takes this method. The series refits the estimator at each observation and writes the frame one row at a time, so it does not go through [`coverage_panel_moment`](@ref), which writes the frame once at the end.
 
+A [`PortfolioOptimisersCovariance`](@ref) overrides this method, so that its inner estimator chooses the route.
+
 # Algorithm
 
  1. Orient `X` to `observations × assets` with [`dims_oriented`](@ref).
@@ -1269,6 +1397,51 @@ function variance_series(ce::AbstractCovarianceEstimator, X::MatNum,
                                           kwargs...))
     end
     return isone(dims) ? val : permutedims(val)
+end
+"""
+    covers_an_asset(est::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel};
+                    dims::Int = 1, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                    kwargs...) -> Bool
+    covers_an_asset(est::Union{WindowedVariance, WindowedCovariance}, X::MatNum,
+                    pnl::Option{<:AssetPanel}; dims::Int = 1, iv::Option{<:MatNum} = nothing,
+                    kwargs...) -> Bool
+    covers_an_asset(est::PortfolioOptimisersCovariance, X::MatNum, pnl::Option{<:AssetPanel};
+                    kwargs...) -> Bool
+
+Answer whether the panel method of `Statistics.var` of `est` can fit the window `X`, where a plain estimator refuses a window that covers no asset.
+
+The method of [`panel_series_row`](@ref) for a wrapper reads the answer, so a variance series writes a `NaN` row for such a window and does not raise. The answer follows the panel method of `var`, so it is the rule of [`coverage_mask`](@ref) on the window that the innermost plain estimator fits:
+
+  - A mask-aware estimator, by [`reads_active_mask`](@ref), reads the window itself, so the answer is `true`.
+  - A plain estimator reads the window as [`coverage_keyword_reduction`](@ref) does. The answer is `true` when [`coverage_keyword_flags`](@ref) flags an asset.
+  - A [`WindowedVariance`](@ref) or a [`WindowedCovariance`](@ref) cuts `X`, `pnl`, `iv` and the masks to its window, as its panel method of `var` does, and asks its inner estimator.
+  - A [`PortfolioOptimisersCovariance`](@ref) gives the window to its inner estimator without change, so it asks it.
+
+# Arguments
+
+  - `est`: The variance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:cvg_active_mask])
+  - `iv`: Implied volatility surface of the window, or `nothing`.
+  - `kwargs...`: The other keywords of the fit.
+
+# Returns
+
+  - `flag::Bool`: `true` when the fit has an asset to fit.
+
+# Related
+
+  - [`panel_series_row`](@ref)
+  - [`coverage_flags`](@ref)
+  - [`reads_active_mask`](@ref)
+"""
+function covers_an_asset(est::AbstractCovarianceEstimator, X::MatNum,
+                         pnl::Option{<:AssetPanel}; dims::Int = 1,
+                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    return reads_active_mask(est) ||
+           any(coverage_keyword_flags(est, X, pnl, dims, active_mask; kwargs...))
 end
 """
     coverage_panel_moment(f, est, cvg, X, pnl, expand; dims::Int = 1, kwargs...)

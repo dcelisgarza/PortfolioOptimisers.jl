@@ -1369,4 +1369,11 @@ function variance_count(ve::SimpleVariance, X::MatNum,
     end
     return VarianceCount(getproperty.(cnt, :n), getproperty.(cnt, :m))
 end
+function reads_active_mask(::Union{Covariance{<:Any, <:Any, <:Any, <:Any, <:CoveragePolicy},
+                                   SimpleVariance{<:Any, <:Any, <:Any, <:CoveragePolicy}})
+    return true
+end
+function series_folds(ce::Covariance{<:Any, <:Any, <:FullMoment, <:Any, <:CoveragePolicy})
+    return isnothing(ce.cache)
+end
 export SimpleVariance, var, std

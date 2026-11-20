@@ -3112,7 +3112,7 @@ end
 end
 
 # Two variance estimators of a user whose series over an Asset Panel reads the active mask.
-# Only the second declares it through `assert_mask_aware_variance`.
+# Only the second declares it through `reads_active_mask`.
 struct UndeclaredMaskAwareVariance <: PO.AbstractVarianceEstimator end
 struct DeclaredMaskAwareVariance <: PO.AbstractVarianceEstimator end
 function PO.variance_series(::Union{UndeclaredMaskAwareVariance, DeclaredMaskAwareVariance},
@@ -3121,8 +3121,8 @@ function PO.variance_series(::Union{UndeclaredMaskAwareVariance, DeclaredMaskAwa
     return PO.variance_series(ExpWeightedVariance(; min_obs = 3), X, pnl; dims = dims,
                               kwargs...)
 end
-function PO.assert_mask_aware_variance(::DeclaredMaskAwareVariance)
-    return nothing
+function PO.reads_active_mask(::DeclaredMaskAwareVariance)
+    return true
 end
 
 @testset "EW beta descriptors: EWResidualVolatility" begin
@@ -3206,17 +3206,32 @@ end
         @test_throws r"beta_half_life" EWResidualDownsideVolatility(; beta_half_life = 0)
         @test_throws r"half_life" EWResidualVolatility(; half_life = -1)
     end
-    @testset "A ce that is not mask-aware is refused, and a mask-aware one answers" begin
+    @testset "A ce whose every window holds the warm-up is refused, and every other one answers" begin
         # The residual of every asset is `NaN` until its beta exists. A plain estimator
-        # reduces each window to its Coverage Universe, which then holds no asset, so the
-        # Descriptor would be `NaN` at every cell (#2223).
+        # reduces each expanding window to its Coverage Universe, which then holds no asset, so
+        # the Descriptor would be `NaN` at every cell (#2223). A window that leaves the warm-up
+        # covers assets, and its series answers (#2225). A composite over a mask-aware
+        # estimator lets it read the window (#2224).
+        pnone = MatrixProcessing(; pdm = nothing)
         for ce in (Covariance(), SimpleVariance(), GerberCovariance(),
-                   PortfolioOptimisersCovariance(),
-                   PortfolioOptimisersCovariance(; ce = ExpWeightedCovariance()),
-                   WindowedVariance(; window = 4), WindowedCovariance(; window = 4))
+                   PortfolioOptimisersCovariance(), WindowedVariance(),
+                   WindowedVariance(; window = collect(1:40)))
             @test_throws ArgumentError EWResidualVolatility(; ce = ce)
             @test_throws r"not mask-aware" EWResidualDownsideVolatility(; ce = ce)
         end
+        # An index window is admitted from the first observation past the warm-up.
+        @test_throws r"not mask-aware" EWResidualVolatility(;
+                                                            ce = WindowedVariance(;
+                                                                                  window = collect(2:40)),
+                                                            beta_min_obs = 3)
+        @test EWResidualVolatility(; ce = WindowedVariance(; window = collect(3:40)),
+                                   beta_min_obs = 3) isa EWResidualVolatility
+        @test EWResidualVolatility(; ce = WindowedVariance(; window = collect(2:40)),
+                                   beta_min_obs = 1) isa EWResidualVolatility
+        @test_throws r"not mask-aware" EWResidualVolatility(;
+                                                            ce = WindowedVariance(;
+                                                                                  window = collect(1:40)),
+                                                            beta_min_obs = 1)
         pol = CoveragePolicy()
         Xl = 0.01 .* randn(StableRNGs.StableRNG(2223), 40, 3)
         rdl = ewb_hand_panel(Xl, ones(40, 3))
@@ -3224,16 +3239,22 @@ end
                    ExpWeightedVariance(; min_obs = 3), ExpWeightedCovariance(; min_obs = 3),
                    RegimeAdjustedExpWeightedCovariance(; min_obs = 3),
                    WindowedVariance(; ve = SimpleVariance(; cvg = pol), window = 4),
-                   WindowedCovariance(; ce = Covariance(; cvg = pol), window = 4))
+                   WindowedCovariance(; ce = Covariance(; cvg = pol), window = 4),
+                   WindowedVariance(; window = 4), WindowedCovariance(; window = 4),
+                   WindowedVariance(; ve = WindowedVariance(; window = 4)),
+                   WindowedVariance(; window = collect(2:40)),
+                   PortfolioOptimisersCovariance(; ce = ExpWeightedCovariance(; min_obs = 3),
+                                                 mp = pnone),
+                   PortfolioOptimisersCovariance(; ce = WindowedCovariance(; window = 4), mp = pnone))
             D = descriptor(EWResidualVolatility(; half_life = 2, beta_half_life = 3,
                                                 beta_min_obs = 2, ce = ce), rdl)
             @test all(isnan, D[1:2, :])
             @test all(isfinite, D[5:end, :])
         end
-        # A type of the user is admitted by a method of `assert_mask_aware_variance`, and
+        # A type of the user is admitted by a method of `reads_active_mask`, and
         # its own panel method then gives the series.
-        @test_throws r"adds a method of `PortfolioOptimisers.assert_mask_aware_variance`" EWResidualVolatility(;
-                                                                                                               ce = UndeclaredMaskAwareVariance())
+        @test_throws r"adds a method of `PortfolioOptimisers.reads_active_mask`" EWResidualVolatility(;
+                                                                                                      ce = UndeclaredMaskAwareVariance())
         kw = (; half_life = 2, beta_half_life = 3, beta_min_obs = 2)
         D = descriptor(EWResidualVolatility(; kw..., ce = DeclaredMaskAwareVariance()), rdl)
         Dref = descriptor(EWResidualVolatility(; kw...,
@@ -3241,6 +3262,11 @@ end
                           rdl)
         @test count(isfinite, D) > 0
         @test isequal(D, Dref)
+        # The window of four rows holds the residual of row 1, which is `NaN`, until row 5.
+        D = descriptor(EWResidualVolatility(; half_life = 2, beta_half_life = 3,
+                                            beta_min_obs = 2,
+                                            ce = WindowedVariance(; window = 4)), rdl)
+        @test all(isnan, D[1:4, :])
     end
 end
 

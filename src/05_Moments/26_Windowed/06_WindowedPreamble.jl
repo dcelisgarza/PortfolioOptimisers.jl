@@ -255,6 +255,38 @@ function windowed_panel(pnl::Option{<:AssetPanel}, win::VecInt)
     return port_opt_view(pnl, win, :, nothing)
 end
 """
+    windowed_mask_panel(pnl::Union{Nothing, AssetPanel{<:Any, Nothing, Nothing}},
+                        rows::VecInt) -> Nothing
+    windowed_mask_panel(pnl::AssetPanel, rows::VecInt) -> AssetPanel
+
+Cut the active mask and the estimation mask of an Asset Panel to the observations `rows`, and keep no Panel Field.
+
+A variance fit reads the two masks of a panel and no Panel Field. A variance series cuts the panel at each of its rows, and the view of every Panel Field costs more than the fit itself. On a panel of 21 Panel Fields over 300 observations, the view of the fields takes about 0.4 ms for each row, and the fit about 0.03 ms. So [`panel_series_row`](@ref) cuts the masks alone. A panel with no mask has no observation axis, so its cut is `nothing`, which every moment verb reads as a panel with no mask.
+
+# Arguments
+
+  - $(arg_dict[:pnl_moment])
+  - `rows`: The observations of the fit.
+
+# Returns
+
+  - `pt::Option{<:AssetPanel}`: A panel that holds the two masks over `rows`, or `nothing`.
+
+# Related
+
+  - [`windowed_panel`](@ref)
+  - [`panel_series_row`](@ref)
+  - [`panel_mask_view`](@ref)
+"""
+function windowed_mask_panel(::Union{Nothing, AssetPanel{<:Any, Nothing, Nothing}},
+                             ::VecInt)
+    return nothing
+end
+function windowed_mask_panel(pnl::AssetPanel, rows::VecInt)
+    return AssetPanel(; pf = nothing, amsk = panel_mask_view(pnl.amsk, rows, :),
+                      emsk = panel_mask_view(pnl.emsk, rows, :))
+end
+"""
     windowed_series_rows(window::Nothing, t::Integer) -> UnitRange
     windowed_series_rows(window::Integer, t::Integer) -> UnitRange
     windowed_series_rows(window::VecInt, t::Integer) -> VecInt
@@ -302,9 +334,9 @@ Fit the variance of the inner estimator of a windowed estimator on the observati
 
 # Algorithm
 
- 1. Cut `X`, the observation weights, `iv` and the two universe masks to `rows` with [`windowed_preamble`](@ref). The results are `inner`, `Xt`, `ivt` and `kw`.
- 2. `pnl` is `nothing`: call `Statistics.var(inner, Xt; dims, iv = ivt, kw...)`. `pnl` is an Asset Panel: call the panel method of `Statistics.var` with the panel over `rows`, from [`windowed_panel`](@ref), and with the same keywords.
- 3. Return the result as a vector.
+ 1. `pnl` is an Asset Panel: return the row of [`panel_series_row`](@ref), which reads the panel over `rows`.
+ 2. `pnl` is `nothing`: cut `X`, the observation weights, `iv` and the two universe masks to `rows` with [`windowed_preamble`](@ref). The results are `inner`, `Xt`, `ivt` and `kw`.
+ 3. Call `Statistics.var(inner, Xt; dims, iv = ivt, kw...)`, and return the result as a vector.
 
 Step 2 passes `iv = ivt` also when `ivt` is `nothing`, as the generated `var` method of a windowed estimator does. So every row reads the implied volatility of its own observations.
 
@@ -326,6 +358,7 @@ Step 2 passes `iv = ivt` also when `ivt` is `nothing`, as the generated `var` me
 
   - [`variance_series(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt}, X::MatNum, pnl::Option{<:AssetPanel})`](@ref)
   - [`windowed_preamble`](@ref)
+  - [`panel_series_row`](@ref)
 """
 function windowed_series_row(est, w::Option{<:ObsWeights}, rows::VecInt, X::MatNum,
                              ::Nothing; dims::Int = 1, kwargs...)
@@ -334,9 +367,99 @@ function windowed_series_row(est, w::Option{<:ObsWeights}, rows::VecInt, X::MatN
 end
 function windowed_series_row(est, w::Option{<:ObsWeights}, rows::VecInt, X::MatNum,
                              pnl::AssetPanel; dims::Int = 1, kwargs...)
+    return panel_series_row(est, w, rows, X, pnl; dims = dims, kwargs...)
+end
+"""
+    panel_series_row(est, w::Option{<:ObsWeights}, rows::VecInt, X::MatNum,
+                     pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...) -> VecNum
+    panel_series_row(est::Union{WindowedVariance, WindowedCovariance,
+                                PortfolioOptimisersCovariance},
+                     w::Option{<:ObsWeights}, rows::VecInt, X::MatNum,
+                     pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...) -> VecNum
+
+Fit the panel method of the variance of an estimator on the observations `rows`, as one row of a variance series over an Asset Panel.
+
+A plain estimator reduces the window to its Coverage Universe, and the panel method of `Statistics.var` refuses a window that covers no asset, as [`coverage_mask`](@ref) states for one fit. A variance series fits many windows, and a window can cover no asset while a later one covers some. An example is a window that holds a warm-up row, where every asset is `NaN`. So the row of such a window is `NaN`, as the row of a window that keeps no observation is, and the series goes on. A mask-aware estimator reads the window itself and never meets the refusal.
+
+The function reads `pnl` through the panel route also when `pnl` is `nothing`. That route then reduces the window to the assets whose returns are finite, as it does for a matrix call. So the expanding series of a [`PortfolioOptimisersCovariance`](@ref) and the windowed series share this row.
+
+The first method holds a leaf estimator. A mask-aware leaf, by [`reads_active_mask`](@ref), takes the panel method of `var`. A plain leaf scans the window one time with [`coverage_keyword_flags`](@ref), and reduces it with those flags, as the reduce-and-expand root of `var` does. So a plain leaf pays no scan more than one fit of the root. The second method holds a wrapper, whose panel method of `var` cuts the window again or passes it to an inner estimator. It asks [`covers_an_asset`](@ref), which follows the wrapper to the rows that the innermost fit reads, and then it fits the panel method of `var`.
+
+# Algorithm
+
+ 1. Cut `X`, the observation weights, `iv` and the two universe masks to `rows` with [`windowed_preamble`](@ref). The results are `inner`, `Xt`, `ivt` and `kw`. Cut the masks of `pnl` to `rows` with [`windowed_mask_panel`](@ref), which gives `pt`.
+ 2. A mask-aware leaf: return `Statistics.var(inner, Xt, pt; dims, iv = ivt, kw...)` as a vector.
+ 3. A plain leaf: flag the covered assets with [`coverage_keyword_flags`](@ref). Return a `NaN` vector with one entry for each asset when no flag is `true`. Otherwise slice `Xt`, `iv` and `ivpa` with [`coverage_keyword_columns`](@ref), fit the matrix method of `var` on the slice, and expand it with [`expand_moment`](@ref).
+ 4. A wrapper: return the `NaN` vector when [`covers_an_asset`](@ref) answers `false`, and the panel method of `var` as a vector otherwise.
+
+# Arguments
+
+  - `est`: The variance estimator, or the inner estimator of a windowed estimator.
+  - $(arg_dict[:oow])
+  - `rows`: The observations of the fit.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - `kwargs...`: Keywords for the variance estimator. The function cuts `iv` and the two universe masks to `rows`.
+
+# Validation
+
+  - $(val_dict[:nan_frame]) The check runs only on a window that covers no asset.
+
+# Returns
+
+  - `v::VecNum`: The variance of each asset, `NaN` outside the Coverage Universe of the window.
+
+# Related
+
+  - [`windowed_series_row`](@ref)
+  - [`covers_an_asset`](@ref)
+  - [`coverage_nan_frame`](@ref)
+"""
+function panel_series_row(est, w::Option{<:ObsWeights}, rows::VecInt, X::MatNum,
+                          pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
     inner, Xt, ivt, kw = windowed_preamble(est, w, rows, X; dims = dims, kwargs...)
-    return vec(Statistics.var(inner, Xt, windowed_panel(pnl, rows); dims = dims, iv = ivt,
-                              kw...))
+    pt = windowed_mask_panel(pnl, rows)
+    if reads_active_mask(inner)
+        return vec(Statistics.var(inner, Xt, pt; dims = dims, iv = ivt, kw...))
+    end
+    # The root of `var` reads `active_mask` itself and does not pass it on, so the slice and
+    # the fit take the other keywords alone.
+    kwf = Base.structdiff(kw, NamedTuple{(:active_mask,)})
+    flags = coverage_keyword_flags(inner, Xt, pt, dims, get(kw, :active_mask, nothing);
+                                   iv = ivt, kwf...)
+    if !any(flags)
+        return coverage_nan_frame(similar(Xt, size(Xt, 3 - dims)))
+    end
+    cmsk, Xc, kwc = coverage_keyword_columns(coverage_sentinel(flags), Xt, dims; iv = ivt,
+                                             kwf...)
+    return vec(expand_moment(Statistics.var(inner, Xc; dims = dims, kwc...), cmsk, dims))
+end
+function panel_series_row(est::Union{WindowedVariance, WindowedCovariance,
+                                     PortfolioOptimisersCovariance},
+                          w::Option{<:ObsWeights}, rows::VecInt, X::MatNum,
+                          pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    inner, Xt, ivt, kw = windowed_preamble(est, w, rows, X; dims = dims, kwargs...)
+    pt = windowed_mask_panel(pnl, rows)
+    return if covers_an_asset(inner, Xt, pt; dims = dims, iv = ivt, kw...)
+        vec(Statistics.var(inner, Xt, pt; dims = dims, iv = ivt, kw...))
+    else
+        coverage_nan_frame(similar(Xt, size(Xt, 3 - dims)))
+    end
+end
+function reads_active_mask(est::Union{WindowedVariance, WindowedCovariance})
+    return reads_active_mask(getfield(est, 1))
+end
+function covers_an_asset(est::Union{WindowedVariance, WindowedCovariance}, X::MatNum,
+                         pnl::Option{<:AssetPanel}; dims::Int = 1,
+                         iv::Option{<:MatNum} = nothing, kwargs...)
+    # The panel method of `var` cuts the window before it calls the inner estimator, so the
+    # probe reads the rows that the inner fit reads.
+    win = get_window(est.window, X, dims)
+    return covers_an_asset(getfield(est, 1), windowed_rows(X, win, dims),
+                           windowed_panel(pnl, win); dims = dims,
+                           iv = windowed_rows(iv, win, dims),
+                           windowed_keywords(win, dims; kwargs...)...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -369,7 +492,7 @@ Where:
   - ``n``: Number of observations in the window.
   - ``\\mathcal{S}``: Indices of the observations that an index window selects.
 
-``\\mathbf{V}_{tj}`` is `NaN` when ``\\mathcal{W}_{t}`` is empty. Before an integer window is full, ``\\mathcal{W}_{t}`` holds every observation from ``1`` to ``t``.
+``\\mathbf{V}_{tj}`` is `NaN` when ``\\mathcal{W}_{t}`` is empty. Over an Asset Panel, row ``t`` is `NaN` also when the window of a plain inner estimator covers no asset, as [`panel_series_row`](@ref) states. Before an integer window is full, ``\\mathcal{W}_{t}`` holds every observation from ``1`` to ``t``.
 
 # Algorithm
 
@@ -377,7 +500,7 @@ Where:
  2. Fit row `T`, the last observation, with [`windowed_series_row`](@ref) on the rows from [`windowed_series_rows`](@ref). The result is `vT`.
  3. If row `1` keeps no observation, refuse an `Integer` or a `Rational` element type of `vT`. The rows that a window keeps grow with `t`, so a row holds `NaN` only in this case.
  4. Allocate the series `val` with the element type of `vT`, and write `vT` into row `T`.
- 5. For each earlier observation `t`, fit row `t` the same way. A row that keeps no observation is `NaN`.
+ 5. For each earlier observation `t`, fit row `t` the same way. A row that keeps no observation is `NaN`, and so is a row over an Asset Panel whose window covers no asset.
  6. Return `val`, transposed when `dims == 2`.
 
 # Arguments

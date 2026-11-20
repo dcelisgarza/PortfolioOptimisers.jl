@@ -1,5 +1,5 @@
 ```@meta
-Description = "Abstract covariance variance, public API of PortfolioOptimisers.jl: var, std, cov, cor, effective_observation_count."
+Description = "Abstract covariance variance, public API of PortfolioOptimisers.jl: var, std, cov, cor, effective_observation_count, reads_active_mask."
 ```
 
 # Abstract covariance variance
@@ -12,6 +12,7 @@ cor(ve::AbstractVarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
 std(ve::AbstractVarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
 cov(ce::AbstractCovarianceEstimator; kwargs...)
 effective_observation_count
+PortfolioOptimisers.reads_active_mask
 ```
 
 ## References

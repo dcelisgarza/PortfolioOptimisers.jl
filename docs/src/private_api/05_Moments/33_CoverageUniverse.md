@@ -1,5 +1,5 @@
 ```@meta
-Description = "Coverage Universe, private API of PortfolioOptimisers.jl: coverage_mask, coverage_mask_source, coverage_sentinel, coverage_reduction, coverage_reduced_pair, …"
+Description = "Coverage Universe, private API of PortfolioOptimisers.jl: coverage_mask, coverage_flags, coverage_mask_source, coverage_sentinel, coverage_reduction, …"
 ```
 
 # Coverage Universe: private API
@@ -14,6 +14,7 @@ A matrix call can give the active mask as the `active_mask` keyword, with no pan
 
 ```@docs
 PortfolioOptimisers.coverage_mask
+PortfolioOptimisers.coverage_flags
 PortfolioOptimisers.coverage_mask_source
 PortfolioOptimisers.coverage_sentinel
 PortfolioOptimisers.coverage_reduction(X::MatNum, pnl::Option{<:AssetPanel})
@@ -48,6 +49,7 @@ PortfolioOptimisers.inactive_as_nonfinite
 
 ```@docs
 PortfolioOptimisers.variance_series(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+PortfolioOptimisers.covers_an_asset
 ```
 
 ## The available-case fit
@@ -62,5 +64,7 @@ PortfolioOptimisers.coverage_series_frame
 PortfolioOptimisers.variance_series(ce::Union{Covariance{<:Any, <:Any, <:Any, <:Any, <:CoveragePolicy}, SimpleVariance{<:Any, <:Any, <:Any, <:CoveragePolicy}}, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 PortfolioOptimisers.coverage_floor
 PortfolioOptimisers.coverage_keyword_reduction
+PortfolioOptimisers.coverage_keyword_columns
+PortfolioOptimisers.coverage_keyword_flags
 PortfolioOptimisers.coverage_columns
 ```
