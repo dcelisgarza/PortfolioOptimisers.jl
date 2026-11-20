@@ -507,7 +507,7 @@ Each moving average of the three momentum transforms starts at zero, and the `de
 | [`RootMeanSquareGradient`](@ref) | ``\\sqrt{1 - \\gamma_2^k}``                            |
 | [`AdaptiveMomentGradient`](@ref) | ``\\sqrt{1 - \\gamma_2^k} / (1 - \\gamma_1^k)``        |
 
-The undivided form starts slowly. At ``\\gamma_1 = 0.99`` and ``\\gamma_2 = 0``, the defaults of [li2022egm](@cite), the first uncorrected step is ``1 - \\gamma_1 = 0.01`` of the corrected step. It stays below one half of the corrected step for the first 68 periods, and it is ``0.63`` of it after ``1 / (1 - \\gamma_1) = 100`` periods. This shrinks the early steps, when the averages read few gradients. The divided form takes each step at its full size from the first period. At ``\\gamma_2 = 0`` the factor ``\\sqrt{1 - \\gamma_2^k}`` is one, so the correction does not change [`RootMeanSquareGradient`](@ref) at its default. At the rates ``\\gamma_1 = 0.9`` and ``\\gamma_2 = 0.999`` of [kingma2015](@cite), the uncorrected first step is about three times the corrected one, because the second average is small, and [kingma2015](@cite) corrects both averages for this reason. No Learning-Rate Schedule gives these factors, so the field is the one way to reach the divided form.
+The undivided form starts slowly. At ``\\gamma_1 = 0.99`` and ``\\gamma_2 = 0``, the defaults of [li2022egm](@cite), the first uncorrected step is ``1 - \\gamma_1 = 0.01`` of the corrected step. It stays below one half of the corrected step for the first 68 periods, and it is ``0.63`` of it after ``1 / (1 - \\gamma_1) = 100`` periods. This shrinks the early steps, when the averages read few gradients. The divided form takes each step at its full size from the first period. At ``\\gamma_2 = 0`` the factor ``\\sqrt{1 - \\gamma_2^k}`` is one, so the correction does not change [`RootMeanSquareGradient`](@ref) at its default. At the rates ``\\gamma_1 = 0.9`` and ``\\gamma_2 = 0.999`` of [kingma2015](@cite), the uncorrected first step is about three times the corrected one, because the second average is small, and [kingma2015](@cite) corrects both averages for this reason. No Learning-Rate Schedule of the library gives these factors, so the field is the way to reach the divided form.
 
 # Interfaces
 
@@ -845,21 +845,21 @@ $(DocStringExtensions.FIELDS)
     m
 end
 """
-    gradient_state_seed(::Nothing, w::AbstractVector)
+    gradient_state_seed(grad::Option{<:AbstractGradientTransform}, w::AbstractVector)
     gradient_state_seed(grad::GradientMomentum, w::AbstractVector)
     gradient_state_seed(grad::RootMeanSquareGradient, w::AbstractVector)
     gradient_state_seed(grad::AdaptiveMomentGradient, w::AbstractVector)
 
 Seeds the state that a Gradient Transform keeps on the Rule State before the first row.
 
-The seed is `nothing` for no transform, `grad = nothing`. For each momentum transform it is a [`GradientAverageState`](@ref) at the count zero, with a zero vector for each average that the transform keeps.
+The seed is `nothing` for no transform, `grad = nothing`, and for a transform that has no method of its own. For each momentum transform it is a [`GradientAverageState`](@ref) at the count zero, with a zero vector for each average that the transform keeps.
 
 # Related
 
   - [`AbstractGradientTransform`](@ref)
   - [`transform_gradient!`](@ref)
 """
-function gradient_state_seed(::Nothing, ::AbstractVector)
+function gradient_state_seed(::Option{<:AbstractGradientTransform}, ::AbstractVector)
     return nothing
 end
 function gradient_state_seed(::GradientMomentum, w::AbstractVector)

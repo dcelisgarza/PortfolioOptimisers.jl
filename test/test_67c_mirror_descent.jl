@@ -56,6 +56,12 @@ function PortfolioOptimisers.transform_gradient!(grad::PairAdaptiveMoment, gs::T
     m .= grad.gamma2 .* m .+ (1 - grad.gamma2) .* g .^ 2
     return gs, v ./ (sqrt.(m) .+ grad.eps)
 end
+# A transform that keeps no state and has no method of `gradient_state_seed`.
+struct DoubledGradient <: PortfolioOptimisers.AbstractGradientTransform end
+function PortfolioOptimisers.transform_gradient!(::DoubledGradient, ::Nothing,
+                                                 g::AbstractVector)
+    return nothing, 2 .* g
+end
 @testset "Online portfolio selection: mirror descent, its geometries and schedules" begin
     po = PortfolioOptimisers
     OPS = po.OnlinePortfolioSelection
@@ -100,6 +106,11 @@ end
         @test isnothing(po.gradient_state_seed(nothing, [0.5, 0.5]))
         g0 = [0.25, -0.5]
         @test po.transform_gradient!(nothing, nothing, g0) === (nothing, g0)
+        # A transform with no seed of its own keeps the state `nothing`, as the interface
+        # of `AbstractGradientTransform` states.
+        @test isnothing(po.gradient_state_seed(DoubledGradient(), [0.5, 0.5]))
+        @test libpath(ExponentiatedGradient(; grad = DoubledGradient())) ==
+              libpath(ExponentiatedGradient(; eta = 0.1))
         @test isa(ExponentiatedGradient(), MirrorDescent)
         @test isa(GradientProjection().proj, EuclideanProjection)
         @test_throws DomainError MirrorDescent(; eta = 0)

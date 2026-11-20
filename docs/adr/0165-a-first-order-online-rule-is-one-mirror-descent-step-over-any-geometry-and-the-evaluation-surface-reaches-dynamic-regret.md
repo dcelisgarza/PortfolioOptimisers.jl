@@ -528,3 +528,24 @@ residual sums and the state of the predictor. `online_update!` dispatches on the
 `OptimisticStep(; alg = GradientProjection(; eta), predictor)` to
 `GradientProjection(; eta, predictor)`, and `OptimisticStep()` to
 `MirrorDescent(; predictor = LastGradient())`.
+
+## Amendment (2026-11-20): a Zero-Start Debias on the momentum transforms
+
+Issue #2222: `GradientMomentum`, `RootMeanSquareGradient` and `AdaptiveMomentGradient` take a
+`debias` field, `Option{<:AbstractZeroStartDebias}`, last. The default `nothing` is the undivided
+form of Equations 7, 8 and 9 of Li, Zheng, Chen, Wang and Xu (2022), so no number moves.
+`ZeroStartDebias()` divides each average by `1 - γ^k`, the correction of Algorithm 1 of Kingma
+and Ba (2015). The Decision above states the transforms "without bias correction". That is now
+the default, and the correction is an option. `EGE`, `EGR` and `EGA` take the keyword `debias`
+too, so the amendment of #1864 above, which says that they take only the parameters of their
+paper, no longer holds for them.
+
+The count `k` of the steps since the seed is in the state of the transform,
+`GradientAverageState(k, v, m)`, because a restart of the schedule seeds the averages again, and
+the period count of the Rule State does not restart. So `transform_gradient!(grad, gs, g)`
+returns `(gs, ĝ)`, the state after the period and the transformed gradient, as
+`predict_gradient!` returns its state and its hint. `transform_gradient!(::Nothing, ::Nothing, g)`
+returns `(nothing, g)`, where the amendment of #1867 above states `g`. The rule asserts a `Tuple`
+at the call, so a transform with the old return raises a `TypeError` at its first step.
+`gradient_state_seed` returns `nothing` for a transform with no method of its own, as
+`predictor_state_seed` does for a predictor.
