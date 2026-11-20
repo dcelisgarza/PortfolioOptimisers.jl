@@ -10,5 +10,4 @@ gap_fill_value(::PortfolioOptimisersCovariance)
 PortfolioOptimisers.show_fields(::PortfolioOptimisersCovariance)
 PortfolioOptimisers.observation_count(ce::PortfolioOptimisersCovariance{<:Any, <:Any, Nothing})
 PortfolioOptimisers.processing_observation_count
-PortfolioOptimisers.variance_series(ce::PortfolioOptimisersCovariance{<:Any, <:MatrixProcessing{<:Any, <:Any, <:Any, Nothing}}, X::MatNum; dims::Int = 1, kwargs...)
 ```

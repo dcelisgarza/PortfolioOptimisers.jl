@@ -458,6 +458,35 @@ their composites. Route such a guard through that verb, and do not write it inli
 already carries the shape, and it names the symbol that the caller passed.
 `test/test_63_domain_error_shape_census.jl` gates the rule over `src/` and `ext/`.
 
+### A raise from a step that the caller configured is judged before it is fixed
+
+A step of a configuration can refuse the input that a degenerate fit gives it. An example is the
+positive definite repair of a `MatrixProcessing`, which refuses the `NaN` covariance of a fit on
+one observation, such as row 1 of a variance series. Such a raise can be a defect, or it can be
+the behaviour to document. Find which one it is before you change the code.
+
+- **It is the behaviour to document** when the call that raises is outside the purpose of the
+  type, or reaches the type only through a generalisation, and another configuration avoids the
+  raise. Put a `!!! warning` in the docstring of the type whose call raises. The warning names the
+  call, the condition, the error, and the configuration that avoids the raise. Do not add a
+  method, a branch, a type bound or a trait that sends the call around the step. Such a route
+  skips the step on every fit, not only on the degenerate fit, so a step of the caller that
+  changes the result no longer changes it.
+- **It is a defect** when the call is the purpose of the type, or when no configuration avoids
+  the raise. Fix it or file it, as `CLAUDE.md` § *Defects you find* states.
+- **If you cannot find which one it is, file an issue.** Give the reproduction, the evidence for
+  each reading, and the reading that you suspect. Do not change the code for the raise.
+
+The example is `PortfolioOptimisersCovariance`. Its purpose is a covariance. Its variance is a
+generalisation: the diagonal of the processed covariance. So the raise of its variance series on
+row 1 is the behaviour to document, and `mp = MatrixProcessing(; pdm = nothing)` avoids it. #2211
+added a route around `mp` for the variance, #2221 found that the route skips a step of the caller
+that changes the diagonal, and the route was reverted for a warning.
+
+A raise on data that the caller gives directly is a check of the input (§ *Input Validation*). A
+correct computation that gives a degenerate value is a different case: the docstring states the
+condition, and the code adds no `@warn` (#1282).
+
 ## Multiple Dispatch
 
 - **Prefer multiple dispatch over conditionals** to select an algorithm or a method.

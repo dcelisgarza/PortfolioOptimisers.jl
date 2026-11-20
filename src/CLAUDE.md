@@ -30,6 +30,11 @@ routes every subject that this list does not name.
   [`julia-source-code.instructions.md`][sc] § *A function returns a defined type or a plain
   tuple, not a named tuple*, with the name of a new type. `code_health/forward_survey.jl` reports
   it.
+- **A raise from a step that the caller configured, on a degenerate fit, is judged first: a
+  defect is fixed or filed, a call outside the purpose of the type gets a `!!! warning`, and a
+  doubt is filed with the evidence.** No method or trait routes around the step.
+  [`julia-source-code.instructions.md`][sc] § *A raise from a step that the caller configured is
+  judged before it is fixed*.
 - **The simple form wins, and a method for each type wins over a new dependency.**
   [`julia-source-code.instructions.md`][sc] § *The simple form wins*.
 - **The text of a field or an argument comes from the docstring dictionaries.**

@@ -208,17 +208,12 @@
         @test_throws DomainError mean(sd461, X461; dims = 3)
         @test_throws DomainError mean(vr461, X461; dims = 3)
         # The result is the diagonal of the matrix that `ce` returns. Denoising changes the
-        # correlation and keeps that diagonal, so the composite reads the variance of its
-        # inner estimator (#2211), and the processed diagonal equals it to rounding.
+        # correlation and keeps that diagonal, so it leaves the result unchanged.
         cedn461 = PortfolioOptimisersCovariance(; mp = MatrixProcessing(; dn = Denoise()))
         for ce in (PortfolioOptimisersCovariance(), cedn461)
             @test vec(mean(StandardDeviationExpectedReturns(; ce = ce), X461)) ==
-                  vec(std(ce.ce, X461))
-            @test vec(mean(VarianceExpectedReturns(; ce = ce), X461)) ==
-                  vec(var(ce.ce, X461))
-            @test vec(mean(StandardDeviationExpectedReturns(; ce = ce), X461)) ≈
-                  sqrt.(diag(cov(ce, X461))) rtol = 1e-14
-            @test vec(mean(VarianceExpectedReturns(; ce = ce), X461)) ≈ diag(cov(ce, X461)) rtol = 1e-14
+                  sqrt.(diag(cov(ce, X461)))
+            @test vec(mean(VarianceExpectedReturns(; ce = ce), X461)) == diag(cov(ce, X461))
         end
 
         # --- MedianExpectedReturns ------------------------------------------
