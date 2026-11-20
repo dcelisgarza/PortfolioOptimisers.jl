@@ -3111,6 +3111,20 @@ end
     end
 end
 
+# Two variance estimators of a user whose series over an Asset Panel reads the active mask.
+# Only the second declares it through `assert_mask_aware_variance`.
+struct UndeclaredMaskAwareVariance <: PO.AbstractVarianceEstimator end
+struct DeclaredMaskAwareVariance <: PO.AbstractVarianceEstimator end
+function PO.variance_series(::Union{UndeclaredMaskAwareVariance, DeclaredMaskAwareVariance},
+                            X::PO.MatNum, pnl::PO.Option{<:PO.AssetPanel}; dims::Int = 1,
+                            kwargs...)
+    return PO.variance_series(ExpWeightedVariance(; min_obs = 3), X, pnl; dims = dims,
+                              kwargs...)
+end
+function PO.assert_mask_aware_variance(::DeclaredMaskAwareVariance)
+    return nothing
+end
+
 @testset "EW beta descriptors: EWResidualVolatility" begin
     X = [0.10 0.20 -0.05
          -0.10 0.00 0.03
@@ -3216,6 +3230,17 @@ end
             @test all(isnan, D[1:2, :])
             @test all(isfinite, D[5:end, :])
         end
+        # A type of the user is admitted by a method of `assert_mask_aware_variance`, and
+        # its own panel method then gives the series.
+        @test_throws r"adds a method of `PortfolioOptimisers.assert_mask_aware_variance`" EWResidualVolatility(;
+                                                                                                               ce = UndeclaredMaskAwareVariance())
+        kw = (; half_life = 2, beta_half_life = 3, beta_min_obs = 2)
+        D = descriptor(EWResidualVolatility(; kw..., ce = DeclaredMaskAwareVariance()), rdl)
+        Dref = descriptor(EWResidualVolatility(; kw...,
+                                               ce = ExpWeightedVariance(; min_obs = 3)),
+                          rdl)
+        @test count(isfinite, D) > 0
+        @test isequal(D, Dref)
     end
 end
 

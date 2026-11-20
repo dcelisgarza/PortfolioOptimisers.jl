@@ -138,7 +138,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :fees => "`fees`: Fees estimator or result.",#
                  :fees_res => "`fees`: The resolved [`Fees`](@ref) the head was charged with, on the universe it solved on, or `nothing`. A walk-forward fold charges it through [`extract_fees`](@ref).",#
                  :proj => "`proj`: The Projection Geometry the rule projects its raw step onto the Allocation Set in; the slot's type bound names the geometries the rule's theorem covers.",#
-                 :grad_debias => "`debias`: How the transform reads each moving average out of its state, which starts at zero. `nothing`, the default, reads the average as it is, the undivided form of the momentum paper. [`ZeroStartDebias`](@ref) divides each average by `1 - gamma^k`, where `k` counts the steps since the seed of the state, the corrected form of Adam.",#
+                 :grad_debias => "`debias`: How the transform reads each moving average out of its state, which starts at zero. `nothing`, the default, reads the average as it is, the undivided form of Equations 7, 8 and 9 of [li2022egm](@cite). [`ZeroStartDebias`](@ref) divides each average by `1 - gamma^k`, where `k` counts the steps since the seed of the state, the corrected form of Algorithm 1 of [kingma2015](@cite).",#
                  :price_window => "`window`: The number of price levels the statistic reads, the current one included; `window - 1` returns reconstruct them.",#
                  :forecaster => "`me`: The forecaster whose mean is the Price Relative Forecast, `x̂ = 1 .+ mu`: folded on the Rule State where it has an exact fold, and refit over the rows the head holds otherwise.",#
                  # Non-optimisation risk measures.

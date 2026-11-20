@@ -23,3 +23,10 @@ mean(me::ExpWeightedExpectedReturns, state::ExpWeightedExpectedReturnsState; kwa
 mean(me::ExpWeightedExpectedReturns; kwargs...)
 merge_states(a::ExpWeightedExpectedReturnsState, b::ExpWeightedExpectedReturnsState)
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

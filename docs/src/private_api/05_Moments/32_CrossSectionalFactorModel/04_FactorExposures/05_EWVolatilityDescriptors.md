@@ -1,5 +1,5 @@
 ```@meta
-Description = "EW volatility descriptors, private API of PortfolioOptimisers.jl: EWVolatilityState, ew_variance_estimator, ew_volatility_input, assert_mask_aware_variance, …"
+Description = "EW volatility descriptors, private API of PortfolioOptimisers.jl: EWVolatilityState, ew_variance_estimator, ew_volatility_input, ew_residual_returns, …"
 ```
 
 # EW volatility descriptors: private API
@@ -15,7 +15,6 @@ EWVolatilityState
 ```@docs
 ew_variance_estimator
 ew_volatility_input
-assert_mask_aware_variance
 ew_residual_returns
 ew_residual_unresolved!
 Base.copy(x::PortfolioOptimisers.EWVolatilityState)

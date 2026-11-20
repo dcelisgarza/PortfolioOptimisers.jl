@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Divides the state of an exponentially weighted mean that starts at zero by the sum of its weights, so the mean is a weighted mean of the valid inputs whose weights sum to one.
 
-After ``n`` valid inputs, the weights of the state sum to ``1 - \\lambda^{n}``. The division removes that factor, so the first value of an asset is its first input, and the mean of an asset with a short history is comparable with the mean of an asset observed since the start. This rule is the default of every estimator that holds a `debias` field of this family. It is not the default of the three momentum Gradient Transforms, [`GradientMomentum`](@ref), [`RootMeanSquareGradient`](@ref) and [`AdaptiveMomentGradient`](@ref), because the equations of the momentum paper that they implement apply no correction. On a transform it is the correction of Adam, and [`AbstractGradientTransform`](@ref) compares the two forms of a step and cites both sources.
+After ``n`` valid inputs, the weights of the state sum to ``1 - \\lambda^{n}``. The division removes that factor, so the first value of an asset is its first input, and the mean of an asset with a short history is comparable with the mean of an asset observed since the start. This rule is the default of every estimator that holds a `debias` field of this family. It is not the default of the three momentum Gradient Transforms, [`GradientMomentum`](@ref), [`RootMeanSquareGradient`](@ref) and [`AdaptiveMomentGradient`](@ref), because Equations 7, 8 and 9 of [li2022egm](@cite), which they implement, apply no correction. On a transform it is the correction of Algorithm 1 of [kingma2015](@cite), and [`AbstractGradientTransform`](@ref) compares the two forms of a step and cites both sources.
 
 `debias = nothing` keeps the undivided state. That state is the mean multiplied by ``1 - \\lambda^{n}``, so it is shrunk toward zero: by one half after one half-life, and by one quarter after two half-lives. For a signed mean whose neutral value is zero, such as an expected return or a momentum, this shrinkage pulls a noisy estimate from a short history toward no signal. The shrinkage applies at the start of the sample, after a late listing and after a relisting. The division removes it, so each value is the mean of the inputs that the asset has.
 
@@ -26,6 +26,11 @@ ZeroStartDebias()
   - [`EWMean`](@ref)
   - [`AbstractGradientTransform`](@ref)
   - [`ZeroStartCentring`](@ref)
+
+# References
+
+  - $(ref_dict[:li2022egm]) Section 4.2.
+  - $(ref_dict[:kingma2015]) Algorithm 1.
 """
 struct ZeroStartDebias <: AbstractZeroStartDebias end
 """

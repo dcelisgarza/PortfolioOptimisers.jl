@@ -454,6 +454,8 @@ Refuses a variance estimator whose [`variance_series`](@ref) over an Asset Panel
 
 The admitted estimators are the ones whose series has a mask-aware method of its own: the exponentially weighted and the regime-adjusted families, a [`Covariance`](@ref) or a [`SimpleVariance`](@ref) with a [`CoveragePolicy`](@ref), and a windowed estimator over an admitted one. A [`PortfolioOptimisersCovariance`](@ref) has no such method, so it is refused whatever its inner estimator.
 
+A variance estimator of your own whose [`variance_series`](@ref) over an Asset Panel reads the active mask of each asset adds a method of this function that returns `nothing`, as the admitted types do. Without that method the constructor refuses it, because the generic method cannot see the panel method of the type.
+
 # Arguments
 
   - `ce`: The variance estimator of the Descriptor.
@@ -474,7 +476,7 @@ The admitted estimators are the ones whose series has a mask-aware method of its
   - [`CoveragePolicy`](@ref)
 """
 function assert_mask_aware_variance(ce::AbstractCovarianceEstimator)::Nothing
-    return throw(ArgumentError("the `ce` of an EWResidualVolatility holds a `$(typeof(ce).name.name)`, which is not mask-aware: its variance series reduces each window to its Coverage Universe, and the residual of every asset is `NaN` until its beta exists, so every cell of the Descriptor would be `NaN`. Pass the default `ce`, an `ExpWeightedVariance`, or a `SimpleVariance(; cvg = CoveragePolicy())`."))
+    return throw(ArgumentError("the `ce` of an EWResidualVolatility holds a `$(typeof(ce).name.name)`, which is not mask-aware: the variance series of a plain estimator reduces each window to its Coverage Universe, and the residual of every asset is `NaN` until its beta exists, so every cell of the Descriptor would be `NaN`. Pass the default `ce`, an `ExpWeightedVariance`, or a `SimpleVariance(; cvg = CoveragePolicy())`. A type of your own whose `variance_series` over an Asset Panel reads the active mask adds a method of `PortfolioOptimisers.assert_mask_aware_variance` that returns `nothing`."))
 end
 function assert_mask_aware_variance(::Union{RegimeAdjustedExpWeightedVariance,
                                             RegimeAdjustedExpWeightedCovariance,
@@ -1078,3 +1080,4 @@ end
 
 export EWVolatility, EWDownsideVolatility, EWResidualVolatility,
        EWResidualDownsideVolatility
+public assert_mask_aware_variance
