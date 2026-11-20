@@ -387,7 +387,7 @@ julia> (de.ce.decay ≈ exp2(-inv(5.0)), de.ce.min_obs, de.beta_decay ≈ exp2(-
     """
     mcap
     """
-    Variance estimator whose [`variance_series`](@ref) the Descriptor takes the square root of, over the residual rather than over the return. It carries the recursion, the warm-up and the reset of an asset that turns inactive. It must be mask-aware, or a windowed estimator whose window leaves the first observations, because the residual of every asset is `NaN` until its beta exists, as [`assert_mask_aware_variance`](@ref) states.
+    Variance estimator whose [`variance_series`](@ref) the Descriptor takes the square root of, over the residual rather than over the return. It carries the recursion, the warm-up and the reset of an asset that turns inactive. It must be mask-aware, a windowed estimator whose window leaves the first observations, or a [`PortfolioOptimisersCovariance`](@ref) over one of them, because the residual of every asset is `NaN` until its beta exists, as [`assert_mask_aware_variance`](@ref) states. A [`PortfolioOptimisersCovariance`](@ref) with a step in its `mp`, as its default `mp` holds, raises on the `NaN` row of the warm-up, as its docstring states.
     """
     ce
     """

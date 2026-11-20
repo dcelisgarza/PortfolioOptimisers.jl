@@ -49,6 +49,7 @@ PortfolioOptimisers.inactive_as_nonfinite
 
 ```@docs
 PortfolioOptimisers.variance_series(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+PortfolioOptimisers.coverage_variance_series
 PortfolioOptimisers.covers_an_asset
 ```
 

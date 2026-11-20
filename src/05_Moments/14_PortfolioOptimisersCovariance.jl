@@ -380,7 +380,7 @@ Answer whether a variance series of `ce` can fold the observations one at a time
 
 A variance series of a [`PortfolioOptimisersCovariance`](@ref) fits the processed covariance at each row. A refit reads the observations `1` to `t` again at each row `t`, so the series costs a time that grows as the square of the number of observations. A fold reads each observation one time, so [`fold_variance_series`](@ref) costs a time that grows with it. The fold is a route only where it gives the series of the refit.
 
-The fallback answers `false`. A mask-aware covariance estimator whose fold over the active mask is its batch fit, and that holds no state yet, answers `true` with a method in its own file. These are a [`Covariance`](@ref) with a [`FullMoment`](@ref) and a [`CoveragePolicy`](@ref), an [`ExpWeightedCovariance`](@ref) and a [`RegimeAdjustedExpWeightedCovariance`](@ref). A windowed estimator is not one: its fold keeps every observation after its first fold, and a row of its series fits the window alone. The composite answers `true` when it holds no state, when its `mp` runs from the shape of the sample, as [`supports_shape_processing`](@ref) states, and when its inner estimator answers `true`.
+The fallback answers `false`. A mask-aware covariance estimator whose fold over the active mask is its batch fit, and that holds no state yet, answers `true` with a method in its own file. These are a [`Covariance`](@ref) with a [`FullMoment`](@ref), a [`CoveragePolicy`](@ref) and no observation weights `w`, which [`partial_fit!`](@ref) refuses, an [`ExpWeightedCovariance`](@ref) and a [`RegimeAdjustedExpWeightedCovariance`](@ref). A windowed estimator is not one: its fold keeps every observation after its first fold, and a row of its series fits the window alone. The composite answers `true` when it holds no state, when its `mp` runs from the shape of the sample, as [`supports_shape_processing`](@ref) states, and when its inner estimator answers `true`.
 
 # Arguments
 
@@ -480,7 +480,7 @@ end
 
 Compute the point-in-time variance series of a [`PortfolioOptimisersCovariance`](@ref), the diagonal of its processed covariance over the observations `1` to `t` at each row `t`.
 
-When [`series_folds`](@ref) answers `true`, the series folds each observation one time with [`fold_variance_series`](@ref). It reads the masks from the keywords `active_mask` and `estimation_mask`, or from the Asset Panel. Otherwise the series refits the composite at each row. The matrix method takes the expanding series of [`variance_series(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt}, X::MatNum, pnl::Option{<:AssetPanel})`](@ref). The panel method fits the panel method of `Statistics.var` of the composite at each row with [`panel_series_row`](@ref), so the inner estimator chooses its route: a mask-aware one reads the window, and a plain one reduces it to its Coverage Universe. A row whose window covers no asset of a plain inner estimator is `NaN`.
+When [`series_folds`](@ref) answers `true`, the series folds each observation one time with [`fold_variance_series`](@ref). It reads the masks from the keywords `active_mask` and `estimation_mask`, or from the Asset Panel. Otherwise the series refits the composite at each row. The matrix method takes the expanding series of [`variance_series(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt}, X::MatNum, pnl::Option{<:AssetPanel})`](@ref). The panel method fits the panel method of `Statistics.var` of the composite at each row with [`panel_series_row`](@ref), so the inner estimator chooses its route: a mask-aware one reads the window, and a plain one reduces it to its Coverage Universe. A row whose window covers no asset of a plain inner estimator is `NaN`. When the inner estimator is a plain leaf, by [`reduces_each_window`](@ref), the panel method takes the reduce-and-expand series of [`coverage_variance_series`](@ref) in place of the refit, because the two give the same values and the refit costs more for each row.
 
 The reduce-and-expand series of [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref) would reduce each window whatever the inner estimator is, so the composite overrides it. The estimators that are not composites keep their own methods, and they do no work of this method.
 
@@ -488,7 +488,7 @@ The reduce-and-expand series of [`variance_series(ce::AbstractCovarianceEstimato
 
  1. Orient `X`, and the masks, to `observations × assets` with [`dims_oriented`](@ref). The panel method allocates the `NaN` frame with [`coverage_series_frame`](@ref), which checks the size of the active mask.
  2. If [`series_folds`](@ref) answers `true`, compute the series with [`fold_variance_series`](@ref).
- 3. Otherwise refit: the matrix method returns the expanding windowed series, and the panel method writes the row of [`panel_series_row`](@ref) on the rows `1` to `t` into each row `t`.
+ 3. Otherwise refit. The matrix method returns the expanding windowed series. The panel method returns the series of [`coverage_variance_series`](@ref) when [`reduces_each_window`](@ref) answers `true` for the inner estimator, and otherwise it writes the row of [`panel_series_row`](@ref) on the rows `1` to `t` into each row `t`.
  4. Return the series, transposed when `dims == 2`.
 
 # Arguments
@@ -530,6 +530,9 @@ function variance_series(ce::PortfolioOptimisersCovariance, X::MatNum; dims::Int
 end
 function variance_series(ce::PortfolioOptimisersCovariance, X::MatNum,
                          pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    if !series_folds(ce) && reduces_each_window(ce.ce)
+        return coverage_variance_series(ce, X, pnl; dims = dims, kwargs...)
+    end
     X = dims_oriented(dims, X)
     val, _ = coverage_series_frame(X, pnl)
     if series_folds(ce)

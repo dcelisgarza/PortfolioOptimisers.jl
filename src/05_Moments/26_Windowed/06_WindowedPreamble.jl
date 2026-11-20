@@ -450,6 +450,43 @@ end
 function reads_active_mask(est::Union{WindowedVariance, WindowedCovariance})
     return reads_active_mask(getfield(est, 1))
 end
+"""
+    reduces_each_window(est::AbstractCovarianceEstimator) -> Bool
+    reduces_each_window(est::Union{WindowedVariance, WindowedCovariance}) -> Bool
+    reduces_each_window(est::PortfolioOptimisersCovariance) -> Bool
+
+Answer whether the panel method of the variance of `est` is the fit over the Coverage Universe of the window that it is given.
+
+The variance series of a [`PortfolioOptimisersCovariance`](@ref) over an Asset Panel reads the answer for its inner estimator:
+
+  - A plain leaf answers `true`. Its fit over the rows `1` to `t` is the fit over the Coverage Universe of those rows, so the composite takes the reduce-and-expand series of [`coverage_variance_series`](@ref). That series gives the values of a refit through [`panel_series_row`](@ref) at a lower cost for each row, and it is the series of v0.33.
+  - A mask-aware leaf, by [`reads_active_mask`](@ref), answers `false`, because it reads the window itself.
+  - A windowed estimator answers `false`. It fits a window inside the rows `1` to `t`, so an asset whose gap is before that window is in its fit. So the composite over it refits each row through [`panel_series_row`](@ref).
+  - A [`PortfolioOptimisersCovariance`](@ref) passes the window to its own inner estimator without a cut, so it answers for that estimator. A composite over a composite over a plain leaf takes the reduce-and-expand series too.
+
+# Arguments
+
+  - `est`: The inner estimator of the composite.
+
+# Returns
+
+  - `flag::Bool`: `true` when the reduce-and-expand series gives the values of the refit.
+
+# Related
+
+  - [`coverage_variance_series`](@ref)
+  - [`panel_series_row`](@ref)
+  - [`reads_active_mask`](@ref)
+"""
+function reduces_each_window(est::AbstractCovarianceEstimator)
+    return !reads_active_mask(est)
+end
+function reduces_each_window(::Union{WindowedVariance, WindowedCovariance})
+    return false
+end
+function reduces_each_window(est::PortfolioOptimisersCovariance)
+    return reduces_each_window(est.ce)
+end
 function covers_an_asset(est::Union{WindowedVariance, WindowedCovariance}, X::MatNum,
                          pnl::Option{<:AssetPanel}; dims::Int = 1,
                          iv::Option{<:MatNum} = nothing, kwargs...)

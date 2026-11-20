@@ -16,6 +16,7 @@ windowed_mask_panel
 windowed_series_rows
 windowed_series_row
 panel_series_row
+reduces_each_window
 variance_series(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt}, X::MatNum, pnl::Option{<:AssetPanel})
 SeedWindowed
 seed_window_path(::SeedWindowed)

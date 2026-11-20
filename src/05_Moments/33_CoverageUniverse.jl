@@ -1382,6 +1382,34 @@ Where:
 """
 function variance_series(ce::AbstractCovarianceEstimator, X::MatNum,
                          pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    return coverage_variance_series(ce, X, pnl; dims = dims, kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Run the reduce-and-expand variance series over an Asset Panel, the body of the root method of [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref).
+
+The root method states the rule and the `# Algorithm`. The body is a function of its own, because a [`PortfolioOptimisersCovariance`](@ref) over a plain leaf estimator, by [`reduces_each_window`](@ref), takes this series too. Its own panel method of `variance_series` overrides the root, so it calls this function and does not refit through [`panel_series_row`](@ref), which costs more for each row and gives the same values.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to the estimator.
+
+# Returns
+
+  - `val::Matrix{<:Number}`: The variance series, as the root method returns it.
+
+# Related
+
+  - [`PortfolioOptimisersCovariance`](@ref)
+  - [`reduces_each_window`](@ref)
+"""
+function coverage_variance_series(ce::AbstractCovarianceEstimator, X::MatNum,
+                                  pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)
     val, amsk = coverage_series_frame(X, pnl)
     for t in axes(X, 1)

@@ -296,6 +296,19 @@ dropped every asset with one gap. The inner estimator now reads the window.
     @test isapprox(PO.variance_series(poc, X, pnl),
                    PO.variance_series(Covariance(), X, pnl); rtol = 1e-12, nans = true)
     @test all(isnan, PO.variance_series(poc, R, pnl))
+    # A composite over a composite answers for its inner estimator, so over a plain leaf it takes
+    # the reduce-and-expand series too, and over a window it refits each row (R85 of #1817).
+    pp = PortfolioOptimisersCovariance(; ce = poc, mp = MatrixProcessing(; pdm = nothing))
+    @test PO.reduces_each_window(pp)
+    @test !PO.reduces_each_window(PortfolioOptimisersCovariance(;
+                                                                ce = WindowedCovariance(;
+                                                                                        window = 4)))
+    @test !PO.reduces_each_window(PortfolioOptimisersCovariance(;
+                                                                ce = ExpWeightedCovariance()))
+    @test isapprox(PO.variance_series(pp, X, pnl), PO.variance_series(Covariance(), X, pnl);
+                   rtol = 1e-12, nans = true)
+    @test isapprox(PO.variance_series(pp, R, pnl), PO.variance_series(poc, R, pnl);
+                   rtol = 1e-12, nans = true)
     Rn = copy(X)
     Rn[5, 2] = NaN
     @test isapprox(PO.variance_series(poc, Rn, nothing),
@@ -359,6 +372,18 @@ dropped every asset with one gap. The inner estimator now reads the window.
         @test isapprox(var(pm, permutedims(R), pnl; dims = 2), permutedims(var(ce, R, pnl));
                        rtol = 1e-12, nans = true)
     end
+    # R85 of #1817. A `Covariance` with observation weights cannot fold, because `partial_fit!`
+    # refuses its `w`. So the composite over it refits each row, with the panel and with the mask
+    # keywords, and it does not raise.
+    cw = Covariance(; cvg = CoveragePolicy(),
+                    w = StatsBase.aweights(collect(range(0.5, 1.5; length = size(R, 1)))))
+    pw = PortfolioOptimisersCovariance(; ce = cw, mp = MatrixProcessing(; pdm = nothing))
+    @test !PO.series_folds(pw)
+    @test isapprox(PO.variance_series(pw, R, pnl), PO.variance_series(cw, R, pnl);
+                   rtol = 1e-12, nans = true)
+    @test isapprox(PO.variance_series(pw, R; active_mask = amsk),
+                   PO.variance_series(pw, nothing, nothing, R, nothing; active_mask = amsk);
+                   rtol = 1e-12, nans = true)
     # The trait names the mask-aware estimators, and a wrapper answers for its inner one.
     pol = CoveragePolicy()
     for (ce, flag) in ((SimpleVariance(), false), (Covariance(), false),

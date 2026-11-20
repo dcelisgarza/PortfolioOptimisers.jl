@@ -1374,6 +1374,7 @@ function reads_active_mask(::Union{Covariance{<:Any, <:Any, <:Any, <:Any, <:Cove
     return true
 end
 function series_folds(ce::Covariance{<:Any, <:Any, <:FullMoment, <:Any, <:CoveragePolicy})
-    return isnothing(ce.cache)
+    # `partial_fit!` refuses the observation weights `w`, so a weighted estimator refits.
+    return isnothing(ce.cache) && isnothing(ce.w)
 end
 export SimpleVariance, var, std
