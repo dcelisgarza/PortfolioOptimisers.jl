@@ -1,5 +1,5 @@
 ```@meta
-Description = "Matrix processing, private API of PortfolioOptimisers.jl: matrix_processing_block!, assert_finite_block, matrix_processing_step!, sample_matrix_processing!, …"
+Description = "Matrix processing, private API of PortfolioOptimisers.jl: matrix_processing_block!, assert_finite_block, block_assets, matrix_processing_step!, …"
 ```
 
 # Matrix processing: private API
@@ -9,6 +9,7 @@ These are the helpers of [`matrix_processing!`](@ref). `matrix_processing_block!
 ```@docs
 matrix_processing_block!
 PortfolioOptimisers.assert_finite_block
+PortfolioOptimisers.block_assets
 matrix_processing_step!
 PortfolioOptimisers.sample_matrix_processing!
 PortfolioOptimisers.assert_shape_only_matrix_processing

@@ -891,9 +891,46 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Returns the assets of a block of a co-moment matrix, as a mask over the `N` assets.
+
+[`matrix_processing_block!`](@ref) processes the finite block of a frame, and a step that reads the sample reads the assets of that block. A covariance or a coskewness matrix is on the asset axis, so its block mask is the mask of its assets. A cokurtosis matrix is on the axis of the `N^2` asset pairs, and the pair `(i, j)` has the index `(i - 1) N + j`. An asset outside the Coverage Universe makes every one of its pairs `NaN`, so the asset `i` is in the block when its own pair `(i, i)` is in the block. The denoising step then reads the ratio of the observations to the assets of the block, as the batch verb does over the columns that the block covers.
+
+# Algorithm
+
+ 1. When `blk` has `N` entries, return `blk`.
+ 2. Otherwise, check that `blk` has `N^2` entries, and return the entries of the pairs `(i, i)`.
+
+# Arguments
+
+  - `blk`: The block mask over the rows of the matrix.
+  - `N`: The number of assets of the sample.
+
+# Validation
+
+  - `length(blk)` is `N` or `N^2`. Otherwise, the function raises a `DimensionMismatch`.
+
+# Returns
+
+  - `assets::AbstractVector{Bool}`: The mask of the assets of the block, with `N` entries.
+
+# Related
+
+  - [`matrix_processing_block!`](@ref)
+"""
+function block_assets(blk::AbstractVector{Bool}, N::Integer)
+    if length(blk) == N
+        return blk
+    end
+    @argcheck(length(blk) == N^2,
+              DimensionMismatch("a block mask has one entry for each asset or for each pair of assets, so it must have $N or $(N^2) entries for $N assets. Got\nlength(blk) => $(length(blk))."))
+    return BitVector(blk[(i - 1) * N + i] for i in 1:N)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Applies matrix processing to the finite block of `sigma`, from the shape of the sample and not from the sample.
 
-This is the shape form of [`matrix_processing_block!`](@ref). An incremental fit calls it when it makes the estimate from its state. Its body is the body of the matrix method with one change. The matrix method cuts the columns of `X` to the block, and this method passes the size of the block in their place, because the steps read only the number of those columns. The matrix method cuts `X` only when the axis of `sigma` is the asset axis, so this method passes the size of the block only then. A cokurtosis matrix has an axis of asset pairs, and its block keeps the `N` assets of the sample, as the matrix method keeps the whole of `X`.
+This is the shape form of [`matrix_processing_block!`](@ref). An incremental fit calls it when it makes the estimate from its state. Its body is the body of the matrix method with one change. The matrix method cuts the columns of `X` to the block, and this method passes the size of the block in their place, because the steps read only the number of those columns. Both methods read the assets of the block from [`block_assets`](@ref). On a cokurtosis matrix, whose axis is the asset pairs, that is the assets whose own pair is in the block, and not the pairs of the block.
 
 An estimate from the state calls this method, and not the plain one, for the same reason as the [`AssetPanel`](@ref) methods. An estimator fitted over a changing universe gives `NaN` for an asset outside the Coverage Universe. A positive definite repair of a frame that holds such an entry gets a LAPACK error that does not name the cause. A complete matrix has no frame. For it, the body first refuses a non-finite off-diagonal entry with an error that names it, and then runs the plain method on the whole matrix.
 
@@ -903,7 +940,7 @@ An estimate from the state calls this method, and not the plain one, for the sam
  2. Refuse a non-finite entry inside the finite rows with an `IsNonFiniteError`, as the matrix method does.
  3. Set the rows and columns of the zero variances to zero with [`zero_variance_rows!`](@ref), and take the block as the finite rows whose variance is not zero. A zero variance has no correlation, so no step reads it.
  4. When every asset is in the block, run the plain method and return. When no asset is in the block, return `sigma`.
- 5. Otherwise, process the block, and write it back. The block reads the number of assets of the block when `sigma` is on the asset axis, and `N` otherwise.
+ 5. Otherwise, process the block with the number of assets that [`block_assets`](@ref) gives, and write it back.
 
 # Arguments
 
@@ -941,10 +978,7 @@ function matrix_processing_block!(mp::Option{<:AbstractMatrixProcessingEstimator
         return sigma
     end
     block = sigma[blk, blk]
-    # The block cuts the assets only where the axis of the matrix is the asset axis, as the
-    # matrix method cuts the columns of `X`. A cokurtosis matrix is indexed by asset pairs, so
-    # its block keeps the `N` assets of the sample.
-    matrix_processing!(mp, block, T, N == length(blk) ? count(blk) : N; kwargs...)
+    matrix_processing!(mp, block, T, count(block_assets(blk, N)); kwargs...)
     sigma[blk, blk] = block
     return sigma
 end
@@ -1041,7 +1075,7 @@ The plain [`matrix_processing!`](@ref) and [`posdef!`](@ref) do not change, so t
  4. Set the rows and columns of the zero variances to zero with [`zero_variance_rows!`](@ref), and take the block `blk` as the rows of `fin` whose variance is not zero.
  5. When `blk` holds no `false`, run the plain repair on `sigma` itself and return. A complete matrix has no frame to keep.
  6. When `blk` holds no `true`, return `sigma`. Every finite variance is zero, so nothing is left to repair.
- 7. Copy the block out, repair the copy with [`sample_matrix_processing!`](@ref) under `T` and the columns of `X` that the block names, write it back into `sigma`, and return `sigma`. The function cuts `X` only when the axis of `sigma` is the asset axis. A cokurtosis matrix has an axis of asset pairs, so its block names no column of `X`. The function then passes the whole returns matrix, as the plain path does for that matrix.
+ 7. Copy the block out, repair the copy with [`sample_matrix_processing!`](@ref) under `T` and the columns of `X` of the assets of the block, write it back into `sigma`, and return `sigma`. [`block_assets`](@ref) gives those assets. A cokurtosis matrix has an axis of asset pairs, so its assets are the assets whose own pair is in the block. The repair then reads the same sample as the batch verb over the columns that the block covers.
 
 # Arguments
 
@@ -1089,11 +1123,7 @@ function matrix_processing_block!(mp::Option{<:AbstractMatrixProcessingEstimator
         return sigma
     end
     block = sigma[blk, blk]
-    # `X` is cut only where the axis of the matrix IS the asset axis. A cokurtosis matrix is
-    # indexed by asset pairs, so its block mask is `assets²` long and names no column of `X`;
-    # the plain path hands `matrix_processing!` the whole returns matrix at that order too.
-    Xb = size(X, 2) == length(blk) ? X[:, blk] : X
-    sample_matrix_processing!(mp, block, Xb, T; kwargs...)
+    sample_matrix_processing!(mp, block, X[:, block_assets(blk, size(X, 2))], T; kwargs...)
     sigma[blk, blk] = block
     return sigma
 end

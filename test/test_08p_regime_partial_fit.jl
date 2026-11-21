@@ -839,27 +839,42 @@ PortfolioOptimisers.reads_sample_values(::WrongDist2234) = false
                        rtol = 1e-12)
         @test isapprox(cokurtosis(partial_fit!(kte, X10)), cokurtosis(kte, X10);
                        rtol = 1e-12)
-        # A fold over a changing universe gives a frame. The shape route of the block reads
-        # the ratio of the batch route on the same frame: the width of the block for a matrix
-        # on the asset axis, and the `N` assets for a cokurtosis, whose axis is the pairs.
-        Xg = copy(X10)
+        # A fold over a changing universe gives a frame. The batch verb refuses such a sample
+        # and names the route that reduces it to the covered columns, so the block of the
+        # frame equals the batch verb over those columns, at every order (#2236). The frame
+        # takes 300 rows: at the 80 rows of `X10`, the ratios `T / 10` and `T / 9` leave the
+        # same eigenvalues under the edge of the denoising step, so no check could tell them
+        # apart.
+        Xg = randn(StableRNG(11), 300, 10)
         Xg[1:20, 4] .= NaN
         Tg, Ng = size(Xg)
+        keep = setdiff(1:Ng, 4)
         Z = zeros(Tg, Ng)
         kraw = cokurtosis(partial_fit!(Cokurtosis(), Xg))
-        @test 0 < count(isfinite, LinearAlgebra.diag(kraw)) < Ng^2
+        kb = isfinite.(LinearAlgebra.diag(kraw))
+        @test count(kb) == (Ng - 1)^2
         kfold = cokurtosis(partial_fit!(kte, Xg))
+        @test isapprox(kfold[kb, kb], cokurtosis(kte, Xg[:, keep]); rtol = 1e-12)
+        Vfold = last(coskewness(partial_fit!(ske, Xg)))
+        vb = isfinite.(LinearAlgebra.diag(Vfold))
+        @test isapprox(Vfold[vb, vb], last(coskewness(ske, Xg[:, keep])); rtol = 1e-12)
+        cpo = PortfolioOptimisersCovariance(; mp = mpd)
+        cfold = cov(partial_fit!(cpo, Xg))
+        cb = isfinite.(LinearAlgebra.diag(cfold))
+        @test isapprox(cfold[cb, cb], cov(cpo, Xg[:, keep]); rtol = 1e-12)
+        # The shape and the matrix methods of the block read the same assets.
         @test isapprox(kfold, PO.matrix_processing_block!(mpd, copy(kraw), Z); rtol = 1e-12,
                        nans = true)
         @test isapprox(PO.matrix_processing_block!(mpd, copy(kraw), Tg, Ng),
                        PO.matrix_processing_block!(mpd, copy(kraw), Z); rtol = 1e-12,
                        nans = true)
-        # Before #2234 the shape route read the `count(blk)` pairs of the block as `N`. That
-        # ratio gives a different matrix, so the check above tells the two rules apart.
-        @test !isapprox(PO.matrix_processing_block!(mpd, copy(kraw), Tg,
-                                                    count(isfinite,
-                                                          LinearAlgebra.diag(kraw))), kfold;
-                        rtol = 1e-6, nans = true)
+        # Before #2236 both methods read all `Ng` assets on a cokurtosis frame, and before
+        # #2234 the shape method read the `count(kb)` pairs. Both ratios give another matrix,
+        # so the checks above tell the rules apart.
+        for n in (Ng, count(kb))
+            @test !isapprox(PO.matrix_processing!(mpd, kraw[kb, kb], Tg, n), kfold[kb, kb];
+                            rtol = 1e-6)
+        end
         sraw, Vraw = coskewness(partial_fit!(Coskewness(), Xg))
         @test isapprox(last(coskewness(partial_fit!(ske, Xg))),
                        PO.negative_spectral_coskewness(sraw, Z, mpd); rtol = 1e-12,
@@ -873,6 +888,16 @@ PortfolioOptimisers.reads_sample_values(::WrongDist2234) = false
         @test isapprox(PO.matrix_processing_block!(mpd, copy(craw), Tg, Ng),
                        PO.matrix_processing_block!(mpd, copy(craw), Z); rtol = 1e-12,
                        nans = true)
+        # `block_assets` reads the mask on the asset axis as it is, and the own pair of each
+        # asset on the axis of pairs. A pair of two covered assets can be out of the block.
+        @test PO.block_assets(BitVector([1, 0, 1]), 3) == BitVector([1, 0, 1])
+        pb = trues(9)
+        pb[[2, 4, 5, 6, 8]] .= false
+        @test PO.block_assets(pb, 3) == BitVector([1, 0, 1])
+        pb[3] = false
+        @test PO.block_assets(pb, 3) == BitVector([1, 0, 1])
+        @test PO.block_assets(kb, Ng) == BitVector(i != 4 for i in 1:Ng)
+        @test_throws DimensionMismatch PO.block_assets(trues(4), 3)
     end
 
     @testset "For one series the merge is Proposition 2.1 of pebay2008" begin
