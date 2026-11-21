@@ -696,6 +696,41 @@ end
         # The currency factor leaves the regression, so the systematic error is the market's alone.
         @test isfinite(fc.sys.mu_se)
     end
+    @testset "An unknown variance follows the rule of the unstated kind (#2229)" begin
+        # One pair of the regression is in the warm-up of its variance.
+        vsn = copy(vs)
+        vsn[2, 3] = NaN
+        rrn = CrossSectionalFactorModel(; M = rr.M, b = rr.b, csr = csr, Ms = Ms, vs = vsn,
+                                        esigma = rr.esigma, rw = rw, bw = rw,
+                                        nf = ["market", "style"], fam = ["market", "style"],
+                                        lag = 0)
+        prn = LowOrderPrior(; X = X, mu = mu, sigma = sigma, rr = rrn, fpr = fpr)
+        fe = factor_attribution(w, prn, X; se = true)
+        @test isnan(fe.sys.mu_se)
+        @test all(isnan, fe.fbd.mu_se)
+        # The leverage kind does not read the variance of a pair in the warm-up.
+        fl = factor_attribution(w, prn, X; se = true,
+                                unknown = KindwiseUnknown(; leverage = ZeroUnknown()))
+        @test isnan(fl.sys.mu_se)
+        # Under `ZeroUnknown` the variance is zero: the direct sandwich with that entry at zero.
+        vs0 = ifelse.(isnan.(vsn), 0.0, vsn)
+        V0 = map(1:2) do t
+            B = Ms[:, :, t]
+            G = transpose(B) * Diagonal(rw[t, :]) * B
+            S = transpose(B) * Diagonal(rw[t, :] .^ 2 .* vs0[t, :]) * B
+            Gi = inv(G)
+            return Gi * S * transpose(Gi)
+        end
+        fz = factor_attribution(w, prn, X; se = true, unknown = ZeroUnknown())
+        @test fz.sys.mu_se ≈ scale * sqrt(sum(dot(g[t], V0[t], g[t]) for t in 1:2))
+        @test fz.fbd.mu_se ≈
+              [scale * sqrt(sum(g[t][k]^2 * V0[t][k, k] for t in 1:2)) for k in 1:2]
+        @test fz.sys.mu_se < fa.sys.mu_se
+        fk = factor_attribution(w, prn, X; se = true,
+                                unknown = KindwiseUnknown(; unstated = ZeroUnknown()))
+        @test fk.sys.mu_se == fz.sys.mu_se
+        @test fk.fbd.mu_se == fz.fbd.mu_se
+    end
     @testset "The decomposition of the fixture is exact, and its remainder is the intercept" begin
         @test fa.sys.vol_contrib + fa.idio.vol_contrib + fa.unattr.vol_contrib ≈
               fa.total.vol_contrib
