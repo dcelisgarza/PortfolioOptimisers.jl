@@ -150,7 +150,6 @@ end
                                 # Public descriptor factories: one keyword call each, the
                                 # user's door to a named exposure (ADR 0135).
                                 :ReturnOnEquity => "public descriptor factory",
-                                :SalesToEnterpriseValue => "public descriptor factory",
                                 :LogMarketCap => "public descriptor factory",
                                 :EbitdaToEnterpriseValue => "public descriptor factory",
                                 :AssetsGrowthRate => "public descriptor factory",
