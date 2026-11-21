@@ -84,15 +84,16 @@ The refusal is correct. A sub-issue under a wrong parent is work that somebody m
 
 ## After the apply
 
-The sub-issue closes when the file's row reads `swept = true`. Close it yourself in the commit that
-finishes the sweep of that file, and name the issue in the commit message:
+The sub-issue closes when the file's row reads `swept = true`. Name the issue in the commit that
+finishes the sweep of that file. Close it yourself when the push of that commit reaches the remote
+branch:
 
 ```bash
-gh issue close <number> --comment "Swept in <commit>."
+gh issue close <number> --comment "Swept in <commit> on <branch>."
 ```
 
-A closing keyword in the commit message does not close it. GitHub acts on the keyword only when the
-commit reaches `main`, and `main` is current to the last release.
+Do not wait for the merge into `main` (`CLAUDE.md` § *Repo etiquette*). A closing keyword in the
+commit message acts only when the commit reaches `main`.
 
 ## Before it
 

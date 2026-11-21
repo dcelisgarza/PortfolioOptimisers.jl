@@ -1,6 +1,6 @@
 ---
 name: sweep-conform
-description: "Make an addition under src/ or ext/ conform to the sweep of #404 before the commit: the manifest row, the unit count, the child map, the coverage entry, the include line, the gate baseline rows, the size headroom, and the two tracker steps no Julia test can reach. Then land the branch in the order that survives a busy base, by the route that the issue states (ADR 0240): dev-fixes, a map branch, or a pull request of its own. Use after adding or changing any file under src/ or ext/, before committing, and before any push."
+description: "Make an addition under src/ or ext/ conform to the sweep of #404 before the commit: the manifest row, the unit count, the child map, the coverage entry, the include line, the gate baseline rows, the size headroom, and the two tracker steps no Julia test can reach. Then land the branch in the order that survives a busy base, by the route that the issue states (ADR 0240): dev, a map branch, or a pull request of its own. Use after adding or changing any file under src/ or ext/, before committing, and before any push."
 ---
 
 # Conforming to the sweep
@@ -131,8 +131,8 @@ When `main` changed the ratchet after your branch started, rebase, so that you l
 that is current. GitHub shows the conflict on the pull request.
 
 **The landing base.** The `**Lands on:**` line of the issue names the route (ADR 0240). A sweep
-sub-issue lands on `dev-fixes` unless its line names another route. `<base>` below is the landing
-base: `origin/main` for a branch of your own, and `origin/dev-fixes` or `origin/agents/<map>-<slug>`
+sub-issue lands on `dev` unless its line names another route. `<base>` below is the landing
+base: `origin/main` for a branch of your own, and `origin/dev` or `origin/agents/<map>-<slug>`
 for a shared branch. On a shared branch, run
 `bash code_health/gate_stamp.sh base origin/<branch>` once, before the first gate. Every gate,
 stamp and check then measures against it.
@@ -218,13 +218,16 @@ of cost, the fast ones first, and the slow ones once, on the tree you will push:
      body that the `pr` skill writes and `Closes #<issue>` in it. Turn on auto-merge with
      `gh pr merge <number> --auto --squash`. GitHub merges it when the required checks pass.
    - **Shared branch.** Rebase onto `<base>` if it moved, and push with
-     `git push origin HEAD:<branch>`. The commit message names `Fix #<issue>: …`, and the issue
-     closes when the batch merges. Open no pull request of your own.
+     `git push origin HEAD:<branch>`. The commit message names `Fix #<issue>: …`. Open no pull
+     request of your own.
+   - **Every route.** When the push holds the last part of the work, close the issue with
+     `gh issue close <issue> --comment "Fixed in <sha> on <branch>."`. Do not wait for the merge
+     into `main` (`CLAUDE.md` § *Repo etiquette*).
 
 Each gate and each test file records a stamp of the tree it measured. The pre-push hook refuses
 the push in three cases, and the refusal names what to do:
 
-- The push goes to `dev-fixes`, and the landing base is not `origin/dev-fixes`. Store the base,
+- The push goes to `dev`, and the landing base is not `origin/dev`. Store the base,
   rebase, and run the gates again.
 - `<base>` moved, after a gate ran, in a file or a `src/` directory your branch changes. Re-run only
   the gates your change can reach, and paste the `drop` line that the refusal prints for the rest.

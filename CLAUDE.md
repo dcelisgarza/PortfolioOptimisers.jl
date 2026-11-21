@@ -31,7 +31,7 @@ name.
   | `**Lands on:**` | For | Branch |
   | --- | --- | --- |
   | `own branch` | a standalone feature, an important correctness fix, a large performance fix | `agents/<issue>-<slug>` from `origin/main` |
-  | `dev-fixes` | a sweep sub-issue, an ergonomics change, a small performance fix, an unusual composition bug, a docs fix | `dev-fixes`, shared |
+  | `dev` | a sweep sub-issue, an ergonomics change, a small performance fix, an unusual composition bug, a docs fix | `dev`, shared |
   | `map #<map>` | a ticket of a map whose tickets make sense on `main` only together | `agents/<map>-<slug>`, shared |
 
   Write the line in each issue that you file, from the same table.
@@ -48,8 +48,8 @@ name.
   is necessary only when GitHub shows a conflict with `main`.
 - **Shared branch.** Commit, rebase onto `origin/<branch>`, and push with
   `git push origin HEAD:<branch>` as a fast-forward. Never force-push it. When `origin` has no
-  `dev-fixes`, create it with `git push origin origin/main:refs/heads/dev-fixes`, and open a draft
-  pull request into `main`. The maintainer merges `dev-fixes` as a batch. A map branch gets one
+  `dev`, create it with `git push origin origin/main:refs/heads/dev`, and open a draft
+  pull request into `main`. The maintainer merges `dev` as a batch. A map branch gets one
   draft pull request too. The session that lands the last ticket of the map turns on auto-merge.
 - **Never commit a change you did not make.** Check `git status`, and stage the files you edited
   by name, never with `git add -A`.
@@ -131,10 +131,12 @@ steps 3 and 4. Defer a feature whose design is not settled, as `sweep-conform` s
 - **Assign the issue to your `gh` account before your first edit**, with
   `gh issue edit <number> --add-assignee @me`. An issue that you fix, close, or leave open with a
   part of the work done carries your account.
-- **The merge of the pull request closes the issue that it resolves**, for every kind of issue: a
-  defect, a feature, a sweep sub-issue, a map. Name the issue in the commit message, for example
-  `Fix #493: …`. On your own branch, also write `Closes #493` in the body of the pull request.
-  On a shared branch, the issue closes when the batch merges. A squash merge puts
-  every commit message into the commit on `main`, and a closing keyword there closes the issue.
-  So a commit of a part of the work names `Part of #493: …`, with no closing keyword, and the
-  issue stays open while a part of the work remains.
+- **Close the issue when its fix is pushed, not when the pull request merges**, for every kind
+  of issue and every route: a defect, a feature, a sweep sub-issue, a map. When the push that
+  holds the last part of the work reaches the remote branch, close the issue with
+  `gh issue close 493 --comment "Fixed in <sha> on <branch>."`. A map closes when its last ticket
+  closes. Name the issue in the commit message, for example `Fix #493: …`. On your own branch,
+  also write `Closes #493` in the body of the pull request, so that the pull request links the
+  issue. A commit of a part of the work names `Part of #493: …`, with no closing keyword, and the
+  issue stays open while a part of the work remains. A squash merge puts every commit message
+  into `main`, and a `Fix #493` there closes a partial ticket that a later session reopened.

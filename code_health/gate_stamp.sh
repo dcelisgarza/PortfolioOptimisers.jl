@@ -12,7 +12,7 @@
 #     code_health/gate_stamp.sh check                   the pre-push guard of .pre-commit-config.yaml
 #
 # The landing base is the branch the worktree lands on (ADR 0240): origin/main for a branch of its
-# own, or the shared branch, such as origin/dev-fixes. `base <ref>` stores it in the git directory
+# own, or the shared branch, such as origin/dev. `base <ref>` stores it in the git directory
 # of the worktree, and it defaults to origin/main.
 #
 # A gate measures a tree: the merge-base of the branch with the landing base, plus the branch. When
@@ -63,7 +63,7 @@
 #   GATE_STAMP_REF       the ref a gate is measured against. Default: the landing base, which
 #                        is origin/main when `base` stored none.
 #   GATE_STAMP_BRANCH    the globs, split on spaces, of the remote branches the guard protects,
-#                        the branches of ADR 0240. Default: refs/heads/agents/* refs/heads/dev-fixes.
+#                        the branches of ADR 0240. Default: refs/heads/agents/* refs/heads/dev.
 #   GATE_STAMP_REQUIRED  the gates a push that changes src/ or ext/ needs. Default:
 #                        "jet size complexity perf doctest coverage". The tests set it empty.
 #   GATE_STAMP_FORCE     any value acts outside .claude/worktrees/ too. The tests use it.
@@ -146,7 +146,7 @@ waive() {
 }
 
 # Print the landing base, or store a new one. The landing base is the branch the worktree lands on
-# (ADR 0240): `origin/main` for a branch of its own, `origin/dev-fixes` or `origin/agents/<map>-…`
+# (ADR 0240): `origin/main` for a branch of its own, `origin/dev` or `origin/agents/<map>-…`
 # for a shared branch. Every stamp and every check reads it.
 landing_base() {
     if [ $# -eq 0 ]; then
@@ -317,7 +317,7 @@ moved_files() {
 # does not have. On a shared branch, the base is the shared branch itself.
 check() {
     acts || return 0
-    local protected=${GATE_STAMP_BRANCH:-refs/heads/agents/* refs/heads/dev-fixes}
+    local protected=${GATE_STAMP_BRANCH:-refs/heads/agents/* refs/heads/dev}
     if [ -n "${PRE_COMMIT_REMOTE_BRANCH:-}" ]; then
         local glob globs hit_branch=0
         # `read -a` splits the list on spaces and expands no pathname. Each glob is unquoted in
@@ -332,10 +332,10 @@ check() {
         [ "$hit_branch" = 1 ] || return 0
         # A push to the shared branch measures against it. A worktree with another landing base
         # measured a tree that this push does not land on.
-        if [ "$PRE_COMMIT_REMOTE_BRANCH" = refs/heads/dev-fixes ] && [ "$ref" != origin/dev-fixes ]; then
-            echo "This push lands on dev-fixes, and the landing base is $ref. Run"
-            echo "  code_health/gate_stamp.sh base origin/dev-fixes"
-            echo "then rebase onto origin/dev-fixes, and run the gates again."
+        if [ "$PRE_COMMIT_REMOTE_BRANCH" = refs/heads/dev ] && [ "$ref" != origin/dev ]; then
+            echo "This push lands on dev, and the landing base is $ref. Run"
+            echo "  code_health/gate_stamp.sh base origin/dev"
+            echo "then rebase onto origin/dev, and run the gates again."
             return 1
         fi
     fi
