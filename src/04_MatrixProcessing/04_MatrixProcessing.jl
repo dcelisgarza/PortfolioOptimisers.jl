@@ -90,7 +90,7 @@ To add a matrix processing algorithm that `MatrixProcessing` can use, subtype `A
 
   - `matrix_processing_algorithm!(mpa::AbstractMatrixProcessingAlgorithm, sigma::MatNum, args...; kwargs...) -> MatNum`: Applies the algorithm to `sigma` in place.
   - `matrix_processing_algorithm(mpa::AbstractMatrixProcessingAlgorithm, sigma::MatNum, args...; kwargs...) -> MatNum`: Optional. Applies the algorithm to a copy of `sigma`, and returns the copy.
-  - `reads_sample_values(mpa::AbstractMatrixProcessingAlgorithm) -> Bool`: Optional. Answers `false` when the algorithm reads no value of the sample `X`. The fallback answers `true`, so an incremental fit refuses the algorithm, because the fit keeps no observation. An algorithm that answers `false` also adds the method `matrix_processing_algorithm!(mpa, sigma)` with no sample, which the estimate from the state calls. [`LoGo`](@ref) gives the answer of its distance estimator, which states it with the same verb, as the interfaces of [`AbstractDistanceEstimator`](@ref) and [`AbstractDistanceAlgorithm`](@ref) state.
+  - `reads_sample_values(mpa::AbstractMatrixProcessingAlgorithm) -> Bool`: Optional. Answers `false` when the algorithm reads no value of the sample `X`. The fallback answers `true`, so an incremental fit refuses the algorithm, because the fit keeps no observation. An algorithm that answers `false` also adds the method `matrix_processing_algorithm!(mpa, sigma)` with no sample, which the estimate from the state calls. A `false` answer for an algorithm that reads `X` raises an error or gives a wrong matrix with no error, as the warning of [`reads_sample_values`](@ref) states. [`LoGo`](@ref) gives the answer of its distance estimator, which states it with the same verb, as the interfaces of [`AbstractDistanceEstimator`](@ref) and [`AbstractDistanceAlgorithm`](@ref) state.
 
 ## Arguments
 
@@ -197,7 +197,11 @@ Tells whether a matrix processing algorithm reads the values of the sample `X`.
 
 An incremental fit keeps a moment and a count, and not the observations. So it can run the `:alg` step of a [`MatrixProcessing`](@ref) only when the step reads no value of `X`. [`supports_shape_processing`](@ref) and [`assert_shape_only_matrix_processing`](@ref) read this answer. The estimate from the state then calls `matrix_processing_algorithm!(mpa, sigma)`, with no sample.
 
-An algorithm of your own that reads no value of `X` adds a method that answers `false`, and a method of [`matrix_processing_algorithm!`](@ref) with no sample, as the interface of [`AbstractMatrixProcessingAlgorithm`](@ref) states. Without them, an incremental fit refuses the algorithm, and [`Online`](@ref) runs it over the observations that it keeps.
+An algorithm of your own that reads no value of `X` adds a method that answers `false`, and a method of [`matrix_processing_algorithm!`](@ref) with no sample, as the interface of [`AbstractMatrixProcessingAlgorithm`](@ref) states. Without them, an incremental fit refuses the algorithm, and [`Online`](@ref) runs it over the observations that it keeps. A distance estimator or a distance algorithm of your own inside [`LoGo`](@ref) states its answer with the same verb.
+
+!!! warning
+
+    Answer `false` only for a type that reads no value of `X`. The library cannot check the answer, and the estimate from the state of an incremental fit has no observation to give. The estimate of a [`PortfolioOptimisersCovariance`](@ref) gives the step no sample. A matrix processing algorithm gets no `X` argument, and a distance inside [`LoGo`](@ref) gets `X = nothing`, so a type that reads `X` raises an error. The estimate of a [`Coskewness`](@ref) or a [`Cokurtosis`](@ref) gives the step a matrix of zeros of the shape of the sample, so a type that reads the values of `X` computes from zeros, and it can return a wrong matrix with no error. Keep the default `true` for such a type, and fold it with [`Online`](@ref).
 
 # Algorithm
 
