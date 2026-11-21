@@ -140,7 +140,7 @@ Each issue states its route in a `**Lands on:**` line, and every pull request me
 | `**Lands on:**` | For                                                                                                      | Branch                                              |
 |:----------------|:---------------------------------------------------------------------------------------------------------|:----------------------------------------------------|
 | `own branch`    | a standalone feature, an important correctness fix, a large performance fix                              | `agents/<issue>-<slug>`, with its own pull request  |
-| `dev-fixes`     | a sweep sub-issue, an ergonomics change, a small performance fix, an unusual composition bug, a docs fix | `dev-fixes`, which the maintainer merges as a batch |
+| `dev`           | a sweep sub-issue, an ergonomics change, a small performance fix, an unusual composition bug, a docs fix | `dev`, which the maintainer merges as a batch       |
 | `map #<map>`    | a ticket of a map whose tickets make sense on `main` only together                                       | `agents/<map>-<slug>`, one pull request for the map |
 
 The maintainer can name another route for an issue.
@@ -148,7 +148,8 @@ The maintainer can name another route for an issue.
 - A push to a branch of this repository runs the full CI, and the pull request shows those checks. A merge into `main` waits for them (ADR 0220).
 - A branch of a fork gets no push checks in this repository, so its pull request cannot merge. The maintainer pushes the branch of a fork to an `agents/` branch here, and the pull request from that branch merges.
 - The base of a pull request need not be current. Rebase only when GitHub shows a conflict with `main`.
-- Name the issue in the commit message, as `Fix #<issue>: …`. A squash copies each commit message into `main`, so the merge closes the issue. A pull request of its own also writes `Closes #<issue>` in its body.
+- Name the issue in the commit message, as `Fix #<issue>: …`. A pull request of its own also writes `Closes #<issue>` in its body, so that the pull request links the issue.
+- Close the issue when the push that holds the last part of its fix reaches the remote branch, with `gh issue close <issue> --comment "Fixed in <sha> on <branch>."`. Do not wait for the merge into `main`. A commit of a part of the work names `Part of #<issue>: …`, and the issue stays open.
 
 ## When a code-health gate turns red
 

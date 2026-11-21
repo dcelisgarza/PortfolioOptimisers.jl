@@ -327,8 +327,52 @@ function negative_spectral_part(vals::AbstractVector{<:Complex}, vecs::MatNum, T
     return real(vecs * LinearAlgebra.Diagonal(v) * transpose(vecs))
 end
 """
-    negative_spectral_coskewness(cskew::MatNum, X::MatNum,
-                 mp::Option{<:AbstractMatrixProcessingEstimator}, T::Real = size(X, 1))
+    negative_spectral_processing!(mp::Option{<:AbstractMatrixProcessingEstimator}, V::MatNum,
+                                  X::MatNum, blk::BitVector, T::Real) -> MatNum
+    negative_spectral_processing!(mp::Option{<:AbstractMatrixProcessingEstimator}, V::MatNum,
+                                  ::Nothing, ::BitVector, T::Option{<:Real}) -> MatNum
+
+Runs the matrix processing estimator on the negative spectral skewness matrix of a block, in place.
+
+This function is the last step of [`negative_spectral_coskewness`](@ref). It has one method for a sample and one for no sample. The batch verbs pass the sample. The estimate from the state of a [`partial_fit!`](@ref) keeps no observation, so it passes `nothing`. Dispatch on `X` selects the route, and each method takes the count `T` that its route reads.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A sample runs [`sample_matrix_processing!`](@ref) with `X` and `T`. When `V` is narrower than the tensor, the method first cuts `X` to the assets of `blk`.
+ 2. No sample runs the shape method of [`matrix_processing!`](@ref) with `T` and the width of `V`. That method gives the `:alg` step no sample, so an `alg` that reads `X` raises an error.
+
+# Arguments
+
+  - $(arg_dict[:omp])
+  - `V`: The negative spectral skewness matrix of the block. The function writes into it.
+  - `X`: The data matrix (observations × assets), or `nothing` for no sample.
+  - `blk`: The assets of the tensor whose per-asset diagonal is finite.
+  - `T`: The effective number of observations of the tensor, or `nothing` with no sample when no step reads it.
+
+# Returns
+
+  - `V::MatNum`: The input matrix `V`, modified in place.
+
+# Related
+
+  - [`negative_spectral_coskewness`](@ref)
+  - [`sample_matrix_processing!`](@ref)
+  - [`matrix_processing!`](@ref)
+"""
+function negative_spectral_processing!(mp::Option{<:AbstractMatrixProcessingEstimator},
+                                       V::MatNum, X::MatNum, blk::BitVector, T::Real)
+    return sample_matrix_processing!(mp, V, size(V, 1) == length(blk) ? X : X[:, blk], T)
+end
+function negative_spectral_processing!(mp::Option{<:AbstractMatrixProcessingEstimator},
+                                       V::MatNum, ::Nothing, ::BitVector, T::Option{<:Real})
+    return matrix_processing!(mp, V, T, size(V, 1))
+end
+"""
+    negative_spectral_coskewness(cskew::MatNum, X::Option{<:MatNum},
+                 mp::Option{<:AbstractMatrixProcessingEstimator},
+                 T::Option{<:Real} = isnothing(X) ? nothing : size(X, 1)) -> MatNum
 
 Builds the negative spectral skewness matrix of a coskewness tensor.
 
@@ -339,6 +383,8 @@ The function reduces the block of the tensor alone. This is the rule that [`matr
 The function finds the block from the per-asset diagonal of the tensor, `cskew[i, (i - 1) * N + i]`. That entry is the third central moment of asset `i`. It is finite if and only if the fit gives a value for that asset. A non-finite cell inside the block is a triple of assets that the fit estimated, but that share no observation. [`assert_finite_block`](@ref) refuses that cell with an error that names it, so the cell never reaches `eigen`. The spectral step and `mp` run on the block alone. The function then writes the result into a `NaN` frame of the full width, so the row and the column of each asset that the policy refused hold `NaN`.
 
 Every site of the library that reduces a coskewness tensor to `V` calls this function, so the block rule has one definition. The callers include [`_coskewness`](@ref), the available-case arm of [`coskewness`](@ref), [`port_opt_view`](@ref) of a [`HighOrderPrior`](@ref), the high order factor prior and [`NegativeSkewness`](@ref).
+
+The estimate from the state of a [`partial_fit!`](@ref) has no sample, so it passes `X = nothing` and the count `T` of the state. The function then runs the shape method of [`matrix_processing!`](@ref), with `T` and the width of the block. That method gives the `:alg` step no sample, as the estimate of a [`PortfolioOptimisersCovariance`](@ref) does. So an `alg` that reads `X` raises an error and does not read a stand-in. The denoising step reads the ratio of `T` to the width of the block, as the matrix method reads the ratio of `T` to the columns of the cut `X`.
 
 # Mathematical definition
 
@@ -369,21 +415,21 @@ Section 2 of [nskew](@cite) splits each block as ``\\mathbf{S}_{i} = \\mathbf{S}
  1. Read `N` from the row count of `cskew`. Take the block `blk` as `isfinite.(cskew[i, (i - 1) * N + i])` over `i`.
  2. When `blk` holds no `true`, reduce the whole tensor. The tensor has no block, so no cell is refused here, and `LinearAlgebra.eigen` raises `ArgumentError: matrix contains Infs or NaNs` on the first block.
  3. Refuse a non-finite cell inside the block with [`assert_finite_block`](@ref). When `blk` holds no `false`, the block is the whole tensor, and the refusal covers that case too.
- 4. Cut the tensor to the block, at the rows `blk` and the pair columns of [`coverage_pair_index`](@ref). Cut `X` to the same assets. When `blk` holds no `false`, the function does not copy either of them.
+ 4. Cut the tensor to the block, at the rows `blk` and the pair columns of [`coverage_pair_index`](@ref). Step 8 cuts `X` to the same assets. When `blk` holds no `false`, the function does not copy either of them.
  5. Allocate the accumulator `V` of zeros at the width of the block.
  6. For each block index `i`, take `coskew_jk`, the view of the columns `(i - 1) * N + 1` to `i * N` of the cut tensor.
  7. Take the eigenvalues `vals` and the eigenvectors `vecs` of `coskew_jk`. Subtract from `V` the negative semidefinite part that [`negative_spectral_part`](@ref) rebuilds from them.
- 8. Run [`sample_matrix_processing!`](@ref) once, on the accumulated `V`, with the cut `X` and `T`. The function does not process a block on its own.
+ 8. Run the matrix processing estimator once, on the accumulated `V`, through [`negative_spectral_processing!`](@ref). A sample runs [`sample_matrix_processing!`](@ref) with the cut `X` and `T`. No sample runs the shape method of [`matrix_processing!`](@ref) with `T` and the width of the block. The function does not process a block on its own.
  9. When the block is the whole tensor, return `V`. Otherwise, write `V` into the block of a `NaN` frame of the full width, and return the frame.
 
 # Arguments
 
   - `cskew`: The coskewness tensor, `assets × assets²`, in `N` blocks of `N` columns. It can be a frame, in which each refused asset carries `NaN` across its row and its pair columns.
-  - `X`: The data matrix (observations × assets). [`matrix_processing!`](@ref) reads it, and the spectral step does not.
+  - `X`: The data matrix (observations × assets), or `nothing` for no sample. [`matrix_processing!`](@ref) reads it, and the spectral step does not.
   - $(arg_dict[:omp])
       + `::AbstractMatrixProcessingEstimator`: The estimator processes the accumulated `V` in place.
       + `::Nothing`: The function does not process `V`, which is the sum of the negated negative parts.
-  - `T`: The effective number of observations of the tensor, which the denoising step reads. It is `size(X, 1)` by default, the count of an unweighted tensor. [`_coskewness`](@ref) passes the count of its weights.
+  - `T`: The effective number of observations of the tensor, which the denoising step reads. It is `size(X, 1)` by default, the count of an unweighted tensor. With `X = nothing` it is `nothing` by default, so a denoising step raises an `ArgumentError` that names the missing count. [`_coskewness`](@ref) passes the count of its weights. The estimate from a partial-fit state passes the count of the state.
 
 # Validation
 
@@ -400,6 +446,7 @@ Section 2 of [nskew](@cite) splits each block as ``\\mathbf{S}_{i} = \\mathbf{S}
   - [`matrix_processing!`](@ref)
   - [`matrix_processing_block!`](@ref)
   - [`negative_spectral_part`](@ref)
+  - [`negative_spectral_processing!`](@ref)
   - [`assert_finite_block`](@ref)
   - [`CoveragePolicy`](@ref)
   - [`coskewness`](@ref)
@@ -408,9 +455,13 @@ Section 2 of [nskew](@cite) splits each block as ``\\mathbf{S}_{i} = \\mathbf{S}
 
   - $(ref_dict[:nskew]) Section 2.
 """
-function negative_spectral_coskewness(cskew::MatNum, X::MatNum,
+function negative_spectral_coskewness(cskew::MatNum, X::Option{<:MatNum},
                                       mp::Option{<:AbstractMatrixProcessingEstimator},
-                                      T::Real = size(X, 1))
+                                      T::Option{<:Real} = if isnothing(X)
+                                          nothing
+                                      else
+                                          size(X, 1)
+                                      end)
     N0 = size(cskew, 1)
     blk = BitVector(isfinite(cskew[i, (i - 1) * N0 + i]) for i in 1:N0)
     # A tensor with no finite per-asset diagonal has no block, so it is the plain path's and
@@ -419,7 +470,6 @@ function negative_spectral_coskewness(cskew::MatNum, X::MatNum,
     # complete diagonal, so a short-circuit past the refusal would send the case it was
     # written for to LAPACK.
     frame = any(blk) && !all(blk)
-    Xb = frame ? X[:, blk] : X
     cskew_b = frame ? cskew[blk, coverage_pair_index(blk)] : cskew
     if any(blk)
         assert_finite_block(cskew_b)
@@ -433,7 +483,7 @@ function negative_spectral_coskewness(cskew::MatNum, X::MatNum,
         vals, vecs = LinearAlgebra.eigen(coskew_jk)
         V .-= negative_spectral_part(vals, vecs, eltype(cskew_b))
     end
-    sample_matrix_processing!(mp, V, Xb, T)
+    negative_spectral_processing!(mp, V, X, blk, T)
     if !frame
         return V
     end

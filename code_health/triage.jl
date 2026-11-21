@@ -431,8 +431,8 @@ from the tracker's own metadata, so this text is free to change without breaking
 function body_of(c::Candidate, action::Symbol, reason::AbstractString,
                  commit::AbstractString)
     io = IOBuffer()
-    # The route of ADR 0240. A code-health ticket can wait for the batch of `dev-fixes`.
-    println(io, "**Lands on:** dev-fixes\n")
+    # The route of ADR 0240. A code-health ticket can wait for the batch of `dev`.
+    println(io, "**Lands on:** dev\n")
     println(io, "`", c.path, "` stands above a code-health threshold.\n")
     if action === :refile
         println(io,

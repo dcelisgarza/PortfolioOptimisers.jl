@@ -480,6 +480,45 @@ its estimator no longer matches.
 =#
 using Statistics
 
+# Issue 2233. A distance estimator and a distance algorithm of your own that read the
+# correlation matrix alone. The `Opt` types add the opt-in, and the others do not. The types
+# live at the top level, because a `struct` cannot sit inside a `@testset`.
+struct RhoDist2233 <: PortfolioOptimisers.AbstractDistanceEstimator end
+struct RhoDist2233Opt <: PortfolioOptimisers.AbstractDistanceEstimator end
+struct RhoAlg2233 <: PortfolioOptimisers.AbstractDistanceAlgorithm end
+struct RhoAlg2233Opt <: PortfolioOptimisers.AbstractDistanceAlgorithm end
+rho_dist2233(rho) = sqrt.(max.((1 .- rho) ./ 2, 0))
+function PortfolioOptimisers.distance(::Union{RhoDist2233, RhoDist2233Opt},
+                                      rho::PortfolioOptimisers.MatNum, args...; kwargs...)
+    return rho_dist2233(rho)
+end
+function PortfolioOptimisers.distance(::Distance{<:Any, <:Union{RhoAlg2233, RhoAlg2233Opt}},
+                                      rho::PortfolioOptimisers.MatNum, args...; kwargs...)
+    return rho_dist2233(rho)
+end
+PortfolioOptimisers.reads_sample_values(::RhoDist2233Opt) = false
+PortfolioOptimisers.reads_sample_values(::RhoAlg2233Opt) = false
+
+# Issue 2234. A matrix processing algorithm and a distance estimator of your own that read the
+# values of `X` and answer `false` all the same. The library cannot check the answer, so the
+# fold lets them through. Each one scales its result by the mean absolute value of `X`, so a
+# stand-in of zeros gives a wrong matrix with no error.
+struct WrongAlg2234 <: PortfolioOptimisers.AbstractMatrixProcessingAlgorithm end
+struct WrongDist2234 <: PortfolioOptimisers.AbstractDistanceEstimator end
+function PortfolioOptimisers.matrix_processing_algorithm!(::WrongAlg2234,
+                                                          sigma::PortfolioOptimisers.MatNum,
+                                                          X::PortfolioOptimisers.MatNum;
+                                                          kwargs...)
+    sigma .*= 1 + sum(abs, X) / length(X)
+    return sigma
+end
+function PortfolioOptimisers.distance(::WrongDist2234, rho::PortfolioOptimisers.MatNum,
+                                      X::PortfolioOptimisers.MatNum; kwargs...)
+    return rho_dist2233(rho) .* (1 + sum(abs, X) / length(X))
+end
+PortfolioOptimisers.reads_sample_values(::WrongAlg2234) = false
+PortfolioOptimisers.reads_sample_values(::WrongDist2234) = false
+
 @testset "Higher-moment partial fit" begin
     PO = PortfolioOptimisers
 
@@ -634,6 +673,233 @@ using Statistics
         @test_throws ArgumentError cokurtosis(Cokurtosis())
     end
 
+    @testset "An mp that reads the sample refuses at the fold, and buffers under Online (#713)" begin
+        # The read-out gives `mp` a matrix of zeros of the shape of the sample. `LoGo` under a
+        # variation of information distance reads the values, so before #713 the batch verb
+        # answered and the read-out raised a DomainError about a NaN distance.
+        X10 = randn(StableRNG(713), 80, 10) .* 0.02
+        mpl = MatrixProcessing(;
+                               alg = LoGo(; de = Distance(; alg = VariationInfoDistance())))
+        ske = Coskewness(; mp = mpl)
+        kte = Cokurtosis(; mp = mpl)
+        for est in (ske, kte)
+            for x in (X10, X10[1, :])
+                err = try
+                    partial_fit!(est, x)
+                    nothing
+                catch e
+                    e
+                end
+                @test isa(err, ArgumentError)
+                @test occursin("LoGo", err.msg)
+                @test occursin("Online", err.msg)
+            end
+            @test !PO.supports_partial_fit(est)
+        end
+        @test PO.supports_partial_fit(Coskewness())
+        @test PO.supports_partial_fit(Cokurtosis())
+        # `Online` keeps the rows, so the step runs and the estimate is the batch one.
+        warm = PO.update_online_estimator(Online(ske))
+        @test PO.supports_partial_fit(warm)
+        @test isapprox(last(coskewness(partial_fit!(warm, X10))),
+                       last(coskewness(ske, X10)); atol = 1e-14)
+    end
+
+    @testset "An alg step that reads no value of the sample folds (#2231)" begin
+        # The default `LoGo()` reads the correlation matrix alone, so the shape of the sample
+        # is enough, and every fold gives the batch answer.
+        X10 = randn(StableRNG(2231), 80, 10) .* 0.02
+        mpl = MatrixProcessing(; alg = LoGo())
+        @test !PO.reads_sample_values(nothing)
+        @test !PO.reads_sample_values(LoGo())
+        @test !PO.reads_sample_values(LoGo(;
+                                           de = DistanceDistance(;
+                                                                 alg = CanonicalDistance())))
+        @test !PO.reads_sample_values(LoGo(; de = Distance(; alg = LogDistance())))
+        @test PO.reads_sample_values(LoGo(; de = Distance(; alg = VariationInfoDistance())))
+        @test PO.reads_sample_values(LoGo(; de = FeatureDistance()))
+        @test PO.supports_shape_processing(mpl)
+        @test isnothing(PO.assert_shape_only_matrix_processing(mpl))
+        ske = Coskewness(; mp = mpl)
+        kte = Cokurtosis(; mp = mpl)
+        @test PO.supports_partial_fit(ske)
+        @test PO.supports_partial_fit(kte)
+        sb, kb = coskewness(ske, X10), cokurtosis(kte, X10)
+        s1 = partial_fit!(ske, X10)
+        k1 = partial_fit!(kte, X10)
+        @test isapprox(first(coskewness(s1)), first(sb); rtol = 1e-12)
+        @test isapprox(last(coskewness(s1)), last(sb); rtol = 1e-12)
+        @test isapprox(cokurtosis(k1), kb; rtol = 1e-12)
+        sr, kr = ske, kte
+        for t in axes(X10, 1)
+            sr = partial_fit!(sr, X10[t, :])
+            kr = partial_fit!(kr, X10[t, :])
+        end
+        @test isapprox(last(coskewness(sr)), last(sb); rtol = 1e-10)
+        # The tensor of 80 row folds equals the batch tensor to 6.1e-16 relative, as it does
+        # with no `alg`. `LoGo` inverts the clique blocks of a cokurtosis with a condition
+        # number of 2.2e12, so the last bit grows to 4.5e-5 relative (measured 2026-11-21).
+        @test isapprox(cokurtosis(kr), kb; rtol = 1e-3)
+        # The composite folds the same step through the shape route, which runs the step
+        # with no sample.
+        ce = PortfolioOptimisersCovariance(; mp = mpl)
+        @test PO.supports_partial_fit(ce)
+        @test isapprox(cov(partial_fit!(ce, X10)), cov(ce, X10); rtol = 1e-12)
+        cr = ce
+        for t in axes(X10, 1)
+            cr = partial_fit!(cr, X10[t, :])
+        end
+        @test isapprox(cov(cr), cov(ce, X10); rtol = 1e-12)
+        @test isapprox(cor(cr), cor(ce, X10); rtol = 1e-12)
+        @test PO.series_folds(PortfolioOptimisersCovariance(; ce = ExpWeightedCovariance(),
+                                                            mp = mpl))
+        # A step that reads the sample refuses at the composite fold too.
+        cev = PortfolioOptimisersCovariance(;
+                                            mp = MatrixProcessing(;
+                                                                  alg = LoGo(;
+                                                                             de = Distance(;
+                                                                                           alg = VariationInfoDistance()))))
+        @test !PO.supports_partial_fit(cev)
+        @test !PO.series_folds(cev)
+        @test_throws ArgumentError partial_fit!(cev, X10)
+        # The variance of a step that reads no value of the sample rests on the observations
+        # of `ce.ce`, so it keeps their count.
+        vc, vb = PO.variance_count(ce, X10), PO.variance_count(Covariance(), X10)
+        @test vc.n == vb.n
+        @test vc.m == vb.m
+        @test isnothing(PO.variance_count(cev, X10))
+    end
+
+    @testset "A distance of your own folds inside LoGo when it states that it reads no sample (#2233)" begin
+        X10 = randn(StableRNG(2233), 80, 10) .* 0.02
+        # The distance family gives the answer, and `LoGo` reads it from its distance.
+        @test !PO.reads_sample_values(Distance(; alg = LogDistance()))
+        @test !PO.reads_sample_values(DistanceDistance(; alg = LogDistance()))
+        @test !PO.reads_sample_values(DistanceDistance(; alg = CanonicalDistance()))
+        @test PO.reads_sample_values(Distance(; alg = VariationInfoDistance()))
+        @test PO.reads_sample_values(DistanceDistance(; alg = VariationInfoDistance()))
+        @test PO.reads_sample_values(FeatureDistance())
+        @test PO.reads_sample_values(RhoDist2233())
+        @test PO.reads_sample_values(RhoAlg2233())
+        @test PO.reads_sample_values(Distance(; alg = RhoAlg2233()))
+        @test !PO.reads_sample_values(Distance(; alg = RhoAlg2233Opt()))
+        @test !PO.reads_sample_values(DistanceDistance(; alg = RhoAlg2233Opt()))
+        for (plain, opt) in ((RhoDist2233(), RhoDist2233Opt()),
+                             (Distance(; alg = RhoAlg2233()), Distance(; alg = RhoAlg2233Opt())))
+            # Without the opt-in, the library cannot see what the distance reads, so the
+            # fold refuses and a call with no sample raises.
+            mpp = MatrixProcessing(; alg = LoGo(; de = plain))
+            @test PO.reads_sample_values(mpp.alg)
+            @test_throws ArgumentError partial_fit!(Coskewness(; mp = mpp), X10)
+            @test_throws ArgumentError partial_fit!(PortfolioOptimisersCovariance(;
+                                                                                  mp = mpp),
+                                                    X10)
+            @test_throws IsNothingError PO.logo(mpp.alg, cov(X10))
+            # With the opt-in, every family folds and gives the batch answer.
+            mpo = MatrixProcessing(; alg = LoGo(; de = opt))
+            @test !PO.reads_sample_values(mpo.alg)
+            ske = Coskewness(; mp = mpo)
+            kte = Cokurtosis(; mp = mpo)
+            ce = PortfolioOptimisersCovariance(; mp = mpo)
+            @test PO.supports_partial_fit(ske)
+            @test PO.supports_partial_fit(kte)
+            @test PO.supports_partial_fit(ce)
+            @test isapprox(last(coskewness(partial_fit!(ske, X10))),
+                           last(coskewness(ske, X10)); rtol = 1e-12)
+            @test isapprox(cokurtosis(partial_fit!(kte, X10)), cokurtosis(kte, X10);
+                           rtol = 1e-12)
+            @test isapprox(cov(partial_fit!(ce, X10)), cov(ce, X10); rtol = 1e-12)
+            @test isapprox(PO.logo(mpo.alg, cov(X10)), PO.logo(mpo.alg, cov(X10), X10);
+                           rtol = 1e-12)
+        end
+    end
+
+    @testset "A wrong opt-in raises at every read-out, and the shape routes equal the batch (#2234)" begin
+        X10 = randn(StableRNG(2234), 80, 10) .* 0.02
+        # Each read-out gives the `:alg` step no sample, so a type that reads `X` raises.
+        # Before #2234 the higher-moment read-outs gave it zeros and returned a matrix.
+        for mpw in (MatrixProcessing(; alg = WrongAlg2234()),
+                    MatrixProcessing(; alg = LoGo(; de = WrongDist2234())))
+            @test !PO.reads_sample_values(mpw.alg)
+            ske = partial_fit!(Coskewness(; mp = mpw), X10)
+            kte = partial_fit!(Cokurtosis(; mp = mpw), X10)
+            ce = partial_fit!(PortfolioOptimisersCovariance(; mp = mpw), X10)
+            @test_throws MethodError coskewness(ske)
+            @test_throws MethodError cokurtosis(kte)
+            @test_throws MethodError cov(ce)
+            # The batch verbs have the sample, so they run the step.
+            @test all(isfinite, last(coskewness(Coskewness(; mp = mpw), X10)))
+            @test all(isfinite, cokurtosis(Cokurtosis(; mp = mpw), X10))
+        end
+        # The denoising step reads the ratio `T / N`. A complete fold equals the batch verb.
+        mpd = MatrixProcessing(; dn = Denoise())
+        ske = Coskewness(; mp = mpd)
+        kte = Cokurtosis(; mp = mpd)
+        @test isapprox(last(coskewness(partial_fit!(ske, X10))), last(coskewness(ske, X10));
+                       rtol = 1e-12)
+        @test isapprox(cokurtosis(partial_fit!(kte, X10)), cokurtosis(kte, X10);
+                       rtol = 1e-12)
+        # A fold over a changing universe gives a frame. The shape route of the block reads
+        # the ratio of the batch route on the same frame: the width of the block for a matrix
+        # on the asset axis, and the `N` assets for a cokurtosis, whose axis is the pairs.
+        Xg = copy(X10)
+        Xg[1:20, 4] .= NaN
+        Tg, Ng = size(Xg)
+        Z = zeros(Tg, Ng)
+        kraw = cokurtosis(partial_fit!(Cokurtosis(), Xg))
+        @test 0 < count(isfinite, LinearAlgebra.diag(kraw)) < Ng^2
+        kfold = cokurtosis(partial_fit!(kte, Xg))
+        @test isapprox(kfold, PO.matrix_processing_block!(mpd, copy(kraw), Z); rtol = 1e-12,
+                       nans = true)
+        @test isapprox(PO.matrix_processing_block!(mpd, copy(kraw), Tg, Ng),
+                       PO.matrix_processing_block!(mpd, copy(kraw), Z); rtol = 1e-12,
+                       nans = true)
+        # Before #2234 the shape route read the `count(blk)` pairs of the block as `N`. That
+        # ratio gives a different matrix, so the check above tells the two rules apart.
+        @test !isapprox(PO.matrix_processing_block!(mpd, copy(kraw), Tg,
+                                                    count(isfinite,
+                                                          LinearAlgebra.diag(kraw))), kfold;
+                        rtol = 1e-6, nans = true)
+        sraw, Vraw = coskewness(partial_fit!(Coskewness(), Xg))
+        @test isapprox(last(coskewness(partial_fit!(ske, Xg))),
+                       PO.negative_spectral_coskewness(sraw, Z, mpd); rtol = 1e-12,
+                       nans = true)
+        # With no sample and no count, the count is `nothing`. A denoising step needs it and
+        # raises an error that names it, and a step that reads no count runs.
+        @test_throws ArgumentError PO.negative_spectral_coskewness(sraw, nothing, mpd)
+        @test isequal(PO.negative_spectral_coskewness(sraw, nothing, nothing),
+                      PO.negative_spectral_coskewness(sraw, Z, nothing))
+        craw = cov(partial_fit!(PortfolioOptimisersCovariance(), Xg))
+        @test isapprox(PO.matrix_processing_block!(mpd, copy(craw), Tg, Ng),
+                       PO.matrix_processing_block!(mpd, copy(craw), Z); rtol = 1e-12,
+                       nans = true)
+    end
+
+    @testset "For one series the merge is Proposition 2.1 of pebay2008" begin
+        x = X[:, 1]
+        a, b = x[1:15], x[16:end]
+        na, nb = length(a), length(b)
+        n = na + nb
+        d = mean(b) - mean(a)
+        Mp(v, p) = sum((v .- mean(v)) .^ p)
+        function pebay(p)
+            s = Mp(a, p) + Mp(b, p)
+            for k in 1:(p - 2)
+                s += binomial(p, k) *
+                     ((-nb / n)^k * Mp(a, p - k) + (na / n)^k * Mp(b, p - k)) *
+                     d^k
+            end
+            return s + (na * nb / n * d)^p * (1 / nb^(p - 1) - (-1 / na)^(p - 1))
+        end
+        ka = partial_fit!(Cokurtosis(), reshape(a, :, 1)).cache
+        kb = partial_fit!(Cokurtosis(), reshape(b, :, 1)).cache
+        m = PO.merge_states(ka, kb)
+        @test isapprox(only(m.M3), pebay(3); atol = 1e-12)
+        @test isapprox(only(m.M4), pebay(4); atol = 1e-12)
+        @test isapprox(only(m.M3), Mp(x, 3); atol = 1e-12)
+        @test isapprox(only(m.M4), Mp(x, 4); atol = 1e-12)
+    end
+
     @testset "The state's element count" begin
         ske = partial_fit!(Coskewness(), X)
         kte = partial_fit!(Cokurtosis(), X)
@@ -734,5 +1000,59 @@ using Statistics
         @test !isnothing(kte.cache)
         @test_throws ArgumentError coskewness(ske)
         @test_throws ArgumentError cokurtosis(kte)
+    end
+
+    @testset "The shift is the direct sum about the new centre, and a row fold holds two arrays of the size of M4 (#2228)" begin
+        # The shifts add into `out`, so a nonzero `out` checks the add as well as the shift.
+        a = randn(StableRNG(2228), N)
+        n, mu, M2, M3, z = PO.comoment_block(X)
+        M4 = transpose(z) * z
+        Yd = X .- transpose(mu .+ a)
+        o = ones(1, N)
+        zd = kron(o, Yd) .* kron(Yd, o)
+        M3d = transpose(Yd) * zd
+        M4d = transpose(zd) * zd
+        out3 = fill(0.5, size(M3))
+        out4 = fill(0.5, size(M4))
+        @test PO.shift_comoment3!(out3, n, a, M2, M3) === out3
+        @test PO.shift_comoment4!(out4, n, a, M2, M3, M4) === out4
+        @test isapprox(out3, M3d .+ 0.5; rtol = 1e-13)
+        @test isapprox(out4, M4d .+ 0.5; rtol = 1e-13)
+
+        # Ten terms built as full arrays held about 24 arrays of the size of `M4` per row. The
+        # fold now holds the block's own `M4` and the merged one.
+        Xw = randn(StableRNG(22), 20, 12)
+        kw = partial_fit!(Cokurtosis(), Xw)
+        x1 = Xw[1:1, :]
+        fold_bytes(k, x) = @allocated partial_fit!(k, x)
+        fold_bytes(kw, x1)
+        @test fold_bytes(kw, x1) < 3 * sizeof(kw.cache.M4)
+    end
+
+    @testset "The shifts refuse an array of the wrong shape before the loop (#2232)" begin
+        # The loops index under `@inbounds`, so a wrong shape read or wrote out of bounds.
+        a = randn(StableRNG(2232), 3)
+        M2, M3, M4 = zeros(3, 3), zeros(3, 9), zeros(9, 9)
+        @test_throws DimensionMismatch PO.shift_comoment3!(zeros(3, 9), 2, a, zeros(3, 2),
+                                                           M3)
+        @test_throws DimensionMismatch PO.shift_comoment3!(zeros(3, 9), 2, a, M2,
+                                                           zeros(3, 3))
+        @test_throws DimensionMismatch PO.shift_comoment3!(zeros(3, 3), 2, a, M2, M3)
+        @test_throws DimensionMismatch PO.shift_comoment4!(zeros(9, 9), 2, a, zeros(2, 2),
+                                                           M3, M4)
+        @test_throws DimensionMismatch PO.shift_comoment4!(zeros(9, 9), 2, a, M2,
+                                                           zeros(3, 3), M4)
+        @test_throws DimensionMismatch PO.shift_comoment4!(zeros(9, 9), 2, a, M2, M3,
+                                                           zeros(3, 9))
+        @test_throws DimensionMismatch PO.shift_comoment4!(zeros(3, 9), 2, a, M2, M3, M4)
+        err = try
+            PO.shift_comoment4!(zeros(9, 9), 2, a, M2, M3, zeros(3, 9))
+        catch e
+            e
+        end
+        @test occursin("size(M4) => (3, 9)", err.msg)
+        @test isapprox(PO.shift_comoment3!(zeros(3, 9), 2, a, M2, M3),
+                       -2 .* a .* reshape(kron(a, a), 1, 9); rtol = 1e-14)
+        @test size(PO.shift_comoment4!(zeros(9, 9), 2, a, M2, M3, M4)) == (9, 9)
     end
 end

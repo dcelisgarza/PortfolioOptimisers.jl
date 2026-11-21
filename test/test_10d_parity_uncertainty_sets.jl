@@ -335,7 +335,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
                     # before its repair. The Mahalanobis distance of the set is chi-squared
                     # with 15 degrees of freedom. The oracle reads N² = 25, a radius of 6.14
                     # against 5.00, which covers 0.999 of the errors at a stated 0.95 (#1425,
-                    # ADR 0188). `ambient = true` gives the oracle's radius on both routes.
+                    # ADR 0188). The oracle's radius, given as a number, reaches both routes.
                     if kind == "Bootstrap"
                         @test rank(s.L) == N * (N + 1) ÷ 2
                     end
@@ -343,13 +343,13 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
                                    rtol = 1e-14)
                     @test radius[2 + k] > s.kappa
                     amb = NormBallUncertaintySetAlgorithm(;
-                                                          method = ChiSqKUncertaintyAlgorithm(;
-                                                                                              ambient = true),
+                                                          method = sqrt(quantile(Chisq(N^2),
+                                                                                 0.95)),
                                                           diagonal = false)
                     _, sa = ucs(mk(kind, amb), X)
                     @test sa.L == s.L
                     @test parity_compare([sa.kappa], [radius[2 + k]];
-                                         name = "$(kind) cov radius, ambient").ok
+                                         name = "$(kind) cov radius, N^2").ok
                 else
                     @test parity_compare([s.kappa], [radius[2 + k]];
                                          name = "$(kind) cov radius").ok

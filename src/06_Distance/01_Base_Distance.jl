@@ -5,12 +5,20 @@ Abstract supertype for all distance estimator types.
 
 A subtype turns a correlation matrix or a data matrix into a distance matrix. [`distance`](@ref) and [`cor_and_dist`](@ref) dispatch on it.
 
+# Interfaces
+
+A distance estimator of your own subtypes `AbstractDistanceEstimator`, keeps its parameters in the fields of the struct, and adds the methods that its consumers call. [`LoGo`](@ref) calls the first form below. The clustering and network estimators call [`distance`](@ref) and [`cor_and_dist`](@ref) with a covariance estimator and the data, and the docstrings of those verbs state the forms.
+
+  - `distance(de::AbstractDistanceEstimator, rho::MatNum, X::Option{<:MatNum}; dims::Int = 1, kwargs...) -> MatNum`: The distance matrix of the correlation or covariance matrix `rho`. The method reads `X` only when the estimator needs the data. `X` is `nothing` when the estimate of an incremental fit runs the step.
+  - `reads_sample_values(de::AbstractDistanceEstimator) -> Bool`: Optional. Answers `false` when the estimator reads no value of `X`, so that a [`LoGo`](@ref) step over it runs from the state of an incremental fit. The fallback answers `true`, and an incremental fit then refuses the step. A distance that reads the data, as a variation of information does, cannot answer `false`, because the fit keeps no observation. A `false` answer for such a distance raises an error, as the warning of [`reads_sample_values`](@ref) states.
+
 # Related
 
   - [`AbstractEstimator`](@ref)
   - [`AbstractDistanceAlgorithm`](@ref)
   - [`distance`](@ref)
   - [`cor_and_dist`](@ref)
+  - [`reads_sample_values`](@ref)
 """
 abstract type AbstractDistanceEstimator <: AbstractEstimator end
 """
@@ -20,9 +28,17 @@ Abstract supertype for all distance algorithm types.
 
 A subtype names the transform that a distance estimator applies. Four subtypes transform a correlation matrix, [`VariationInfoDistance`](@ref) reads the data matrix, and [`CanonicalDistance`](@ref) selects one of the others from the covariance estimator.
 
+# Interfaces
+
+A distance algorithm of your own subtypes `AbstractDistanceAlgorithm`, goes into the field `alg` of a [`Distance`](@ref) or a [`DistanceDistance`](@ref), and adds these methods:
+
+  - `distance(de::Distance, rho::MatNum, args...; kwargs...) -> MatNum`: A method on `Distance{<:Any, <:MyAlgorithm}` that gives the distance matrix of the correlation or covariance matrix `rho`. A [`DistanceDistance`](@ref) calls it on its base distance, and then applies its metric.
+  - `reads_sample_values(alg::AbstractDistanceAlgorithm) -> Bool`: Optional. Answers `false` when the algorithm reads no value of the data `X`. A [`Distance`](@ref) and a [`DistanceDistance`](@ref) give the answer of their algorithm, so a [`LoGo`](@ref) step over them then runs from the state of an incremental fit. The fallback answers `true`. A `false` answer for an algorithm that reads `X` raises an error, as the warning of [`reads_sample_values`](@ref) states.
+
 # Related
 
   - [`AbstractDistanceEstimator`](@ref)
+  - [`reads_sample_values`](@ref)
   - [`SimpleDistance`](@ref)
   - [`SimpleAbsoluteDistance`](@ref)
   - [`LogDistance`](@ref)
@@ -340,6 +356,43 @@ With a correlation or a covariance matrix and no estimator, it uses [`SimpleDist
   - [`cor_and_dist`](@ref)
 """
 struct CanonicalDistance <: AbstractDistanceAlgorithm end
+"""
+    reads_sample_values(alg::AbstractDistanceAlgorithm) -> Bool
+    reads_sample_values(de::AbstractDistanceEstimator) -> Bool
+
+The fallbacks of [`reads_sample_values`](@ref) for the distance family.
+
+[`logo!`](@ref) reads the data `X` only through its distance estimator. So [`reads_sample_values`](@ref) of a [`LoGo`](@ref) gives the answer of its distance estimator, and a [`Distance`](@ref) or a [`DistanceDistance`](@ref) gives the answer of its algorithm. These fallbacks answer `true`, because the library cannot see what a type of your own reads. An incremental fit then refuses the step. The algorithms that read the correlation matrix alone answer `false` with a method in `02_Distance.jl`. [`VariationInfoDistance`](@ref) reads the data and takes the fallback, and so does [`FeatureDistance`](@ref), which reads a panel.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Return `true`.
+
+# Arguments
+
+  - `alg`: The distance algorithm.
+  - `de`: The distance estimator.
+
+# Returns
+
+  - `flag::Bool`: `true`, because the type can read the values of `X`.
+
+# Related
+
+  - [`reads_sample_values`](@ref)
+  - [`AbstractDistanceAlgorithm`](@ref)
+  - [`AbstractDistanceEstimator`](@ref)
+  - [`LoGo`](@ref)
+"""
+function reads_sample_values(::AbstractDistanceAlgorithm)
+    return true
+end
+function reads_sample_values(::AbstractDistanceEstimator)
+    return true
+end
 
 export SimpleDistance, SimpleAbsoluteDistance, LogDistance, CorrelationDistance,
        VariationInfoDistance, CanonicalDistance
+public AbstractDistanceEstimator, AbstractDistanceAlgorithm

@@ -1317,7 +1317,9 @@ end
                                                                 size(fx.rd.X, 1)), td:td)
                 g = permutedims(dropdims(sum(al.B; dims = 1); dims = 1)) ./ size(al.B, 1)
                 return PO.attribution_standard_errors(g, al, PO.attribution_families(pr.rr),
-                                                      1.0, 1, ZeroUnknown())
+                                                      1.0, 1,
+                                                      KindwiseUnknown(;
+                                                                      leverage = ZeroUnknown()))
             end
             ea = row_errors(pa)
             eb = row_errors(pb)

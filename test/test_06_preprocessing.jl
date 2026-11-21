@@ -1842,6 +1842,126 @@ end
                       naive_percentile_rank(RAND_X, nothing))
 end
 
+# The closed forms that the docstrings state, written from the docstring text alone (#722). The
+# quantile of the Winsoriser is read from the order statistics, not from `Statistics.quantile`,
+# and the three grouped members are derived one cell at a time.
+function hand_quantile(v, p)
+    s = sort(v)
+    n = length(s)
+    h = (n - 1) * p + 1
+    k = floor(Int, h)
+    return s[k] + (h - k) * (s[min(k + 1, n)] - s[k])
+end
+function hand_rows(X, w, t)
+    x = X[t, :]
+    wr = isnothing(w) ? ones(length(x)) : w[t, :]
+    fin = isfinite.(x)
+    return x, wr, fin, findall(fin .& (wr .> 0))
+end
+# The set a cell is estimated against: its group when the group stands, the row otherwise.
+function hand_group(G, E, t, i, mgs)
+    Ig = [j for j in E if G[t, j] == G[t, i]]
+    return (G[t, i] != PortfolioOptimisers.CS_MISSING_GROUP && length(Ig) >= mgs) ? Ig : E
+end
+hand_centre(x, wr, I) = sum(wr[I] .* x[I]) / sum(wr[I])
+function hand_scale(x, I, m)
+    return length(I) < 2 ? 0.0 : sqrt(sum((x[I] .- m) .^ 2) / (length(I) - 1))
+end
+# The recentring and the rescaling of a grouped score over the whole observation.
+function hand_recentre(z, wr, fin, E, scale)
+    z = copy(z)
+    z[fin] .-= hand_centre(z, wr, E)
+    if scale
+        s = hand_scale(z, E, 0.0)
+        z[fin] .= s > 1e-12 ? z[fin] ./ s : 0.0
+    end
+    return z
+end
+function hand_grouped_standardise(X, w, G, mgs)
+    Y = fill(NaN, size(X))
+    for t in axes(X, 1)
+        x, wr, fin, E = hand_rows(X, w, t)
+        if isempty(E)
+            continue
+        end
+        z = fill(NaN, length(x))
+        for i in findall(fin)
+            I = hand_group(G, E, t, i, mgs)
+            m = hand_centre(x, wr, I)
+            s = hand_scale(x, I, m)
+            z[i] = s > 1e-12 ? (x[i] - m) / s : 0.0
+        end
+        Y[t, :] .= hand_recentre(z, wr, fin, E, true)
+    end
+    return Y
+end
+function hand_grouped_percentile(X, w, G, mgs)
+    P = fill(NaN, size(X))
+    for t in axes(X, 1)
+        x, _, fin, E = hand_rows(X, w, t)
+        if isempty(E)
+            continue
+        end
+        for i in findall(fin)
+            I = hand_group(G, E, t, i, mgs)
+            n = length(I)
+            r = (count(j -> x[j] < x[i], I) + count(j -> x[j] <= x[i], I)) / (2n)
+            P[t, i] = clamp(r, 1 / (2n), 1 - 1 / (2n))
+        end
+    end
+    return P
+end
+function hand_grouped_gaussian(X, w, G, mgs, scale)
+    P = hand_grouped_percentile(X, w, G, mgs)
+    Y = fill(NaN, size(X))
+    for t in axes(X, 1)
+        _, wr, fin, E = hand_rows(X, w, t)
+        if isempty(E)
+            continue
+        end
+        g = [fin[i] ? quantile(Normal(), P[t, i]) : NaN for i in axes(X, 2)]
+        Y[t, :] .= hand_recentre(g, wr, fin, E, scale)
+    end
+    return Y
+end
+
+@testset "The closed forms of the docstrings, checked by hand" begin
+    # The consistency constant is 1 / Φ⁻¹(3/4). Measured: equal to the last bit.
+    @test PortfolioOptimisers.CS_MAD_CONSISTENCY == 1 / quantile(Normal(), 0.75)
+    # The band edges are the type-7 sample quantiles of the estimation set. Measured: the
+    # written-out quantile agrees with the clip to 8.9e-16.
+    for w in (nothing, RAND_W), (lo, hi) in ((0.0, 1.0), (0.1, 0.9), (0.37, 0.61))
+        Y = cross_sectional_transform(CrossSectionalWinsoriser(; low = lo, high = hi),
+                                      RAND_X; w = w)
+        for t in axes(RAND_X, 1)
+            x, _, _, E = hand_rows(RAND_X, w, t)
+            isempty(E) && continue
+            v = x[E]
+            @test same_matrix(Y[t:t, :],
+                              reshape(clamp.(x, hand_quantile(v, lo), hand_quantile(v, hi)),
+                                      1, :))
+        end
+    end
+    # The three grouped members. Measured: every cell agrees to the last bit.
+    for w in (nothing, RAND_W), mgs in (1, 2, 3)
+        @test same_matrix(cross_sectional_transform(CrossSectionalStandardiser(;
+                                                                               min_group_size = mgs),
+                                                    RAND_X; w = w, groups = RAND_G),
+                          hand_grouped_standardise(RAND_X, w, RAND_G, mgs))
+        @test isequal(cross_sectional_transform(CrossSectionalPercentileRank(;
+                                                                             min_group_size = mgs),
+                                                RAND_X; w = w, groups = RAND_G),
+                      hand_grouped_percentile(RAND_X, w, RAND_G, mgs))
+        for scale in (true, false)
+            @test same_matrix(cross_sectional_transform(CrossSectionalGaussianRank(;
+                                                                                   min_group_size = mgs,
+                                                                                   scale = scale),
+                                                        RAND_X; w = w, groups = RAND_G),
+                              hand_grouped_gaussian(RAND_X, w, RAND_G, mgs, scale))
+        end
+    end
+end
+
 @testset "The estimation set is the finite cells that carry a positive weight" begin
     # A weight of zero removes an asset from every statistic. Winsorising with the mask must
     # therefore differ from winsorising without it exactly where the excluded asset would
@@ -2042,6 +2162,12 @@ end
     B2[3, 1, 2] = 1.0
     @test cross_sectional_groups(B2) == [1 2 PortfolioOptimisers.CS_MISSING_GROUP;
                                          PortfolioOptimisers.CS_MISSING_GROUP PortfolioOptimisers.CS_MISSING_GROUP 1]
+    # A cell that is not live is `NaN` across every level of a `OneHotExposure` block, so it
+    # sets no level and the asset has no group. Before the sweep of #722, `!iszero(NaN)` read
+    # it as a member of level 1.
+    B3 = fill(NaN, 2, 3, 1)
+    B3[1, :, 1] = [0.0, 1.0, 0.0]
+    @test cross_sectional_groups(B3) == [2 PortfolioOptimisers.CS_MISSING_GROUP]
     # The derived labels drive the verb, which is the route the exposure build takes.
     G = cross_sectional_groups(B2)
     @test size(cross_sectional_transform(CrossSectionalPercentileRank(; min_group_size = 1),

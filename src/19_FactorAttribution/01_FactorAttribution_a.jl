@@ -961,7 +961,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Reads every entry the factor model does not state as zero, and an absent return as a zero return.
 
-The rule is a stated assumption, not a fact of the model. An unknown idiosyncratic variance read as zero makes the portfolio variance a lower bound, so it understates the volatility and every share divided by it. A missing return read as zero dilutes the mean of an asset by the observations it was absent. A total moment the prior does not state reads the model, with every unknown entry of the model read as zero, so the gap of the remainder reads the stated entries alone.
+The rule is a stated assumption, not a fact of the model. An unknown idiosyncratic variance read as zero makes the portfolio variance a lower bound, so it understates the volatility and every share divided by it. It understates the standard error of a realised mean contribution in the same way. A missing return read as zero dilutes the mean of an asset by the observations it was absent. A total moment the prior does not state reads the model, with every unknown entry of the model read as zero, so the gap of the remainder reads the stated entries alone.
 
 A Leverage-One Pair keeps the split as fitted: its idiosyncratic variance is zero, so the attribution reports a held pair as wholly systematic. This understates the idiosyncratic part by the unknown own variance of the asset, and the factor whose only member is the pair carries that variance.
 

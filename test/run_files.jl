@@ -488,7 +488,7 @@ end
 """
     record_gate(path)
 
-Record a gate stamp for one test file. A failure to write it never fails the run.
+Record a gate stamp for one test file that ran green. A failure to write it never fails the run.
 """
 record_gate(path::AbstractString) = record_stamp("test/$(basename(path))")
 
@@ -992,7 +992,8 @@ function run_files(; done, testset, time_depth, timeout, names, case = nothing,
                     stop_watchdog(dog, done)
                 end
             end
-            if select === nothing && case === nothing
+            # A red file records no stamp: the push guard reads a stamp as a green run.
+            if select === nothing && case === nothing && green(ts)
                 record_gate(p)
             end
             note, stale = known_red_notes(ts, rows; filtered = select !== nothing)

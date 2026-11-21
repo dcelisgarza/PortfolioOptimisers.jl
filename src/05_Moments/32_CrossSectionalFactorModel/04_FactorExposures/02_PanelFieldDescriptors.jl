@@ -114,7 +114,7 @@ end
 
 Check that every Panel Field a guard names is one the ratio reads.
 
-A guard on a Panel Field the ratio never reads would be checked against nothing, and a typo in a guard would then pass in silence. The check runs in the constructors of [`PanelFieldRatio`](@ref), [`EWVolumeRatio`](@ref) and [`DaysToCover`](@ref).
+A guard on a Panel Field that the ratio never reads checks nothing, so a typo in a guard would pass in silence. The check runs in the constructors of [`PanelFieldRatio`](@ref), [`EWVolumeRatio`](@ref) and [`DaysToCover`](@ref).
 
 # Arguments
 
@@ -160,7 +160,7 @@ This is the archetype of every point-in-time ratio Descriptor: a book-to-price, 
 ```math
 \\begin{align}
 u_{t,i} &= \\sum_{k} c_{k}\\, z^{(k)}_{t,i}\\,,\\qquad v_{t,i} = \\sum_{l} c'_{l}\\, y^{(l)}_{t,i}\\\\
-d_{t,i} &= \\begin{cases} u_{t,i} / v_{t,i} & \\text{if } v_{t,i} > 0 \\text{ and every guarded field is positive} \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
+d_{t,i} &= \\begin{cases} u_{t,i} / v_{t,i} & \\text{if } v_{t,i} > 0,\\ u_{t,i} / v_{t,i} \\text{ is finite, and } x_{t,i} > 0 \\ \\forall x \\in \\mathcal{P} \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
 \\end{align}
 ```
 
@@ -169,10 +169,11 @@ Where:
   - ``d_{t,i}``: Descriptor of asset ``i`` at observation ``t``.
   - ``z^{(k)}_{t,i}``, ``c_{k}``: The numerator's Panel Fields and their coefficients. A single name is one field with coefficient one.
   - ``y^{(l)}_{t,i}``, ``c'_{l}``: The denominator's Panel Fields and their coefficients.
+  - ``\\mathcal{P}``: The Panel Fields that `pos` names.
 
-A cell that is not observed in any field it reads, or that is not active, is `NaN`.
+A cell that is not observed in any field it reads, or that is not active, is `NaN`. A quotient that overflows is `NaN` too, through [`positive_divide`](@ref).
 
-The three guards separate a data error from a ratio that is not defined. A field that is positive by construction, a price, a market capitalisation, a share count or a total of assets, goes in `gt0`, and a field that is non-negative by construction, a dividend or a sales figure, goes in `nonneg`: a value that breaks the sign is a data error, and the ratio refuses it. A denominator that valid data can make zero or negative, a book equity or an enterprise value, carries no guard: the ratio is not defined for that firm at that observation, and the cell is `NaN`. A named constructor sets the guards of its default fields, and this type with no guard gives `NaN` in every such cell.
+The three guards separate a data error from a ratio that is not defined. A field that is positive by construction, such as a price, a market capitalisation, a share count or a total of assets, goes in `gt0`. A field that is non-negative by construction, such as a debt, a dividend or a sales figure, goes in `nonneg`. A value that breaks the sign of its guard is a data error, and the ratio refuses it. A denominator that valid data can make zero or negative, such as a book equity or an enterprise value, carries no guard. There the ratio is not defined for that firm at that observation, and the cell is `NaN`. A named constructor sets the guards of its default fields, and this type with no guard gives `NaN` in every such cell.
 
 # Fields
 
@@ -281,7 +282,22 @@ $(DocStringExtensions.TYPEDEF)
 
 Takes the natural logarithm of one Panel Field at every observation.
 
-The size Descriptor of an equity factor model is the logarithm of the market capitalisation, which tames the right skew of the raw capitalisation. The logarithm is `NaN` wherever the Panel Field is not strictly positive. Under `gt0 = true` a value at or below zero is a data error instead, and the Descriptor refuses it: [`LogMarketCap`](@ref) sets it, because a market capitalisation is positive by construction.
+The size Descriptor of an equity factor model is the logarithm of the market capitalisation, which tames the right skew of the raw capitalisation. The logarithm is `NaN` wherever the Panel Field is not strictly positive. Under `gt0 = true`, a value at or below zero is a data error instead, and the Descriptor refuses it. [`LogMarketCap`](@ref) sets `gt0 = true`, because a market capitalisation is positive by construction.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+d_{t,i} &= \\begin{cases} \\ln x_{t,i} & \\text{if } x_{t,i} > 0 \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``d_{t,i}``: Descriptor of asset ``i`` at observation ``t``.
+  - ``x_{t,i}``: The Panel Field that `field` names.
+
+A cell that is not observed, or that is not active, is `NaN`.
 
 # Fields
 
@@ -316,11 +332,11 @@ PanelFieldLog
 """
 @concrete struct PanelFieldLog <: AbstractDescriptorEstimator
     """
-    Name of the Panel Field whose logarithm is taken.
+    Name of the Panel Field that the Descriptor takes the logarithm of.
     """
     field
     """
-    Whether the Panel Field must be strictly positive wherever it is observed and active. A value at or below zero then raises a `DomainError`; otherwise its logarithm is `NaN`.
+    Whether the Panel Field must be strictly positive wherever it is observed and active. If `true`, a value at or below zero raises a `DomainError`. If `false`, its logarithm is `NaN`.
     """
     gt0
     function PanelFieldLog(field::AbstractString, gt0::Bool)
@@ -387,7 +403,7 @@ end
 
 Check the sign of the named Panel Fields on every cell that is observed and active.
 
-A field that is non-negative by construction, a dividend or a sales figure, is checked with `strict = false`. A field that is positive by construction, a price, a market capitalisation, a share count or a total of assets, is checked with `strict = true`. A value that breaks the sign is a data error and not a state of the firm, so the check refuses it rather than write `NaN` into its cell. A cell outside the active mask never reaches the Descriptor, and a cell that is not observed reads back as `NaN`, so neither is checked.
+The `nonneg` guard calls this check with `strict = false`, for a field that is non-negative by construction, such as a debt, a dividend or a sales figure. The `gt0` guard calls it with `strict = true`, for a field that is positive by construction, such as a price, a market capitalisation, a share count or a total of assets. A value that breaks the sign is a data error and not a state of the firm, so the check refuses it and does not write `NaN` into its cell. A cell outside the active mask never reaches the Descriptor, and a cell that is not observed reads back as `NaN`, so the check skips both.
 
 # Algorithm
 
@@ -428,10 +444,13 @@ function assert_panel_field_sign(rd::ReturnsResult, names::VecStr, strict::Bool)
         amsk = rd.pnl.amsk
         z = zero(eltype(V))
         k = findfirst(k -> amsk[k] && (strict ? V[k] <= z : V[k] < z), eachindex(V, amsk))
+        if isnothing(k)
+            continue
+        end
+        t, i = Tuple(CartesianIndices(V)[k])
         sign = strict ? "strictly positive" : "non-negative"
-        @argcheck(isnothing(k),
-                  DomainError(isnothing(k) ? NaN : V[k],
-                              "the Panel Field \"$name\" must be $sign wherever it is observed and active, and it is $(isnothing(k) ? NaN : V[k]) at observation $(isnothing(k) ? 0 : Tuple(CartesianIndices(V)[k])[1]) for asset $(isnothing(k) ? 0 : Tuple(CartesianIndices(V)[k])[2]). A value of this sign in this field is a data error, so clean the input rather than pass it through."))
+        throw(DomainError(V[k],
+                          "the Panel Field \"$name\" must be $sign wherever it is observed and active, and it is $(V[k]) at observation $t for asset $i. A value of this sign in this field is a data error, so clean the input rather than pass it through."))
     end
     return nothing
 end
@@ -582,7 +601,7 @@ end
 
 Book equity over market capitalisation, the value Descriptor.
 
-The ratio is `book_equity / market_cap` at each observation. A market capitalisation at or below zero is a data error, and the estimator raises on one. A negative book equity is kept, because it carries information about the balance sheet. The aggregate form is used rather than the per-share form, because it cannot suffer a split-adjustment mismatch between its two sides.
+The ratio is `book_equity / market_cap` at each observation. A market capitalisation at or below zero is a data error, and the estimator raises on one. The ratio keeps a negative book equity, because it carries information about the balance sheet. The estimator reads the aggregate form and not the per-share form, because the aggregate form cannot suffer a split-adjustment mismatch between its two sides.
 
 # Arguments
 
@@ -662,7 +681,7 @@ end
 
 Trailing sales over market capitalisation, a value Descriptor.
 
-The ratio is `sales_ttm / market_cap`. A market capitalisation at or below zero is a data error, and the estimator raises on one. Sales are the least exposed of the fundamentals to accounting choices, and the ratio stays defined for a firm whose earnings or book equity are negative.
+The ratio is `sales_ttm / market_cap`. A market capitalisation at or below zero is a data error, and the estimator raises on one. A negative sales figure is a data error too, and the estimator raises on one. Sales are the least exposed of the fundamentals to accounting choices, and the ratio stays defined for a firm whose earnings or book equity are negative.
 
 # Arguments
 
@@ -671,7 +690,7 @@ The ratio is `sales_ttm / market_cap`. A market capitalisation at or below zero 
 
 # Returns
 
-  - `de::PanelFieldRatio`: The estimator, with the two Panel Fields fixed and `gt0 = [den]`.
+  - `de::PanelFieldRatio`: The estimator, with the two Panel Fields fixed, `nonneg = [num]` and `gt0 = [den]`.
 
 # Examples
 
@@ -680,7 +699,7 @@ julia> SalesToPrice()
 PanelFieldRatio
      num ┼ String: \"sales_ttm\"
      den ┼ String: \"market_cap\"
-  nonneg ┼ nothing
+  nonneg ┼ Vector{String}: [\"sales_ttm\"]
      pos ┼ nothing
      gt0 ┴ Vector{String}: [\"market_cap\"]
 ```
@@ -694,7 +713,8 @@ PanelFieldRatio
 """
 function SalesToPrice(; num::AbstractString = "sales_ttm",
                       den::AbstractString = "market_cap")::PanelFieldRatio
-    return PanelFieldRatio(; num = num, den = den, gt0 = [String(den)])
+    return PanelFieldRatio(; num = num, den = den, nonneg = [String(num)],
+                           gt0 = [String(den)])
 end
 """
     EarningsToPrice(; num::AbstractString = "net_income_ttm",
@@ -822,7 +842,7 @@ end
 
 Trailing common dividends over market capitalisation, the dividend yield Descriptor.
 
-The ratio is `dividends_ttm / market_cap`. A market capitalisation at or below zero is a data error, and the estimator raises on one. The dividends must be non-negative wherever they are observed: a negative dividend is a data error, and the estimator raises on one.
+The ratio is `dividends_ttm / market_cap`. A market capitalisation at or below zero is a data error, and the estimator raises on one. A negative dividend is a data error, and the estimator raises on one.
 
 # Arguments
 
@@ -946,7 +966,7 @@ end
 
 Total debt over total book capital, the book leverage Descriptor.
 
-The ratio is `total_debt / (total_debt + book_equity)`, `NaN` where the total capital is not strictly positive, which a negative book equity can make it. A negative debt is a data error, and the estimator raises on one. It is bounded in `[0, 1]` for a firm whose book equity is positive, which is why it is preferred to the debt-to-equity ratio it is a monotone function of. A negative book equity that leaves the total capital positive gives a ratio above one, which is a valid signal of distress.
+The ratio is `total_debt / (total_debt + book_equity)`. It is `NaN` where the total capital is not strictly positive, and a negative book equity can make it so. A negative debt is a data error, and the estimator raises on one. The ratio is an increasing function of the debt-to-equity ratio, and it stays in `[0, 1)` for a firm whose book equity is positive, so it is the better scale of the two. A negative book equity that leaves the total capital positive gives a ratio above one, which is a valid signal of distress.
 
 # Arguments
 
@@ -1028,7 +1048,7 @@ end
 
 Total debt over total assets, a leverage Descriptor.
 
-The ratio is `total_debt / total_assets`. Total assets at or below zero are a data error, and the estimator raises on them.
+The ratio is `total_debt / total_assets`. Total assets at or below zero are a data error, and the estimator raises on them. A negative debt is a data error too, and the estimator raises on one.
 
 # Arguments
 
@@ -1037,7 +1057,7 @@ The ratio is `total_debt / total_assets`. Total assets at or below zero are a da
 
 # Returns
 
-  - `de::PanelFieldRatio`: The estimator, with the two Panel Fields fixed and `gt0 = [den]`.
+  - `de::PanelFieldRatio`: The estimator, with the two Panel Fields fixed, `nonneg = [num]` and `gt0 = [den]`.
 
 # Examples
 
@@ -1046,7 +1066,7 @@ julia> DebtToAssets()
 PanelFieldRatio
      num ┼ String: \"total_debt\"
      den ┼ String: \"total_assets\"
-  nonneg ┼ nothing
+  nonneg ┼ Vector{String}: [\"total_debt\"]
      pos ┼ nothing
      gt0 ┴ Vector{String}: [\"total_assets\"]
 ```
@@ -1060,7 +1080,8 @@ PanelFieldRatio
 """
 function DebtToAssets(; num::AbstractString = "total_debt",
                       den::AbstractString = "total_assets")::PanelFieldRatio
-    return PanelFieldRatio(; num = num, den = den, gt0 = [String(den)])
+    return PanelFieldRatio(; num = num, den = den, nonneg = [String(num)],
+                           gt0 = [String(den)])
 end
 """
     GrossProfitability(; sales::AbstractString = "sales_ttm",
@@ -1069,7 +1090,7 @@ end
 
 Gross profit over total assets, the gross profitability Descriptor.
 
-The ratio is `(sales_ttm - cost_of_revenue_ttm) / total_assets`. Total assets at or below zero are a data error, and the estimator raises on them. Gross profit sits above the accounting choices that shape net income, which is what makes it the cleaner profitability signal.
+The ratio is `(sales_ttm - cost_of_revenue_ttm) / total_assets`. Total assets at or below zero are a data error, and the estimator raises on them. Negative sales are a data error too, and the estimator raises on them. Gross profit sits above the accounting choices that shape net income, so it is the cleaner profitability signal.
 
 # Arguments
 
@@ -1079,7 +1100,7 @@ The ratio is `(sales_ttm - cost_of_revenue_ttm) / total_assets`. Total assets at
 
 # Returns
 
-  - `de::PanelFieldRatio`: The estimator, with `num = [sales => 1, cogs => -1]` and `gt0 = [den]`.
+  - `de::PanelFieldRatio`: The estimator, with `num = [sales => 1, cogs => -1]`, `nonneg = [sales]` and `gt0 = [den]`.
 
 # Examples
 
@@ -1088,7 +1109,7 @@ julia> GrossProfitability()
 PanelFieldRatio
      num ┼ Vector{Pair{String, Int64}}: [\"sales_ttm\" => 1, \"cost_of_revenue_ttm\" => -1]
      den ┼ String: \"total_assets\"
-  nonneg ┼ nothing
+  nonneg ┼ Vector{String}: [\"sales_ttm\"]
      pos ┼ nothing
      gt0 ┴ Vector{String}: [\"total_assets\"]
 ```
@@ -1104,7 +1125,7 @@ function GrossProfitability(; sales::AbstractString = "sales_ttm",
                             cogs::AbstractString = "cost_of_revenue_ttm",
                             den::AbstractString = "total_assets")::PanelFieldRatio
     return PanelFieldRatio(; num = [String(sales) => 1, String(cogs) => -1], den = den,
-                           gt0 = [String(den)])
+                           nonneg = [String(sales)], gt0 = [String(den)])
 end
 """
     GrossMargin(; sales::AbstractString = "sales_ttm",
@@ -1231,7 +1252,7 @@ end
 
 Trailing sales over total assets, the asset turnover Descriptor.
 
-The ratio is `sales_ttm / total_assets`. Total assets at or below zero are a data error, and the estimator raises on them.
+The ratio is `sales_ttm / total_assets`. Total assets at or below zero are a data error, and the estimator raises on them. Negative sales are a data error too, and the estimator raises on them.
 
 # Arguments
 
@@ -1240,7 +1261,7 @@ The ratio is `sales_ttm / total_assets`. Total assets at or below zero are a dat
 
 # Returns
 
-  - `de::PanelFieldRatio`: The estimator, with the two Panel Fields fixed and `gt0 = [den]`.
+  - `de::PanelFieldRatio`: The estimator, with the two Panel Fields fixed, `nonneg = [num]` and `gt0 = [den]`.
 
 # Examples
 
@@ -1249,7 +1270,7 @@ julia> AssetTurnover()
 PanelFieldRatio
      num ┼ String: \"sales_ttm\"
      den ┼ String: \"total_assets\"
-  nonneg ┼ nothing
+  nonneg ┼ Vector{String}: [\"sales_ttm\"]
      pos ┼ nothing
      gt0 ┴ Vector{String}: [\"total_assets\"]
 ```
@@ -1262,7 +1283,8 @@ PanelFieldRatio
 """
 function AssetTurnover(; num::AbstractString = "sales_ttm",
                        den::AbstractString = "total_assets")::PanelFieldRatio
-    return PanelFieldRatio(; num = num, den = den, gt0 = [String(den)])
+    return PanelFieldRatio(; num = num, den = den, nonneg = [String(num)],
+                           gt0 = [String(den)])
 end
 """
     CashFlowToAssets(; num::AbstractString = "operating_cash_flow_ttm",
@@ -1310,7 +1332,7 @@ end
 
 Trailing sales over enterprise value, a profitability Descriptor that is neutral to the capital structure.
 
-The ratio is `sales_ttm / enterprise_value`, `NaN` where the enterprise value is not strictly positive.
+The ratio is `sales_ttm / enterprise_value`, `NaN` where the enterprise value is not strictly positive. Negative sales are a data error, and the estimator raises on them.
 
 # Arguments
 
@@ -1319,7 +1341,7 @@ The ratio is `sales_ttm / enterprise_value`, `NaN` where the enterprise value is
 
 # Returns
 
-  - `de::PanelFieldRatio`: The estimator, with the two Panel Fields fixed.
+  - `de::PanelFieldRatio`: The estimator, with the two Panel Fields fixed and `nonneg = [num]`.
 
 # Examples
 
@@ -1328,7 +1350,7 @@ julia> SalesToEnterpriseValue()
 PanelFieldRatio
      num ┼ String: \"sales_ttm\"
      den ┼ String: \"enterprise_value\"
-  nonneg ┼ nothing
+  nonneg ┼ Vector{String}: [\"sales_ttm\"]
      pos ┼ nothing
      gt0 ┴ nothing
 ```
@@ -1342,7 +1364,7 @@ PanelFieldRatio
 """
 function SalesToEnterpriseValue(; num::AbstractString = "sales_ttm",
                                 den::AbstractString = "enterprise_value")::PanelFieldRatio
-    return PanelFieldRatio(; num = num, den = den)
+    return PanelFieldRatio(; num = num, den = den, nonneg = [String(num)])
 end
 """
     AccrualsCashFlow(; income::AbstractString = "net_income_ttm",

@@ -932,8 +932,8 @@ can make zero or negative (a book equity, an enterprise value) gives `NaN`. Thre
 from the oracle are deliberate, and ADR 0108 records them:
 
   - the ratios over `total_assets` and `MarketLeverage` refuse a non-positive total of assets or
-    market capitalisation, where the oracle gives `NaN`; `GrossMargin` refuses a negative sales
-    figure;
+    market capitalisation, where the oracle gives `NaN`; every named ratio over a sales figure
+    refuses a negative one, and `DebtToAssets` a negative debt;
   - the archetypes `ChangeToScale` and `ChangeInIntensity` give `NaN` at a non-positive scale by
     default, where the oracle refuses; their named constructors refuse, as the oracle does;
   - the non-negative guard reads the active observed cells alone, where the oracle reads every
@@ -1155,18 +1155,21 @@ end
         @test isnan(R[40, 7]) && all(isnan, R[41:50, 8])
     end
     # The negative case: `parity_ratio_case(:negative)`. Ours and the oracle refuse the same 13
-    # Descriptors, whose negative field the oracle also refuses. Ours also refuses the nine
+    # Descriptors, whose negative field the oracle also refuses. Ours also refuses the eleven
     # below, over a negative total of assets or a negative sales figure, where the oracle gives
-    # NaN or refuses the scale; the stored output of each is the oracle's, and
-    # `parity_unguarded` equals it. Measured `maxrel = 0.0`.
+    # a number, gives NaN or refuses the scale; the stored output of each is the oracle's, and
+    # `parity_unguarded` equals it. Measured `maxrel = 0.0`. `SalesToPrice` and
+    # `SalesToEnterpriseValue` joined the list when their sales figure took the `nonneg` guard
+    # of ADR 0108 (#727).
     @testset "Negative guarded fields refuse" begin
         both = ["DividendToPrice", "ForwardDividendToPrice", "ShareholderYield",
                 "AnalystDispersionToPrice", "ShortInterest", "AssetsGrowthRateL1",
                 "SalesGrowthRateL1", "IssuanceGrowthRateL1", "GrowthRateCapexL1",
                 "AssetsGrowthRateL30", "SalesGrowthRateL30", "IssuanceGrowthRateL30",
                 "GrowthRateCapexL30"]
-        ours = ["DebtToAssets", "GrossProfitability", "GrossMargin", "ReturnOnAssets",
-                "AssetTurnover", "CashFlowToAssets", "AccrualsCashFlow",
+        ours = ["SalesToPrice", "DebtToAssets", "GrossProfitability", "GrossMargin",
+                "ReturnOnAssets", "AssetTurnover", "CashFlowToAssets",
+                "SalesToEnterpriseValue", "AccrualsCashFlow",
                 "CapexToAssetsChangeInIntensityL1", "CapexToAssetsChangeInIntensityL30"]
         @test both ⊆ names && ours ⊆ names
         c = parity_ratio_case(:negative)

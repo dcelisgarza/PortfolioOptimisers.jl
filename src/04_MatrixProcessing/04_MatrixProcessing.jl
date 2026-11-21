@@ -90,6 +90,7 @@ To add a matrix processing algorithm that `MatrixProcessing` can use, subtype `A
 
   - `matrix_processing_algorithm!(mpa::AbstractMatrixProcessingAlgorithm, sigma::MatNum, args...; kwargs...) -> MatNum`: Applies the algorithm to `sigma` in place.
   - `matrix_processing_algorithm(mpa::AbstractMatrixProcessingAlgorithm, sigma::MatNum, args...; kwargs...) -> MatNum`: Optional. Applies the algorithm to a copy of `sigma`, and returns the copy.
+  - `reads_sample_values(mpa::AbstractMatrixProcessingAlgorithm) -> Bool`: Optional. Answers `false` when the algorithm reads no value of the sample `X`. The fallback answers `true`, so an incremental fit refuses the algorithm, because the fit keeps no observation. An algorithm that answers `false` also adds the method `matrix_processing_algorithm!(mpa, sigma)` with no sample, which the estimate from the state calls. A `false` answer for an algorithm that reads `X` raises an error, as the warning of [`reads_sample_values`](@ref) states. [`LoGo`](@ref) gives the answer of its distance estimator, which states it with the same verb, as the interfaces of [`AbstractDistanceEstimator`](@ref) and [`AbstractDistanceAlgorithm`](@ref) state.
 
 ## Arguments
 
@@ -187,6 +188,50 @@ The out-of-place form of [`matrix_processing_algorithm!`](@ref). The `nothing` m
 """
 function matrix_processing_algorithm(::Nothing, sigma::MatNum, args...; kwargs...)
     return sigma
+end
+"""
+    reads_sample_values(mpa::AbstractMatrixProcessingAlgorithm) -> Bool
+    reads_sample_values(::Nothing) -> Bool
+
+Tells whether a matrix processing algorithm reads the values of the sample `X`.
+
+An incremental fit keeps a moment and a count, and not the observations. So it can run the `:alg` step of a [`MatrixProcessing`](@ref) only when the step reads no value of `X`. [`supports_shape_processing`](@ref) and [`assert_shape_only_matrix_processing`](@ref) read this answer. The estimate from the state then calls `matrix_processing_algorithm!(mpa, sigma)`, with no sample.
+
+An algorithm of your own that reads no value of `X` adds a method that answers `false`, and a method of [`matrix_processing_algorithm!`](@ref) with no sample, as the interface of [`AbstractMatrixProcessingAlgorithm`](@ref) states. Without them, an incremental fit refuses the algorithm, and [`Online`](@ref) runs it over the observations that it keeps. A distance estimator or a distance algorithm of your own inside [`LoGo`](@ref) states its answer with the same verb.
+
+!!! warning
+
+    Answer `false` only for a type that reads no value of `X`. The library cannot check the answer, and the estimate from the state of an incremental fit has no observation to give. The estimate of a [`PortfolioOptimisersCovariance`](@ref), a [`Coskewness`](@ref) or a [`Cokurtosis`](@ref) gives the step no sample. A matrix processing algorithm gets no `X` argument, and a distance inside [`LoGo`](@ref) gets `X = nothing`, so a type that reads `X` raises an error. Keep the default `true` for such a type, and fold it with [`Online`](@ref).
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `nothing` answers `false`, because no step runs.
+ 2. The fallback answers `true` for every other algorithm, because the library cannot see what it reads.
+ 3. [`LoGo`](@ref) gives the answer of its distance estimator. The distance family has methods of its own: a [`Distance`](@ref) or a [`DistanceDistance`](@ref) gives the answer of its algorithm, an algorithm that reads the correlation matrix alone answers `false`, and every other distance algorithm or distance estimator answers `true`.
+
+# Arguments
+
+  - `mpa`: The matrix processing algorithm, or `nothing`.
+
+# Returns
+
+  - `flag::Bool`: `true` when the algorithm can read the values of `X`.
+
+# Related
+
+  - [`supports_shape_processing`](@ref)
+  - [`assert_shape_only_matrix_processing`](@ref)
+  - [`matrix_processing_algorithm!`](@ref)
+  - [`AbstractMatrixProcessingAlgorithm`](@ref)
+  - [`LoGo`](@ref)
+"""
+function reads_sample_values(::Nothing)
+    return false
+end
+function reads_sample_values(::AbstractMatrixProcessingAlgorithm)
+    return true
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -529,7 +574,7 @@ end
 
 Refuses a matrix processing estimator whose steps need more than the shape of the sample.
 
-Three of the four steps of [`MatrixProcessing`](@ref) never read the sample. The steps `pdm` and `dt` read `sigma` alone, and `dn` reads only `size(X)`. The fourth step, `alg`, is a step that a caller extends. It gets the whole of `X`, so this function cannot know what it reads. An incremental fit keeps a moment and a count, and not the observations. So it can run the first three steps and cannot run the fourth.
+Three of the four steps of [`MatrixProcessing`](@ref) never read the sample. The steps `pdm` and `dt` read `sigma` alone, and `dn` reads only `size(X)`. The fourth step, `alg`, gets the whole of `X`, and [`reads_sample_values`](@ref) states whether it reads the values. The library ships [`LoGo`](@ref) for it. `LoGo` reads the values of `X` under a variation of information distance, and it reads the correlation matrix alone under the default [`CanonicalDistance`](@ref). An incremental fit keeps a moment and a count, and not the observations. So it can run the `alg` step only when the step reads no value of `X`.
 
 The refusal is an `ArgumentError` that names the type of `alg`. It also names the two ways that keep the observations. [`Online`](@ref) buffers them for the estimator itself, and a prior keeps them for one of its members.
 
@@ -537,7 +582,7 @@ The refusal is an `ArgumentError` that names the type of `alg`. It also names th
 
 The method that Julia selects is the algorithm.
 
- 1. A [`MatrixProcessing`](@ref) passes when `mp.alg` is `nothing`.
+ 1. A [`MatrixProcessing`](@ref) passes when [`reads_sample_values`](@ref) answers `false` for `mp.alg`. It answers `false` for `nothing`.
  2. The function refuses every other subtype of [`AbstractMatrixProcessingEstimator`](@ref). Its interface states only [`matrix_processing!`](@ref) on the whole sample, so the shape of the sample cannot replace the sample.
 
 # Arguments
@@ -546,7 +591,7 @@ The method that Julia selects is the algorithm.
 
 # Validation
 
-  - `mp` is a [`MatrixProcessing`](@ref), and `mp.alg` is `nothing`. Otherwise, the function raises an `ArgumentError`.
+  - `mp` is a [`MatrixProcessing`](@ref), and `reads_sample_values(mp.alg)` is `false`. Otherwise, the function raises an `ArgumentError`.
 
 # Returns
 
@@ -561,8 +606,8 @@ The method that Julia selects is the algorithm.
   - [`partial_fit!`](@ref)
 """
 function assert_shape_only_matrix_processing(mp::MatrixProcessing)
-    @argcheck(isnothing(mp.alg),
-              ArgumentError("`$(typeof(mp.alg))` is a matrix processing algorithm of your own, and it is handed the whole sample, so an incremental fit that keeps a moment and a count cannot run it. Wrap the estimator in `Online`, which buffers the observations the algorithm reads, or put it in a prior that carries them."))
+    @argcheck(!reads_sample_values(mp.alg),
+              ArgumentError("`$(typeof(mp.alg))` is the `alg` step of a `MatrixProcessing`, and `reads_sample_values` states that it reads the values of the sample, so an incremental fit that keeps a moment and a count cannot run it. `LoGo` reads them under a variation of information distance, and it reads none under a distance that reads the correlation matrix alone, such as the default `CanonicalDistance`. Wrap the estimator in `Online`, which buffers the observations the algorithm reads, or put it in a prior that carries them."))
     return nothing
 end
 function assert_shape_only_matrix_processing(mp::AbstractMatrixProcessingEstimator)
@@ -580,7 +625,7 @@ This is the test of [`assert_shape_only_matrix_processing`](@ref) as a `Bool`. A
 
 The method that Julia selects is the algorithm.
 
- 1. A [`MatrixProcessing`](@ref) answers `true` when `mp.alg` is `nothing`.
+ 1. A [`MatrixProcessing`](@ref) answers `true` when [`reads_sample_values`](@ref) answers `false` for `mp.alg`.
  2. Every other subtype of [`AbstractMatrixProcessingEstimator`](@ref) answers `false`.
 
 # Arguments
@@ -598,7 +643,7 @@ The method that Julia selects is the algorithm.
   - [`MatrixProcessing`](@ref)
 """
 function supports_shape_processing(mp::MatrixProcessing)
-    return isnothing(mp.alg)
+    return !reads_sample_values(mp.alg)
 end
 function supports_shape_processing(::AbstractMatrixProcessingEstimator)
     return false
@@ -743,11 +788,11 @@ An incremental fit calls this method when it makes the estimate from its state. 
 
 A caller passes `T = nothing` when [`matrix_processing_reads_count`](@ref) answers `false`, because then no step reads `T`. The caller then reads no count from the state, and a state that records no count works.
 
-`alg` is the one step that the shape cannot replace. Before any step runs, [`assert_shape_only_matrix_processing`](@ref) refuses it with an `ArgumentError` that names its type. It also refuses a matrix processing estimator that a caller defines, because that interface states no shape method.
+`alg` is the one step that the shape can fail to replace. An `alg` that reads the values of `X`, as [`reads_sample_values`](@ref) states, has no answer from the shape. Before any step runs, [`assert_shape_only_matrix_processing`](@ref) refuses it with an `ArgumentError` that names its type. It also refuses a matrix processing estimator that a caller defines, because that interface states no shape method. An `alg` that reads no value of `X` runs with no sample.
 
 # Algorithm
 
- 1. Refuse an `mp` that is not a [`MatrixProcessing`](@ref), and an `mp` whose `alg` is not `nothing`.
+ 1. Refuse an `mp` that is not a [`MatrixProcessing`](@ref), and an `mp` whose `alg` reads the values of the sample.
  2. Run each step of `mp.order` in turn, through the shape methods of [`matrix_processing_step!`](@ref).
 
 # Arguments
@@ -760,7 +805,7 @@ A caller passes `T = nothing` when [`matrix_processing_reads_count`](@ref) answe
 
 # Validation
 
-  - `mp` is a [`MatrixProcessing`](@ref), and `mp.alg` is `nothing`. Otherwise, the method raises an `ArgumentError`.
+  - `mp` is a [`MatrixProcessing`](@ref), and `reads_sample_values(mp.alg)` is `false`. Otherwise, the method raises an `ArgumentError`.
   - `T` is not `nothing` when `mp.dn` is not `nothing`. Otherwise, the denoising step raises an `ArgumentError`.
 
 # Returns
@@ -794,7 +839,7 @@ end
 
 Applies one named matrix processing step to `sigma` in place, from the shape of the sample.
 
-These methods are the shape forms of the matrix methods of [`matrix_processing_step!`](@ref), one method for each step. Only the shape method of [`matrix_processing!`](@ref) calls them. The steps `pdm` and `dt` read `sigma` alone, so they are the same as the matrix methods. The step `dn` takes the ratio `T / N` from the arguments and not from `size(X)`. The step `alg` does nothing, because the caller refuses an `alg` that is not `nothing` before the loop starts.
+These methods are the shape forms of the matrix methods of [`matrix_processing_step!`](@ref), one method for each step. Only the shape method of [`matrix_processing!`](@ref) calls them. The steps `pdm` and `dt` read `sigma` alone, so they are the same as the matrix methods. The step `dn` takes the ratio `T / N` from the arguments and not from `size(X)`. The step `alg` calls `matrix_processing_algorithm!(mp.alg, sigma)` with no sample. The caller refuses an `alg` that reads the values of the sample before the loop starts, so the step gets an `alg` that reads only `sigma`.
 
 A `T` of `nothing` states that the caller read no count, because [`matrix_processing_reads_count`](@ref) answered `false`. The step `dn` then refuses a denoiser that is not `nothing`, because the ratio `T / N` has no value.
 
@@ -848,7 +893,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Applies matrix processing to the finite block of `sigma`, from the shape of the sample and not from the sample.
 
-This is the shape form of [`matrix_processing_block!`](@ref). An incremental fit calls it when it makes the estimate from its state. Its body is the body of the matrix method with one change. The matrix method cuts the columns of `X` to the block, and this method passes the size of the block in their place, because the steps read only the number of those columns.
+This is the shape form of [`matrix_processing_block!`](@ref). An incremental fit calls it when it makes the estimate from its state. Its body is the body of the matrix method with one change. The matrix method cuts the columns of `X` to the block, and this method passes the size of the block in their place, because the steps read only the number of those columns. The matrix method cuts `X` only when the axis of `sigma` is the asset axis, so this method passes the size of the block only then. A cokurtosis matrix has an axis of asset pairs, and its block keeps the `N` assets of the sample, as the matrix method keeps the whole of `X`.
 
 An estimate from the state calls this method, and not the plain one, for the same reason as the [`AssetPanel`](@ref) methods. An estimator fitted over a changing universe gives `NaN` for an asset outside the Coverage Universe. A positive definite repair of a frame that holds such an entry gets a LAPACK error that does not name the cause. A complete matrix has no frame. For it, the body first refuses a non-finite off-diagonal entry with an error that names it, and then runs the plain method on the whole matrix.
 
@@ -858,14 +903,14 @@ An estimate from the state calls this method, and not the plain one, for the sam
  2. Refuse a non-finite entry inside the finite rows with an `IsNonFiniteError`, as the matrix method does.
  3. Set the rows and columns of the zero variances to zero with [`zero_variance_rows!`](@ref), and take the block as the finite rows whose variance is not zero. A zero variance has no correlation, so no step reads it.
  4. When every asset is in the block, run the plain method and return. When no asset is in the block, return `sigma`.
- 5. Otherwise, process the block with the number of assets of the block, and write it back.
+ 5. Otherwise, process the block, and write it back. The block reads the number of assets of the block when `sigma` is on the asset axis, and `N` otherwise.
 
 # Arguments
 
   - $(arg_dict[:omp])
   - $(arg_dict[:sigrho])
   - `T`: The effective number of observations of the fit, or `nothing` when no step reads it.
-  - `N`: The number of assets of the matrix.
+  - `N`: The number of assets of the sample. It is the side of `sigma` for a matrix on the asset axis, and not for a cokurtosis matrix, whose side is `N^2`.
   - `kwargs...`: The keyword arguments for the steps.
 
 # Returns
@@ -896,7 +941,10 @@ function matrix_processing_block!(mp::Option{<:AbstractMatrixProcessingEstimator
         return sigma
     end
     block = sigma[blk, blk]
-    matrix_processing!(mp, block, T, count(blk); kwargs...)
+    # The block cuts the assets only where the axis of the matrix is the asset axis, as the
+    # matrix method cuts the columns of `X`. A cokurtosis matrix is indexed by asset pairs, so
+    # its block keeps the `N` assets of the sample.
+    matrix_processing!(mp, block, T, N == length(blk) ? count(blk) : N; kwargs...)
     sigma[blk, blk] = block
     return sigma
 end
@@ -1083,4 +1131,5 @@ end
 
 export MatrixProcessing, matrix_processing, matrix_processing!
 public AbstractMatrixProcessingEstimator, AbstractMatrixProcessingAlgorithm,
-       matrix_processing_algorithm, matrix_processing_algorithm!, matrix_processing_posdef
+       matrix_processing_algorithm, matrix_processing_algorithm!, matrix_processing_posdef,
+       reads_sample_values

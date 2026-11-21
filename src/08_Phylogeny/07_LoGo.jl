@@ -327,16 +327,55 @@ function LoGo_dist_assert(::AbstractDistanceEstimator, ::MatNum, ::MatNum; dims:
     return nothing
 end
 """
-    logo!(je::LoGo, sigma::MatNum, X::MatNum;
+    LoGo_dist_assert(de::AbstractDistanceEstimator, sigma::MatNum, X::Nothing; dims::Int = 1)
+
+Check that a call of [`logo!`](@ref) with no sample has a distance estimator that reads no value of `X`.
+
+An incremental fit keeps no observation, so the estimate from its state calls [`logo!`](@ref) with `X = nothing`. A distance estimator for which [`reads_sample_values`](@ref) answers `false` computes its distance from the correlation matrix alone, so it passes. Every other distance estimator can read `X`, and the method refuses it with an error that names it, before [`distance`](@ref) gets `nothing`.
+
+# Algorithm
+
+ 1. Pass when `reads_sample_values(de)` is `false`.
+ 2. Otherwise, raise an `IsNothingError`.
+
+# Arguments
+
+  - `de`: The distance estimator of the [`LoGo`](@ref) algorithm.
+  - `sigma`: `N × N` covariance matrix, which the method ignores.
+  - `X`: `nothing`, because the call has no sample.
+  - $(arg_dict[:dims]) The method ignores it.
+
+# Validation
+
+  - `reads_sample_values(de)` is `false`. Otherwise, the method raises an `IsNothingError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`reads_sample_values`](@ref)
+  - [`logo!`](@ref)
+"""
+function LoGo_dist_assert(de::AbstractDistanceEstimator, ::MatNum, ::Nothing; dims::Int = 1)
+    @argcheck(!reads_sample_values(de),
+              IsNothingError("`X` is `nothing`, and the distance estimator `$(nameof(typeof(de)))` of the `LoGo` can read the values of the sample. Pass the sample `X`, or use a distance that reads the correlation matrix alone, such as `CanonicalDistance()`. A distance estimator or a distance algorithm of your own states that with a method of `PortfolioOptimisers.reads_sample_values` that returns `false`."))
+    return nothing
+end
+"""
+    logo!(je::LoGo, sigma::MatNum, X::Option{<:MatNum} = nothing;
           dims::Int = 1, kwargs...)
 
 Write the LoGo (Local-Global) covariance matrix into `sigma`.
 
 The method builds a Triangulated Maximally Filtered Graph (TMFG) on a similarity matrix of the assets. It computes the LoGo precision matrix from the clique and separator blocks of `sigma`, and it writes the inverse of that precision matrix into `sigma`. When `je.pdm` is not `nothing`, [`posdef!`](@ref) then repairs `sigma` to the nearest positive definite matrix.
 
+`X` is optional when [`reads_sample_values`](@ref) answers `false` for `je.de`, because its distance then reads the correlation matrix alone. The estimate from the state of an incremental fit calls the method with no sample, as [`reads_sample_values`](@ref) states.
+
 # Algorithm
 
- 1. Check that `sigma` is square. Check with [`LoGo_dist_assert`](@ref) that the asset axis of `X` has the size of `sigma`.
+ 1. Check that `sigma` is square. Check with [`LoGo_dist_assert`](@ref) that the asset axis of `X` has the size of `sigma`, or, with no `X`, that `je.de` reads no value of `X`.
  2. Read the diagonal of `sigma` into `s`. When an entry of `s` is not one, `sigma` is a covariance matrix. Then replace `s` with its square roots, and get the correlation matrix `S` with `StatsBase.cov2cor`. `sigma` stays a covariance matrix, and step 6 decomposes it.
  3. Take the distance matrix `D` from `S` and `X` with `je.de`. Check with [`assert_similarity_domain`](@ref) that `D` lies in the domain that `je.sim` needs.
  4. Map `D` to the non-negative similarity `S` with `je.sim`, through [`distance_to_similarity`](@ref).
@@ -348,7 +387,7 @@ The method builds a Triangulated Maximally Filtered Graph (TMFG) on a similarity
 
   - `je`: The LoGo algorithm.
   - `sigma`: `N × N` covariance or correlation matrix. The method writes the LoGo covariance matrix into it.
-  - `X`: `T × N` data matrix when `dims` is `1`, and `N × T` when `dims` is `2`.
+  - `X`: `T × N` data matrix when `dims` is `1`, and `N × T` when `dims` is `2`, or `nothing` for no sample.
   - $(arg_dict[:dims])
   - `kwargs...`: Keyword arguments that the method passes to [`distance`](@ref).
 
@@ -356,6 +395,7 @@ The method builds a Triangulated Maximally Filtered Graph (TMFG) on a similarity
 
   - `size(sigma, 1) == size(sigma, 2)`.
   - The asset axis of `X` has `size(sigma, 1)` entries, when `je.de` reads `X`. [`LoGo_dist_assert`](@ref) holds this check, and it has a method for the variation-of-information estimators alone. Every other distance estimator takes the method on `AbstractDistanceEstimator`, which does nothing. Thus a default `LoGo()` accepts a `20 × 20` `sigma` with a `400 × 10` `X` and raises no error, because [`CanonicalDistance`](@ref) derives the distance from the correlation matrix and does not read `X`.
+  - With `X = nothing`, `reads_sample_values(je.de)` is `false`. Otherwise, [`LoGo_dist_assert`](@ref) raises an `IsNothingError`.
 
 # Returns
 
@@ -366,11 +406,13 @@ The method builds a Triangulated Maximally Filtered Graph (TMFG) on a similarity
   - [`LoGo`](@ref)
   - [`J_LoGo`](@ref)
   - [`LoGo_dist_assert`](@ref)
+  - [`reads_sample_values`](@ref)
   - [`PMFG_T2s`](@ref)
   - [`distance_to_similarity`](@ref)
   - [`Posdef`](@ref)
 """
-function logo!(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
+function logo!(je::LoGo, sigma::MatNum, X::Option{<:MatNum} = nothing; dims::Int = 1,
+               kwargs...)
     assert_matrix_issquare(sigma, :sigma)
     LoGo_dist_assert(je.de, sigma, X; dims = dims)
     s = LinearAlgebra.diag(sigma)
@@ -390,7 +432,8 @@ function logo!(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
     return nothing
 end
 """
-    logo(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...) -> MatNum
+    logo(je::LoGo, sigma::MatNum, X::Option{<:MatNum} = nothing; dims::Int = 1,
+         kwargs...) -> MatNum
 
 Return a copy of `sigma` with the LoGo (Local-Global) transformation applied.
 
@@ -406,7 +449,7 @@ This is the out-of-place form of [`logo!`](@ref). It copies `sigma`, and it runs
 
   - `je::LoGo`: The LoGo algorithm.
   - `sigma::MatNum`: `N × N` covariance or correlation matrix. The function does not change it.
-  - `X::MatNum`: `T × N` returns data matrix when `dims` is `1`, and `N × T` when `dims` is `2`.
+  - `X::Option{<:MatNum}`: `T × N` returns data matrix when `dims` is `1`, and `N × T` when `dims` is `2`, or `nothing` for no sample, as in [`logo!`](@ref).
   - $(arg_dict[:dims])
   - `kwargs...`: Keyword arguments that [`logo!`](@ref) passes to [`distance`](@ref).
 
@@ -424,20 +467,21 @@ This is the out-of-place form of [`logo!`](@ref). It copies `sigma`, and it runs
   - [`LoGo`](@ref)
   - [`J_LoGo`](@ref)
 """
-function logo(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
+function logo(je::LoGo, sigma::MatNum, X::Option{<:MatNum} = nothing; dims::Int = 1,
+              kwargs...)
     sigma = copy(sigma)
     logo!(je, sigma, X; dims = dims, kwargs...)
     return sigma
 end
 """
     matrix_processing_algorithm!(je::LoGo, sigma::MatNum,
-                                 X::MatNum; dims::Int = 1, kwargs...)
+                                 X::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Apply the LoGo (Local-Global) transformation to `sigma` in place, as the `:alg` step of [`matrix_processing!`](@ref).
 
 The method runs [`logo!`](@ref) on `sigma` and returns `sigma`. When `je.pdm` is not `nothing`, [`logo!`](@ref) repairs the result to the nearest positive definite matrix.
 
-[`LoGo`](@ref) satisfies the contract of the [`AbstractMatrixProcessingAlgorithm`](@ref) family with this method. The pipeline calls `matrix_processing_algorithm!(alg, sigma, X; kwargs...)` on its algorithm, the algorithm writes into `sigma`, and the method returns `sigma`. `src/04_MatrixProcessing/04_MatrixProcessing.jl` holds the family, and this file declares one method of it.
+[`LoGo`](@ref) satisfies the contract of the [`AbstractMatrixProcessingAlgorithm`](@ref) family with this method. The pipeline calls `matrix_processing_algorithm!(alg, sigma, X; kwargs...)` on its algorithm, the algorithm writes into `sigma`, and the method returns `sigma`. The estimate from the state of an incremental fit calls `matrix_processing_algorithm!(alg, sigma)` with no sample, when [`reads_sample_values`](@ref) answers `false`. `src/04_MatrixProcessing/04_MatrixProcessing.jl` holds the family, and this file declares one method of it.
 
 # Algorithm
 
@@ -448,7 +492,7 @@ The method runs [`logo!`](@ref) on `sigma` and returns `sigma`. When `je.pdm` is
 
   - `je`: The LoGo algorithm. Its field `pdm` holds the positive definite repair, so the method takes no `pdm` argument.
   - `sigma`: `N × N` covariance or correlation matrix. The method writes the result into it.
-  - `X`: `T × N` data matrix when `dims` is `1`, and `N × T` when `dims` is `2`.
+  - `X`: `T × N` data matrix when `dims` is `1`, and `N × T` when `dims` is `2`, or `nothing` for no sample, as in [`logo!`](@ref).
   - $(arg_dict[:dims])
   - `kwargs...`: Keyword arguments that [`logo!`](@ref) passes to [`distance`](@ref).
 
@@ -467,10 +511,40 @@ The method runs [`logo!`](@ref) on `sigma` and returns `sigma`. When `je.pdm` is
   - [`Posdef`](@ref)
   - [`AbstractMatrixProcessingAlgorithm`](@ref)
 """
-function matrix_processing_algorithm!(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1,
+function matrix_processing_algorithm!(je::LoGo, sigma::MatNum,
+                                      X::Option{<:MatNum} = nothing; dims::Int = 1,
                                       kwargs...)
     logo!(je, sigma, X; dims = dims, kwargs...)
     return sigma
+end
+"""
+    reads_sample_values(je::LoGo) -> Bool
+
+[`LoGo`](@ref) method of [`reads_sample_values`](@ref).
+
+[`logo!`](@ref) reads `X` only through its distance estimator `je.de`, so the method gives the answer of `je.de`. A [`Distance`](@ref) or a [`DistanceDistance`](@ref) whose algorithm reads the correlation matrix alone answers `false`, and an incremental fit runs the step from its state. The default `LoGo()`, with [`CanonicalDistance`](@ref), is one of them. A [`VariationInfoDistance`](@ref) reads the values of `X`, and a [`FeatureDistance`](@ref) reads a panel, so both answer `true`. A distance estimator or a distance algorithm of your own answers `true` unless it adds a method that answers `false`.
+
+# Algorithm
+
+ 1. Return `reads_sample_values(je.de)`.
+
+# Arguments
+
+  - `je`: The LoGo algorithm.
+
+# Returns
+
+  - `flag::Bool`: `true` when `je.de` can read the values of `X`.
+
+# Related
+
+  - [`reads_sample_values`](@ref)
+  - [`AbstractDistanceEstimator`](@ref)
+  - [`AbstractDistanceAlgorithm`](@ref)
+  - [`LoGo_dist_assert`](@ref)
+"""
+function reads_sample_values(je::LoGo)
+    return reads_sample_values(je.de)
 end
 
 export LoGo

@@ -1,5 +1,5 @@
 ```@meta
-Description = "Coskewness, private API of PortfolioOptimisers.jl: negative_spectral_coskewness, negative_spectral_part, _coskewness."
+Description = "Coskewness, private API of PortfolioOptimisers.jl: negative_spectral_coskewness, negative_spectral_part, negative_spectral_processing!, _coskewness."
 ```
 
 # Coskewness: private API
@@ -7,6 +7,7 @@ Description = "Coskewness, private API of PortfolioOptimisers.jl: negative_spect
 ```@docs
 negative_spectral_coskewness
 negative_spectral_part
+negative_spectral_processing!
 _coskewness
 ```
 

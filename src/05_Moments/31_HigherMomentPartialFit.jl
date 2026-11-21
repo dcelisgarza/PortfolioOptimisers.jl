@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Partial-fit state of a [`Coskewness`](@ref) estimator under [`FullMoment`](@ref).
 
-The state carries the running count, the running mean and the running second and third central co-moment accumulators. The third accumulator is the answer the estimator reports, and the second one is there because the update of the third reads it: a new observation moves the centre, and every past third co-moment is corrected by a term in the second one.
+The state carries the running count, the running mean and the running second and third central co-moment accumulators. The estimator reports the third accumulator. The state keeps the second one because the update of the third reads it. A new observation moves the centre, and the update corrects every past third co-moment by a term in the second one.
 
 This type is an implementation detail and is not intended for direct use. [`partial_fit!`](@ref) writes it, [`coskewness`](@ref) reads it, and [`merge_states`](@ref) folds two of them.
 
@@ -42,9 +42,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Partial-fit state of a [`Cokurtosis`](@ref) estimator under [`FullMoment`](@ref).
 
-The state carries the running count, the running mean and the running second, third and fourth central co-moment accumulators. The fourth accumulator is the answer the estimator reports. The second and the third are there because the update of the fourth reads both: a new observation moves the centre, and every past fourth co-moment is corrected by terms in the third and in the second.
+The state carries the running count, the running mean and the running second, third and fourth central co-moment accumulators. The estimator reports the fourth accumulator. The state keeps the second and the third because the update of the fourth reads both. A new observation moves the centre, and the update corrects every past fourth co-moment by terms in the third and in the second.
 
-`M4` is `assets² × assets²`, so the state is the largest object of the incremental fit. At 100 assets it holds 10⁸ entries, which is 800 MB in double precision. The incremental fit trades that memory for the recomputation it removes, and a caller who cannot pay it runs the batch verb instead.
+`M4` is `assets² × assets²`, so the state is the largest object of the incremental fit. At 100 assets it holds 10⁸ entries, which is 800 MB in double precision. The incremental fit pays that memory to read each observation once. A caller who cannot pay it runs the batch verb instead.
 
 This type is an implementation detail and is not intended for direct use. [`partial_fit!`](@ref) writes it, [`cokurtosis`](@ref) reads it, and [`merge_states`](@ref) folds two of them.
 
@@ -87,9 +87,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Builds the count, the mean and the central co-moment accumulators of one block of observations.
 
-The accumulators are the numerators of the batch verbs: `M2` divided by `n` is the covariance the batch route computes, `M3` divided by `n` is the coskewness tensor, and `transpose(z) * z` divided by `n` is the cokurtosis matrix. The block of one observation has a mean equal to that observation and three accumulators of zero, which is what makes one `partial_fit!` per row the Welford update.
+The accumulators are the numerators of the batch verbs. `M2` divided by `n` is the covariance with the divisor `n`, `M3` divided by `n` is the coskewness tensor, and `transpose(z) * z` divided by `n` is the cokurtosis matrix. The block of one observation has a mean equal to that observation and three accumulators of zero. So one `partial_fit!` per row is the update of one observation, Corollary 2.2 of [pebay2008](@cite).
 
-A pair of assets ``(p, q)`` is one column of the third accumulator and one row or column of the fourth, at position ``(p - 1) N + q``, with `p` the slow index and `q` the fast one. That is the ordering `kron(o, Y) ⊙ kron(Y, o)` produces, so nothing is transposed between the incremental route and the batch one.
+A pair of assets ``(p, q)`` is one column of the third accumulator and one row or column of the fourth, at position ``(p - 1) N + q``, with `p` the slow index and `q` the fast one. The batch verbs build `z` with the same `kron(o, Y) ⊙ kron(Y, o)`, so the incremental route and the batch route order the pairs in the same way.
 
 # Algorithm
 
@@ -108,9 +108,13 @@ A pair of assets ``(p, q)`` is one column of the third accumulator and one row o
 
 # Related
 
-  - [`shift_comoment3`](@ref)
-  - [`shift_comoment4`](@ref)
+  - [`shift_comoment3!`](@ref)
+  - [`shift_comoment4!`](@ref)
   - [`partial_fit!`](@ref)
+
+# References
+
+  - $(ref_dict[:pebay2008]) Corollary 2.2, page 10.
 """
 function comoment_block(X::MatNum)
     n = size(X, 1)
@@ -125,11 +129,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Moves the third central co-moment accumulator of one block from its own mean to a shifted centre.
 
-This is the whole mathematics of the higher-moment incremental fit, and both [`partial_fit!`](@ref) and [`merge_states`](@ref) reach it. A block records its co-moments about its own mean. Two blocks folded into one have a common mean that is neither of theirs, so each block's accumulator is first moved to the common centre and the two are then added. The one-observation update is the same operation with a block of one row, whose accumulators are zero.
+[`partial_fit!`](@ref) and [`merge_states`](@ref) both reach this shift, and with [`shift_comoment4!`](@ref) it is the whole of the higher-moment merge. A block records its co-moments about its own mean. Two blocks folded into one have a common mean that differs from both, so the merge moves the accumulator of each block to the common centre and then adds the two. The update of one observation is the same operation with a block of one row, whose accumulators are zero.
 
 # Mathematical definition
 
-Write ``y_{ti} = x_{ti} - \\mu_i`` for the deviations of the block about its own mean, and let the centre move to ``\\mu + a``. The deviations become ``y_{ti} - a_i``, and the sum of the deviations about the block's own mean is zero. Expanding the product of three shifted deviations and dropping every term that carries a lone ``\\sum_t y_t`` gives
+Write ``y_{ti} = x_{ti} - \\mu_i`` for the deviations of the block about its own mean, and let the centre move to ``\\mu + a``. The deviations become ``y_{ti} - a_i``, and the sum of the deviations about the block's own mean is zero. The expansion of the product of three shifted deviations, without each term that carries a lone ``\\sum_t y_t``, gives
 
 ```math
 \\begin{align}
@@ -143,47 +147,65 @@ Where:
   - ``a``: displacement of the centre.
   - ``M_2``, ``M_3``: second and third central co-moment accumulators of the block about its own mean.
 
-The three correction terms read the **old** accumulator ``M_2``, so a caller shifts the third accumulator before it overwrites the second one. The scalar case ``N = 1`` is the univariate Welford recursion ``M_3 \\leftarrow M_3 - 3 a M_2 - m a^3``.
+The three correction terms read the **old** accumulator ``M_2``, so a caller shifts the third accumulator before it overwrites the second one. The scalar case ``N = 1`` is ``M_3 \\leftarrow M_3 - 3 a M_2 - m a^3``. That is the term in the first block of Equation 2.6 of [pebay2008](@cite) at ``p = 3``, which states the shift for one series and any order. The expansion above applies the same step to each entry of the co-moment tensor.
+
+The function adds the shifted accumulator into `out`, so a merge writes the two shifted blocks into one array. It takes each entry from `a`, `M2` and `M3` in one loop, and it allocates nothing.
 
 # Algorithm
 
- 1. Form the pairwise product `az` of the displacement with itself, ordered as in [`comoment_block`](@ref).
- 2. Take the three correction terms in the second accumulator, one for each index of the third.
- 3. Subtract them, and subtract the displacement cubed scaled by the block count.
+ 1. Visit each entry ``(k, (p - 1) N + q)`` of `out`, ordered as in [`comoment_block`](@ref).
+ 2. Take the three correction terms in the second accumulator, one for each index of the third, and the displacement cubed scaled by the block count.
+ 3. Add the entry of `M3`, less those terms, to the entry of `out`.
 
 # Arguments
 
+  - `out`: The accumulator to add into, of the shape of `M3`. The function writes into it.
   - `m`: Number of observations in the block.
   - `a`: Displacement of the centre, `assets × 1`.
   - `M2`: Second central co-moment accumulator of the block, about its own mean.
   - `M3`: Third central co-moment accumulator of the block, about its own mean.
 
+# Validation
+
+  - With `N = length(a)`, `size(M2) == (N, N)`, and `size(M3) == size(out) == (N, N^2)`. Otherwise, the function raises a `DimensionMismatch`, before the loop reads an entry under `@inbounds`.
+  - Every array has one-based axes. Otherwise, `Base.require_one_based_indexing` raises an `ArgumentError`.
+
 # Returns
 
-  - `M3::MatNum`: The third accumulator of the same block about the shifted centre.
+  - `out::MatNum`: `out` plus the third accumulator of the same block about the shifted centre.
 
 # Related
 
-  - [`shift_comoment4`](@ref)
+  - [`shift_comoment4!`](@ref)
   - [`comoment_block`](@ref)
   - [`merge_states`](@ref)
+
+# References
+
+  - $(ref_dict[:pebay2008]) Equation 2.6, page 10. $(ref_dict[:no_original_source])
 """
-function shift_comoment3(m::Number, a::VecNum, M2::MatNum, M3::MatNum)
-    at = transpose(a)
-    az = kron(a, a)
-    return M3 .- a * transpose(vec(M2)) .- kron(at, M2) .- kron(M2, at) .-
-           m .* (a * transpose(az))
+function shift_comoment3!(out::MatNum, m::Number, a::VecNum, M2::MatNum, M3::MatNum)
+    N = length(a)
+    Base.require_one_based_indexing(out, a, M2, M3)
+    @argcheck((size(M2), size(M3), size(out)) == ((N, N), (N, N^2), (N, N^2)),
+              DimensionMismatch("`shift_comoment3!` needs `M2` of size $((N, N)), and `M3` and `out` of size $((N, N^2)), for the $N entries of `a`. Got\nsize(M2) => $(size(M2))\nsize(M3) => $(size(M3))\nsize(out) => $(size(out))."))
+    @inbounds for p in 1:N, q in 1:N, k in 1:N
+        c = (p - 1) * N + q
+        out[k, c] += M3[k, c] - a[k] * M2[q, p] - a[p] * M2[k, q] - M2[k, p] * a[q] -
+                     m * a[k] * a[p] * a[q]
+    end
+    return out
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Moves the fourth central co-moment accumulator of one block from its own mean to a shifted centre.
 
-The companion of [`shift_comoment3`](@ref), derived from the same expansion carried one order further. It reads the third and the second accumulator of the block, so a caller shifts the fourth one first.
+The companion of [`shift_comoment3!`](@ref), derived from the same expansion carried one order further. It reads the third and the second accumulator of the block, so a caller shifts the fourth one first.
 
 # Mathematical definition
 
-With the notation of [`shift_comoment3`](@ref), expanding the product of four shifted deviations and dropping every term that carries a lone ``\\sum_t y_t`` gives
+With the notation of [`shift_comoment3!`](@ref), the expansion of the product of four shifted deviations, without each term that carries a lone ``\\sum_t y_t``, gives
 
 ```math
 \\begin{align}
@@ -201,53 +223,77 @@ Where:
   - ``a``: displacement of the centre.
   - ``M_2``, ``M_3``, ``M_4``: second, third and fourth central co-moment accumulators of the block about its own mean.
 
-The four third-order terms are one per index, and the six second-order terms are one per pair of indices. Both accumulators are fully symmetric in their indices, so each term is one Kronecker product of the displacement with the accumulator. The scalar case ``N = 1`` is the univariate Welford recursion ``M_4 \\leftarrow M_4 - 4 a M_3 + 6 a^2 M_2 + m a^4``.
+The four third-order terms are one per index, and the six second-order terms are one per pair of indices. The scalar case ``N = 1`` is ``M_4 \\leftarrow M_4 - 4 a M_3 + 6 a^2 M_2 + m a^4``, the term in the first block of Equation 2.6 of [pebay2008](@cite) at ``p = 4``. That equation states the shift for one series, and the expansion above applies the same step to each entry of the co-moment tensor.
+
+The function adds the shifted accumulator into `out`, so a merge writes the two shifted blocks into one array of the size of `M4`. It takes each entry from `a`, `M2` and `M3` in one loop. Its one allocation is a transposed copy of `M3`, of `assets³` entries, so that the loop reads both forms of the third-order term down a column. At 30 assets, the copy makes the call 23 % faster. A form that builds each of the ten terms as an `assets² × assets²` array allocated 68 MiB per call.
 
 # Algorithm
 
- 1. Form the pairwise product `az` of the displacement with itself, and the outer product `aa`.
- 2. Subtract the four third-order terms, one for each index of the fourth accumulator.
- 3. Add the six second-order terms, one for each pair of indices.
- 4. Add the displacement to the fourth power, scaled by the block count.
+ 1. Transpose `M3`. Then visit each entry ``((p - 1) N + q, (r - 1) N + s)`` of `out`, ordered as in [`comoment_block`](@ref).
+ 2. Take the four third-order terms, one for each index of the fourth accumulator.
+ 3. Take the six second-order terms, one for each pair of indices, and the displacement to the fourth power scaled by the block count.
+ 4. Add the entry of `M4`, less the third-order terms and plus the others, to the entry of `out`.
 
 # Arguments
 
+  - `out`: The accumulator to add into, of the shape of `M4`. The function writes into it.
   - `m`: Number of observations in the block.
   - `a`: Displacement of the centre, `assets × 1`.
   - `M2`: Second central co-moment accumulator of the block, about its own mean.
   - `M3`: Third central co-moment accumulator of the block, about its own mean.
   - `M4`: Fourth central co-moment accumulator of the block, about its own mean.
 
+# Validation
+
+  - With `N = length(a)`, `size(M2) == (N, N)`, `size(M3) == (N, N^2)`, and `size(M4) == size(out) == (N^2, N^2)`. Otherwise, the function raises a `DimensionMismatch`, before the loop reads an entry under `@inbounds`.
+  - Every array has one-based axes. Otherwise, `Base.require_one_based_indexing` raises an `ArgumentError`.
+
 # Returns
 
-  - `M4::MatNum`: The fourth accumulator of the same block about the shifted centre.
+  - `out::MatNum`: `out` plus the fourth accumulator of the same block about the shifted centre.
 
 # Related
 
-  - [`shift_comoment3`](@ref)
+  - [`shift_comoment3!`](@ref)
   - [`comoment_block`](@ref)
   - [`merge_states`](@ref)
+
+# References
+
+  - $(ref_dict[:pebay2008]) Equation 2.6, page 10. $(ref_dict[:no_original_source])
 """
-function shift_comoment4(m::Number, a::VecNum, M2::MatNum, M3::MatNum, M4::MatNum)
-    at = transpose(a)
-    aa = a * at
-    az = kron(a, a)
-    v2 = vec(M2)
-    M3t = transpose(M3)
-    cross = kron(a, kron(M2, at))
-    return M4 .- kron(a, M3) .- kron(M3, a) .- kron(at, M3t) .- kron(M3t, at) .+
-           az * transpose(v2) .+ v2 * transpose(az) .+ kron(aa, M2) .+ kron(M2, aa) .+
-           cross .+ transpose(cross) .+ m .* (az * transpose(az))
+function shift_comoment4!(out::MatNum, m::Number, a::VecNum, M2::MatNum, M3::MatNum,
+                          M4::MatNum)
+    N = length(a)
+    Base.require_one_based_indexing(out, a, M2, M3, M4)
+    @argcheck((size(M2), size(M3), size(M4), size(out)) ==
+              ((N, N), (N, N^2), (N^2, N^2), (N^2, N^2)),
+              DimensionMismatch("`shift_comoment4!` needs `M2` of size $((N, N)), `M3` of size $((N, N^2)), and `M4` and `out` of size $((N^2, N^2)), for the $N entries of `a`. Got\nsize(M2) => $(size(M2))\nsize(M3) => $(size(M3))\nsize(M4) => $(size(M4))\nsize(out) => $(size(out))."))
+    M3t = permutedims(M3)
+    @inbounds for r in 1:N, s in 1:N, p in 1:N, q in 1:N
+        i = (p - 1) * N + q
+        j = (r - 1) * N + s
+        ap, aq, ar, as = a[p], a[q], a[r], a[s]
+        t3 = ap * M3[q, j] + aq * M3[p, j] + ar * M3t[i, s] + as * M3t[i, r]
+        t2 = ap * aq * M2[s, r] +
+             ar * as * M2[q, p] +
+             ap * ar * M2[q, s] +
+             aq * as * M2[p, r] +
+             ap * as * M2[q, r] +
+             aq * ar * M2[s, p]
+        out[i, j] += M4[i, j] - t3 + t2 + m * ap * aq * ar * as
+    end
+    return out
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Refuses an estimator whose configuration no incremental fit reproduces, naming the field that refuses it.
 
-A partial fit keeps the running sample mean and the central co-moments about it, and nothing else of the sample. Two configuration choices break that, and both are refused rather than approximated.
+A partial fit keeps the running sample mean and the central co-moments about it, and nothing else of the sample. Two configuration choices break that. The function refuses both, and it does not approximate either.
 
   - **Observation weights.** A weights vector describes a sample of a fixed length, and a [`DynamicAbstractWeights`](@ref) derives every weight from the length of the sample. Either way a new observation reweights every past one, so no state written before it is still valid.
-  - **A mean estimator that is not the plain sample mean.** The state carries the running sample mean, so an estimator whose centre is a shrunk, a median or a custom value would be centred on a quantity the state does not hold.
+  - **A mean estimator that is not the plain sample mean.** The state carries the running sample mean. An estimator whose centre is a shrunk mean, a median or a custom value needs a centre that the state does not hold.
 
 An estimator that carries no centring field hands over `nothing`, which the `Nothing` method reads as [`SimpleExpectedReturns`](@ref), because that is the centre such an estimator takes.
 
@@ -292,7 +338,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds two [`CoskewnessPartialFitState`](@ref) fitted on disjoint blocks into the state of the concatenated block.
 
-The count, the mean and the second accumulator take Chan's merge. The third accumulator is moved to the common mean one block at a time, with [`shift_comoment3`](@ref), and the two shifted accumulators are added.
+The count, the mean and the second accumulator take the merge of [`chan_merge`](@ref). [`shift_comoment3!`](@ref) moves the third accumulator of each block to the common mean, and it adds the two shifted accumulators into one array. For one series, the result is Proposition 2.1 of [pebay2008](@cite) at ``p = 3``.
 
 # Algorithm
 
@@ -317,14 +363,19 @@ The count, the mean and the second accumulator take Chan's merge. The third accu
 # Related
 
   - [`CoskewnessPartialFitState`](@ref)
-  - [`shift_comoment3`](@ref)
+  - [`shift_comoment3!`](@ref)
   - [`chan_merge`](@ref)
+
+# References
+
+  - $(ref_dict[:pebay2008]) Proposition 2.1, page 10. $(ref_dict[:no_original_source])
 """
 function merge_states(a::CoskewnessPartialFitState, b::CoskewnessPartialFitState)
     assert_mergeable_states(a, b)
     n, mu, M2 = chan_merge(a.n, a.mu, a.M2, b.n, b.mu, b.M2)
-    M3 = shift_comoment3(a.n, mu .- a.mu, a.M2, a.M3) .+
-         shift_comoment3(b.n, mu .- b.mu, b.M2, b.M3)
+    M3 = zeros(promote_type(eltype(mu), eltype(a.M3), eltype(b.M3)), size(a.M3))
+    shift_comoment3!(M3, a.n, mu .- a.mu, a.M2, a.M3)
+    shift_comoment3!(M3, b.n, mu .- b.mu, b.M2, b.M3)
     return CoskewnessPartialFitState(n, mu, M2, M3)
 end
 """
@@ -332,7 +383,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Copies a [`CoskewnessPartialFitState`](@ref), so the copy shares no array with the original.
 
-The `copy` method of the [`AbstractPartialFitState`](@ref) interface. The count is a scalar and passes through, and the running mean and the two accumulators are copied. This family overrides [`partial_fit`](@ref), so the value form of that interface never calls this method on it, and a caller who copies a state by hand still gets one.
+The `copy` method of the [`AbstractPartialFitState`](@ref) interface. The count is a scalar and passes through, and the method copies the running mean and the two accumulators. This family overrides [`partial_fit`](@ref), so the value form of that interface never calls this method on it. A caller who copies a state by hand still gets a copy.
 
 # Arguments
 
@@ -358,7 +409,7 @@ Slices a [`CoskewnessPartialFitState`](@ref) to the selected assets.
 
 A third co-moment reads three assets' observations and no fourth, so the sub-tensor over a subset of assets is the state of that subset, entry for entry, and the count passes through. `M3` is `assets × assets²`, and its column for the pair ``(p, q)`` is ``(p - 1) N + q``, so the slice keeps the rows `i` and the columns of every pair drawn from `i`. [`fourth_moment_index_generator`](@ref) builds that column set, in the order the sliced universe numbers its own pairs.
 
-The slice copies by index and does not `view`, so a later [`partial_fit!`](@ref) on the viewed estimator writes into arrays of its own. The copy is small: a cluster's sub-tensor is cubic in the cluster size, where the full one is cubic in the universe size.
+The slice copies by index and does not `view`, so a later [`partial_fit!`](@ref) on the viewed estimator writes into arrays of its own. The copy is small. A cluster's sub-tensor is cubic in the cluster size, and the full one is cubic in the universe size.
 
 # Arguments
 
@@ -386,7 +437,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds two [`CokurtosisPartialFitState`](@ref) fitted on disjoint blocks into the state of the concatenated block.
 
-The companion of the [`CoskewnessPartialFitState`](@ref) merge, carried one order further. The fourth accumulator is shifted before the third, because [`shift_comoment4`](@ref) reads the third accumulator of the block about its own mean.
+The companion of the [`CoskewnessPartialFitState`](@ref) merge, one order higher. The merge shifts the fourth accumulator before the third, because [`shift_comoment4!`](@ref) reads the third accumulator of the block about its own mean. For one series, the result is Proposition 2.1 of [pebay2008](@cite) at ``p = 4``.
 
 # Algorithm
 
@@ -412,17 +463,24 @@ The companion of the [`CoskewnessPartialFitState`](@ref) merge, carried one orde
 # Related
 
   - [`CokurtosisPartialFitState`](@ref)
-  - [`shift_comoment4`](@ref)
+  - [`shift_comoment4!`](@ref)
   - [`chan_merge`](@ref)
+
+# References
+
+  - $(ref_dict[:pebay2008]) Proposition 2.1, page 10. $(ref_dict[:no_original_source])
 """
 function merge_states(a::CokurtosisPartialFitState, b::CokurtosisPartialFitState)
     assert_mergeable_states(a, b)
     n, mu, M2 = chan_merge(a.n, a.mu, a.M2, b.n, b.mu, b.M2)
     da = mu .- a.mu
     db = mu .- b.mu
-    M4 = shift_comoment4(a.n, da, a.M2, a.M3, a.M4) .+
-         shift_comoment4(b.n, db, b.M2, b.M3, b.M4)
-    M3 = shift_comoment3(a.n, da, a.M2, a.M3) .+ shift_comoment3(b.n, db, b.M2, b.M3)
+    M4 = zeros(promote_type(eltype(mu), eltype(a.M4), eltype(b.M4)), size(a.M4))
+    shift_comoment4!(M4, a.n, da, a.M2, a.M3, a.M4)
+    shift_comoment4!(M4, b.n, db, b.M2, b.M3, b.M4)
+    M3 = zeros(promote_type(eltype(mu), eltype(a.M3), eltype(b.M3)), size(a.M3))
+    shift_comoment3!(M3, a.n, da, a.M2, a.M3)
+    shift_comoment3!(M3, b.n, db, b.M2, b.M3)
     return CokurtosisPartialFitState(n, mu, M2, M3, M4)
 end
 """
@@ -430,7 +488,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Copies a [`CokurtosisPartialFitState`](@ref), so the copy shares no array with the original.
 
-The `copy` method of the [`AbstractPartialFitState`](@ref) interface. The count is a scalar and passes through, and the running mean and the three accumulators are copied. `M4` is `assets² × assets²`, so this method is the expensive one of that interface, and it is why the family overrides [`partial_fit`](@ref) rather than paying the copy on every fold.
+The `copy` method of the [`AbstractPartialFitState`](@ref) interface. The count is a scalar and passes through, and the method copies the running mean and the three accumulators. `M4` is `assets² × assets²`, so this method is the expensive one of that interface. That is why the family overrides [`partial_fit`](@ref), which would pay this copy on every fold.
 
 # Arguments
 
@@ -456,7 +514,7 @@ Slices a [`CokurtosisPartialFitState`](@ref) to the selected assets.
 
 A fourth co-moment reads four assets' observations and no fifth, so the sub-tensor over a subset of assets is the state of that subset, entry for entry, and the count passes through. `M4` is `assets² × assets²`, and both of its axes are numbered by the pair ``(p, q)`` at ``(p - 1) N + q``, so the slice keeps the columns of every pair drawn from `i` on both axes. `M3` keeps the rows `i` and the same column set.
 
-The slice copies by index and does not `view`, so a later [`partial_fit!`](@ref) on the viewed estimator writes into arrays of its own. The copy is small next to the state it comes from: a cluster's sub-tensor is quartic in the cluster size, so ten clusters of ten assets copy 80 KB each out of the 800 MB a hundred-asset state holds.
+The slice copies by index and does not `view`, so a later [`partial_fit!`](@ref) on the viewed estimator writes into arrays of its own. The copy is small next to the state it comes from. A cluster's sub-tensor is quartic in the cluster size, so ten clusters of ten assets copy 80 KB each out of the 800 MB that a hundred-asset state holds.
 
 # Arguments
 
@@ -484,13 +542,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds a block of observations into the partial-fit state of a [`Coskewness`](@ref) estimator under [`FullMoment`](@ref).
 
-The estimator that carries no state adopts the block's state. The estimator that carries one merges the two, so the state after any sequence of blocks is the state of the concatenated sample. One row per call is the Welford update, and it is exact: the block of one observation carries zero accumulators, and the whole correction is the shift of the running state to the new mean.
+The estimator that carries no state adopts the block's state. The estimator that carries one merges the two, so the state after any sequence of blocks is the state of the concatenated sample. One row per call is exact. The block of one observation carries zero accumulators, and the whole correction is the shift of the running state to the new mean.
 
-The method builds a new state rather than writing into the arrays of the old one, because the merge of two blocks is written once and shared with [`merge_states`](@ref). No caller may rely on that: the verb promises nothing about an estimator kept from before the call, and [`partial_fit`](@ref) is the verb that does. This family is the one that overrides [`partial_fit`](@ref), because a copy of the state it never writes into buys nothing.
+The method builds a new state and does not write into the arrays of the old one, because [`merge_states`](@ref) holds the one merge of two blocks. A caller must not rely on that. The verb promises nothing about an estimator kept from before the call, and [`partial_fit`](@ref) is the verb that does. This family overrides [`partial_fit`](@ref), because a copy of a state that the fold never writes into buys nothing.
+
+The state keeps no observation, so `coskewness(ske)` runs `ske.mp` from the shape of the sample, with no sample. The steps `:pdm`, `:dn` and `:dt` of a [`MatrixProcessing`](@ref) read no value of the sample. An `:alg` step can read the values, as [`LoGo`](@ref) does under a variation of information distance, and [`reads_sample_values`](@ref) states whether it does. So the method refuses an `mp` that does not run from the shape of the sample, before it folds a row. [`Online`](@ref) keeps the observations and runs such a step. The default `LoGo()` reads no value of the sample, so it folds.
 
 # Algorithm
 
- 1. Refuse the configuration no incremental fit reproduces, with [`assert_partial_fittable`](@ref).
+ 1. Refuse the configuration no incremental fit reproduces, with [`assert_partial_fittable`](@ref) and [`assert_shape_only_matrix_processing`](@ref).
  2. Orient `X` to observations × assets with [`dims_oriented`](@ref), which validates `dims`, and write `NaN` in each cell that `active_mask` turns off with [`inactive_as_nonfinite`](@ref). Return the estimator unchanged when the block holds no observation, because the fold of an empty sample is the identity, and the mean of an empty block is `NaN`, which the merge would carry into every accumulator.
  3. Build the state of the block alone, with [`comoment_block`](@ref).
  4. Merge it into the state the estimator carries, unless the estimator carries none.
@@ -506,6 +566,7 @@ The method builds a new state rather than writing into the arrays of the old one
 # Validation
 
   - `ske.w` is `nothing` and `ske.me` is an unweighted [`SimpleExpectedReturns`](@ref).
+  - `ske.mp` runs from the shape of the sample, as [`assert_shape_only_matrix_processing`](@ref) states. An `ArgumentError` is thrown otherwise.
   - `dims` is either `1` or `2`.
   - A state already held has the asset count of `X`.
 
@@ -546,6 +607,7 @@ function partial_fit!(ske::Coskewness{<:Any, <:Any, <:FullMoment, <:Any, Nothing
                       dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing)
     assert_partial_fittable(ske.me, ske.w, "Coskewness")
+    assert_shape_only_matrix_processing(ske.mp)
     X = inactive_as_nonfinite(dims_oriented(dims, X), dims_oriented(dims, active_mask))
     if iszero(size(X, 1))
         return ske
@@ -594,7 +656,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 [`Coskewness`](@ref) method of [`partial_fit`](@ref). Forwards to [`partial_fit!`](@ref), because the fold already writes into no array of the state it was given.
 
-This is the one family that overrides the generic method. The generic method copies the state before it folds, and a copy is what gives the verb its value semantics. This family's fold reaches [`merge_states`](@ref), which reads the two states and builds a third, so the estimator handed over is already left as it was and the copy buys nothing. The override is kept for a measured loss: at 30 assets, one row takes 0.29 ms and 2.5 MiB through it, and 0.34 ms and 2.7 MiB through the generic method.
+This family overrides the generic method. The generic method copies the state before it folds, and the copy gives the verb its value semantics. The fold of this family reaches [`merge_states`](@ref), which reads the two states and builds a third. So the fold leaves the given estimator as it was, and the copy buys nothing. The override stays for a measured loss. At 30 assets, one row takes 0.11 ms and 0.46 MiB through it, and 0.13 ms and 0.67 MiB through the generic method.
 
 # Algorithm
 
@@ -652,11 +714,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds a block of observations into the partial-fit state of a [`Cokurtosis`](@ref) estimator under [`FullMoment`](@ref).
 
-The companion of the [`Coskewness`](@ref) method, carried one order further. The state it writes is `assets² × assets²` in its largest field, so the memory the incremental fit trades for the recomputation it removes is stated on [`CokurtosisPartialFitState`](@ref). It builds a new state rather than writing into the arrays of the old one, for the reason the [`Coskewness`](@ref) method states, and it overrides [`partial_fit`](@ref) for that reason too.
+The companion of the [`Coskewness`](@ref) method, one order higher. The largest field of the state that it writes is `assets² × assets²`, and [`CokurtosisPartialFitState`](@ref) states the memory that this costs. The method builds a new state and does not write into the arrays of the old one, for the reason that the [`Coskewness`](@ref) method states. It overrides [`partial_fit`](@ref) for the same reason, and it refuses an `mp` that does not run from the shape of the sample for the same reason too.
 
 # Algorithm
 
- 1. Refuse the configuration no incremental fit reproduces, with [`assert_partial_fittable`](@ref).
+ 1. Refuse the configuration no incremental fit reproduces, with [`assert_partial_fittable`](@ref) and [`assert_shape_only_matrix_processing`](@ref).
  2. Orient `X` to observations × assets with [`dims_oriented`](@ref), which validates `dims`, and write `NaN` in each cell that `active_mask` turns off with [`inactive_as_nonfinite`](@ref). Return the estimator unchanged when the block holds no observation, for the reason that the [`Coskewness`](@ref) method states.
  3. Build the state of the block alone, with [`comoment_block`](@ref), and square its pairwise deviation product for the fourth accumulator.
  4. Merge it into the state the estimator carries, unless the estimator carries none.
@@ -672,6 +734,7 @@ The companion of the [`Coskewness`](@ref) method, carried one order further. The
 # Validation
 
   - `kte.w` is `nothing` and `kte.me` is an unweighted [`SimpleExpectedReturns`](@ref).
+  - `kte.mp` runs from the shape of the sample, as [`assert_shape_only_matrix_processing`](@ref) states. An `ArgumentError` is thrown otherwise.
   - `dims` is either `1` or `2`.
   - A state already held has the asset count of `X`.
 
@@ -710,6 +773,7 @@ function partial_fit!(kte::Cokurtosis{<:Any, <:Any, <:FullMoment, <:Any, Nothing
                       dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing)
     assert_partial_fittable(kte.me, kte.w, "Cokurtosis")
+    assert_shape_only_matrix_processing(kte.mp)
     X = inactive_as_nonfinite(dims_oriented(dims, X), dims_oriented(dims, active_mask))
     if iszero(size(X, 1))
         return kte
@@ -758,7 +822,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 [`Cokurtosis`](@ref) method of [`partial_fit`](@ref). Forwards to [`partial_fit!`](@ref), because the fold already writes into no array of the state it was given.
 
-The companion of the [`Coskewness`](@ref) method, and the one that pays for the override. The generic method would copy `M4` before every fold, which is `assets² × assets²`: 800 MB at a hundred assets, per call, for a copy no caller reads. The override is kept for that measured loss: at 30 assets, one row allocates 151 MiB through it, and 158 MiB through the generic method.
+The companion of the [`Coskewness`](@ref) method, and the one that pays for the override. The generic method copies `M4`, which is `assets² × assets²`, before every fold. That is 800 MB per call at a hundred assets, for a copy that no caller reads. The override stays for that measured loss. At 30 assets, one row allocates 13.2 MiB through it, and 19.6 MiB through the generic method.
 
 # Algorithm
 
@@ -818,13 +882,13 @@ Reads the coskewness tensor and its negative spectral skewness matrix out of a p
 
 The method of [`coskewness`](@ref) that makes the estimate from a Partial Fit State. It returns the pair the batch method returns, to machine precision, for the sample the state was fitted on.
 
-Only the shape of that sample survives a partial fit, so the matrix processing estimator is handed a matrix of the right shape whose entries are zero. Of the shipped steps only `:dn` reads it, and it reads only `size(X)`, so the two routes agree. A custom `:alg` step that reads the values of the sample must be run from the batch verb.
+Only the shape of that sample survives a partial fit, so the matrix processing estimator runs from the shape, through the shape method of [`matrix_processing!`](@ref). Of the steps that [`partial_fit!`](@ref) lets through, only `:dn` reads the sample, and `:dn` reads only the ratio `T / N`, which the state keeps. The `:alg` step gets no sample, as in the estimate of a [`PortfolioOptimisersCovariance`](@ref). An `:alg` step that [`partial_fit!`](@ref) lets through reads no value of the sample, as [`reads_sample_values`](@ref) states. So the two routes agree. [`partial_fit!`](@ref) refuses an `:alg` step that can read the values of the sample, and a wrong `false` answer of [`reads_sample_values`](@ref) raises an error here.
 
 # Algorithm
 
  1. Refuse a configuration the state no longer matches, with [`assert_partial_fittable`](@ref). [`factory`](@ref) carries the state and replaces `w`, so an estimator that says weighted may hold a state fitted unweighted. The state stays on the estimator, so a caller who restores `w = nothing` reads it again.
  2. Divide the third accumulator by the observation count, giving the coskewness tensor.
- 3. Reduce it with [`negative_spectral_coskewness`](@ref), under `ske.mp` and the shape of the fitted sample.
+ 3. Reduce it with [`negative_spectral_coskewness`](@ref), under `ske.mp`, with no sample and the observation count of the state.
 
 # Arguments
 
@@ -851,15 +915,14 @@ function coskewness(ske::Coskewness{<:Any, <:Any, <:FullMoment},
                     state::CoskewnessPartialFitState)
     assert_partial_fittable(ske.me, ske.w, "Coskewness")
     cskew = state.M3 ./ state.n
-    shape = SparseArrays.spzeros(eltype(cskew), state.n, length(state.mu))
-    return cskew, negative_spectral_coskewness(cskew, shape, ske.mp)
+    return cskew, negative_spectral_coskewness(cskew, nothing, ske.mp, state.n)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads the coskewness tensor and its negative spectral skewness matrix out of the state the estimator carries.
 
-The one-argument forwarder of [`coskewness`](@ref). It reads `ske.cache`, which [`partial_fit!`](@ref) writes, and refuses an estimator that has been shown no observation.
+The one-argument forwarder of [`coskewness`](@ref). It reads `ske.cache`, which [`partial_fit!`](@ref) writes. It refuses an estimator that has folded no observation.
 
 # Algorithm
 
@@ -896,13 +959,13 @@ Reads the square cokurtosis matrix out of a partial-fit state.
 
 The method of [`cokurtosis`](@ref) that makes the estimate from a Partial Fit State. It returns the matrix the batch method returns, to machine precision, for the sample the state was fitted on.
 
-Only the shape of that sample survives a partial fit, so the matrix processing estimator is handed a matrix of the right shape whose entries are zero. Of the shipped steps only `:dn` reads it, and it reads only `size(X)`, so the two routes agree. A custom `:alg` step that reads the values of the sample must be run from the batch verb.
+Only the shape of that sample survives a partial fit, so the matrix processing estimator runs from the shape, through the shape method of [`matrix_processing_block!`](@ref). Of the steps that [`partial_fit!`](@ref) lets through, only `:dn` reads the sample, and `:dn` reads only the ratio `T / N`, which the state keeps. `N` is the number of assets, and not the `N^2` asset pairs of the side of the matrix, as in the batch verb. The `:alg` step gets no sample, as in the estimate of a [`PortfolioOptimisersCovariance`](@ref). An `:alg` step that [`partial_fit!`](@ref) lets through reads no value of the sample, as [`reads_sample_values`](@ref) states. So the two routes agree. [`partial_fit!`](@ref) refuses an `:alg` step that can read the values of the sample, and a wrong `false` answer of [`reads_sample_values`](@ref) raises an error here.
 
 # Algorithm
 
  1. Refuse a configuration the state no longer matches, with [`assert_partial_fittable`](@ref). [`factory`](@ref) carries the state and replaces `w`, so an estimator that says weighted may hold a state fitted unweighted. The state stays on the estimator, so a caller who restores `w = nothing` reads it again.
  2. Divide the fourth accumulator by the observation count, giving the cokurtosis matrix.
- 3. Process it in place through [`matrix_processing_block!`](@ref), under `kte.mp` and the shape of the fitted sample. It is the block arm rather than the plain one for the reason the low order's `cov(ce)` with no data takes it: a plain fold over a changing universe answers `NaN` for an asset outside the Coverage Universe at every pair naming it, and a positive-definite repair over that frame meets a LAPACK refusal rather than a named error. The block arm repairs the finite block and leaves the frame for [`investable_mask`](@ref) to read, which is what the batch verb's reduce-and-expand leaves it too; a complete matrix runs the plain arm over the whole of it.
+ 3. Process it in place through the shape method of [`matrix_processing_block!`](@ref), under `kte.mp`, the observation count of the state and the number of assets. The method takes the block arm for the reason that `cov(ce)` with no data takes it. A plain fold over a changing universe answers `NaN` at every pair that names an asset outside the Coverage Universe. A positive definite repair over that frame then meets a refusal from LAPACK, not a named error. The block arm repairs the finite block and leaves the frame for [`investable_mask`](@ref) to read, as the reduce-and-expand of the batch verb does. A complete matrix runs the plain arm over the whole of it.
 
 # Arguments
 
@@ -928,8 +991,7 @@ function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:FullMoment},
                     state::CokurtosisPartialFitState)
     assert_partial_fittable(kte.me, kte.w, "Cokurtosis")
     ckurt = state.M4 ./ state.n
-    shape = SparseArrays.spzeros(eltype(ckurt), state.n, length(state.mu))
-    matrix_processing_block!(kte.mp, ckurt, shape)
+    matrix_processing_block!(kte.mp, ckurt, state.n, length(state.mu))
     return ckurt
 end
 """
@@ -937,7 +999,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads the square cokurtosis matrix out of the state the estimator carries.
 
-The one-argument forwarder of [`cokurtosis`](@ref). It reads `kte.cache`, which [`partial_fit!`](@ref) writes, and refuses an estimator that has been shown no observation.
+The one-argument forwarder of [`cokurtosis`](@ref). It reads `kte.cache`, which [`partial_fit!`](@ref) writes. It refuses an estimator that has folded no observation.
 
 # Algorithm
 
@@ -971,7 +1033,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads a coskewness tensor out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
 
-The method of `coskewness` that makes the estimate from a Sample Buffer. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
+The method of `coskewness` that makes the estimate from a Sample Buffer. An estimator wrapped in [`Online`](@ref) carries a buffer and not a family state, so it takes no exact fold. Its estimate is the batch fit over the rows that the buffer holds. An uncapped buffer holds every observation folded so far, and a capped one holds the last `max_history` of them. The method runs no [`assert_partial_fittable`](@ref) check of its own. The batch verb answers configurations that an incremental fold cannot, and a wrapper is the way a caller reaches them. The buffer also holds the mask of each observation that it folded. So the batch verb gets the mask that explains the rows, and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
 
 The call with no data, `coskewness(ske)`, fills `state` with the state that the estimator carries, which [`partial_fit_cache`](@ref) reads out of the `cache` field. The call then goes to the method of `coskewness` for the type of that state. This is the call with no data of an estimator that has no such call of its own. A family that folds exactly has a call with no data of its own, so the default serves the estimators that fold by buffering alone, such as [`WindowedCoskewness`](@ref).
 
@@ -1005,7 +1067,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads a cokurtosis matrix out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
 
-The method of `cokurtosis` that makes the estimate from a Sample Buffer. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
+The method of `cokurtosis` that makes the estimate from a Sample Buffer. An estimator wrapped in [`Online`](@ref) carries a buffer and not a family state, so it takes no exact fold. Its estimate is the batch fit over the rows that the buffer holds. An uncapped buffer holds every observation folded so far, and a capped one holds the last `max_history` of them. The method runs no [`assert_partial_fittable`](@ref) check of its own. The batch verb answers configurations that an incremental fold cannot, and a wrapper is the way a caller reaches them. The buffer also holds the mask of each observation that it folded. So the batch verb gets the mask that explains the rows, and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
 
 The call with no data, `cokurtosis(kte)`, fills `state` with the state that the estimator carries, which [`partial_fit_cache`](@ref) reads out of the `cache` field. The call then goes to the method of `cokurtosis` for the type of that state, as the call with no data of [`coskewness`](@ref) does. The default serves the estimators that fold by buffering alone, such as [`WindowedCokurtosis`](@ref).
 
@@ -1064,13 +1126,13 @@ function Statistics.mean(me::AbstractExpectedReturnsEstimator)
     return Statistics.mean(me, partial_fit_cache(me))
 end
 
-# A co-moment folds under `FullMoment` with no matrix processing on the way in. The
-# `SemiMoment` arm refuses, for the reason `Covariance` does, and a matrix-processing step
-# reads the whole sample; both fall back to the default, which buffers wherever a wrapper
-# gave them a buffer (see [`supports_partial_fit`](@ref)).
-function supports_partial_fit(::Coskewness{<:Any, <:Any, <:FullMoment, <:Any, Nothing})
-    return true
+# A co-moment folds under `FullMoment` with no Coverage Policy, when its `mp` runs from the
+# shape of the sample. The `SemiMoment` arm refuses for the reason that `Covariance` does, and
+# `partial_fit!` refuses an `mp.alg` that reads the values of the sample. Both take the
+# buffer route of the default `supports_partial_fit`, as `PortfolioOptimisersCovariance` does.
+function supports_partial_fit(ske::Coskewness{<:Any, <:Any, <:FullMoment, <:Any, Nothing})
+    return isa(ske.cache, SampleBufferState) || supports_shape_processing(ske.mp)
 end
-function supports_partial_fit(::Cokurtosis{<:Any, <:Any, <:FullMoment, <:Any, Nothing})
-    return true
+function supports_partial_fit(kte::Cokurtosis{<:Any, <:Any, <:FullMoment, <:Any, Nothing})
+    return isa(kte.cache, SampleBufferState) || supports_shape_processing(kte.mp)
 end

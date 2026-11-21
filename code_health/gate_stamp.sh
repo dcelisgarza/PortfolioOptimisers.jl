@@ -8,11 +8,12 @@
 #     code_health/gate_stamp.sh waive <gate> <reason>   push without a required gate, for a reason
 #     code_health/gate_stamp.sh readers <file>          the gates that read a shared ledger file
 #     code_health/gate_stamp.sh reach                   the gates the change of the worktree reaches
+#     code_health/gate_stamp.sh censuses <file>         the prose censuses that read a file
 #     code_health/gate_stamp.sh base [<ref>]            print, or store, the landing base
 #     code_health/gate_stamp.sh check                   the pre-push guard of .pre-commit-config.yaml
 #
 # The landing base is the branch the worktree lands on (ADR 0240): origin/main for a branch of its
-# own, or the shared branch, such as origin/dev-fixes. `base <ref>` stores it in the git directory
+# own, or the shared branch, such as origin/dev. `base <ref>` stores it in the git directory
 # of the worktree, and it defaults to origin/main.
 #
 # A gate measures a tree: the merge-base of the branch with the landing base, plus the branch. When
@@ -46,6 +47,13 @@
 #     scoped run. `docs/doctest_files.jl --against origin/main` runs the blocks of the changed
 #     files, and the full run of `--all` covers it too. A change can alter what a block of another
 #     file prints. The doctest job of CI runs every block and stays the gate for that case.
+#   - A push that changes a text that a prose census reads needs a stamp of that census, whatever
+#     the class of the change. `censuses` names the census files that read a path: the docstrings,
+#     strings and names under src/ and ext/, the pages of the four page corpora, the standards
+#     files, GLOSSARY.md and the prose baseline. Each census runs in seconds, and each one reached
+#     `dev` red when a session changed prose and did not run it (`test_74` on `read-out`).
+#     `test/run_files.jl` records the stamp of a test file only when the file is green, so a red
+#     census does not let the push through. `waive test/<file> <reason>` records a known red.
 #   - `coverage` is required of a `code` change alone. `test/run_files.jl --coverage=<dir>` records
 #     it when the targeted files ran green and no line that the branch adds is a line that CI
 #     reads as a miss (#1912, ADR 0082). A line that no test can reach carries a Coverage
@@ -63,10 +71,12 @@
 #   GATE_STAMP_REF       the ref a gate is measured against. Default: the landing base, which
 #                        is origin/main when `base` stored none.
 #   GATE_STAMP_BRANCH    the globs, split on spaces, of the remote branches the guard protects,
-#                        the branches of ADR 0240. Default: refs/heads/agents/* refs/heads/dev-fixes.
+#                        the branches of ADR 0240. Default: refs/heads/agents/* refs/heads/dev.
 #   GATE_STAMP_REQUIRED  the gates a push that changes src/ or ext/ needs. Default:
 #                        "jet size complexity perf doctest coverage". The tests set it empty.
-#   GATE_STAMP_FORCE     any value acts outside .claude/worktrees/ too. The tests use it.
+#   GATE_STAMP_CENSUS    empty turns off the demand for the prose censuses. Default: on. The
+#                        tests set it empty, except the test of that demand.
+#   GATE_STAMP_FORCE    any value acts outside .claude/worktrees/ too. The tests use it.
 #   PRE_COMMIT_TO_REF, PRE_COMMIT_REMOTE_BRANCH
 #                        set by pre-commit for a pre-push hook: the pushed tip and the branch
 #                        pushed to.
@@ -75,7 +85,7 @@ set -euo pipefail
 
 usage() {
     echo "usage: gate_stamp.sh record <gate>... | list | drop <gate>... | waive <gate> <reason>" \
-        "| readers <file> | reach | base [<ref>] | check" >&2
+        "| readers <file> | reach | censuses <file> | base [<ref>] | check" >&2
     exit 2
 }
 
@@ -94,6 +104,7 @@ else
     ref=origin/main
 fi
 required=${GATE_STAMP_REQUIRED-jet size complexity perf doctest coverage}
+census=${GATE_STAMP_CENSUS-on}
 
 acts() {
     case "$top" in
@@ -146,7 +157,7 @@ waive() {
 }
 
 # Print the landing base, or store a new one. The landing base is the branch the worktree lands on
-# (ADR 0240): `origin/main` for a branch of its own, `origin/dev-fixes` or `origin/agents/<map>-…`
+# (ADR 0240): `origin/main` for a branch of its own, `origin/dev` or `origin/agents/<map>-…`
 # for a shared branch. Every stamp and every check reads it.
 landing_base() {
     if [ $# -eq 0 ]; then
@@ -237,6 +248,57 @@ reads_page() {
     return 1
 }
 
+# The prose censuses that read the path "$1", as the stamps that `test/run_files.jl` records, one
+# to a line. Each case reads one corpus, and a path can be in more than one. The generated pages
+# under docs/src/ are untracked, so no diff names them. The `CODING_STANDARDS.md` rows of the
+# census files state each corpus.
+censuses() {
+    local t46=test/test_46_standards_citation_census.jl
+    local t64=test/test_64_docs_page_metadata_census.jl
+    local t71=test/test_71_process_citation_census.jl
+    local t72=test/test_72_prose_census.jl
+    local t74=test/test_74_source_citation_census.jl
+    # The docstrings, the strings and the names of the library: `test_71` and `test_74` read
+    # them, and `test_64` reads every published text for a link to another repository.
+    case "$1" in
+    src/*.jl | ext/*.jl) printf '%s\n' "$t64" "$t71" "$t74" ;;
+    esac
+    # The four page corpora: the Literate sources, the hand-written pages of docs/src/ outside
+    # contribute/, the README and the Capability Catalogue.
+    case "$1" in
+    docs/src/contribute/*) ;;
+    README.md | docs/capability_catalogue.jl | examples/*.jl | user_guide/*.jl | docs/src/*.md)
+        printf '%s\n' "$t71" "$t72" "$t74"
+        ;;
+    esac
+    # Every other published text of the docs tree, with its ADRs, papers and generators.
+    case "$1" in
+    README.md | examples/*.jl | user_guide/*.jl | docs/*.md | docs/*.jl | docs/*.typ)
+        printf '%s\n' "$t64"
+        ;;
+    esac
+    # The standards files, and the two ledgers of prose.
+    case "$1" in
+    CODING_STANDARDS.md | CLAUDE.md | */CLAUDE.md | .github/copilot-instructions.md | \
+        .github/instructions/*.md | .github/prompts/*.md)
+        printf '%s\n' "$t46"
+        ;;
+    GLOSSARY.md) printf '%s\n' "$t46" "$t72" "$t74" ;;
+    code_health/prose_baseline.toml) printf '%s\n' "$t72" "$t74" ;;
+    esac
+}
+
+# The prose censuses that a change to the files of the list "$1" needs, one path to a line. It
+# prints each census once, and nothing when GATE_STAMP_CENSUS is empty.
+needed_censuses() {
+    [ -n "$census" ] || return 0
+    local f
+    printf '%s\n' "$1" | while read -r f; do
+        [ -n "$f" ] || continue
+        censuses "$f"
+    done | sort -u
+}
+
 # Whether a change of the class "$2" reaches the gate "$1", as `reached` reads it. A stamp of the
 # full doctest run and a stamp of the scoped run are both doctest stamps here.
 class_reaches() {
@@ -285,16 +347,23 @@ reached() {
 # Print the class of each changed file of the worktree against the ref, and the gates the change
 # reaches.
 reach() {
-    local base out class
+    local base out class need
     base=$(git merge-base "$ref" HEAD)
     out=$(julia --startup-file=no "$here/gate_reach.jl" "$base" WORKTREE)
     printf '%s\n' "$out"
     if [ "$(printf '%s\n' "$out" | wc -l)" -eq 1 ]; then
         echo "gates none: no .jl file under src/ or ext/ changes"
-        return 0
+    else
+        class=$(printf '%s\n' "$out" | awk '$1 == "reach" { print $2 }')
+        echo "gates" $(reached "$required" "$class")
     fi
-    class=$(printf '%s\n' "$out" | awk '$1 == "reach" { print $2 }')
-    echo "gates" $(reached "$required" "$class")
+    need=$(needed_censuses "$({
+        git diff --name-only --no-renames "$base"
+        git ls-files --others --exclude-standard
+    } | sort -u)")
+    if [ -n "$need" ]; then
+        echo "censuses" $need
+    fi
 }
 
 # The files that the commits base..from change, without the commits this worktree pushed.
@@ -317,7 +386,7 @@ moved_files() {
 # does not have. On a shared branch, the base is the shared branch itself.
 check() {
     acts || return 0
-    local protected=${GATE_STAMP_BRANCH:-refs/heads/agents/* refs/heads/dev-fixes}
+    local protected=${GATE_STAMP_BRANCH:-refs/heads/agents/* refs/heads/dev}
     if [ -n "${PRE_COMMIT_REMOTE_BRANCH:-}" ]; then
         local glob globs hit_branch=0
         # `read -a` splits the list on spaces and expands no pathname. Each glob is unquoted in
@@ -332,10 +401,10 @@ check() {
         [ "$hit_branch" = 1 ] || return 0
         # A push to the shared branch measures against it. A worktree with another landing base
         # measured a tree that this push does not land on.
-        if [ "$PRE_COMMIT_REMOTE_BRANCH" = refs/heads/dev-fixes ] && [ "$ref" != origin/dev-fixes ]; then
-            echo "This push lands on dev-fixes, and the landing base is $ref. Run"
-            echo "  code_health/gate_stamp.sh base origin/dev-fixes"
-            echo "then rebase onto origin/dev-fixes, and run the gates again."
+        if [ "$PRE_COMMIT_REMOTE_BRANCH" = refs/heads/dev ] && [ "$ref" != origin/dev ]; then
+            echo "This push lands on dev, and the landing base is $ref. Run"
+            echo "  code_health/gate_stamp.sh base origin/dev"
+            echo "then rebase onto origin/dev, and run the gates again."
             return 1
         fi
     fi
@@ -401,6 +470,13 @@ check() {
             covered "$gate" || absent+=" $gate"
         done
     fi
+    local unread="" runs=""
+    for gate in $(needed_censuses "$own"); do
+        if ! covered "$gate"; then
+            unread+=" $gate"
+            runs+=" $(basename "$gate")"
+        fi
+    done
 
     local status=0
     if [ -n "$stale" ]; then
@@ -415,6 +491,14 @@ check() {
         echo "This push changes src/ or ext/ ($class), and no stamp records these gates:$absent"
         echo "Run each one (the sweep-conform skill, § Land the branch), or record why it does not"
         echo "apply: code_health/gate_stamp.sh waive <gate> <reason>."
+        status=1
+    fi
+    if [ -n "$unread" ]; then
+        echo "This push changes a text that these prose censuses read, and no green run records"
+        echo "them:$unread"
+        echo "Run them, in seconds after the package load:"
+        echo "  julia -t 1 --project=test test/run_files.jl --done=<path>$runs"
+        echo "A census that is a known red takes: code_health/gate_stamp.sh waive test/<file> <issue>."
         status=1
     fi
     # Remember the commits of a push this guard let through, so a later check does not count
@@ -438,6 +522,10 @@ readers)
     readers "$1"
     ;;
 reach) reach ;;
+censuses)
+    [ $# -eq 1 ] || usage
+    censuses "$1"
+    ;;
 base) landing_base "$@" ;;
 check) check ;;
 *) usage ;;

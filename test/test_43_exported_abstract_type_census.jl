@@ -156,6 +156,8 @@
         :AbstractDescriptorEstimator,
         :AbstractDetoneEstimator,
         :AbstractDiagonalConstruction,
+        :AbstractDistanceAlgorithm,
+        :AbstractDistanceEstimator,
         :AbstractEmptyPairAlgorithm,
         :AbstractEntropyPoolingViewFormulation,
         :AbstractEstimatorValueAlgorithm,
