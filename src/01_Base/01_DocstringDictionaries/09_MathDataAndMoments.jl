@@ -133,6 +133,11 @@ unique_key_dict!(math_dict, :math_dict,
                  # The rolling Descriptors of `04_FactorExposures/`, stated by two or
                  # more Units of that file.
                  :w_roll => "``w``: `window`, the number of observations in the window.",#
+                 # The lag Descriptors of `04_FactorExposures/`, stated by two or more
+                 # Units of that file.
+                 :z_ti_lag => "``z_{t,i}``: Panel Field value of asset ``i`` at observation ``t``, the value of `field`.",#
+                 :s_ti_lag => "``s_{t,i}``: Scale value of asset ``i`` at observation ``t``, the value of the Panel Field `scale`.",#
+                 :ell_lag => "``\\ell``: `lag`, the number of observations that the Descriptor looks back.",#
                  # The ambiguity radius rules of `06_CalibrationRules.jl`, and the
                  # effective sample size the significance rules share with them. Each
                  # rule returns one radius off one record, so the radius, its scale

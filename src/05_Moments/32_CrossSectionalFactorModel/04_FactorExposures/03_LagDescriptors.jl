@@ -34,21 +34,24 @@ $(DocStringExtensions.TYPEDEF)
 
 Growth of a non-negative Panel Field over a fixed lag, at every observation.
 
-This is the archetype of every growth Descriptor: the growth of total assets, of sales, of the share count. The first `lag` observations are `NaN`, because no lagged value exists there, and so is every cell whose lagged value is zero. The Panel Field must be non-negative wherever it is observed and active: a growth rate over a negative base flips its sign, so the estimator raises on a negative value rather than rank a shrinking loss as growth. A field that can turn negative, a net income or an earnings per share, takes [`ChangeToScale`](@ref) instead.
+This is the archetype of every growth Descriptor, such as the growth of total assets, of sales or of the share count. The first `lag` observations are `NaN`, because no lagged value exists there, and so is every cell whose lagged value is zero. The Panel Field must be non-negative wherever it is observed and active. A growth rate over a negative base flips its sign, so the estimator raises on a negative value rather than rank a shrinking loss as growth. A field that can turn negative, a net income or an earnings per share, takes [`ChangeToScale`](@ref) instead.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-d_{t,i} &= \\begin{cases} \\dfrac{z_{t,i}}{z_{t-\\ell,i}} - 1 & \\text{if } t > \\ell \\text{ and } z_{t-\\ell,i} > 0 \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
+d_{t,i} &= \\begin{cases} \\dfrac{z_{t,i}}{z_{t-\\ell,i}} - 1 & \\text{if } t > \\ell \\text{, } a_{ti} = 1 \\text{, } a_{t-\\ell,i} = 1 \\text{ and } z_{t-\\ell,i} > 0 \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
 \\end{align}
 ```
+
+A value that is not observed reads as `NaN`, so it makes the Descriptor `NaN` at either end of the lag. The quotient goes through [`positive_divide`](@ref), which also gives `NaN` where the quotient overflows.
 
 Where:
 
   - ``d_{t,i}``: Descriptor of asset ``i`` at observation ``t``.
-  - ``z_{t,i}``: The Panel Field's value for asset ``i`` at observation ``t``.
-  - ``\\ell``: The lag, in observations.
+  - $(math_dict[:z_ti_lag])
+  - $(math_dict[:a_ti_pnl])
+  - $(math_dict[:ell_lag])
 
 # Fields
 
@@ -59,7 +62,7 @@ $(DocStringExtensions.FIELDS)
     GrowthRate(; field::AbstractString, lag::Integer,
                cache::Option{<:AbstractPartialFitState} = nothing) -> GrowthRate
 
-Keywords correspond to the struct's fields. `lag` takes no default, because it depends on the data frequency: `252` is one year of daily observations, `12` one year of monthly ones, `4` one year of quarterly ones. The named growth Descriptors fix it at `252`.
+Keywords correspond to the struct's fields. `lag` takes no default, because it depends on the data frequency. One year is `252` daily observations, `12` monthly ones or `4` quarterly ones. The named growth Descriptors fix it at `252`.
 
 ## Validation
 
@@ -114,22 +117,25 @@ $(DocStringExtensions.TYPEDEF)
 
 Change of a Panel Field over a fixed lag, scaled by the current value of a second Panel Field.
 
-This is the growth archetype for a field that can be negative. A growth rate over a negative base flips its sign, so an earnings change is instead divided by the current market capitalisation, and the sign of the Descriptor is the direction of the change. The first `lag` observations are `NaN`, and so is every cell where the scale is not strictly positive. Under `gt0 = true` a scale at or below zero is a data error instead, and the Descriptor refuses it: [`EarningsChangeToPrice`](@ref) sets it, because a market capitalisation is positive by construction.
+This is the growth archetype for a field that can be negative. A growth rate over a negative base flips its sign, so an earnings change is instead divided by the current market capitalisation, and the sign of the Descriptor is the direction of the change. The first `lag` observations are `NaN`, and so is every cell where the scale is not strictly positive. Under `gt0 = true` a scale at or below zero is a data error instead, and the Descriptor refuses it. [`EarningsChangeToPrice`](@ref) sets `gt0 = true`, because a market capitalisation is positive by construction.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-d_{t,i} &= \\begin{cases} \\dfrac{z_{t,i} - z_{t-\\ell,i}}{s_{t,i}} & \\text{if } t > \\ell \\text{ and } s_{t,i} > 0 \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
+d_{t,i} &= \\begin{cases} \\dfrac{z_{t,i} - z_{t-\\ell,i}}{s_{t,i}} & \\text{if } t > \\ell \\text{, } a_{ti} = 1 \\text{, } a_{t-\\ell,i} = 1 \\text{ and } s_{t,i} > 0 \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
 \\end{align}
 ```
+
+A value that is not observed reads as `NaN`, so it makes the Descriptor `NaN` at either end of the lag. The quotient goes through [`positive_divide`](@ref), which also gives `NaN` where the quotient overflows.
 
 Where:
 
   - ``d_{t,i}``: Descriptor of asset ``i`` at observation ``t``.
-  - ``z_{t,i}``: The Panel Field's value for asset ``i`` at observation ``t``.
-  - ``s_{t,i}``: The scale Panel Field's value for asset ``i`` at observation ``t``.
-  - ``\\ell``: The lag, in observations.
+  - $(math_dict[:z_ti_lag])
+  - $(math_dict[:s_ti_lag])
+  - $(math_dict[:a_ti_pnl])
+  - $(math_dict[:ell_lag])
 
 # Fields
 
@@ -181,7 +187,7 @@ ChangeToScale
     """
     lag
     """
-    Whether the scale must be strictly positive wherever it is observed and active. A value at or below zero then raises a `DomainError`; otherwise its cell is `NaN`.
+    Whether the scale must be strictly positive wherever it is observed and active. Under `true`, a value at or below zero raises a `DomainError`. Under `false`, its cell is `NaN`.
     """
     gt0
     """
@@ -207,22 +213,25 @@ $(DocStringExtensions.TYPEDEF)
 
 Change of the ratio of two Panel Fields over a fixed lag.
 
-Where [`ChangeToScale`](@ref) divides the change of a level by the current scale, this archetype forms the ratio at both ends and takes the difference, so it measures a change in intensity: a capital expenditure that grew with the assets it serves reads zero. The first `lag` observations are `NaN`, and so is every cell where either ratio is undefined because its scale is not strictly positive. Under `gt0 = true` a scale at or below zero is a data error instead, and the Descriptor refuses it: [`CapexToAssetsChangeInIntensity`](@ref) sets it, because a total of assets is positive by construction.
+Where [`ChangeToScale`](@ref) divides the change of a level by the current scale, this archetype forms the ratio at both ends and takes the difference. So it measures a change in intensity, and a capital expenditure that grew with the assets it serves reads zero. The first `lag` observations are `NaN`, and so is every cell where either ratio is undefined because its scale is not strictly positive. Under `gt0 = true` a scale at or below zero is a data error instead, and the Descriptor refuses it. [`CapexToAssetsChangeInIntensity`](@ref) sets `gt0 = true`, because a total of assets is positive by construction.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-d_{t,i} &= \\begin{cases} \\dfrac{z_{t,i}}{s_{t,i}} - \\dfrac{z_{t-\\ell,i}}{s_{t-\\ell,i}} & \\text{if } t > \\ell \\text{, } s_{t,i} > 0 \\text{ and } s_{t-\\ell,i} > 0 \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
+d_{t,i} &= \\begin{cases} \\dfrac{z_{t,i}}{s_{t,i}} - \\dfrac{z_{t-\\ell,i}}{s_{t-\\ell,i}} & \\text{if } t > \\ell \\text{, } a_{ti} = 1 \\text{, } a_{t-\\ell,i} = 1 \\text{, } s_{t,i} > 0 \\text{ and } s_{t-\\ell,i} > 0 \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
 \\end{align}
 ```
+
+A value that is not observed reads as `NaN`, so it makes the Descriptor `NaN` at either end of the lag. Each ratio goes through [`positive_divide`](@ref), which also gives `NaN` where the ratio overflows.
 
 Where:
 
   - ``d_{t,i}``: Descriptor of asset ``i`` at observation ``t``.
-  - ``z_{t,i}``: The Panel Field's value for asset ``i`` at observation ``t``.
-  - ``s_{t,i}``: The scale Panel Field's value for asset ``i`` at observation ``t``.
-  - ``\\ell``: The lag, in observations.
+  - $(math_dict[:z_ti_lag])
+  - $(math_dict[:s_ti_lag])
+  - $(math_dict[:a_ti_pnl])
+  - $(math_dict[:ell_lag])
 
 # Fields
 
@@ -274,7 +283,7 @@ ChangeInIntensity
     """
     lag
     """
-    Whether the scale must be strictly positive wherever it is observed and active. A value at or below zero then raises a `DomainError`; otherwise every ratio over it is `NaN`.
+    Whether the scale must be strictly positive wherever it is observed and active. Under `true`, a value at or below zero raises a `DomainError`. Under `false`, every ratio over it is `NaN`.
     """
     gt0
     """
@@ -307,7 +316,7 @@ The batch call is the fold [`lag_descriptor_fold`](@ref) from no state, so the s
 
 # Algorithm
 
- 1. Check the Panel Fields and read them through [`lag_descriptor_inputs`](@ref): for a [`GrowthRate`](@ref), check that the field is non-negative through [`assert_panel_field_sign`](@ref); for a [`ChangeToScale`](@ref) or a [`ChangeInIntensity`](@ref), check the scale under `gt0`.
+ 1. Check the Panel Fields and read them through [`lag_descriptor_inputs`](@ref). A [`GrowthRate`](@ref) checks that its field is non-negative through [`assert_panel_field_sign`](@ref). A [`ChangeToScale`](@ref) or a [`ChangeInIntensity`](@ref) checks its scale under `gt0 = true`.
  2. Write the Descriptor of each cell from its current values and from the lagged quantity `lag` observations back through [`lag_descriptor_value`](@ref):
      1. [`GrowthRate`](@ref): `z[t] / z[t - lag] - 1` through [`positive_divide`](@ref).
      2. [`ChangeToScale`](@ref): `(z[t] - z[t - lag]) / s[t]` through [`positive_divide`](@ref).
@@ -379,9 +388,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Carried state of a lag Descriptor: the lagged quantity of the last `lag` observations.
+Carried state of a lag Descriptor, which holds the lagged quantity of the last `lag` observations.
 
-A [`GrowthRate`](@ref), a [`ChangeToScale`](@ref) and a [`ChangeInIntensity`](@ref) read two observations of each cell: the current one, and the one `lag` observations back. The value that the observation `lag` back gives is the lagged quantity: the field `z` for a [`GrowthRate`](@ref) and a [`ChangeToScale`](@ref), and the ratio `z / s` for a [`ChangeInIntensity`](@ref), as [`lag_descriptor_lagged`](@ref) gives it. So the last `lag` rows of that quantity give the Descriptor of the next observation, and the state holds no other value. The state keeps each row with the bits of the batch call, so the Descriptor of a new observation equals the one of the batch call to the last bit.
+A [`GrowthRate`](@ref), a [`ChangeToScale`](@ref) and a [`ChangeInIntensity`](@ref) read two observations of each cell, the current one and the one `lag` observations back. The lagged quantity is the value that the Descriptor reads at the observation `lag` back. It is the field `z` for a [`GrowthRate`](@ref) and a [`ChangeToScale`](@ref), and the ratio `z / s` for a [`ChangeInIntensity`](@ref), as [`lag_descriptor_lagged`](@ref) gives it. So the last `lag` rows of that quantity give the Descriptor of the next observation, and the state holds no other value. The state keeps each row with the bits of the batch call, so the Descriptor of a new observation equals the one of the batch call to the last bit.
 
 Each row is a vector of its own, and no verb changes a row after the state carries it. A step copies the buffer, which copies the references to the rows and no row, so the state before the step stays as it was.
 
@@ -544,7 +553,7 @@ end
     lag_descriptor_lagged(::Union{GrowthRate, ChangeToScale}, V::AbstractMatrix, S::AbstractMatrix)
     lag_descriptor_lagged(::ChangeInIntensity, V::AbstractMatrix, S::AbstractMatrix)
 
-Returns the lagged quantity of each cell: the value that a lag Descriptor reads `lag` observations back, and that a [`LagDescriptorState`](@ref) carries.
+Returns the lagged quantity of each cell, which is the value that a lag Descriptor reads `lag` observations back, and that a [`LagDescriptorState`](@ref) carries.
 
 It is the field for a [`GrowthRate`](@ref) and a [`ChangeToScale`](@ref), and the ratio of the field to the scale through [`positive_divide`](@ref) for a [`ChangeInIntensity`](@ref).
 
@@ -607,7 +616,9 @@ end
     lag_state_seed(de::Union{GrowthRate, ChangeToScale, ChangeInIntensity},
                    st::LagDescriptorState, Q::AbstractMatrix)
 
-Returns the buffer that a fold of a lag Descriptor reads its lagged rows from and pushes its new rows onto: an empty buffer of capacity `lag` when the estimator carries no state, or a copy of the buffer of its state that shares its rows.
+Returns the buffer that a fold of a lag Descriptor reads its lagged rows from and pushes its new rows onto.
+
+The buffer is empty, with capacity `lag`, when the estimator carries no state. Otherwise it is a copy of the buffer of the state, and it shares the rows of that buffer.
 
 # Arguments
 
@@ -782,7 +793,7 @@ end
 
 Growth of total assets over one year, the investment Descriptor.
 
-The value is `total_assets(t) / total_assets(t - lag) - 1`, `NaN` on the first `lag` observations and where the lagged value is zero. A firm whose balance sheet expands quickly tends to earn a lower return afterwards, which is what the investment factor prices.
+The value is `total_assets(t) / total_assets(t - lag) - 1`, `NaN` on the first `lag` observations and where the lagged value is zero. A firm whose total assets grow fast tends to earn a lower return afterwards, and the investment factor prices this.
 
 # Arguments
 
