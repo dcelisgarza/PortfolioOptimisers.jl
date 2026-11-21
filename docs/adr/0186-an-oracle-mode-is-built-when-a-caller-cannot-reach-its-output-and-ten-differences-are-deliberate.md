@@ -159,3 +159,13 @@ here.
   path of the repair, and it is the measure of the last box of #1383.
 - The premise of #929, that the oracle persists nothing, was wrong. #1399 builds the round trip
   that parity needs.
+
+## Amendment (2026-11-21)
+
+`ChiSqKUncertaintyAlgorithm` has no keyword `ambient` (ADR 0188, amendment of 2026-11-21). The
+radius of the oracle on a full covariance set, at `N²` degrees of freedom, stays reachable: a plain
+number in the `method` slot of the set algorithm is the radius, so
+`method = sqrt(quantile(Chisq(N^2), 1 - q))` gives it. This is the second way of the Context, a
+library route that reaches the output of the mode, so the removal keeps every capability of the
+oracle. The row of the chi-squared radius in the table above reads that route in place of
+`ambient = true`.

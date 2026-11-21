@@ -545,12 +545,12 @@ end
 """
     k_norm_ball(km::NormalKUncertaintyAlgorithm, q::Number, X::MatNum, L::MatNum, ::Integer)
     k_norm_ball(::GeneralKUncertaintyAlgorithm, q::Number, args...)
-    k_norm_ball(km::ChiSqKUncertaintyAlgorithm, q::Number, ::Any, L::MatNum, df::Integer)
+    k_norm_ball(::ChiSqKUncertaintyAlgorithm, q::Number, ::Any, ::MatNum, df::Integer)
     k_norm_ball(type::Number, args...)
 
 Radius ``\\kappa`` of a [`NormBallUncertaintySet`](@ref), read against a geometry map rather than against a shape matrix.
 
-It is the norm-ball twin of [`k_ucs`](@ref), and the two differ on the two algorithms that read the geometry. [`NormalKUncertaintyAlgorithm`](@ref) solves in the factor rather than inverting a shape, so it serves a rank-deficient map, where a shape matrix would have to be repaired first. [`ChiSqKUncertaintyAlgorithm`](@ref) takes its degrees of freedom from `df`, the dimension of the ball, and not from the row count of the map, because a flat set is a confidence region of its own subspace and not of the ambient space. Under `ambient = true` it reads the row count `size(L, 1)` instead. [`GeneralKUncertaintyAlgorithm`](@ref) and a plain number read neither, and absorb the trailing arguments.
+It is the norm-ball twin of [`k_ucs`](@ref), and the two differ on the two algorithms that read the geometry. [`NormalKUncertaintyAlgorithm`](@ref) solves in the factor rather than inverting a shape, so it serves a rank-deficient map, where a shape matrix would have to be repaired first. [`ChiSqKUncertaintyAlgorithm`](@ref) takes its degrees of freedom from `df`, the dimension of the ball, and not from the row count of the map, because a flat set is a confidence region of its own subspace and not of the ambient space. [`GeneralKUncertaintyAlgorithm`](@ref) and a plain number read neither, and absorb the trailing arguments.
 
 # Mathematical definition
 
@@ -577,7 +577,7 @@ Where:
 
  1. On [`NormalKUncertaintyAlgorithm`](@ref), take the ball coordinates of each sampled error with [`norm_ball_coordinates`](@ref), one column per error.
  2. Take the squared column norms, giving one squared distance per sample, and return the square root of their `1 - q` quantile.
- 3. On [`ChiSqKUncertaintyAlgorithm`](@ref), return the square root of the `1 - q` chi-squared quantile at `df` degrees of freedom, or at `size(L, 1)` when `km.ambient` is `true`.
+ 3. On [`ChiSqKUncertaintyAlgorithm`](@ref), return the square root of the `1 - q` chi-squared quantile at `df` degrees of freedom.
  4. On [`GeneralKUncertaintyAlgorithm`](@ref), return `sqrt((1 - q) / q)`, Cantelli's bound, which reads no geometry.
  5. On a `Number`, return it unchanged.
 
@@ -614,10 +614,8 @@ end
 function k_norm_ball(::GeneralKUncertaintyAlgorithm, q::Number, args...)
     return sqrt((one(q) - q) / q)
 end
-function k_norm_ball(km::ChiSqKUncertaintyAlgorithm, q::Number, ::Any, L::MatNum,
-                     df::Integer)
-    p = km.ambient ? size(L, 1) : df
-    return sqrt(Distributions.cquantile(Distributions.Chisq(p), q))
+function k_norm_ball(::ChiSqKUncertaintyAlgorithm, q::Number, ::Any, ::MatNum, df::Integer)
+    return sqrt(Distributions.cquantile(Distributions.Chisq(df), q))
 end
 function k_norm_ball(type::Number, args...)::Number
     return type

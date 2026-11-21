@@ -1320,7 +1320,7 @@ The degrees of freedom are the dimension of the set, which is the number of free
 
 The squared Mahalanobis distance of a normal error has a chi-squared distribution at the rank of its shape. So a full covariance shape reads ``N(N+1)/2``. A diagonal shape reads ``N^{2}``, because its statistic is a sum of ``N^{2}`` terms with a mean of one. [`ucs_dimension`](@ref) states the rule, and the set builders give its value to [`k_ucs`](@ref) and [`k_norm_ball`](@ref).
 
-**`ambient = true` reads the dimension of the ambient space instead.** That is the first dimension of the shape matrix or of the geometry map, which is ``N^{2}`` on every covariance shape. At ``N = 5`` and ``q = 0.05``, that radius is ``6.136``, and the dimension of the set gives ``5.000``. So the set covers ``0.999`` of the errors, not ``0.95``, and the radius is too large for its level. As ``N`` increases, the ratio of the two radii decreases to ``1 / \\sqrt{2}``. The field keeps that rule available for a comparison with a caller that counts every entry of the vectorised matrix.
+**The first dimension of the shape matrix is not the rule.** It is ``N^{2}`` on every covariance shape. At ``N = 5`` and ``q = 0.05``, that radius is ``6.136``, and the dimension of the set gives ``5.000``. So the set covers ``0.999`` of the errors, not ``0.95``, and the radius is too large for its level. To compare with a caller that counts every entry of the vectorised matrix, give that radius as a number in place of the algorithm.
 
 **The sources state this closed form for the mean axis only.** Equation 50 of [goldfarbiyengar2003](@cite) states that the squared Mahalanobis distance of a normal estimation error has a chi-squared distribution at the dimension of the estimate. That work sizes its sets with an F quantile, because it estimates the variance. Equation 11.23 of [cajas2025](@cite) sets ``\\kappa^{2}_{\\boldsymbol{\\mu}}`` to the chi-squared quantile at ``n`` degrees of freedom, where ``n`` is the number of assets. It gets ``\\kappa^{2}_{\\mathbf{\\Sigma}}`` from a simulation, not in closed form. The form on the covariance axis is an extension that this library makes.
 
@@ -1337,27 +1337,14 @@ k &= \\sqrt{\\chi^{2,\\,-1}_{p}(1 - q)}\\,.
 Where:
 
   - ``\\chi^{2,\\,-1}_{p}``: Inverse cumulative distribution function of the chi-squared distribution with ``p`` degrees of freedom.
-  - ``p``: Degrees of freedom, the dimension of the set, or the first dimension of the shape matrix under `ambient = true`.
+  - ``p``: Degrees of freedom, the dimension of the set.
   - ``q``: Significance level.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    ChiSqKUncertaintyAlgorithm(;
-        ambient::Bool = false
-    )
-
-The keyword is the field above.
 
 # Examples
 
 ```jldoctest
 julia> ChiSqKUncertaintyAlgorithm()
-ChiSqKUncertaintyAlgorithm
-  ambient ┴ Bool: false
+ChiSqKUncertaintyAlgorithm()
 ```
 
 # Related
@@ -1376,24 +1363,12 @@ ChiSqKUncertaintyAlgorithm
   - $(ref_dict[:magnus1979]) Theorem 3.1 (vi).
   - $(ref_dict[:cajas2025]) Equation 11.23. $(ref_dict[:no_original_source])
 """
-@concrete struct ChiSqKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm
-    """
-    Whether the degrees of freedom are the first dimension of the shape matrix, and not the dimension of the set. The first dimension is ``N^{2}`` on every covariance shape. The default is `false`.
-    """
-    ambient
-    function ChiSqKUncertaintyAlgorithm(ambient::Bool)
-        return new{typeof(ambient)}(ambient)
-    end
-end
-function ChiSqKUncertaintyAlgorithm(; ambient::Bool = false)::ChiSqKUncertaintyAlgorithm
-    return ChiSqKUncertaintyAlgorithm(ambient)
-end
+struct ChiSqKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
 """
     k_ucs(km::NormalKUncertaintyAlgorithm, q::Number, X::MatNum, sigma_X::MatNum,
-          ::Integer = size(sigma_X, 1))
+          ::Integer)
     k_ucs(::GeneralKUncertaintyAlgorithm, q::Number, args...)
-    k_ucs(km::ChiSqKUncertaintyAlgorithm, q::Number, ::Any, sigma_X::MatNum,
-          df::Integer = size(sigma_X, 1))
+    k_ucs(::ChiSqKUncertaintyAlgorithm, q::Number, ::Any, ::MatNum, df::Integer)
     k_ucs(type::Number, args...)
 
 Computes the radius `k` of an ellipsoidal uncertainty set at the significance level `q`.
@@ -1415,7 +1390,7 @@ Each of the first three methods does one procedure. The fourth method, `k_ucs(ty
 
 [`ChiSqKUncertaintyAlgorithm`](@ref):
 
- 1. Read the degrees of freedom from `df`, the dimension of the set. If `km.ambient` is `true`, read them from `size(sigma_X, 1)`.
+ 1. Read the degrees of freedom from `df`, the dimension of the set.
  2. Return the square root of the `1 - q` chi-squared quantile at those degrees of freedom as the radius. The method runs no simulation, so it ignores the sample argument.
 
 # Arguments
@@ -1424,7 +1399,7 @@ Each of the first three methods does one procedure. The fourth method, `k_ucs(ty
   - `q`: Significance level.
   - `X`: Matrix of estimation errors, with one row for each sample. **Every caller gives centred deviations, not levels.** Each row is a deviation from the point estimate, and the method cannot check it. A sample that is not centred makes the distance non-central, and makes the radius too large.
   - `sigma_X`: Shape matrix of the ellipsoid, against which the method measures the distances. It is ``N \\times N`` on the mean axis and ``N^{2} \\times N^{2}`` on the covariance axis. Under its default `diagonal = true`, [`ellipsoidal_set`](@ref) gives the diagonal of the asymptotic covariance. So the method takes the quantile against that diagonal, not against the full matrix.
-  - `df`: Dimension of the set, which [`ucs_dimension`](@ref) gives. The default `size(sigma_X, 1)` is correct on a shape of full rank. It is too large on a full covariance shape, whose rank is ``N(N+1)/2``, so [`ellipsoidal_set`](@ref) always gives `df`. [`NormalKUncertaintyAlgorithm`](@ref) ignores it, because its sampled distances contain the dimension.
+  - `df`: Dimension of the set, which [`ucs_dimension`](@ref) gives. [`ChiSqKUncertaintyAlgorithm`](@ref) needs it, because the side of the shape is too large on a full covariance shape, whose rank is ``N(N+1)/2``. [`NormalKUncertaintyAlgorithm`](@ref) ignores it, because its sampled distances contain the dimension. Every method takes it, as every method of [`k_norm_ball`](@ref) does.
   - `args...`: More arguments, which the algorithms that need no sample ignore.
   - `type`: The radius as a number.
 
@@ -1447,7 +1422,7 @@ Each of the first three methods does one procedure. The fourth method, `k_ucs(ty
   - $(ref_dict[:cajas2025]) Section 11.3.2, Equation 11.23 and Listings 11.10 and 11.11. $(ref_dict[:no_original_source])
 """
 function k_ucs(km::NormalKUncertaintyAlgorithm, q::Number, X::MatNum, sigma_X::MatNum,
-               ::Integer = size(sigma_X, 1))
+               ::Integer)
     A = sigma_X \ transpose(X)
     k_mus = [transpose(view(X, i, :)) * view(A, :, i) for i in axes(X, 1)]
     return sqrt(Statistics.quantile(k_mus, one(q) - q; km.kwargs...))
@@ -1455,11 +1430,9 @@ end
 function k_ucs(::GeneralKUncertaintyAlgorithm, q::Number, args...)
     return sqrt((one(q) - q) / q)
 end
-function k_ucs(km::ChiSqKUncertaintyAlgorithm, q::Number, ::Any, sigma_X::MatNum,
-               df::Integer = size(sigma_X, 1))
-    # The sample container is unused, because this route runs no simulation.
-    p = km.ambient ? size(sigma_X, 1) : df
-    return sqrt(Distributions.cquantile(Distributions.Chisq(p), q))
+function k_ucs(::ChiSqKUncertaintyAlgorithm, q::Number, ::Any, ::MatNum, df::Integer)
+    # The sample and the shape are unused, because the radius reads the dimension alone.
+    return sqrt(Distributions.cquantile(Distributions.Chisq(df), q))
 end
 function k_ucs(type::Number, args...)::Number
     return type
@@ -1490,8 +1463,7 @@ $(DocStringExtensions.FIELDS)
 ```jldoctest
 julia> EllipsoidalUncertaintySetAlgorithm()
 EllipsoidalUncertaintySetAlgorithm
-    method ┼ ChiSqKUncertaintyAlgorithm
-           │   ambient ┴ Bool: false
+    method ┼ ChiSqKUncertaintyAlgorithm()
   diagonal ┴ Bool: true
 ```
 
@@ -1558,8 +1530,7 @@ The keywords are the fields of the struct.
 ```jldoctest
 julia> NormBallUncertaintySetAlgorithm()
 NormBallUncertaintySetAlgorithm
-    method ┼ ChiSqKUncertaintyAlgorithm
-           │   ambient ┴ Bool: false
+    method ┼ ChiSqKUncertaintyAlgorithm()
   diagonal ┼ Bool: true
          p ┼ Int64: 2
   mtx_sqrt ┴ EigenFallbackSquareRoot()
