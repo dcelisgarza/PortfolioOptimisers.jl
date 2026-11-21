@@ -3884,11 +3884,12 @@ end
 
     @testset "`logo` runs with no sample under a distance that reads the correlation alone (#2231)" begin
         # The estimate from the state of an incremental fit keeps no observation, so it calls
-        # the step with no sample. An estimator of `DRho_DDRho` gives the answer with `X`.
+        # the step with no sample. A distance for which `reads_sample_values` is `false` gives
+        # the answer with `X`.
         sigma = PO470.cov(ce470, X470)
         for d in (Distance(; alg = CanonicalDistance()), Distance(; alg = LogDistance()),
                   DistanceDistance(; alg = SimpleDistance()))
-            @test d isa PO470.DRho_DDRho
+            @test !PO470.reads_sample_values(d)
             @test isnothing(PO470.LoGo_dist_assert(d, sigma, nothing))
             je = LoGo(; de = d)
             @test isapprox(PO470.logo(je, sigma), PO470.logo(je, sigma, X470); rtol = 1e-12)
@@ -3899,7 +3900,7 @@ end
         # Every other distance estimator can read `X`, and refuses a call with no sample.
         for d in (Distance(; alg = VariationInfoDistance()),
                   DistanceDistance(; alg = VariationInfoDistance()), FeatureDistance())
-            @test !(d isa PO470.DRho_DDRho)
+            @test PO470.reads_sample_values(d)
             @test_throws IsNothingError PO470.LoGo_dist_assert(d, sigma, nothing)
             @test_throws IsNothingError PO470.logo(LoGo(; de = d), sigma)
         end

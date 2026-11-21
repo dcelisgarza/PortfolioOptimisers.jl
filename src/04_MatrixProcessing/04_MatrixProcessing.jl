@@ -90,7 +90,7 @@ To add a matrix processing algorithm that `MatrixProcessing` can use, subtype `A
 
   - `matrix_processing_algorithm!(mpa::AbstractMatrixProcessingAlgorithm, sigma::MatNum, args...; kwargs...) -> MatNum`: Applies the algorithm to `sigma` in place.
   - `matrix_processing_algorithm(mpa::AbstractMatrixProcessingAlgorithm, sigma::MatNum, args...; kwargs...) -> MatNum`: Optional. Applies the algorithm to a copy of `sigma`, and returns the copy.
-  - `reads_sample_values(mpa::AbstractMatrixProcessingAlgorithm) -> Bool`: Optional. Answers `false` when the algorithm reads no value of the sample `X`. The fallback answers `true`, so an incremental fit refuses the algorithm, because the fit keeps no observation. An algorithm that answers `false` also adds the method `matrix_processing_algorithm!(mpa, sigma)` with no sample, which the estimate from the state calls. [`LoGo`](@ref) answers `false` under a distance that reads the correlation matrix alone.
+  - `reads_sample_values(mpa::AbstractMatrixProcessingAlgorithm) -> Bool`: Optional. Answers `false` when the algorithm reads no value of the sample `X`. The fallback answers `true`, so an incremental fit refuses the algorithm, because the fit keeps no observation. An algorithm that answers `false` also adds the method `matrix_processing_algorithm!(mpa, sigma)` with no sample, which the estimate from the state calls. [`LoGo`](@ref) gives the answer of its distance estimator, which states it with the same verb, as the interfaces of [`AbstractDistanceEstimator`](@ref) and [`AbstractDistanceAlgorithm`](@ref) state.
 
 ## Arguments
 
@@ -205,7 +205,7 @@ The method that Julia selects is the algorithm.
 
  1. `nothing` answers `false`, because no step runs.
  2. The fallback answers `true` for every other algorithm, because the library cannot see what it reads.
- 3. [`LoGo`](@ref) has methods of its own. It answers `false` under a distance that reads the correlation matrix alone, and `true` under every other distance.
+ 3. [`LoGo`](@ref) gives the answer of its distance estimator. The distance family has methods of its own: a [`Distance`](@ref) or a [`DistanceDistance`](@ref) gives the answer of its algorithm, an algorithm that reads the correlation matrix alone answers `false`, and every other distance algorithm or distance estimator answers `true`.
 
 # Arguments
 

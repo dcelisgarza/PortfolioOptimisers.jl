@@ -480,6 +480,25 @@ its estimator no longer matches.
 =#
 using Statistics
 
+# Issue 2233. A distance estimator and a distance algorithm of your own that read the
+# correlation matrix alone. The `Opt` types add the opt-in, and the others do not. The types
+# live at the top level, because a `struct` cannot sit inside a `@testset`.
+struct RhoDist2233 <: PortfolioOptimisers.AbstractDistanceEstimator end
+struct RhoDist2233Opt <: PortfolioOptimisers.AbstractDistanceEstimator end
+struct RhoAlg2233 <: PortfolioOptimisers.AbstractDistanceAlgorithm end
+struct RhoAlg2233Opt <: PortfolioOptimisers.AbstractDistanceAlgorithm end
+rho_dist2233(rho) = sqrt.(max.((1 .- rho) ./ 2, 0))
+function PortfolioOptimisers.distance(::Union{RhoDist2233, RhoDist2233Opt},
+                                      rho::PortfolioOptimisers.MatNum, args...; kwargs...)
+    return rho_dist2233(rho)
+end
+function PortfolioOptimisers.distance(::Distance{<:Any, <:Union{RhoAlg2233, RhoAlg2233Opt}},
+                                      rho::PortfolioOptimisers.MatNum, args...; kwargs...)
+    return rho_dist2233(rho)
+end
+PortfolioOptimisers.reads_sample_values(::RhoDist2233Opt) = false
+PortfolioOptimisers.reads_sample_values(::RhoAlg2233Opt) = false
+
 @testset "Higher-moment partial fit" begin
     PO = PortfolioOptimisers
 
@@ -729,6 +748,50 @@ using Statistics
         @test vc.n == vb.n
         @test vc.m == vb.m
         @test isnothing(PO.variance_count(cev, X10))
+    end
+
+    @testset "A distance of your own folds inside LoGo when it states that it reads no sample (#2233)" begin
+        X10 = randn(StableRNG(2233), 80, 10) .* 0.02
+        # The distance family gives the answer, and `LoGo` reads it from its distance.
+        @test !PO.reads_sample_values(Distance(; alg = LogDistance()))
+        @test !PO.reads_sample_values(DistanceDistance(; alg = LogDistance()))
+        @test !PO.reads_sample_values(DistanceDistance(; alg = CanonicalDistance()))
+        @test PO.reads_sample_values(Distance(; alg = VariationInfoDistance()))
+        @test PO.reads_sample_values(DistanceDistance(; alg = VariationInfoDistance()))
+        @test PO.reads_sample_values(FeatureDistance())
+        @test PO.reads_sample_values(RhoDist2233())
+        @test PO.reads_sample_values(RhoAlg2233())
+        @test PO.reads_sample_values(Distance(; alg = RhoAlg2233()))
+        @test !PO.reads_sample_values(Distance(; alg = RhoAlg2233Opt()))
+        @test !PO.reads_sample_values(DistanceDistance(; alg = RhoAlg2233Opt()))
+        for (plain, opt) in ((RhoDist2233(), RhoDist2233Opt()),
+                             (Distance(; alg = RhoAlg2233()), Distance(; alg = RhoAlg2233Opt())))
+            # Without the opt-in, the library cannot see what the distance reads, so the
+            # fold refuses and a call with no sample raises.
+            mpp = MatrixProcessing(; alg = LoGo(; de = plain))
+            @test PO.reads_sample_values(mpp.alg)
+            @test_throws ArgumentError partial_fit!(Coskewness(; mp = mpp), X10)
+            @test_throws ArgumentError partial_fit!(PortfolioOptimisersCovariance(;
+                                                                                  mp = mpp),
+                                                    X10)
+            @test_throws IsNothingError PO.logo(mpp.alg, cov(X10))
+            # With the opt-in, every family folds and gives the batch answer.
+            mpo = MatrixProcessing(; alg = LoGo(; de = opt))
+            @test !PO.reads_sample_values(mpo.alg)
+            ske = Coskewness(; mp = mpo)
+            kte = Cokurtosis(; mp = mpo)
+            ce = PortfolioOptimisersCovariance(; mp = mpo)
+            @test PO.supports_partial_fit(ske)
+            @test PO.supports_partial_fit(kte)
+            @test PO.supports_partial_fit(ce)
+            @test isapprox(last(coskewness(partial_fit!(ske, X10))),
+                           last(coskewness(ske, X10)); rtol = 1e-12)
+            @test isapprox(cokurtosis(partial_fit!(kte, X10)), cokurtosis(kte, X10);
+                           rtol = 1e-12)
+            @test isapprox(cov(partial_fit!(ce, X10)), cov(ce, X10); rtol = 1e-12)
+            @test isapprox(PO.logo(mpo.alg, cov(X10)), PO.logo(mpo.alg, cov(X10), X10);
+                           rtol = 1e-12)
+        end
     end
 
     @testset "For one series the merge is Proposition 2.1 of pebay2008" begin

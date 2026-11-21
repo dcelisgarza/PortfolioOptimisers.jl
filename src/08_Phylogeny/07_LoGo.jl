@@ -265,26 +265,6 @@ const DVarInfo_DDVarInfo = Union{Distance{<:Any, <:VariationInfoDistance},
                                  DistanceDistance{<:Any, <:Any, <:Any, <:Any,
                                                   <:VariationInfoDistance}}
 """
-    const DRho_DDRho = Union{Distance{<:Any, <:Union{RhoDistanceAlgorithm, CanonicalDistance}},
-                             DistanceDistance{<:Any, <:Any, <:Any, <:Any,
-                                              <:Union{RhoDistanceAlgorithm, CanonicalDistance}}}
-
-Alias for the distance estimators that [`logo!`](@ref) runs on the correlation matrix alone.
-
-The alias matches a [`Distance`](@ref) or a [`DistanceDistance`](@ref) whose algorithm is a [`RhoDistanceAlgorithm`](@ref) or a [`CanonicalDistance`](@ref). On a correlation matrix, the [`distance`](@ref) of each of these estimators reads no value of `X`. [`CanonicalDistance`](@ref) selects [`SimpleDistance`](@ref) on a matrix. So [`reads_sample_values`](@ref) of a [`LoGo`](@ref) answers `false` under one of these estimators, and [`logo!`](@ref) runs with no sample.
-
-# Related
-
-  - [`DVarInfo_DDVarInfo`](@ref)
-  - [`RhoDistanceAlgorithm`](@ref)
-  - [`CanonicalDistance`](@ref)
-  - [`reads_sample_values`](@ref)
-  - [`LoGo_dist_assert`](@ref)
-"""
-const DRho_DDRho = Union{Distance{<:Any, <:Union{RhoDistanceAlgorithm, CanonicalDistance}},
-                         DistanceDistance{<:Any, <:Any, <:Any, <:Any,
-                                          <:Union{RhoDistanceAlgorithm, CanonicalDistance}}}
-"""
     LoGo_dist_assert(de::DVarInfo_DDVarInfo, sigma::MatNum, X::MatNum; dims::Int = 1)
 
 Check that the asset axis of `X` has the size of `sigma`, for a distance estimator that reads `X`.
@@ -347,19 +327,16 @@ function LoGo_dist_assert(::AbstractDistanceEstimator, ::MatNum, ::MatNum; dims:
     return nothing
 end
 """
-    LoGo_dist_assert(de::DRho_DDRho, sigma::MatNum, X::Nothing; dims::Int = 1)
     LoGo_dist_assert(de::AbstractDistanceEstimator, sigma::MatNum, X::Nothing; dims::Int = 1)
 
 Check that a call of [`logo!`](@ref) with no sample has a distance estimator that reads no value of `X`.
 
-An incremental fit keeps no observation, so the estimate from its state calls [`logo!`](@ref) with `X = nothing`. An estimator of [`DRho_DDRho`](@ref) computes its distance from the correlation matrix alone, so it passes. Every other distance estimator can read `X`, and the method refuses it with an error that names it, before [`distance`](@ref) gets `nothing`.
+An incremental fit keeps no observation, so the estimate from its state calls [`logo!`](@ref) with `X = nothing`. A distance estimator for which [`reads_sample_values`](@ref) answers `false` computes its distance from the correlation matrix alone, so it passes. Every other distance estimator can read `X`, and the method refuses it with an error that names it, before [`distance`](@ref) gets `nothing`.
 
 # Algorithm
 
-The method that Julia selects is the algorithm.
-
- 1. An estimator of [`DRho_DDRho`](@ref) passes.
- 2. Every other subtype of [`AbstractDistanceEstimator`](@ref) raises an `IsNothingError`.
+ 1. Pass when `reads_sample_values(de)` is `false`.
+ 2. Otherwise, raise an `IsNothingError`.
 
 # Arguments
 
@@ -370,7 +347,7 @@ The method that Julia selects is the algorithm.
 
 # Validation
 
-  - `de` is an estimator of [`DRho_DDRho`](@ref). Otherwise, the method raises an `IsNothingError`.
+  - `reads_sample_values(de)` is `false`. Otherwise, the method raises an `IsNothingError`.
 
 # Returns
 
@@ -378,15 +355,13 @@ The method that Julia selects is the algorithm.
 
 # Related
 
-  - [`DRho_DDRho`](@ref)
   - [`reads_sample_values`](@ref)
   - [`logo!`](@ref)
 """
-function LoGo_dist_assert(::DRho_DDRho, ::MatNum, ::Nothing; dims::Int = 1)
-    return nothing
-end
 function LoGo_dist_assert(de::AbstractDistanceEstimator, ::MatNum, ::Nothing; dims::Int = 1)
-    return throw(IsNothingError("`X` is `nothing`, and the distance estimator `$(nameof(typeof(de)))` of the `LoGo` can read the values of the sample. Pass the sample `X`, or use a `Distance` or a `DistanceDistance` whose algorithm reads the correlation matrix alone, such as `CanonicalDistance()`."))
+    @argcheck(!reads_sample_values(de),
+              IsNothingError("`X` is `nothing`, and the distance estimator `$(nameof(typeof(de)))` of the `LoGo` can read the values of the sample. Pass the sample `X`, or use a distance that reads the correlation matrix alone, such as `CanonicalDistance()`. A distance estimator or a distance algorithm of your own states that with a method of `PortfolioOptimisers.reads_sample_values` that returns `false`."))
+    return nothing
 end
 """
     logo!(je::LoGo, sigma::MatNum, X::Option{<:MatNum} = nothing;
@@ -396,7 +371,7 @@ Write the LoGo (Local-Global) covariance matrix into `sigma`.
 
 The method builds a Triangulated Maximally Filtered Graph (TMFG) on a similarity matrix of the assets. It computes the LoGo precision matrix from the clique and separator blocks of `sigma`, and it writes the inverse of that precision matrix into `sigma`. When `je.pdm` is not `nothing`, [`posdef!`](@ref) then repairs `sigma` to the nearest positive definite matrix.
 
-`X` is optional when `je.de` is an estimator of [`DRho_DDRho`](@ref), because its distance reads the correlation matrix alone. The estimate from the state of an incremental fit calls the method with no sample, as [`reads_sample_values`](@ref) states.
+`X` is optional when [`reads_sample_values`](@ref) answers `false` for `je.de`, because its distance then reads the correlation matrix alone. The estimate from the state of an incremental fit calls the method with no sample, as [`reads_sample_values`](@ref) states.
 
 # Algorithm
 
@@ -420,7 +395,7 @@ The method builds a Triangulated Maximally Filtered Graph (TMFG) on a similarity
 
   - `size(sigma, 1) == size(sigma, 2)`.
   - The asset axis of `X` has `size(sigma, 1)` entries, when `je.de` reads `X`. [`LoGo_dist_assert`](@ref) holds this check, and it has a method for the variation-of-information estimators alone. Every other distance estimator takes the method on `AbstractDistanceEstimator`, which does nothing. Thus a default `LoGo()` accepts a `20 × 20` `sigma` with a `400 × 10` `X` and raises no error, because [`CanonicalDistance`](@ref) derives the distance from the correlation matrix and does not read `X`.
-  - With `X = nothing`, `je.de` is an estimator of [`DRho_DDRho`](@ref). Otherwise, [`LoGo_dist_assert`](@ref) raises an `IsNothingError`.
+  - With `X = nothing`, `reads_sample_values(je.de)` is `false`. Otherwise, [`LoGo_dist_assert`](@ref) raises an `IsNothingError`.
 
 # Returns
 
@@ -431,7 +406,7 @@ The method builds a Triangulated Maximally Filtered Graph (TMFG) on a similarity
   - [`LoGo`](@ref)
   - [`J_LoGo`](@ref)
   - [`LoGo_dist_assert`](@ref)
-  - [`DRho_DDRho`](@ref)
+  - [`reads_sample_values`](@ref)
   - [`PMFG_T2s`](@ref)
   - [`distance_to_similarity`](@ref)
   - [`Posdef`](@ref)
@@ -547,14 +522,11 @@ end
 
 [`LoGo`](@ref) method of [`reads_sample_values`](@ref).
 
-[`logo!`](@ref) reads `X` only through its distance estimator `je.de`. An estimator of [`DRho_DDRho`](@ref) reads the correlation matrix alone, so the method answers `false` for it, and an incremental fit runs the step from its state. The default `LoGo()`, with [`CanonicalDistance`](@ref), is one of them. A [`VariationInfoDistance`](@ref) reads the values of `X`. A [`FeatureDistance`](@ref) and a distance estimator of your own can read them. So the method answers `true` for every other estimator.
+[`logo!`](@ref) reads `X` only through its distance estimator `je.de`, so the method gives the answer of `je.de`. A [`Distance`](@ref) or a [`DistanceDistance`](@ref) whose algorithm reads the correlation matrix alone answers `false`, and an incremental fit runs the step from its state. The default `LoGo()`, with [`CanonicalDistance`](@ref), is one of them. A [`VariationInfoDistance`](@ref) reads the values of `X`, and a [`FeatureDistance`](@ref) reads a panel, so both answer `true`. A distance estimator or a distance algorithm of your own answers `true` unless it adds a method that answers `false`.
 
 # Algorithm
 
-The method that Julia selects is the algorithm.
-
- 1. A `LoGo` whose `de` is an estimator of [`DRho_DDRho`](@ref) answers `false`.
- 2. Every other `LoGo` answers `true`.
+ 1. Return `reads_sample_values(je.de)`.
 
 # Arguments
 
@@ -567,14 +539,12 @@ The method that Julia selects is the algorithm.
 # Related
 
   - [`reads_sample_values`](@ref)
-  - [`DRho_DDRho`](@ref)
+  - [`AbstractDistanceEstimator`](@ref)
+  - [`AbstractDistanceAlgorithm`](@ref)
   - [`LoGo_dist_assert`](@ref)
 """
-function reads_sample_values(::LoGo)
-    return true
-end
-function reads_sample_values(::LoGo{<:DRho_DDRho})
-    return false
+function reads_sample_values(je::LoGo)
+    return reads_sample_values(je.de)
 end
 
 export LoGo
