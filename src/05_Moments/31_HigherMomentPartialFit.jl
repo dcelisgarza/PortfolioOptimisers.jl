@@ -108,8 +108,8 @@ A pair of assets ``(p, q)`` is one column of the third accumulator and one row o
 
 # Related
 
-  - [`shift_comoment3`](@ref)
-  - [`shift_comoment4`](@ref)
+  - [`shift_comoment3!`](@ref)
+  - [`shift_comoment4!`](@ref)
   - [`partial_fit!`](@ref)
 """
 function comoment_block(X::MatNum)
@@ -145,14 +145,17 @@ Where:
 
 The three correction terms read the **old** accumulator ``M_2``, so a caller shifts the third accumulator before it overwrites the second one. The scalar case ``N = 1`` is the univariate Welford recursion ``M_3 \\leftarrow M_3 - 3 a M_2 - m a^3``.
 
+The function adds the shifted accumulator into `out`, so a merge writes the two shifted blocks into one array. It takes each entry from `a`, `M2` and `M3` in one loop, and it allocates nothing.
+
 # Algorithm
 
- 1. Form the pairwise product `az` of the displacement with itself, ordered as in [`comoment_block`](@ref).
- 2. Take the three correction terms in the second accumulator, one for each index of the third.
- 3. Subtract them, and subtract the displacement cubed scaled by the block count.
+ 1. Visit each entry ``(k, (p - 1) N + q)`` of `out`, ordered as in [`comoment_block`](@ref).
+ 2. Take the three correction terms in the second accumulator, one for each index of the third, and the displacement cubed scaled by the block count.
+ 3. Add the entry of `M3`, less those terms, to the entry of `out`.
 
 # Arguments
 
+  - `out`: The accumulator to add into, of the shape of `M3`. The function writes into it.
   - `m`: Number of observations in the block.
   - `a`: Displacement of the centre, `assets × 1`.
   - `M2`: Second central co-moment accumulator of the block, about its own mean.
@@ -160,30 +163,33 @@ The three correction terms read the **old** accumulator ``M_2``, so a caller shi
 
 # Returns
 
-  - `M3::MatNum`: The third accumulator of the same block about the shifted centre.
+  - `out::MatNum`: `out` plus the third accumulator of the same block about the shifted centre.
 
 # Related
 
-  - [`shift_comoment4`](@ref)
+  - [`shift_comoment4!`](@ref)
   - [`comoment_block`](@ref)
   - [`merge_states`](@ref)
 """
-function shift_comoment3(m::Number, a::VecNum, M2::MatNum, M3::MatNum)
-    at = transpose(a)
-    az = kron(a, a)
-    return M3 .- a * transpose(vec(M2)) .- kron(at, M2) .- kron(M2, at) .-
-           m .* (a * transpose(az))
+function shift_comoment3!(out::MatNum, m::Number, a::VecNum, M2::MatNum, M3::MatNum)
+    N = length(a)
+    @inbounds for p in 1:N, q in 1:N, k in 1:N
+        c = (p - 1) * N + q
+        out[k, c] += M3[k, c] - a[k] * M2[q, p] - a[p] * M2[k, q] - M2[k, p] * a[q] -
+                     m * a[k] * a[p] * a[q]
+    end
+    return out
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Moves the fourth central co-moment accumulator of one block from its own mean to a shifted centre.
 
-The companion of [`shift_comoment3`](@ref), derived from the same expansion carried one order further. It reads the third and the second accumulator of the block, so a caller shifts the fourth one first.
+The companion of [`shift_comoment3!`](@ref), derived from the same expansion carried one order further. It reads the third and the second accumulator of the block, so a caller shifts the fourth one first.
 
 # Mathematical definition
 
-With the notation of [`shift_comoment3`](@ref), expanding the product of four shifted deviations and dropping every term that carries a lone ``\\sum_t y_t`` gives
+With the notation of [`shift_comoment3!`](@ref), expanding the product of four shifted deviations and dropping every term that carries a lone ``\\sum_t y_t`` gives
 
 ```math
 \\begin{align}
@@ -201,17 +207,20 @@ Where:
   - ``a``: displacement of the centre.
   - ``M_2``, ``M_3``, ``M_4``: second, third and fourth central co-moment accumulators of the block about its own mean.
 
-The four third-order terms are one per index, and the six second-order terms are one per pair of indices. Both accumulators are fully symmetric in their indices, so each term is one Kronecker product of the displacement with the accumulator. The scalar case ``N = 1`` is the univariate Welford recursion ``M_4 \\leftarrow M_4 - 4 a M_3 + 6 a^2 M_2 + m a^4``.
+The four third-order terms are one per index, and the six second-order terms are one per pair of indices. The scalar case ``N = 1`` is the univariate Welford recursion ``M_4 \\leftarrow M_4 - 4 a M_3 + 6 a^2 M_2 + m a^4``.
+
+The function adds the shifted accumulator into `out`, so a merge writes the two shifted blocks into one array of the size of `M4`. It takes each entry from `a`, `M2` and `M3` in one loop. Its one allocation is a transposed copy of `M3`, of `assets³` entries, so that the loop reads both forms of the third-order term down a column. At 30 assets, the copy makes the call 23 % faster. A form that builds each of the ten terms as an `assets² × assets²` array allocated 68 MiB per call.
 
 # Algorithm
 
- 1. Form the pairwise product `az` of the displacement with itself, and the outer product `aa`.
- 2. Subtract the four third-order terms, one for each index of the fourth accumulator.
- 3. Add the six second-order terms, one for each pair of indices.
- 4. Add the displacement to the fourth power, scaled by the block count.
+ 1. Transpose `M3`. Then visit each entry ``((p - 1) N + q, (r - 1) N + s)`` of `out`, ordered as in [`comoment_block`](@ref).
+ 2. Take the four third-order terms, one for each index of the fourth accumulator.
+ 3. Take the six second-order terms, one for each pair of indices, and the displacement to the fourth power scaled by the block count.
+ 4. Add the entry of `M4`, less the third-order terms and plus the others, to the entry of `out`.
 
 # Arguments
 
+  - `out`: The accumulator to add into, of the shape of `M4`. The function writes into it.
   - `m`: Number of observations in the block.
   - `a`: Displacement of the centre, `assets × 1`.
   - `M2`: Second central co-moment accumulator of the block, about its own mean.
@@ -220,24 +229,32 @@ The four third-order terms are one per index, and the six second-order terms are
 
 # Returns
 
-  - `M4::MatNum`: The fourth accumulator of the same block about the shifted centre.
+  - `out::MatNum`: `out` plus the fourth accumulator of the same block about the shifted centre.
 
 # Related
 
-  - [`shift_comoment3`](@ref)
+  - [`shift_comoment3!`](@ref)
   - [`comoment_block`](@ref)
   - [`merge_states`](@ref)
 """
-function shift_comoment4(m::Number, a::VecNum, M2::MatNum, M3::MatNum, M4::MatNum)
-    at = transpose(a)
-    aa = a * at
-    az = kron(a, a)
-    v2 = vec(M2)
-    M3t = transpose(M3)
-    cross = kron(a, kron(M2, at))
-    return M4 .- kron(a, M3) .- kron(M3, a) .- kron(at, M3t) .- kron(M3t, at) .+
-           az * transpose(v2) .+ v2 * transpose(az) .+ kron(aa, M2) .+ kron(M2, aa) .+
-           cross .+ transpose(cross) .+ m .* (az * transpose(az))
+function shift_comoment4!(out::MatNum, m::Number, a::VecNum, M2::MatNum, M3::MatNum,
+                          M4::MatNum)
+    N = length(a)
+    M3t = permutedims(M3)
+    @inbounds for r in 1:N, s in 1:N, p in 1:N, q in 1:N
+        i = (p - 1) * N + q
+        j = (r - 1) * N + s
+        ap, aq, ar, as = a[p], a[q], a[r], a[s]
+        t3 = ap * M3[q, j] + aq * M3[p, j] + ar * M3t[i, s] + as * M3t[i, r]
+        t2 = ap * aq * M2[s, r] +
+             ar * as * M2[q, p] +
+             ap * ar * M2[q, s] +
+             aq * as * M2[p, r] +
+             ap * as * M2[q, r] +
+             aq * ar * M2[s, p]
+        out[i, j] += M4[i, j] - t3 + t2 + m * ap * aq * ar * as
+    end
+    return out
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -292,7 +309,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds two [`CoskewnessPartialFitState`](@ref) fitted on disjoint blocks into the state of the concatenated block.
 
-The count, the mean and the second accumulator take Chan's merge. The third accumulator is moved to the common mean one block at a time, with [`shift_comoment3`](@ref), and the two shifted accumulators are added.
+The count, the mean and the second accumulator take Chan's merge. The third accumulator is moved to the common mean one block at a time, with [`shift_comoment3!`](@ref), and the two shifted accumulators are added into one array.
 
 # Algorithm
 
@@ -317,14 +334,15 @@ The count, the mean and the second accumulator take Chan's merge. The third accu
 # Related
 
   - [`CoskewnessPartialFitState`](@ref)
-  - [`shift_comoment3`](@ref)
+  - [`shift_comoment3!`](@ref)
   - [`chan_merge`](@ref)
 """
 function merge_states(a::CoskewnessPartialFitState, b::CoskewnessPartialFitState)
     assert_mergeable_states(a, b)
     n, mu, M2 = chan_merge(a.n, a.mu, a.M2, b.n, b.mu, b.M2)
-    M3 = shift_comoment3(a.n, mu .- a.mu, a.M2, a.M3) .+
-         shift_comoment3(b.n, mu .- b.mu, b.M2, b.M3)
+    M3 = zeros(promote_type(eltype(mu), eltype(a.M3), eltype(b.M3)), size(a.M3))
+    shift_comoment3!(M3, a.n, mu .- a.mu, a.M2, a.M3)
+    shift_comoment3!(M3, b.n, mu .- b.mu, b.M2, b.M3)
     return CoskewnessPartialFitState(n, mu, M2, M3)
 end
 """
@@ -386,7 +404,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds two [`CokurtosisPartialFitState`](@ref) fitted on disjoint blocks into the state of the concatenated block.
 
-The companion of the [`CoskewnessPartialFitState`](@ref) merge, carried one order further. The fourth accumulator is shifted before the third, because [`shift_comoment4`](@ref) reads the third accumulator of the block about its own mean.
+The companion of the [`CoskewnessPartialFitState`](@ref) merge, carried one order further. The fourth accumulator is shifted before the third, because [`shift_comoment4!`](@ref) reads the third accumulator of the block about its own mean.
 
 # Algorithm
 
@@ -412,7 +430,7 @@ The companion of the [`CoskewnessPartialFitState`](@ref) merge, carried one orde
 # Related
 
   - [`CokurtosisPartialFitState`](@ref)
-  - [`shift_comoment4`](@ref)
+  - [`shift_comoment4!`](@ref)
   - [`chan_merge`](@ref)
 """
 function merge_states(a::CokurtosisPartialFitState, b::CokurtosisPartialFitState)
@@ -420,9 +438,12 @@ function merge_states(a::CokurtosisPartialFitState, b::CokurtosisPartialFitState
     n, mu, M2 = chan_merge(a.n, a.mu, a.M2, b.n, b.mu, b.M2)
     da = mu .- a.mu
     db = mu .- b.mu
-    M4 = shift_comoment4(a.n, da, a.M2, a.M3, a.M4) .+
-         shift_comoment4(b.n, db, b.M2, b.M3, b.M4)
-    M3 = shift_comoment3(a.n, da, a.M2, a.M3) .+ shift_comoment3(b.n, db, b.M2, b.M3)
+    M4 = zeros(promote_type(eltype(mu), eltype(a.M4), eltype(b.M4)), size(a.M4))
+    shift_comoment4!(M4, a.n, da, a.M2, a.M3, a.M4)
+    shift_comoment4!(M4, b.n, db, b.M2, b.M3, b.M4)
+    M3 = zeros(promote_type(eltype(mu), eltype(a.M3), eltype(b.M3)), size(a.M3))
+    shift_comoment3!(M3, a.n, da, a.M2, a.M3)
+    shift_comoment3!(M3, b.n, db, b.M2, b.M3)
     return CokurtosisPartialFitState(n, mu, M2, M3, M4)
 end
 """
@@ -594,7 +615,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 [`Coskewness`](@ref) method of [`partial_fit`](@ref). Forwards to [`partial_fit!`](@ref), because the fold already writes into no array of the state it was given.
 
-This is the one family that overrides the generic method. The generic method copies the state before it folds, and a copy is what gives the verb its value semantics. This family's fold reaches [`merge_states`](@ref), which reads the two states and builds a third, so the estimator handed over is already left as it was and the copy buys nothing. The override is kept for a measured loss: at 30 assets, one row takes 0.29 ms and 2.5 MiB through it, and 0.34 ms and 2.7 MiB through the generic method.
+This is the one family that overrides the generic method. The generic method copies the state before it folds, and a copy is what gives the verb its value semantics. This family's fold reaches [`merge_states`](@ref), which reads the two states and builds a third, so the estimator handed over is already left as it was and the copy buys nothing. The override is kept for a measured loss: at 30 assets, one row takes 0.11 ms and 0.46 MiB through it, and 0.13 ms and 0.67 MiB through the generic method.
 
 # Algorithm
 
@@ -758,7 +779,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 [`Cokurtosis`](@ref) method of [`partial_fit`](@ref). Forwards to [`partial_fit!`](@ref), because the fold already writes into no array of the state it was given.
 
-The companion of the [`Coskewness`](@ref) method, and the one that pays for the override. The generic method would copy `M4` before every fold, which is `assets² × assets²`: 800 MB at a hundred assets, per call, for a copy no caller reads. The override is kept for that measured loss: at 30 assets, one row allocates 151 MiB through it, and 158 MiB through the generic method.
+The companion of the [`Coskewness`](@ref) method, and the one that pays for the override. The generic method would copy `M4` before every fold, which is `assets² × assets²`: 800 MB at a hundred assets, per call, for a copy no caller reads. The override is kept for that measured loss: at 30 assets, one row allocates 13.2 MiB through it, and 19.6 MiB through the generic method.
 
 # Algorithm
 

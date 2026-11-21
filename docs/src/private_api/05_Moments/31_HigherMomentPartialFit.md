@@ -1,5 +1,5 @@
 ```@meta
-Description = "Higher-Moment Partial Fit, private API of PortfolioOptimisers.jl: CoskewnessPartialFitState, CokurtosisPartialFitState, comoment_block, shift_comoment3, …"
+Description = "Higher-Moment Partial Fit, private API of PortfolioOptimisers.jl: CoskewnessPartialFitState, CokurtosisPartialFitState, comoment_block, shift_comoment3!, …"
 ```
 
 # Higher-Moment Partial Fit: private API
@@ -17,8 +17,8 @@ PortfolioOptimisers.CokurtosisPartialFitState
 
 ```@docs
 PortfolioOptimisers.comoment_block
-PortfolioOptimisers.shift_comoment3
-PortfolioOptimisers.shift_comoment4
+PortfolioOptimisers.shift_comoment3!
+PortfolioOptimisers.shift_comoment4!
 PortfolioOptimisers.assert_partial_fittable(me::PortfolioOptimisers.AbstractExpectedReturnsEstimator, w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights}, name::AbstractString)
 PortfolioOptimisers.assert_partial_fittable(::Nothing, w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights}, name::AbstractString)
 Base.copy(x::PortfolioOptimisers.CoskewnessPartialFitState)

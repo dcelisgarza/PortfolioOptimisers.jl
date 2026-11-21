@@ -735,4 +735,31 @@ using Statistics
         @test_throws ArgumentError coskewness(ske)
         @test_throws ArgumentError cokurtosis(kte)
     end
+
+    @testset "The shift is the direct sum about the new centre, and a row fold holds two arrays of the size of M4 (#2228)" begin
+        # The shifts add into `out`, so a nonzero `out` checks the add as well as the shift.
+        a = randn(StableRNG(2228), N)
+        n, mu, M2, M3, z = PO.comoment_block(X)
+        M4 = transpose(z) * z
+        Yd = X .- transpose(mu .+ a)
+        o = ones(1, N)
+        zd = kron(o, Yd) .* kron(Yd, o)
+        M3d = transpose(Yd) * zd
+        M4d = transpose(zd) * zd
+        out3 = fill(0.5, size(M3))
+        out4 = fill(0.5, size(M4))
+        @test PO.shift_comoment3!(out3, n, a, M2, M3) === out3
+        @test PO.shift_comoment4!(out4, n, a, M2, M3, M4) === out4
+        @test isapprox(out3, M3d .+ 0.5; rtol = 1e-13)
+        @test isapprox(out4, M4d .+ 0.5; rtol = 1e-13)
+
+        # Ten terms built as full arrays held about 24 arrays of the size of `M4` per row. The
+        # fold now holds the block's own `M4` and the merged one.
+        Xw = randn(StableRNG(22), 20, 12)
+        kw = partial_fit!(Cokurtosis(), Xw)
+        x1 = Xw[1:1, :]
+        fold_bytes(k, x) = @allocated partial_fit!(k, x)
+        fold_bytes(kw, x1)
+        @test fold_bytes(kw, x1) < 3 * sizeof(kw.cache.M4)
+    end
 end
