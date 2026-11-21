@@ -67,7 +67,7 @@ const CS_MAD_CONSISTENCY = 1.4826022185056018
 
 Check that a cross-sectional data matrix is non-empty and holds no infinite cell.
 
-A `NaN` is the marker for a missing cell, so it is admitted and preserved. An infinity is neither a value nor a marker: it survives a quantile, a median and a mean, and it turns every statistic of its observation into an infinity or a `NaN` without saying why.
+A `NaN` is the marker for a missing cell, so it is admitted and preserved. An infinity is neither a value nor a marker. It survives a quantile, a median and a mean, and it turns every statistic of its observation into an infinity or a `NaN` with no message.
 
 # Algorithm
 
@@ -107,7 +107,7 @@ end
 
 Check a benchmark weight matrix against the data matrix it selects the estimation set of.
 
-A weight is a selector first and a weight second: a positive weight puts the cell in the estimation set of its observation, and a zero weight leaves it out. A `NaN` weight therefore says neither, and a negative weight says less than nothing.
+A weight selects first and weights second. A positive weight puts the cell in the estimation set of its observation, and a zero weight leaves it out. So a `NaN` weight neither selects nor leaves out, and a negative weight has no meaning.
 
 # Algorithm
 
@@ -569,13 +569,9 @@ end
 
 Return how many entries of a sorted vector sit below a value, and how many sit at or below it.
 
-The pair is what a midrank needs: their average is the rank a tie shares. Two binary searches read
-it in logarithmic time, and the second starts where the first stopped, because a value at or below
-`x` is never below one that is below it.
-
-The searches are written out rather than taken from `Base`, because a loaded dependency adds its own
-methods to `searchsortedfirst` and `searchsortedlast`, and the static analysis gate reads those arms
-and refuses the call.
+A midrank needs the pair, because the average of the two counts is the rank that a tie shares. Two
+binary searches find the pair in logarithmic time. The second search starts where the first one
+stopped, because every entry below `x` is also at or below `x`.
 
 # Algorithm
 
@@ -609,6 +605,9 @@ julia> PortfolioOptimisers.cross_sectional_rank_counts([1.0, 2.0, 2.0, 3.0], 0.5
   - [`CrossSectionalPercentileRank`](@ref)
 """
 function cross_sectional_rank_counts(v::AbstractVector, x::Number)::Tuple{Int, Int}
+    # The searches are written out, not taken from `searchsortedfirst` and `searchsortedlast`.
+    # A loaded dependency adds its own methods to those two functions, and JET reads those
+    # methods and reports the call.
     lo = 0
     hi = length(v)
     while lo < hi
@@ -776,22 +775,28 @@ $(DocStringExtensions.TYPEDEF)
 
 Clips every value of an observation into the band between two percentiles of that observation's cross-section.
 
-The clip is a hard one, so a value beyond a band edge takes the edge itself and every value inside the band is untouched. It is the cheapest way to stop one asset's extreme reading from dominating a cross-sectional fit.
+The clip is a hard one, so a value beyond a band edge takes the edge itself and every value inside the band is untouched. It stops one extreme value from dominating a cross-sectional fit, at the cost of one sort for each observation.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-x_{t,i}' &= \\min\\left(\\max\\left(x_{t,i},\\, q_{t}^{\\mathrm{lo}}\\right),\\, q_{t}^{\\mathrm{hi}}\\right)\\,.
+x_{t,i}' &= \\min\\left(\\max\\left(x_{t,i},\\, q_{t}(\\ell)\\right),\\, q_{t}(u)\\right) \\\\
+q_{t}(p) &= v_{t,(k)} + (h - k) \\left(v_{t,(\\min(k + 1,\\, n_{t}))} - v_{t,(k)}\\right) \\\\
+h &= (n_{t} - 1) \\, p + 1\\,, \\quad k = \\lfloor h \\rfloor\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``x_{t,i}``: Value of asset ``i`` at observation ``t``.
-  - ``q_{t}^{\\mathrm{lo}}``, ``q_{t}^{\\mathrm{hi}}``: Percentiles of the estimation set of observation ``t``, at the levels `low` and `high`.
+  - $(math_dict[:x_ti_cst])
+  - $(math_dict[:E_t_cst])
+  - ``n_{t} = \\lvert \\mathcal{E}_{t} \\rvert``: Size of the estimation set of observation ``t``.
+  - ``v_{t,(k)}``: The ``k``-th smallest value of the estimation set of observation ``t``.
+  - ``q_{t}(p)``: Sample quantile of the estimation set of observation ``t`` at the level ``p``, the linear interpolation between two adjacent order statistics.
+  - ``\\ell``, ``u``: Levels `low` and `high` of the lower and the upper edge of the band.
 
-The percentiles are equal-weighted over the estimation set. An asset outside that set is still clipped to the same band, and a `NaN` stays a `NaN`.
+Every asset of the estimation set has the same importance in the quantiles. An asset outside that set is still clipped to the same band, and a `NaN` stays a `NaN`.
 
 # Fields
 
@@ -847,26 +852,30 @@ $(DocStringExtensions.TYPEDEF)
 
 Compresses every value of an observation towards the centre of that observation's cross-section, through a hyperbolic tangent.
 
-The map is smooth and strictly increasing, so it creates no jump at a threshold and it keeps the order of the tail. A value near the centre moves almost not at all, and a value far from it is pulled in hard. The output keeps the units of the input.
+The map is smooth and strictly increasing, so it creates no jump at a threshold and it keeps the order of the tail. A value near the centre moves very little, and a value far from it moves a lot. The output keeps the units of the input.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
 x_{t,i}' &= m_{t} + h_{t} \\tanh\\left(\\frac{x_{t,i} - m_{t}}{h_{t}}\\right) \\\\
-h_{t} &= c \\, \\gamma \\, \\mathrm{med}_{j}\\left(\\left\\lvert x_{t,j} - m_{t} \\right\\rvert\\right)\\,.
+h_{t} &= c \\, \\gamma \\, \\underset{j \\in \\mathcal{E}_{t}}{\\mathrm{median}} \\left\\lvert x_{t,j} - m_{t} \\right\\rvert \\\\
+m_{t} &= \\underset{j \\in \\mathcal{E}_{t}}{\\mathrm{median}} \\, x_{t,j} \\\\
+\\gamma &= 1 / \\Phi^{-1}(3/4) \\approx 1.4826\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``x_{t,i}``: Value of asset ``i`` at observation ``t``.
+  - $(math_dict[:x_ti_cst])
+  - $(math_dict[:E_t_cst])
   - ``m_{t}``: Median of the estimation set of observation ``t``.
-  - ``\\gamma``: The constant `1.4826…`, which makes a median absolute deviation consistent with a standard deviation under normality.
-  - ``c``: Compression knee.
+  - ``\\gamma``: Consistency constant, [`CS_MAD_CONSISTENCY`](@ref).
+  - $(math_dict[:Phi_normal])
+  - ``c``: Compression knee, the field `knee`.
   - ``h_{t}``: Half-width of the near-linear region of observation ``t``.
 
-The median and the median absolute deviation are equal-weighted over the estimation set. An asset outside that set is still compressed against the same statistics, and a `NaN` stays a `NaN`. An observation whose robust scale is at or below `atol` is returned unchanged, because it carries no dispersion to compress against.
+For a Gaussian sample with standard deviation ``\\sigma``, the median absolute deviation about the median is ``\\Phi^{-1}(3/4) \\, \\sigma``, so ``\\gamma`` times it estimates ``\\sigma``. Every asset of the estimation set has the same importance in the two medians. An asset outside that set is still compressed against the same statistics, and a `NaN` stays a `NaN`. An observation whose robust scale is at or below `atol` is returned unchanged, because it carries no dispersion to compress against.
 
 # Fields
 
@@ -939,12 +948,13 @@ z_{t,i} &= \\frac{x_{t,i} - \\mu_{t}}{\\sigma_{t}} \\\\
 
 Where:
 
-  - ``x_{t,i}``: Value of asset ``i`` at observation ``t``.
-  - ``w_{t,j}``: Benchmark weight of asset ``j`` at observation ``t``.
-  - ``\\mathcal{E}_{t}``: Estimation set of observation ``t``.
-  - ``\\mu_{t}``, ``\\sigma_{t}``: Centre and scale of observation ``t``.
+  - ``z_{t,i}``: Score of asset ``i`` at observation ``t``.
+  - $(math_dict[:x_ti_cst])
+  - $(math_dict[:w_tj_bench])
+  - $(math_dict[:E_t_cst])
+  - $(math_dict[:mu_sigma_t_cst])
 
-With group labels the same pair is computed inside each group, and the score is recentred and rescaled over the whole observation afterwards. A group holding fewer than `min_group_size` estimation assets, and every asset labelled [`CS_MISSING_GROUP`](@ref), takes the whole-observation pair instead. An observation whose scale is at or below `atol` scores zero, and a `NaN` stays a `NaN`.
+With group labels the same pair is computed inside each group, and the score is recentred and rescaled over the whole observation afterwards. A group holding fewer than `min_group_size` estimation assets, and every asset labelled [`CS_MISSING_GROUP`](@ref), takes the whole-observation pair instead. A cell whose scale is at or below `atol` scores zero, and a `NaN` stays a `NaN`.
 
 # Fields
 
@@ -1002,24 +1012,30 @@ $(DocStringExtensions.TYPEDEF)
 
 Scores every value of an observation by the inverse normal of its cross-sectional percentile rank.
 
-The score depends on the order of the cross-section and not on the size of its gaps, so one extreme reading moves no other asset's score. The inverse normal spreads the ranks the way a normal sample would be spread, which is what makes the output usable as a factor exposure.
+The score depends on the order of the cross-section and not on the size of its gaps, so one extreme reading moves no other asset's score. The inverse normal spreads the ranks as a normal sample is spread, so the output can serve as a factor exposure.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-z_{t,i} &= \\frac{\\Phi^{-1}\\left(p_{t,i}\\right) - \\mu_{t}}{\\sigma_{t}}\\,.
+z_{t,i} &= \\frac{g_{t,i} - \\mu_{t}}{\\sigma_{t}} \\\\
+g_{t,i} &= \\Phi^{-1}\\left(p_{t,i}\\right) \\\\
+\\mu_{t} &= \\frac{\\sum_{j \\in \\mathcal{E}_{t}} w_{t,j} g_{t,j}}{\\sum_{j \\in \\mathcal{E}_{t}} w_{t,j}} \\\\
+\\sigma_{t} &= \\sqrt{\\frac{1}{\\lvert \\mathcal{E}_{t} \\rvert - 1} \\sum_{j \\in \\mathcal{E}_{t}} \\left(g_{t,j} - \\mu_{t}\\right)^{2}}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``p_{t,i}``: Percentile rank of asset ``i`` at observation ``t``, as [`CrossSectionalPercentileRank`](@ref) defines it.
-  - ``\\Phi^{-1}``: Inverse cumulative distribution function of the standard normal distribution.
-  - ``\\mu_{t}``: Weighted centre of the inverse normals of observation ``t``.
-  - ``\\sigma_{t}``: Equal-weighted scale of the inverse normals of observation ``t``, which is divided by only when `scale` is `true`.
+  - ``z_{t,i}``: Score of asset ``i`` at observation ``t``.
+  - ``g_{t,i}``: Inverse normal of the percentile rank of asset ``i`` at observation ``t``.
+  - $(math_dict[:p_ti_rank]) [`CrossSectionalPercentileRank`](@ref) defines it.
+  - $(math_dict[:Phi_normal])
+  - $(math_dict[:w_tj_bench])
+  - $(math_dict[:E_t_cst])
+  - $(math_dict[:mu_sigma_t_cst])
 
-The ranking is equal-weighted over the estimation set, and the recentring is weighted. The recentring and the rescaling always run over the whole observation, never inside a group. An observation whose scale is at or below `atol` scores zero after the recentring, and a `NaN` stays a `NaN`.
+With `scale = false` the score is ``g_{t,i} - \\mu_{t}``, and no division by ``\\sigma_{t}`` happens. Every asset of the estimation set has the same importance in the ranking, and the recentring is weighted. The recentring and the rescaling always run over the whole observation, never inside a group. An observation whose scale is at or below `atol` scores zero after the recentring, and a `NaN` stays a `NaN`.
 
 # Fields
 
@@ -1095,11 +1111,11 @@ p_{t,i} &= \\mathrm{clamp}\\left(\\frac{\\#\\left\\{j \\in \\mathcal{E}_{t} : x_
 
 Where:
 
-  - ``x_{t,i}``: Value of asset ``i`` at observation ``t``.
-  - ``\\mathcal{E}_{t}``: Estimation set of observation ``t``.
-  - ``p_{t,i}``: Percentile rank of asset ``i`` at observation ``t``.
+  - $(math_dict[:p_ti_rank])
+  - $(math_dict[:x_ti_cst])
+  - $(math_dict[:E_t_cst])
 
-The ranking is equal-weighted over the estimation set, so a benchmark weight selects that set and nothing else. With group labels an asset is ranked inside its own group. A group holding fewer than `min_group_size` estimation assets, and every asset labelled [`CS_MISSING_GROUP`](@ref), is ranked against the whole observation instead. A `NaN` stays a `NaN`.
+Without a tie, an asset of rank ``r`` among ``n`` assets of the estimation set scores ``(r - 1/2) / n``, the centre of its bin. Every asset of the estimation set has the same importance in the ranking, so a benchmark weight selects that set and has no other effect. With group labels an asset is ranked inside its own group. A group holding fewer than `min_group_size` estimation assets, and every asset labelled [`CS_MISSING_GROUP`](@ref), is ranked against the whole observation instead. A `NaN` stays a `NaN`.
 
 # Fields
 
@@ -1154,16 +1170,17 @@ end
 
 Transform each observation of a matrix against the other assets of that same observation.
 
-An Exposure Estimator holds its outlier slot and its scoring slot as `Option{<:AbstractCrossSectionalTransform}`, where `nothing` skips the step. The method on `Nothing` returns `X` unchanged, without a check, so a member calls this function on each slot and never writes the two branches.
+An Exposure Estimator holds its outlier slot and its scoring slot as `Option{<:AbstractCrossSectionalTransform}`, where `nothing` skips the step. The method on `Nothing` returns `X` unchanged, without a check, so the estimator calls this function on each slot and needs no branch of its own.
 
 The benchmark weights and the group labels are arguments and never fields, because one transform runs against a different benchmark and a different classification at every call site, while the transform itself is one configuration.
 
-Four rules are shared by every member:
+Three rules hold for every member:
 
-  - The **estimation set** of an observation is its finite cells carrying a positive weight when `w` is given, and its finite cells otherwise. It is what the statistics are computed from.
+  - The **estimation set** of an observation is its finite cells carrying a positive weight when `w` is given, and its finite cells otherwise. The statistics are computed from it.
   - A cell outside the estimation set is still transformed **against** it, so an asset the benchmark does not hold is scored on the same scale as one it does.
   - An observation whose estimation set is empty returns a missing marker at every asset, because it has nothing to be transformed against.
-  - The two outlier members accept `groups` and ignore it: an outlier is extreme against the whole cross-section, not against a sector.
+
+The two outlier members, [`CrossSectionalWinsoriser`](@ref) and [`CrossSectionalTanhShrinker`](@ref), accept `groups` and ignore it. An outlier is extreme against the whole cross-section, not against a sector.
 
 # Algorithm
 
@@ -1446,14 +1463,14 @@ Derive the group labels of a cross-sectional transform from a one-hot block, or 
 
 The one-hot form and the panel form return the `observations × assets` label matrix [`cross_sectional_transform`](@ref) takes, where a label is the position of a level in the level order and [`CS_MISSING_GROUP`](@ref) marks an asset with no level. No grouping field gives no group labels, `nothing`, as the slot `groups::Option` of [`cross_sectional_transform`](@ref) reads it: each observation is one cross-section.
 
-In the one-hot form, an asset carries a one in the column of the level it belongs to, and an asset whose row sets no level has no group. In the panel form, the codes of a [`CategoricalPanelField`](@ref) are the labels, and two kinds of cell have no group. A cell its fill policy wrote (`omsk` is `false`) has none: the fill resolved a blank so that the Panel Field holds no blank, and a fill value is not a membership, so the read undoes it, as [`OneHotExposure`](@ref) and [`descriptor_field_values`](@ref) do for the same cell. A cell outside the universe (`amsk` is `false`) has none either: the panel keeps a code there, and a group that counted it would count an asset the universe does not hold.
+In the one-hot form, an asset carries a one in the column of the level it belongs to, and an asset whose row sets no level has no group. A cell sets its level when it is finite and not zero. So an asset that is not live, which [`OneHotExposure`](@ref) writes as `NaN` across every level, has no group. In the panel form, the codes of a [`CategoricalPanelField`](@ref) are the labels, and two kinds of cell have no group. A cell its fill policy wrote (`omsk` is `false`) has none: the fill resolved a blank so that the Panel Field holds no blank, and a fill value is not a membership, so the read undoes it, as [`OneHotExposure`](@ref) and [`descriptor_field_values`](@ref) do for the same cell. A cell outside the universe (`amsk` is `false`) has none either: the panel keeps a code there, and a group that counted it would count an asset the universe does not hold.
 
 # Algorithm
 
 One-hot form:
 
  1. Label every asset [`CS_MISSING_GROUP`](@ref).
- 2. Walk the levels of each asset, and label the asset with the first level it sets.
+ 2. Walk the levels of each asset, and label the asset with the first level whose cell is finite and not zero.
 
 Panel form:
 
@@ -1504,7 +1521,7 @@ function cross_sectional_groups(B::AbstractArray{<:Real, 3})::Matrix{Int}
     G = fill(CS_MISSING_GROUP, size(B, 3), size(B, 1))
     for t in axes(B, 3), i in axes(B, 1)
         for l in axes(B, 2)
-            if !iszero(B[i, l, t])
+            if isfinite(B[i, l, t]) && !iszero(B[i, l, t])
                 G[t, i] = l
                 break
             end

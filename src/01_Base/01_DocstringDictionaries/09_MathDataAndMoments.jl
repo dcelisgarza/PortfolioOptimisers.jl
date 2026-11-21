@@ -162,6 +162,13 @@ unique_key_dict!(math_dict, :math_dict,
                  :p_mcap => "``p``: Market capitalisation power.",#
                  :M_cs_mask => "``\\mathcal{M}``: Eligibility mask, the set of pairs ``(t, i)`` that enter the fit.",#
                  :rho_S_cs => "``\\rho_{S}``: Cross-sectional rank correlation, over the assets at which both cross-sections are finite. Under the default `ties = :average`, equal values share the mean of their ranks. Under `ties = :ordinal`, they take consecutive ranks, in the order of the asset axis.",#
+                 # The cross-sectional transforms of `14_CrossSectionalTransforms.jl`. Each
+                 # symbol is stated by two or more Units of that file.
+                 :x_ti_cst => "``x_{t,i}``: Input value of asset ``i`` at observation ``t``, `NaN` at a missing cell.",#
+                 :w_tj_bench => "``w_{t,j}``: Benchmark weight of asset ``j`` at observation ``t``. Every weight is one when no benchmark weights are given.",#
+                 :E_t_cst => "``\\mathcal{E}_{t}``: Estimation set of observation ``t``, the assets whose value is finite and whose benchmark weight is positive. It is every asset with a finite value when no benchmark weights are given.",#
+                 :p_ti_rank => "``p_{t,i}``: Percentile rank of asset ``i`` at observation ``t``, against the estimation set of its observation.",#
+                 :mu_sigma_t_cst => "``\\mu_{t}``, ``\\sigma_{t}``: Weighted centre and equal-weighted scale of observation ``t``, both over its estimation set.",#
                  # The factor model summary of `32_CrossSectionalFactorModel/`. Each symbol
                  # is stated by two or more Units of `10_FactorModelSummary.jl`.
                  :f_tk_summary => "``f_{tk}``: Factor return of factor ``k`` at observation ``t``, an entry of the factor return history.",#
