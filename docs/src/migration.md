@@ -1039,7 +1039,7 @@ A static `TensorPanelField` and a static feature matrix keep `assets × labels` 
 - **A regression target of your own subtypes one of two families.** A target that subtypes `AbstractRegressionTarget` directly subtypes `AbstractUnpenalisedRegressionTarget` or `AbstractPenalisedRegressionTarget` now, both public. An unpenalised target takes every criterion of `StepwiseRegression`. A penalised target takes `:aic`, `:aicc` and `:bic`, as `ElasticNet` does. A target in neither family raises a `MethodError` in `StepwiseRegression` under the default `PValue()`, `:r2` and `:adjr2`.
 - **`RiskBudgeting`** has a field `kmin` before `fb`, so its positional constructor takes six arguments, `RiskBudgeting(opt, r, rba, wi, kmin, fb)`, where v0.33 took five. The keyword constructor keeps every v0.33 keyword.
 
-## From v0.34 to v0.35
+## From v0.34.0 to v0.34.1
 
 ### [Calls that now raise](@id migration-0-35-raises)
 
