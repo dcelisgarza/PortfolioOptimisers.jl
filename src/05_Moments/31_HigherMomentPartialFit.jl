@@ -529,7 +529,7 @@ The estimator that carries no state adopts the block's state. The estimator that
 
 The method builds a new state and does not write into the arrays of the old one, because [`merge_states`](@ref) holds the one merge of two blocks. A caller must not rely on that. The verb promises nothing about an estimator kept from before the call, and [`partial_fit`](@ref) is the verb that does. This family overrides [`partial_fit`](@ref), because a copy of a state that the fold never writes into buys nothing.
 
-The state keeps no observation, so the read-out gives `ske.mp` a matrix of zeros of the shape of the sample. The steps `:pdm`, `:dn` and `:dt` of a [`MatrixProcessing`](@ref) read no value of it. An `:alg` step can read the values, as [`LoGo`](@ref) does under a variation of information distance. So the method refuses an `mp` that does not run from the shape of the sample, before it folds a row. [`Online`](@ref) keeps the observations and runs such a step.
+The state keeps no observation, so `coskewness(ske)` gives `ske.mp` a matrix of zeros of the shape of the sample. The steps `:pdm`, `:dn` and `:dt` of a [`MatrixProcessing`](@ref) read no value of it. An `:alg` step can read the values, as [`LoGo`](@ref) does under a variation of information distance. So the method refuses an `mp` that does not run from the shape of the sample, before it folds a row. [`Online`](@ref) keeps the observations and runs such a step.
 
 # Algorithm
 

@@ -1041,9 +1041,9 @@ A static `TensorPanelField` and a static feature matrix keep `assets × labels` 
 
 ## From v0.34.0 to v0.34.1
 
-### [Calls that now raise](@id migration-0-35-raises)
+### [Calls that now raise](@id migration-0-34-1-raises)
 
-| Call | v0.34 | v0.35 |
+| Call | v0.34.0 | v0.34.1 |
 | --- | --- | --- |
 | `partial_fit!` of a `Coskewness` or a `Cokurtosis` whose `mp` has an `alg` step, such as `mp = MatrixProcessing(; alg = LoGo())`, or whose `mp` is a matrix processing estimator of your own | Folded the rows. The call with no data, `coskewness(ske)` or `cokurtosis(kte)`, then gave the step a matrix of zeros in place of the sample. Under a variation of information distance, `LoGo` raised a `DomainError` about a `NaN` distance, and the batch verb answered. | Raises an `ArgumentError` at the fold, as `partial_fit!` of a `PortfolioOptimisersCovariance` does. `supports_partial_fit` answers `false`, so a prior or a pipeline runs the batch verb over its own rows. Wrap the estimator in `Online` to fold it with the step. |
 | `descriptor` of `SalesToPrice()`, `GrossProfitability()`, `AssetTurnover()` or `SalesToEnterpriseValue()` over a panel with a negative sales figure on an active, observed cell | Divided the negative sales figure, as for any other number. `GrossMargin()` already refused it. | Raises a `DomainError` that names the field and the cell, as `GrossMargin()` does. Each of the four constructors sets `nonneg = [num]`, or `nonneg = [sales]` for `GrossProfitability`, because a sales figure below zero is a data error. A zero sales figure stays valid. To read the sales figure without the guard, build `PanelFieldRatio` with the same `num`, `den` and `gt0`, and no `nonneg`. |
