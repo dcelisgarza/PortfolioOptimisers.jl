@@ -76,7 +76,7 @@
 #                        "jet size complexity perf doctest coverage". The tests set it empty.
 #   GATE_STAMP_CENSUS    empty turns off the demand for the prose censuses. Default: on. The
 #                        tests set it empty, except the test of that demand.
-#   GATE_STAMP_FORCE    any value acts outside .claude/worktrees/ too. The tests use it.
+#   GATE_STAMP_FORCE     any value acts outside .claude/worktrees/ too. The tests use it.
 #   PRE_COMMIT_TO_REF, PRE_COMMIT_REMOTE_BRANCH
 #                        set by pre-commit for a pre-push hook: the pushed tip and the branch
 #                        pushed to.
