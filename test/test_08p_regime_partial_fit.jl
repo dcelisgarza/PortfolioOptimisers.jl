@@ -666,6 +666,71 @@ using Statistics
                        last(coskewness(ske, X10)); atol = 1e-14)
     end
 
+    @testset "An alg step that reads no value of the sample folds (#2231)" begin
+        # The default `LoGo()` reads the correlation matrix alone, so the shape of the sample
+        # is enough, and every fold gives the batch answer.
+        X10 = randn(StableRNG(2231), 80, 10) .* 0.02
+        mpl = MatrixProcessing(; alg = LoGo())
+        @test !PO.reads_sample_values(nothing)
+        @test !PO.reads_sample_values(LoGo())
+        @test !PO.reads_sample_values(LoGo(;
+                                           de = DistanceDistance(;
+                                                                 alg = CanonicalDistance())))
+        @test !PO.reads_sample_values(LoGo(; de = Distance(; alg = LogDistance())))
+        @test PO.reads_sample_values(LoGo(; de = Distance(; alg = VariationInfoDistance())))
+        @test PO.reads_sample_values(LoGo(; de = FeatureDistance()))
+        @test PO.supports_shape_processing(mpl)
+        @test isnothing(PO.assert_shape_only_matrix_processing(mpl))
+        ske = Coskewness(; mp = mpl)
+        kte = Cokurtosis(; mp = mpl)
+        @test PO.supports_partial_fit(ske)
+        @test PO.supports_partial_fit(kte)
+        sb, kb = coskewness(ske, X10), cokurtosis(kte, X10)
+        s1 = partial_fit!(ske, X10)
+        k1 = partial_fit!(kte, X10)
+        @test isapprox(first(coskewness(s1)), first(sb); rtol = 1e-12)
+        @test isapprox(last(coskewness(s1)), last(sb); rtol = 1e-12)
+        @test isapprox(cokurtosis(k1), kb; rtol = 1e-12)
+        sr, kr = ske, kte
+        for t in axes(X10, 1)
+            sr = partial_fit!(sr, X10[t, :])
+            kr = partial_fit!(kr, X10[t, :])
+        end
+        @test isapprox(last(coskewness(sr)), last(sb); rtol = 1e-10)
+        # The tensor of 80 row folds equals the batch tensor to 6.1e-16 relative, as it does
+        # with no `alg`. `LoGo` inverts the clique blocks of a cokurtosis with a condition
+        # number of 2.2e12, so the last bit grows to 4.5e-5 relative (measured 2026-11-21).
+        @test isapprox(cokurtosis(kr), kb; rtol = 1e-3)
+        # The composite folds the same step through the shape route, which runs the step
+        # with no sample.
+        ce = PortfolioOptimisersCovariance(; mp = mpl)
+        @test PO.supports_partial_fit(ce)
+        @test isapprox(cov(partial_fit!(ce, X10)), cov(ce, X10); rtol = 1e-12)
+        cr = ce
+        for t in axes(X10, 1)
+            cr = partial_fit!(cr, X10[t, :])
+        end
+        @test isapprox(cov(cr), cov(ce, X10); rtol = 1e-12)
+        @test isapprox(cor(cr), cor(ce, X10); rtol = 1e-12)
+        @test PO.series_folds(PortfolioOptimisersCovariance(; ce = ExpWeightedCovariance(),
+                                                            mp = mpl))
+        # A step that reads the sample refuses at the composite fold too.
+        cev = PortfolioOptimisersCovariance(;
+                                            mp = MatrixProcessing(;
+                                                                  alg = LoGo(;
+                                                                             de = Distance(;
+                                                                                           alg = VariationInfoDistance()))))
+        @test !PO.supports_partial_fit(cev)
+        @test !PO.series_folds(cev)
+        @test_throws ArgumentError partial_fit!(cev, X10)
+        # The variance of a step that reads no value of the sample rests on the observations
+        # of `ce.ce`, so it keeps their count.
+        vc, vb = PO.variance_count(ce, X10), PO.variance_count(Covariance(), X10)
+        @test vc.n == vb.n
+        @test vc.m == vb.m
+        @test isnothing(PO.variance_count(cev, X10))
+    end
+
     @testset "For one series the merge is Proposition 2.1 of pebay2008" begin
         x = X[:, 1]
         a, b = x[1:15], x[16:end]
@@ -818,5 +883,32 @@ using Statistics
         fold_bytes(k, x) = @allocated partial_fit!(k, x)
         fold_bytes(kw, x1)
         @test fold_bytes(kw, x1) < 3 * sizeof(kw.cache.M4)
+    end
+
+    @testset "The shifts refuse an array of the wrong shape before the loop (#2232)" begin
+        # The loops index under `@inbounds`, so a wrong shape read or wrote out of bounds.
+        a = randn(StableRNG(2232), 3)
+        M2, M3, M4 = zeros(3, 3), zeros(3, 9), zeros(9, 9)
+        @test_throws DimensionMismatch PO.shift_comoment3!(zeros(3, 9), 2, a, zeros(3, 2),
+                                                           M3)
+        @test_throws DimensionMismatch PO.shift_comoment3!(zeros(3, 9), 2, a, M2,
+                                                           zeros(3, 3))
+        @test_throws DimensionMismatch PO.shift_comoment3!(zeros(3, 3), 2, a, M2, M3)
+        @test_throws DimensionMismatch PO.shift_comoment4!(zeros(9, 9), 2, a, zeros(2, 2),
+                                                           M3, M4)
+        @test_throws DimensionMismatch PO.shift_comoment4!(zeros(9, 9), 2, a, M2,
+                                                           zeros(3, 3), M4)
+        @test_throws DimensionMismatch PO.shift_comoment4!(zeros(9, 9), 2, a, M2, M3,
+                                                           zeros(3, 9))
+        @test_throws DimensionMismatch PO.shift_comoment4!(zeros(3, 9), 2, a, M2, M3, M4)
+        err = try
+            PO.shift_comoment4!(zeros(9, 9), 2, a, M2, M3, zeros(3, 9))
+        catch e
+            e
+        end
+        @test occursin("size(M4) => (3, 9)", err.msg)
+        @test isapprox(PO.shift_comoment3!(zeros(3, 9), 2, a, M2, M3),
+                       -2 .* a .* reshape(kron(a, a), 1, 9); rtol = 1e-14)
+        @test size(PO.shift_comoment4!(zeros(9, 9), 2, a, M2, M3, M4)) == (9, 9)
     end
 end

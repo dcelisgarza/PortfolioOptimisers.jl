@@ -165,6 +165,11 @@ The function adds the shifted accumulator into `out`, so a merge writes the two 
   - `M2`: Second central co-moment accumulator of the block, about its own mean.
   - `M3`: Third central co-moment accumulator of the block, about its own mean.
 
+# Validation
+
+  - With `N = length(a)`, `size(M2) == (N, N)`, and `size(M3) == size(out) == (N, N^2)`. Otherwise, the function raises a `DimensionMismatch`, before the loop reads an entry under `@inbounds`.
+  - Every array has one-based axes. Otherwise, `Base.require_one_based_indexing` raises an `ArgumentError`.
+
 # Returns
 
   - `out::MatNum`: `out` plus the third accumulator of the same block about the shifted centre.
@@ -181,6 +186,9 @@ The function adds the shifted accumulator into `out`, so a merge writes the two 
 """
 function shift_comoment3!(out::MatNum, m::Number, a::VecNum, M2::MatNum, M3::MatNum)
     N = length(a)
+    Base.require_one_based_indexing(out, a, M2, M3)
+    @argcheck((size(M2), size(M3), size(out)) == ((N, N), (N, N^2), (N, N^2)),
+              DimensionMismatch("`shift_comoment3!` needs `M2` of size $((N, N)), and `M3` and `out` of size $((N, N^2)), for the $N entries of `a`. Got\nsize(M2) => $(size(M2))\nsize(M3) => $(size(M3))\nsize(out) => $(size(out))."))
     @inbounds for p in 1:N, q in 1:N, k in 1:N
         c = (p - 1) * N + q
         out[k, c] += M3[k, c] - a[k] * M2[q, p] - a[p] * M2[k, q] - M2[k, p] * a[q] -
@@ -235,6 +243,11 @@ The function adds the shifted accumulator into `out`, so a merge writes the two 
   - `M3`: Third central co-moment accumulator of the block, about its own mean.
   - `M4`: Fourth central co-moment accumulator of the block, about its own mean.
 
+# Validation
+
+  - With `N = length(a)`, `size(M2) == (N, N)`, `size(M3) == (N, N^2)`, and `size(M4) == size(out) == (N^2, N^2)`. Otherwise, the function raises a `DimensionMismatch`, before the loop reads an entry under `@inbounds`.
+  - Every array has one-based axes. Otherwise, `Base.require_one_based_indexing` raises an `ArgumentError`.
+
 # Returns
 
   - `out::MatNum`: `out` plus the fourth accumulator of the same block about the shifted centre.
@@ -252,6 +265,10 @@ The function adds the shifted accumulator into `out`, so a merge writes the two 
 function shift_comoment4!(out::MatNum, m::Number, a::VecNum, M2::MatNum, M3::MatNum,
                           M4::MatNum)
     N = length(a)
+    Base.require_one_based_indexing(out, a, M2, M3, M4)
+    @argcheck((size(M2), size(M3), size(M4), size(out)) ==
+              ((N, N), (N, N^2), (N^2, N^2), (N^2, N^2)),
+              DimensionMismatch("`shift_comoment4!` needs `M2` of size $((N, N)), `M3` of size $((N, N^2)), and `M4` and `out` of size $((N^2, N^2)), for the $N entries of `a`. Got\nsize(M2) => $(size(M2))\nsize(M3) => $(size(M3))\nsize(M4) => $(size(M4))\nsize(out) => $(size(out))."))
     M3t = permutedims(M3)
     @inbounds for r in 1:N, s in 1:N, p in 1:N, q in 1:N
         i = (p - 1) * N + q
@@ -529,7 +546,7 @@ The estimator that carries no state adopts the block's state. The estimator that
 
 The method builds a new state and does not write into the arrays of the old one, because [`merge_states`](@ref) holds the one merge of two blocks. A caller must not rely on that. The verb promises nothing about an estimator kept from before the call, and [`partial_fit`](@ref) is the verb that does. This family overrides [`partial_fit`](@ref), because a copy of a state that the fold never writes into buys nothing.
 
-The state keeps no observation, so `coskewness(ske)` gives `ske.mp` a matrix of zeros of the shape of the sample. The steps `:pdm`, `:dn` and `:dt` of a [`MatrixProcessing`](@ref) read no value of it. An `:alg` step can read the values, as [`LoGo`](@ref) does under a variation of information distance. So the method refuses an `mp` that does not run from the shape of the sample, before it folds a row. [`Online`](@ref) keeps the observations and runs such a step.
+The state keeps no observation, so `coskewness(ske)` gives `ske.mp` a matrix of zeros of the shape of the sample. The steps `:pdm`, `:dn` and `:dt` of a [`MatrixProcessing`](@ref) read no value of it. An `:alg` step can read the values, as [`LoGo`](@ref) does under a variation of information distance, and [`reads_sample_values`](@ref) states whether it does. So the method refuses an `mp` that does not run from the shape of the sample, before it folds a row. [`Online`](@ref) keeps the observations and runs such a step. The default `LoGo()` reads no value of the sample, so it folds.
 
 # Algorithm
 
@@ -865,7 +882,7 @@ Reads the coskewness tensor and its negative spectral skewness matrix out of a p
 
 The method of [`coskewness`](@ref) that makes the estimate from a Partial Fit State. It returns the pair the batch method returns, to machine precision, for the sample the state was fitted on.
 
-Only the shape of that sample survives a partial fit, so the matrix processing estimator gets a matrix of that shape whose entries are zero. Of the steps that [`partial_fit!`](@ref) lets through, only `:dn` reads it, and `:dn` reads only `size(X)`. So the two routes agree. [`partial_fit!`](@ref) refuses an `:alg` step, which can read the values of the sample.
+Only the shape of that sample survives a partial fit, so the matrix processing estimator gets a matrix of that shape whose entries are zero. Of the steps that [`partial_fit!`](@ref) lets through, only `:dn` reads it, and `:dn` reads only `size(X)`. An `:alg` step that [`partial_fit!`](@ref) lets through reads no value of it, as [`reads_sample_values`](@ref) states. So the two routes agree. [`partial_fit!`](@ref) refuses an `:alg` step that can read the values of the sample.
 
 # Algorithm
 
@@ -943,7 +960,7 @@ Reads the square cokurtosis matrix out of a partial-fit state.
 
 The method of [`cokurtosis`](@ref) that makes the estimate from a Partial Fit State. It returns the matrix the batch method returns, to machine precision, for the sample the state was fitted on.
 
-Only the shape of that sample survives a partial fit, so the matrix processing estimator gets a matrix of that shape whose entries are zero. Of the steps that [`partial_fit!`](@ref) lets through, only `:dn` reads it, and `:dn` reads only `size(X)`. So the two routes agree. [`partial_fit!`](@ref) refuses an `:alg` step, which can read the values of the sample.
+Only the shape of that sample survives a partial fit, so the matrix processing estimator gets a matrix of that shape whose entries are zero. Of the steps that [`partial_fit!`](@ref) lets through, only `:dn` reads it, and `:dn` reads only `size(X)`. An `:alg` step that [`partial_fit!`](@ref) lets through reads no value of it, as [`reads_sample_values`](@ref) states. So the two routes agree. [`partial_fit!`](@ref) refuses an `:alg` step that can read the values of the sample.
 
 # Algorithm
 
@@ -1113,7 +1130,7 @@ end
 
 # A co-moment folds under `FullMoment` with no Coverage Policy, when its `mp` runs from the
 # shape of the sample. The `SemiMoment` arm refuses for the reason that `Covariance` does, and
-# `partial_fit!` refuses an `mp.alg`, which can read the values of the sample. Both take the
+# `partial_fit!` refuses an `mp.alg` that reads the values of the sample. Both take the
 # buffer route of the default `supports_partial_fit`, as `PortfolioOptimisersCovariance` does.
 function supports_partial_fit(ske::Coskewness{<:Any, <:Any, <:FullMoment, <:Any, Nothing})
     return isa(ske.cache, SampleBufferState) || supports_shape_processing(ske.mp)

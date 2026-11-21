@@ -1,5 +1,5 @@
 ```@meta
-Description = "LoGo, private API of PortfolioOptimisers.jl: InverseMatrixSparsificationAlgorithm, DVarInfo_DDVarInfo, jlogo!, J_LoGo, LoGo_dist_assert, logo!, logo."
+Description = "LoGo, private API of PortfolioOptimisers.jl: InverseMatrixSparsificationAlgorithm, DVarInfo_DDVarInfo, DRho_DDRho, jlogo!, J_LoGo, LoGo_dist_assert, logo!, …"
 ```
 
 # LoGo: private API
@@ -7,6 +7,7 @@ Description = "LoGo, private API of PortfolioOptimisers.jl: InverseMatrixSparsif
 ```@docs
 InverseMatrixSparsificationAlgorithm
 DVarInfo_DDVarInfo
+DRho_DDRho
 jlogo!
 J_LoGo
 LoGo_dist_assert
