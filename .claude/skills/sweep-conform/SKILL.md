@@ -173,13 +173,16 @@ of cost, the fast ones first, and the slow ones once, on the tree you will push:
    soon as the new file compiles. Do not keep JET for the end when a file is new.
 4. Run the census files that read the text of the source, in the foreground. They take seconds
    after the one-minute package load:
-   `julia -t 1 --project=test test/run_files.jl --done=<path> test_43_exported_abstract_type_census.jl test_45_sweep_census.jl test_47_alias_and_module_census.jl test_64_docs_page_metadata_census.jl test_66_public_declaration_census.jl test_71_process_citation_census.jl test_72_prose_census.jl test_75_concrete_struct_census.jl`.
+   `julia -t 1 --project=test test/run_files.jl --done=<path> test_43_exported_abstract_type_census.jl test_45_sweep_census.jl test_46_standards_citation_census.jl test_47_alias_and_module_census.jl test_64_docs_page_metadata_census.jl test_66_public_declaration_census.jl test_71_process_citation_census.jl test_72_prose_census.jl test_74_source_citation_census.jl test_75_concrete_struct_census.jl`.
    `test_45` holds the manifest row and `test_47` the `include` line. `test_43` and `test_66` hold
    the `public` and `export` declarations, which `sweep_check.jl` does not read. `test_64` holds
    the `Description` line of a mirror page under `docs/src/`, `test_71` refuses an issue number in
    a docstring, `test_72` holds the prose of every page and docstring, `docs/src/migration.md`
-   among them, and `test_75` holds a new concrete struct. Run them even when your targeted tests
-   leave them out, and run `test_72` on a change to any `.md` page too. Each one once reached
+   among them, `test_74` refuses a word for a mechanism of the code in a string, such as
+   `read-out`, `test_46` holds the names that a standards file cites, and `test_75` holds a new
+   concrete struct. Run them even when your targeted tests leave them out, and run the censuses
+   that `gate_stamp.sh reach` names on a change to any `.md` page too. The push guard refuses a
+   push without a green run of each census that reads a changed text. Each one once reached
    `dev` red because a branch did not run it. `test_72` was red on 55 runs, because commits that
    added a row to the migration guide raised its glossary count.
 5. Run the targeted tests bare, with `run_in_background`, through the driver. It wakes you when
@@ -204,7 +207,8 @@ of cost, the fast ones first, and the slow ones once, on the tree you will push:
    the new commits change with `git diff --stat <old base>..<base>`. Commits that change only
    docs (`.md` pages, ADRs, `GLOSSARY.md`, docstring prose outside a `jldoctest` block) make no
    gate stale, so rerun nothing. Record the required stamps on the new base with
-   `gate_stamp.sh record <gate>...`, and paste the `drop` line for the test stamps. Do not rerun a
+   `gate_stamp.sh record <gate>...`, and paste the `drop` line for the test stamps. Rerun a
+   prose census whose stamp you drop: the push guard asks for it again, and it takes seconds. Do not rerun a
    census file, a test file or a gate that already passed on the old base.
 7. Run `test_26` and the slow gates that `gate_stamp.sh reach` names, once, unless a stamp that
    the rebase did not make stale records them. Run them on the rebased tree:
@@ -241,6 +245,12 @@ the push in three cases, and the refusal names what to do:
   change reaches: `size`, `complexity` and `perf` always, and `jet`, `doctest-files` or
   `coverage` as `gate_stamp.sh reach` names them. Run the gate. If it cannot apply, record
   the reason with `code_health/gate_stamp.sh waive <gate> <reason>`.
+- The push changes a text that a prose census reads, and no green run of that census records it.
+  This holds for every class of change, docstring prose too, and for a page with no change
+  under `src/`. `gate_stamp.sh censuses <file>` names the censuses of one file, and
+  `gate_stamp.sh reach` names those of the whole change. The refusal prints the `run_files.jl`
+  line that runs them. A red run records no stamp. A census that is a known red takes
+  `gate_stamp.sh waive test/<file> <issue>`.
 
 `code_health/gate_stamp.sh list` shows the stamps and the waivers.
 

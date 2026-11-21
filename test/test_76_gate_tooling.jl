@@ -112,10 +112,12 @@ end
 
 """
 Run `gate_stamp.sh` in `dir` and return the exit code and the output. `force` stands in for a
-worktree under `.claude/worktrees/`. No gate is required unless `GATE_STAMP_REQUIRED` names one.
+worktree under `.claude/worktrees/`. No gate is required unless `GATE_STAMP_REQUIRED` names one,
+and no prose census unless `GATE_STAMP_CENSUS` is set.
 """
 function stamp(dir::AbstractString, args...; force::Bool = true, env...)
-    vars = Pair{String, String}["GATE_STAMP_REF" => "trunk", "GATE_STAMP_REQUIRED" => ""]
+    vars = Pair{String, String}["GATE_STAMP_REF" => "trunk", "GATE_STAMP_REQUIRED" => "",
+                                "GATE_STAMP_CENSUS" => ""]
     if force
         push!(vars, "GATE_STAMP_FORCE" => "1")
     end
@@ -514,6 +516,55 @@ end
         code, out = stamp(dir, "reach"; GATE_STAMP_REQUIRED = "jet size doctest")
         @test code == 0
         @test occursin("prose src/a/one.jl\nreach prose\ngates size\n", out)
+    end
+
+    @testset "a push that changes prose needs a green run of each census that reads it" begin
+        t(n) = "test/test_$(n).jl"
+        c64, c71 = t("64_docs_page_metadata_census"), t("71_process_citation_census")
+        c72, c74 = t("72_prose_census"), t("74_source_citation_census")
+        c46 = t("46_standards_citation_census")
+        any_repo = first(fixture_repo())
+        read_by(path) = Set(split(last(stamp(any_repo, "censuses", path))))
+        @test read_by("src/a/b.jl") == Set([c64, c71, c74])
+        @test read_by("ext/X.jl") == Set([c64, c71, c74])
+        @test read_by("docs/src/migration.md") == Set([c64, c71, c72, c74])
+        @test read_by("examples/01_x.jl") == Set([c64, c71, c72, c74])
+        @test read_by("docs/src/contribute/3-code-health.md") == Set([c64])
+        @test read_by("docs/paper/CLAUDE.md") == Set([c64, c46])
+        @test read_by("GLOSSARY.md") == Set([c46, c72, c74])
+        @test read_by(".github/instructions/a.md") == Set([c46])
+        @test isempty(read_by("test/x.jl"))
+        # A change of docstring prose needs no gate of the code, and needs the censuses of the
+        # library. The demand stands whatever the class of the change.
+        guard(dir, from, to) = stamp(dir, "check"; GATE_STAMP_REF = from,
+                                     PRE_COMMIT_TO_REF = to,
+                                     PRE_COMMIT_REMOTE_BRANCH = "refs/heads/agents/work",
+                                     GATE_STAMP_CENSUS = "on")
+        dir, c0, c1 = reach_repo(reach_text(; doc = "Other prose."))
+        code, out = guard(dir, c0, c1)
+        @test code == 1
+        @test occursin("no green run records\nthem: $c64 $c71 $c74\n", out)
+        @test occursin("run_files.jl --done=<path> " *
+                       "test_64_docs_page_metadata_census.jl test_71_process_citation_census.jl " *
+                       "test_74_source_citation_census.jl\n", out)
+        @test first(stamp(dir, "record", c64, c71)) == 0
+        code, out = guard(dir, c0, c1)
+        @test code == 1
+        @test occursin("them: $c74\n", out)
+        # A known red takes a waiver that names its issue.
+        @test first(stamp(dir, "waive", c74, "#1")) == 0
+        @test guard(dir, c0, c1) == (0, "")
+        # A page outside the library needs its censuses with no change under src/.
+        put(dir, "docs/src/migration.md", "a row\n")
+        c2 = commit(dir, "c2")
+        code, out = guard(dir, c1, c2)
+        @test code == 1
+        @test occursin("them: $c72\n", out)
+        # `reach` names the censuses of the working tree against the ref, an untracked file too.
+        put(dir, "GLOSSARY.md", "a term\n")
+        code, out = stamp(dir, "reach"; GATE_STAMP_CENSUS = "on")
+        @test code == 0
+        @test occursin("censuses $c46 $c64 $c71 $c72 $c74\n", out)
     end
 
     @testset "a stamp goes stale only on a change that can alter what the gate measured" begin
