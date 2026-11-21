@@ -24,3 +24,10 @@ PortfolioOptimisers.assert_partial_fittable(::Nothing, w::PortfolioOptimisers.Op
 Base.copy(x::PortfolioOptimisers.CoskewnessPartialFitState)
 Base.copy(x::PortfolioOptimisers.CokurtosisPartialFitState)
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

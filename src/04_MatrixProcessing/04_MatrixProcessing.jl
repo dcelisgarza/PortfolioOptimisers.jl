@@ -529,7 +529,7 @@ end
 
 Refuses a matrix processing estimator whose steps need more than the shape of the sample.
 
-Three of the four steps of [`MatrixProcessing`](@ref) never read the sample. The steps `pdm` and `dt` read `sigma` alone, and `dn` reads only `size(X)`. The fourth step, `alg`, is a step that a caller extends. It gets the whole of `X`, so this function cannot know what it reads. An incremental fit keeps a moment and a count, and not the observations. So it can run the first three steps and cannot run the fourth.
+Three of the four steps of [`MatrixProcessing`](@ref) never read the sample. The steps `pdm` and `dt` read `sigma` alone, and `dn` reads only `size(X)`. The fourth step, `alg`, gets the whole of `X`. The library ships [`LoGo`](@ref) for it, which reads the values of `X` under a variation of information distance, and a caller can add a step of their own. So this function cannot know what the step reads. An incremental fit keeps a moment and a count, and not the observations. So it can run the first three steps and cannot run the fourth.
 
 The refusal is an `ArgumentError` that names the type of `alg`. It also names the two ways that keep the observations. [`Online`](@ref) buffers them for the estimator itself, and a prior keeps them for one of its members.
 
@@ -562,7 +562,7 @@ The method that Julia selects is the algorithm.
 """
 function assert_shape_only_matrix_processing(mp::MatrixProcessing)
     @argcheck(isnothing(mp.alg),
-              ArgumentError("`$(typeof(mp.alg))` is a matrix processing algorithm of your own, and it is handed the whole sample, so an incremental fit that keeps a moment and a count cannot run it. Wrap the estimator in `Online`, which buffers the observations the algorithm reads, or put it in a prior that carries them."))
+              ArgumentError("`$(typeof(mp.alg))` is the `alg` step of a `MatrixProcessing`, and that step gets the whole sample, so an incremental fit that keeps a moment and a count cannot run it. Wrap the estimator in `Online`, which buffers the observations the algorithm reads, or put it in a prior that carries them."))
     return nothing
 end
 function assert_shape_only_matrix_processing(mp::AbstractMatrixProcessingEstimator)
