@@ -90,7 +90,7 @@ To add a matrix processing algorithm that `MatrixProcessing` can use, subtype `A
 
   - `matrix_processing_algorithm!(mpa::AbstractMatrixProcessingAlgorithm, sigma::MatNum, args...; kwargs...) -> MatNum`: Applies the algorithm to `sigma` in place.
   - `matrix_processing_algorithm(mpa::AbstractMatrixProcessingAlgorithm, sigma::MatNum, args...; kwargs...) -> MatNum`: Optional. Applies the algorithm to a copy of `sigma`, and returns the copy.
-  - `reads_sample_values(mpa::AbstractMatrixProcessingAlgorithm) -> Bool`: Optional. Answers `false` when the algorithm reads no value of the sample `X`. The fallback answers `true`, so an incremental fit refuses the algorithm, because the fit keeps no observation. An algorithm that answers `false` also adds the method `matrix_processing_algorithm!(mpa, sigma)` with no sample, which the estimate from the state calls. A `false` answer for an algorithm that reads `X` raises an error or gives a wrong matrix with no error, as the warning of [`reads_sample_values`](@ref) states. [`LoGo`](@ref) gives the answer of its distance estimator, which states it with the same verb, as the interfaces of [`AbstractDistanceEstimator`](@ref) and [`AbstractDistanceAlgorithm`](@ref) state.
+  - `reads_sample_values(mpa::AbstractMatrixProcessingAlgorithm) -> Bool`: Optional. Answers `false` when the algorithm reads no value of the sample `X`. The fallback answers `true`, so an incremental fit refuses the algorithm, because the fit keeps no observation. An algorithm that answers `false` also adds the method `matrix_processing_algorithm!(mpa, sigma)` with no sample, which the estimate from the state calls. A `false` answer for an algorithm that reads `X` raises an error, as the warning of [`reads_sample_values`](@ref) states. [`LoGo`](@ref) gives the answer of its distance estimator, which states it with the same verb, as the interfaces of [`AbstractDistanceEstimator`](@ref) and [`AbstractDistanceAlgorithm`](@ref) state.
 
 ## Arguments
 
@@ -201,7 +201,7 @@ An algorithm of your own that reads no value of `X` adds a method that answers `
 
 !!! warning
 
-    Answer `false` only for a type that reads no value of `X`. The library cannot check the answer, and the estimate from the state of an incremental fit has no observation to give. The estimate of a [`PortfolioOptimisersCovariance`](@ref) gives the step no sample. A matrix processing algorithm gets no `X` argument, and a distance inside [`LoGo`](@ref) gets `X = nothing`, so a type that reads `X` raises an error. The estimate of a [`Coskewness`](@ref) or a [`Cokurtosis`](@ref) gives the step a matrix of zeros of the shape of the sample, so a type that reads the values of `X` computes from zeros, and it can return a wrong matrix with no error. Keep the default `true` for such a type, and fold it with [`Online`](@ref).
+    Answer `false` only for a type that reads no value of `X`. The library cannot check the answer, and the estimate from the state of an incremental fit has no observation to give. The estimate of a [`PortfolioOptimisersCovariance`](@ref), a [`Coskewness`](@ref) or a [`Cokurtosis`](@ref) gives the step no sample. A matrix processing algorithm gets no `X` argument, and a distance inside [`LoGo`](@ref) gets `X = nothing`, so a type that reads `X` raises an error. Keep the default `true` for such a type, and fold it with [`Online`](@ref).
 
 # Algorithm
 
@@ -893,7 +893,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Applies matrix processing to the finite block of `sigma`, from the shape of the sample and not from the sample.
 
-This is the shape form of [`matrix_processing_block!`](@ref). An incremental fit calls it when it makes the estimate from its state. Its body is the body of the matrix method with one change. The matrix method cuts the columns of `X` to the block, and this method passes the size of the block in their place, because the steps read only the number of those columns.
+This is the shape form of [`matrix_processing_block!`](@ref). An incremental fit calls it when it makes the estimate from its state. Its body is the body of the matrix method with one change. The matrix method cuts the columns of `X` to the block, and this method passes the size of the block in their place, because the steps read only the number of those columns. The matrix method cuts `X` only when the axis of `sigma` is the asset axis, so this method passes the size of the block only then. A cokurtosis matrix has an axis of asset pairs, and its block keeps the `N` assets of the sample, as the matrix method keeps the whole of `X`.
 
 An estimate from the state calls this method, and not the plain one, for the same reason as the [`AssetPanel`](@ref) methods. An estimator fitted over a changing universe gives `NaN` for an asset outside the Coverage Universe. A positive definite repair of a frame that holds such an entry gets a LAPACK error that does not name the cause. A complete matrix has no frame. For it, the body first refuses a non-finite off-diagonal entry with an error that names it, and then runs the plain method on the whole matrix.
 
@@ -903,14 +903,14 @@ An estimate from the state calls this method, and not the plain one, for the sam
  2. Refuse a non-finite entry inside the finite rows with an `IsNonFiniteError`, as the matrix method does.
  3. Set the rows and columns of the zero variances to zero with [`zero_variance_rows!`](@ref), and take the block as the finite rows whose variance is not zero. A zero variance has no correlation, so no step reads it.
  4. When every asset is in the block, run the plain method and return. When no asset is in the block, return `sigma`.
- 5. Otherwise, process the block with the number of assets of the block, and write it back.
+ 5. Otherwise, process the block, and write it back. The block reads the number of assets of the block when `sigma` is on the asset axis, and `N` otherwise.
 
 # Arguments
 
   - $(arg_dict[:omp])
   - $(arg_dict[:sigrho])
   - `T`: The effective number of observations of the fit, or `nothing` when no step reads it.
-  - `N`: The number of assets of the matrix.
+  - `N`: The number of assets of the sample. It is the side of `sigma` for a matrix on the asset axis, and not for a cokurtosis matrix, whose side is `N^2`.
   - `kwargs...`: The keyword arguments for the steps.
 
 # Returns
@@ -941,7 +941,10 @@ function matrix_processing_block!(mp::Option{<:AbstractMatrixProcessingEstimator
         return sigma
     end
     block = sigma[blk, blk]
-    matrix_processing!(mp, block, T, count(blk); kwargs...)
+    # The block cuts the assets only where the axis of the matrix is the asset axis, as the
+    # matrix method cuts the columns of `X`. A cokurtosis matrix is indexed by asset pairs, so
+    # its block keeps the `N` assets of the sample.
+    matrix_processing!(mp, block, T, N == length(blk) ? count(blk) : N; kwargs...)
     sigma[blk, blk] = block
     return sigma
 end

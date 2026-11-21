@@ -10,7 +10,7 @@ A subtype turns a correlation matrix or a data matrix into a distance matrix. [`
 A distance estimator of your own subtypes `AbstractDistanceEstimator`, keeps its parameters in the fields of the struct, and adds the methods that its consumers call. [`LoGo`](@ref) calls the first form below. The clustering and network estimators call [`distance`](@ref) and [`cor_and_dist`](@ref) with a covariance estimator and the data, and the docstrings of those verbs state the forms.
 
   - `distance(de::AbstractDistanceEstimator, rho::MatNum, X::Option{<:MatNum}; dims::Int = 1, kwargs...) -> MatNum`: The distance matrix of the correlation or covariance matrix `rho`. The method reads `X` only when the estimator needs the data. `X` is `nothing` when the estimate of an incremental fit runs the step.
-  - `reads_sample_values(de::AbstractDistanceEstimator) -> Bool`: Optional. Answers `false` when the estimator reads no value of `X`, so that a [`LoGo`](@ref) step over it runs from the state of an incremental fit. The fallback answers `true`, and an incremental fit then refuses the step. A distance that reads the data, as a variation of information does, cannot answer `false`, because the fit keeps no observation. A `false` answer for such a distance raises an error or gives a wrong matrix with no error, as the warning of [`reads_sample_values`](@ref) states.
+  - `reads_sample_values(de::AbstractDistanceEstimator) -> Bool`: Optional. Answers `false` when the estimator reads no value of `X`, so that a [`LoGo`](@ref) step over it runs from the state of an incremental fit. The fallback answers `true`, and an incremental fit then refuses the step. A distance that reads the data, as a variation of information does, cannot answer `false`, because the fit keeps no observation. A `false` answer for such a distance raises an error, as the warning of [`reads_sample_values`](@ref) states.
 
 # Related
 
@@ -33,7 +33,7 @@ A subtype names the transform that a distance estimator applies. Four subtypes t
 A distance algorithm of your own subtypes `AbstractDistanceAlgorithm`, goes into the field `alg` of a [`Distance`](@ref) or a [`DistanceDistance`](@ref), and adds these methods:
 
   - `distance(de::Distance, rho::MatNum, args...; kwargs...) -> MatNum`: A method on `Distance{<:Any, <:MyAlgorithm}` that gives the distance matrix of the correlation or covariance matrix `rho`. A [`DistanceDistance`](@ref) calls it on its base distance, and then applies its metric.
-  - `reads_sample_values(alg::AbstractDistanceAlgorithm) -> Bool`: Optional. Answers `false` when the algorithm reads no value of the data `X`. A [`Distance`](@ref) and a [`DistanceDistance`](@ref) give the answer of their algorithm, so a [`LoGo`](@ref) step over them then runs from the state of an incremental fit. The fallback answers `true`. A `false` answer for an algorithm that reads `X` raises an error or gives a wrong matrix with no error, as the warning of [`reads_sample_values`](@ref) states.
+  - `reads_sample_values(alg::AbstractDistanceAlgorithm) -> Bool`: Optional. Answers `false` when the algorithm reads no value of the data `X`. A [`Distance`](@ref) and a [`DistanceDistance`](@ref) give the answer of their algorithm, so a [`LoGo`](@ref) step over them then runs from the state of an incremental fit. The fallback answers `true`. A `false` answer for an algorithm that reads `X` raises an error, as the warning of [`reads_sample_values`](@ref) states.
 
 # Related
 

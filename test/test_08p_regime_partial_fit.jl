@@ -499,6 +499,26 @@ end
 PortfolioOptimisers.reads_sample_values(::RhoDist2233Opt) = false
 PortfolioOptimisers.reads_sample_values(::RhoAlg2233Opt) = false
 
+# Issue 2234. A matrix processing algorithm and a distance estimator of your own that read the
+# values of `X` and answer `false` all the same. The library cannot check the answer, so the
+# fold lets them through. Each one scales its result by the mean absolute value of `X`, so a
+# stand-in of zeros gives a wrong matrix with no error.
+struct WrongAlg2234 <: PortfolioOptimisers.AbstractMatrixProcessingAlgorithm end
+struct WrongDist2234 <: PortfolioOptimisers.AbstractDistanceEstimator end
+function PortfolioOptimisers.matrix_processing_algorithm!(::WrongAlg2234,
+                                                          sigma::PortfolioOptimisers.MatNum,
+                                                          X::PortfolioOptimisers.MatNum;
+                                                          kwargs...)
+    sigma .*= 1 + sum(abs, X) / length(X)
+    return sigma
+end
+function PortfolioOptimisers.distance(::WrongDist2234, rho::PortfolioOptimisers.MatNum,
+                                      X::PortfolioOptimisers.MatNum; kwargs...)
+    return rho_dist2233(rho) .* (1 + sum(abs, X) / length(X))
+end
+PortfolioOptimisers.reads_sample_values(::WrongAlg2234) = false
+PortfolioOptimisers.reads_sample_values(::WrongDist2234) = false
+
 @testset "Higher-moment partial fit" begin
     PO = PortfolioOptimisers
 
@@ -792,6 +812,67 @@ PortfolioOptimisers.reads_sample_values(::RhoAlg2233Opt) = false
             @test isapprox(PO.logo(mpo.alg, cov(X10)), PO.logo(mpo.alg, cov(X10), X10);
                            rtol = 1e-12)
         end
+    end
+
+    @testset "A wrong opt-in raises at every read-out, and the shape routes equal the batch (#2234)" begin
+        X10 = randn(StableRNG(2234), 80, 10) .* 0.02
+        # Each read-out gives the `:alg` step no sample, so a type that reads `X` raises.
+        # Before #2234 the higher-moment read-outs gave it zeros and returned a matrix.
+        for mpw in (MatrixProcessing(; alg = WrongAlg2234()),
+                    MatrixProcessing(; alg = LoGo(; de = WrongDist2234())))
+            @test !PO.reads_sample_values(mpw.alg)
+            ske = partial_fit!(Coskewness(; mp = mpw), X10)
+            kte = partial_fit!(Cokurtosis(; mp = mpw), X10)
+            ce = partial_fit!(PortfolioOptimisersCovariance(; mp = mpw), X10)
+            @test_throws MethodError coskewness(ske)
+            @test_throws MethodError cokurtosis(kte)
+            @test_throws MethodError cov(ce)
+            # The batch verbs have the sample, so they run the step.
+            @test all(isfinite, last(coskewness(Coskewness(; mp = mpw), X10)))
+            @test all(isfinite, cokurtosis(Cokurtosis(; mp = mpw), X10))
+        end
+        # The denoising step reads the ratio `T / N`. A complete fold equals the batch verb.
+        mpd = MatrixProcessing(; dn = Denoise())
+        ske = Coskewness(; mp = mpd)
+        kte = Cokurtosis(; mp = mpd)
+        @test isapprox(last(coskewness(partial_fit!(ske, X10))), last(coskewness(ske, X10));
+                       rtol = 1e-12)
+        @test isapprox(cokurtosis(partial_fit!(kte, X10)), cokurtosis(kte, X10);
+                       rtol = 1e-12)
+        # A fold over a changing universe gives a frame. The shape route of the block reads
+        # the ratio of the batch route on the same frame: the width of the block for a matrix
+        # on the asset axis, and the `N` assets for a cokurtosis, whose axis is the pairs.
+        Xg = copy(X10)
+        Xg[1:20, 4] .= NaN
+        Tg, Ng = size(Xg)
+        Z = zeros(Tg, Ng)
+        kraw = cokurtosis(partial_fit!(Cokurtosis(), Xg))
+        @test 0 < count(isfinite, LinearAlgebra.diag(kraw)) < Ng^2
+        kfold = cokurtosis(partial_fit!(kte, Xg))
+        @test isapprox(kfold, PO.matrix_processing_block!(mpd, copy(kraw), Z); rtol = 1e-12,
+                       nans = true)
+        @test isapprox(PO.matrix_processing_block!(mpd, copy(kraw), Tg, Ng),
+                       PO.matrix_processing_block!(mpd, copy(kraw), Z); rtol = 1e-12,
+                       nans = true)
+        # Before #2234 the shape route read the `count(blk)` pairs of the block as `N`. That
+        # ratio gives a different matrix, so the check above tells the two rules apart.
+        @test !isapprox(PO.matrix_processing_block!(mpd, copy(kraw), Tg,
+                                                    count(isfinite,
+                                                          LinearAlgebra.diag(kraw))), kfold;
+                        rtol = 1e-6, nans = true)
+        sraw, Vraw = coskewness(partial_fit!(Coskewness(), Xg))
+        @test isapprox(last(coskewness(partial_fit!(ske, Xg))),
+                       PO.negative_spectral_coskewness(sraw, Z, mpd); rtol = 1e-12,
+                       nans = true)
+        # With no sample and no count, the count is `nothing`. A denoising step needs it and
+        # raises an error that names it, and a step that reads no count runs.
+        @test_throws ArgumentError PO.negative_spectral_coskewness(sraw, nothing, mpd)
+        @test isequal(PO.negative_spectral_coskewness(sraw, nothing, nothing),
+                      PO.negative_spectral_coskewness(sraw, Z, nothing))
+        craw = cov(partial_fit!(PortfolioOptimisersCovariance(), Xg))
+        @test isapprox(PO.matrix_processing_block!(mpd, copy(craw), Tg, Ng),
+                       PO.matrix_processing_block!(mpd, copy(craw), Z); rtol = 1e-12,
+                       nans = true)
     end
 
     @testset "For one series the merge is Proposition 2.1 of pebay2008" begin

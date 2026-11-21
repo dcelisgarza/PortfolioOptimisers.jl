@@ -546,7 +546,7 @@ The estimator that carries no state adopts the block's state. The estimator that
 
 The method builds a new state and does not write into the arrays of the old one, because [`merge_states`](@ref) holds the one merge of two blocks. A caller must not rely on that. The verb promises nothing about an estimator kept from before the call, and [`partial_fit`](@ref) is the verb that does. This family overrides [`partial_fit`](@ref), because a copy of a state that the fold never writes into buys nothing.
 
-The state keeps no observation, so `coskewness(ske)` gives `ske.mp` a matrix of zeros of the shape of the sample. The steps `:pdm`, `:dn` and `:dt` of a [`MatrixProcessing`](@ref) read no value of it. An `:alg` step can read the values, as [`LoGo`](@ref) does under a variation of information distance, and [`reads_sample_values`](@ref) states whether it does. So the method refuses an `mp` that does not run from the shape of the sample, before it folds a row. [`Online`](@ref) keeps the observations and runs such a step. The default `LoGo()` reads no value of the sample, so it folds.
+The state keeps no observation, so `coskewness(ske)` runs `ske.mp` from the shape of the sample, with no sample. The steps `:pdm`, `:dn` and `:dt` of a [`MatrixProcessing`](@ref) read no value of the sample. An `:alg` step can read the values, as [`LoGo`](@ref) does under a variation of information distance, and [`reads_sample_values`](@ref) states whether it does. So the method refuses an `mp` that does not run from the shape of the sample, before it folds a row. [`Online`](@ref) keeps the observations and runs such a step. The default `LoGo()` reads no value of the sample, so it folds.
 
 # Algorithm
 
@@ -882,13 +882,13 @@ Reads the coskewness tensor and its negative spectral skewness matrix out of a p
 
 The method of [`coskewness`](@ref) that makes the estimate from a Partial Fit State. It returns the pair the batch method returns, to machine precision, for the sample the state was fitted on.
 
-Only the shape of that sample survives a partial fit, so the matrix processing estimator gets a matrix of that shape whose entries are zero. Of the steps that [`partial_fit!`](@ref) lets through, only `:dn` reads it, and `:dn` reads only `size(X)`. An `:alg` step that [`partial_fit!`](@ref) lets through reads no value of it, as [`reads_sample_values`](@ref) states. So the two routes agree. [`partial_fit!`](@ref) refuses an `:alg` step that can read the values of the sample.
+Only the shape of that sample survives a partial fit, so the matrix processing estimator runs from the shape, through the shape method of [`matrix_processing!`](@ref). Of the steps that [`partial_fit!`](@ref) lets through, only `:dn` reads the sample, and `:dn` reads only the ratio `T / N`, which the state keeps. The `:alg` step gets no sample, as in the estimate of a [`PortfolioOptimisersCovariance`](@ref). An `:alg` step that [`partial_fit!`](@ref) lets through reads no value of the sample, as [`reads_sample_values`](@ref) states. So the two routes agree. [`partial_fit!`](@ref) refuses an `:alg` step that can read the values of the sample, and a wrong `false` answer of [`reads_sample_values`](@ref) raises an error here.
 
 # Algorithm
 
  1. Refuse a configuration the state no longer matches, with [`assert_partial_fittable`](@ref). [`factory`](@ref) carries the state and replaces `w`, so an estimator that says weighted may hold a state fitted unweighted. The state stays on the estimator, so a caller who restores `w = nothing` reads it again.
  2. Divide the third accumulator by the observation count, giving the coskewness tensor.
- 3. Reduce it with [`negative_spectral_coskewness`](@ref), under `ske.mp` and the shape of the fitted sample.
+ 3. Reduce it with [`negative_spectral_coskewness`](@ref), under `ske.mp`, with no sample and the observation count of the state.
 
 # Arguments
 
@@ -915,8 +915,7 @@ function coskewness(ske::Coskewness{<:Any, <:Any, <:FullMoment},
                     state::CoskewnessPartialFitState)
     assert_partial_fittable(ske.me, ske.w, "Coskewness")
     cskew = state.M3 ./ state.n
-    shape = SparseArrays.spzeros(eltype(cskew), state.n, length(state.mu))
-    return cskew, negative_spectral_coskewness(cskew, shape, ske.mp)
+    return cskew, negative_spectral_coskewness(cskew, nothing, ske.mp, state.n)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -960,13 +959,13 @@ Reads the square cokurtosis matrix out of a partial-fit state.
 
 The method of [`cokurtosis`](@ref) that makes the estimate from a Partial Fit State. It returns the matrix the batch method returns, to machine precision, for the sample the state was fitted on.
 
-Only the shape of that sample survives a partial fit, so the matrix processing estimator gets a matrix of that shape whose entries are zero. Of the steps that [`partial_fit!`](@ref) lets through, only `:dn` reads it, and `:dn` reads only `size(X)`. An `:alg` step that [`partial_fit!`](@ref) lets through reads no value of it, as [`reads_sample_values`](@ref) states. So the two routes agree. [`partial_fit!`](@ref) refuses an `:alg` step that can read the values of the sample.
+Only the shape of that sample survives a partial fit, so the matrix processing estimator runs from the shape, through the shape method of [`matrix_processing_block!`](@ref). Of the steps that [`partial_fit!`](@ref) lets through, only `:dn` reads the sample, and `:dn` reads only the ratio `T / N`, which the state keeps. `N` is the number of assets, and not the `N^2` asset pairs of the side of the matrix, as in the batch verb. The `:alg` step gets no sample, as in the estimate of a [`PortfolioOptimisersCovariance`](@ref). An `:alg` step that [`partial_fit!`](@ref) lets through reads no value of the sample, as [`reads_sample_values`](@ref) states. So the two routes agree. [`partial_fit!`](@ref) refuses an `:alg` step that can read the values of the sample, and a wrong `false` answer of [`reads_sample_values`](@ref) raises an error here.
 
 # Algorithm
 
  1. Refuse a configuration the state no longer matches, with [`assert_partial_fittable`](@ref). [`factory`](@ref) carries the state and replaces `w`, so an estimator that says weighted may hold a state fitted unweighted. The state stays on the estimator, so a caller who restores `w = nothing` reads it again.
  2. Divide the fourth accumulator by the observation count, giving the cokurtosis matrix.
- 3. Process it in place through [`matrix_processing_block!`](@ref), under `kte.mp` and the shape of the fitted sample. The method takes the block arm for the reason that `cov(ce)` with no data takes it. A plain fold over a changing universe answers `NaN` at every pair that names an asset outside the Coverage Universe. A positive definite repair over that frame then meets a refusal from LAPACK, not a named error. The block arm repairs the finite block and leaves the frame for [`investable_mask`](@ref) to read, as the reduce-and-expand of the batch verb does. A complete matrix runs the plain arm over the whole of it.
+ 3. Process it in place through the shape method of [`matrix_processing_block!`](@ref), under `kte.mp`, the observation count of the state and the number of assets. The method takes the block arm for the reason that `cov(ce)` with no data takes it. A plain fold over a changing universe answers `NaN` at every pair that names an asset outside the Coverage Universe. A positive definite repair over that frame then meets a refusal from LAPACK, not a named error. The block arm repairs the finite block and leaves the frame for [`investable_mask`](@ref) to read, as the reduce-and-expand of the batch verb does. A complete matrix runs the plain arm over the whole of it.
 
 # Arguments
 
@@ -992,8 +991,7 @@ function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:FullMoment},
                     state::CokurtosisPartialFitState)
     assert_partial_fittable(kte.me, kte.w, "Cokurtosis")
     ckurt = state.M4 ./ state.n
-    shape = SparseArrays.spzeros(eltype(ckurt), state.n, length(state.mu))
-    matrix_processing_block!(kte.mp, ckurt, shape)
+    matrix_processing_block!(kte.mp, ckurt, state.n, length(state.mu))
     return ckurt
 end
 """
