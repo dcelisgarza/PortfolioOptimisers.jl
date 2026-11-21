@@ -127,6 +127,9 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/3_optimisers/18_Online_Portfolio_Selection/</loc>
   </url>
   <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/3_optimisers/19_Maximum_Diversification/</loc>
+  </url>
+  <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/4_constraints_costs/01_Budget_Constraints/</loc>
   </url>
   <url>
@@ -155,6 +158,9 @@
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/4_constraints_costs/10_Factor_Exposure_Constraints/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/4_constraints_costs/11_Benchmark_Tracker/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/5_validation_tuning/01_Cross_Validation/</loc>
@@ -191,6 +197,9 @@
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/6_post_processing/03_Performance_Attribution/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/6_post_processing/04_Portfolio_Report/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/7_putting_it_together/01_Profile_Retail_Daily/</loc>
@@ -308,6 +317,9 @@
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/01_Base/17_ReturnsSource/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/01_Base/18_CountFraction/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/02_Tools/01_Operators/</loc>
@@ -571,10 +583,16 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/05_Moments/30_RegimeAdjusted/09_MahalanobisLevelClosure/</loc>
   </url>
   <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/05_Moments/30_RegimeAdjusted/10_HacLogDeterminant/</loc>
+  </url>
+  <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/05_Moments/31_HigherMomentPartialFit/</loc>
   </url>
   <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression/</loc>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression_a/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression_b/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights/</loc>
@@ -679,7 +697,7 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/15_TargetReturnForecastStep/</loc>
   </url>
   <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics/</loc>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics_a/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics/</loc>
@@ -692,6 +710,9 @@
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/05_Moments/32_CrossSectionalFactorModel/12_CrossSectionalExposureIC/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalFactorisation/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/05_Moments/33_CoverageUniverse/</loc>
@@ -707,6 +728,12 @@
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/05_Moments/37_GeodesicShrinkageCovariance/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/05_Moments/38_ElasticNet/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/05_Moments/39_WeightedAvailableCase/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/06_Distance/01_Base_Distance/</loc>
@@ -832,6 +859,9 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/09_ConstraintGeneration/09_CrossSectionalFactorAxis/</loc>
   </url>
   <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/09_ConstraintGeneration/10_LotUnitConstraintGeneration/</loc>
+  </url>
+  <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/10_Prior/01_Base_Prior/</loc>
   </url>
   <url>
@@ -901,10 +931,16 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/10_Prior/10_Base_CrossSectionalFactorPrior/</loc>
   </url>
   <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/10_Prior/11_CrossSectionalFactorPrior/</loc>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/10_Prior/11_CrossSectionalFactorPrior_a/</loc>
   </url>
   <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/10_Prior/12_PriorPartialFit/</loc>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/10_Prior/11_CrossSectionalFactorPrior_b/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/10_Prior/12_PriorPartialFit_a/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/10_Prior/12_PriorPartialFit_b/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/10_Prior/13_PriorExpectedReturns/</loc>
@@ -913,7 +949,7 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/10_Prior/14_LowDimensionEnsemblePrior/</loc>
   </url>
   <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/10_Prior/15_CrossSectionalPriorFold/</loc>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/10_Prior/15_CrossSectionalPriorFold_a/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/10_Prior/16_CrossSectionalForecastHistoryCarry/</loc>
@@ -925,7 +961,10 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/10_Prior/18_CrossSectionalCarryHistories/</loc>
   </url>
   <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/10_Prior/19_PriorScenarios/</loc>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/10_Prior/19_PriorScenarios_a/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/10_Prior/19_PriorScenarios_b/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/10_Prior/20_PriorReturnsSource/</loc>
@@ -1063,6 +1102,9 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/16_RiskMeasures/25_RiskMeasureTools/</loc>
   </url>
   <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/16_RiskMeasures/26_WorstCaseDistribution/</loc>
+  </url>
+  <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/17_Optimisation/01_Base_Optimisation/01_OptimisationTypes/</loc>
   </url>
   <url>
@@ -1082,6 +1124,9 @@
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/17_Optimisation/01_Base_Optimisation/07_ResultInvestableView/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/17_Optimisation/01_Base_Optimisation/08_UniverseAxisOrder/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_a/</loc>
@@ -1108,7 +1153,7 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/17_Optimisation/02_CrossValidation/07_Scoring/</loc>
   </url>
   <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/17_Optimisation/02_CrossValidation/08_OptimisationCrossValidation/</loc>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/17_Optimisation/02_CrossValidation/08_SearchScorers/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation/</loc>
@@ -1208,6 +1253,9 @@
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/17_Optimisation/05_JuMP/02_JuMPConstraints/14_ConstraintBlock/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/17_Optimisation/05_JuMP/03_JuMPOptimiser_a/</loc>
@@ -1369,10 +1417,19 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/17_Optimisation/11_ProjectionWeightFinalisers/</loc>
   </url>
   <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/18_ExpectedReturns/</loc>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/18_ExpectedReturns/01_ExpectedReturns/</loc>
   </url>
   <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/19_FactorAttribution/01_FactorAttribution/</loc>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/18_ExpectedReturns/03_PerformanceSummary/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/18_ExpectedReturns/04_SharpeRatioInference/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/19_FactorAttribution/01_FactorAttribution_a/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/19_FactorAttribution/01_FactorAttribution_b/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/19_FactorAttribution/02_FactorAttributionRealised/</loc>
@@ -1402,10 +1459,28 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/21_Pipeline/06_OnlinePipeline/</loc>
   </url>
   <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/21_Pipeline/07_AssetScorers/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/21_Pipeline/08_ScoreWeightBounds/</loc>
+  </url>
+  <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/22_Plotting/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/23_Aliases/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/24_Report/01_PredictionWeights/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/24_Report/02_ReportModel/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/24_Report/03_ReportWriters/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/24_Report/04_PortfolioReport/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/01_Base/01_DocstringDictionaries/01_Tables/</loc>
@@ -1496,6 +1571,9 @@
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/01_Base/17_ReturnsSource/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/01_Base/18_CountFraction/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/02_Tools/01_Operators/</loc>
@@ -1759,7 +1837,10 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/05_Moments/31_HigherMomentPartialFit/</loc>
   </url>
   <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression/</loc>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression_a/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression_b/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights/</loc>
@@ -1864,7 +1945,10 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/15_TargetReturnForecastStep/</loc>
   </url>
   <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics/</loc>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics_a/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics_b/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics/</loc>
@@ -1877,6 +1961,9 @@
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/05_Moments/32_CrossSectionalFactorModel/12_CrossSectionalExposureIC/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalFactorisation/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/05_Moments/33_CoverageUniverse/</loc>
@@ -1892,6 +1979,9 @@
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/05_Moments/37_GeodesicShrinkageCovariance/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/05_Moments/38_ElasticNet/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/06_Distance/01_Base_Distance/</loc>
@@ -2017,6 +2107,9 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/09_ConstraintGeneration/09_CrossSectionalFactorAxis/</loc>
   </url>
   <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/09_ConstraintGeneration/10_LotUnitConstraintGeneration/</loc>
+  </url>
+  <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/10_Prior/01_Base_Prior/</loc>
   </url>
   <url>
@@ -2086,10 +2179,13 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/10_Prior/10_Base_CrossSectionalFactorPrior/</loc>
   </url>
   <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/10_Prior/11_CrossSectionalFactorPrior/</loc>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/10_Prior/11_CrossSectionalFactorPrior_a/</loc>
   </url>
   <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/10_Prior/12_PriorPartialFit/</loc>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/10_Prior/12_PriorPartialFit_a/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/10_Prior/12_PriorPartialFit_b/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/10_Prior/13_PriorExpectedReturns/</loc>
@@ -2098,10 +2194,10 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/10_Prior/14_LowDimensionEnsemblePrior/</loc>
   </url>
   <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/10_Prior/15_CrossSectionalPriorFold/</loc>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/10_Prior/15_CrossSectionalPriorFold_a/</loc>
   </url>
   <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/10_Prior/16_CrossSectionalForecastHistoryCarry/</loc>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/10_Prior/15_CrossSectionalPriorFold_b/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/10_Prior/17_CrossSectionalCalibrationRules/</loc>
@@ -2110,7 +2206,7 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/10_Prior/18_CrossSectionalCarryHistories/</loc>
   </url>
   <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/10_Prior/19_PriorScenarios/</loc>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/10_Prior/19_PriorScenarios_a/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/10_Prior/20_PriorReturnsSource/</loc>
@@ -2293,7 +2389,7 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/17_Optimisation/02_CrossValidation/07_Scoring/</loc>
   </url>
   <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/17_Optimisation/02_CrossValidation/08_OptimisationCrossValidation/</loc>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/17_Optimisation/02_CrossValidation/08_SearchScorers/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation/</loc>
@@ -2393,6 +2489,9 @@
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/17_Optimisation/05_JuMP/02_JuMPConstraints/14_ConstraintBlock/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/17_Optimisation/05_JuMP/03_JuMPOptimiser_a/</loc>
@@ -2554,10 +2653,19 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/17_Optimisation/11_ProjectionWeightFinalisers/</loc>
   </url>
   <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/18_ExpectedReturns/</loc>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/18_ExpectedReturns/01_ExpectedReturns/</loc>
   </url>
   <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/19_FactorAttribution/01_FactorAttribution/</loc>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/18_ExpectedReturns/02_BrinsonAttribution/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/18_ExpectedReturns/03_PerformanceSummary/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/18_ExpectedReturns/04_SharpeRatioInference/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/19_FactorAttribution/01_FactorAttribution_a/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/19_FactorAttribution/02_FactorAttributionRealised/</loc>
@@ -2587,10 +2695,28 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/21_Pipeline/06_OnlinePipeline/</loc>
   </url>
   <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/21_Pipeline/07_AssetScorers/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/21_Pipeline/08_ScoreWeightBounds/</loc>
+  </url>
+  <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/22_Plotting/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/23_Aliases/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/24_Report/01_PredictionWeights/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/24_Report/02_ReportModel/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/24_Report/03_ReportWriters/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/24_Report/04_PortfolioReport/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/00_User_Guide/</loc>
