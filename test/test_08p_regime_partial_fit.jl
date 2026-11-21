@@ -634,6 +634,63 @@ using Statistics
         @test_throws ArgumentError cokurtosis(Cokurtosis())
     end
 
+    @testset "An mp that reads the sample refuses at the fold, and buffers under Online (#713)" begin
+        # The read-out gives `mp` a matrix of zeros of the shape of the sample. `LoGo` under a
+        # variation of information distance reads the values, so before #713 the batch verb
+        # answered and the read-out raised a DomainError about a NaN distance.
+        X10 = randn(StableRNG(713), 80, 10) .* 0.02
+        mpl = MatrixProcessing(;
+                               alg = LoGo(; de = Distance(; alg = VariationInfoDistance())))
+        ske = Coskewness(; mp = mpl)
+        kte = Cokurtosis(; mp = mpl)
+        for est in (ske, kte)
+            for x in (X10, X10[1, :])
+                err = try
+                    partial_fit!(est, x)
+                    nothing
+                catch e
+                    e
+                end
+                @test isa(err, ArgumentError)
+                @test occursin("LoGo", err.msg)
+                @test occursin("Online", err.msg)
+            end
+            @test !PO.supports_partial_fit(est)
+        end
+        @test PO.supports_partial_fit(Coskewness())
+        @test PO.supports_partial_fit(Cokurtosis())
+        # `Online` keeps the rows, so the step runs and the estimate is the batch one.
+        warm = PO.update_online_estimator(Online(ske))
+        @test PO.supports_partial_fit(warm)
+        @test isapprox(last(coskewness(partial_fit!(warm, X10))),
+                       last(coskewness(ske, X10)); atol = 1e-14)
+    end
+
+    @testset "For one series the merge is Proposition 2.1 of pebay2008" begin
+        x = X[:, 1]
+        a, b = x[1:15], x[16:end]
+        na, nb = length(a), length(b)
+        n = na + nb
+        d = mean(b) - mean(a)
+        Mp(v, p) = sum((v .- mean(v)) .^ p)
+        function pebay(p)
+            s = Mp(a, p) + Mp(b, p)
+            for k in 1:(p - 2)
+                s += binomial(p, k) *
+                     ((-nb / n)^k * Mp(a, p - k) + (na / n)^k * Mp(b, p - k)) *
+                     d^k
+            end
+            return s + (na * nb / n * d)^p * (1 / nb^(p - 1) - (-1 / na)^(p - 1))
+        end
+        ka = partial_fit!(Cokurtosis(), reshape(a, :, 1)).cache
+        kb = partial_fit!(Cokurtosis(), reshape(b, :, 1)).cache
+        m = PO.merge_states(ka, kb)
+        @test isapprox(only(m.M3), pebay(3); atol = 1e-12)
+        @test isapprox(only(m.M4), pebay(4); atol = 1e-12)
+        @test isapprox(only(m.M3), Mp(x, 3); atol = 1e-12)
+        @test isapprox(only(m.M4), Mp(x, 4); atol = 1e-12)
+    end
+
     @testset "The state's element count" begin
         ske = partial_fit!(Coskewness(), X)
         kte = partial_fit!(Cokurtosis(), X)
