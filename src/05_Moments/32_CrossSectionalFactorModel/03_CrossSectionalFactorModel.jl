@@ -4,13 +4,13 @@
 
 Check the observed factor returns of a [`CrossSectionalFactorModel`](@ref) against the fit and the factor axis.
 
-The observed factors are the trailing columns of the reduced axis, after the factors that the fit estimated. So `csr.f` and `fx` together fill the reduced axis, row for row, and every consumer that reads the two side by side with [`cross_sectional_factor_returns`](@ref) meets one matrix of the width of the loadings. A block with no observed factor takes the method over `Nothing`.
+The observed factors are the last columns of the reduced axis, after the factors that the fit estimated. Thus `csr.f` and `fx` together fill the reduced axis, row for row. [`cross_sectional_factor_returns`](@ref) joins the two into one matrix, with one column for each column of the loadings. For a block with no observed factor, the method over `Nothing` does no check.
 
 # Arguments
 
   - `fx`: The observed factor returns, `observations × factors`, or `nothing`.
   - `csr`: The nested cross-sectional regression result, or `nothing`.
-  - `K`: Number of factors on the reduced axis, the column count of `L`, or of `M` when `L` is unset.
+  - `K`: Number of factors on the reduced axis. It is the column count of `L`, or of `M` when `L` is unset.
 
 # Validation
 
@@ -49,12 +49,12 @@ end
 
 Check the idiosyncratic covariance of a [`CrossSectionalFactorModel`](@ref) against the asset count `N`.
 
-The idiosyncratic covariance takes either of two shapes, and the shape is the dispatch rather than a branch: a vector holds the idiosyncratic variances alone, and a matrix holds the full covariance an idiosyncratic correlation threshold produces. An absent covariance is checked by the method over `Nothing`, so no caller writes an `isnothing` test.
+The idiosyncratic covariance has one of two shapes, and each shape has its own method. A vector holds the idiosyncratic variances alone. A matrix holds the full covariance that an idiosyncratic correlation threshold makes. The method over `Nothing` accepts an absent covariance, so no caller writes an `isnothing` test.
 
 # Arguments
 
   - `esigma`: Idiosyncratic covariance, a vector of variances, a square matrix, or `nothing`.
-  - `N`: Number of assets the model carries.
+  - `N`: Number of assets that the model carries.
 
 # Validation
 
@@ -93,9 +93,9 @@ end
     idiosyncratic_covariance_view(esigma::VecNum, i)
     idiosyncratic_covariance_view(esigma::MatNum, i)
 
-Return a view of an idiosyncratic covariance, selecting only the assets indexed by `i`.
+Return a view of an idiosyncratic covariance over the assets that `i` indexes.
 
-The shape is the dispatch, as it is in [`assert_idiosyncratic_covariance`](@ref): a vector of variances is indexed once, and a full covariance matrix is indexed on both of its axes, which keeps the selected block square.
+Each shape has its own method, as in [`assert_idiosyncratic_covariance`](@ref). The method indexes a vector of variances once. It indexes a full covariance matrix on both axes, so the selected block stays square.
 
 # Arguments
 
@@ -140,12 +140,12 @@ end
 
 Check a per-asset count of a loadings block, `edof` or `ediv`, against the asset count `N`.
 
-The count is a vector with one entry per asset, or `nothing` when the fit recorded none. The method over `Nothing` accepts the absent count, so no caller writes an `isnothing` test. The check reads the length alone. An entry that is not finite or not positive is a valid record of a short fit, and the consumer that reads the count refuses it.
+The count is a vector with one entry per asset, or `nothing` when the fit records none. The method over `Nothing` accepts the absent count, so no caller writes an `isnothing` test. The check reads the length alone. An entry that is not finite or not positive is a valid record of a short fit, and the consumer that reads the count refuses it.
 
 # Arguments
 
   - `x`: The count, or `nothing`.
-  - `N`: Number of assets the block carries.
+  - `N`: Number of assets that the block carries.
   - `sym`: Name of the field, for the error message.
 
 # Validation
@@ -177,13 +177,13 @@ end
 
 Check the asset axis of an optional per-asset history of a [`CrossSectionalFactorModel`](@ref), and return its observation count.
 
-A per-asset history holds one row per observation and one column per asset, so the asset axis is the second one. The count comes back so that the caller pins the observation axis of two histories against each other with [`assert_cs_history_obs`](@ref) and needs no `isnothing` test of its own.
+A per-asset history holds one row per observation and one column per asset, so the asset axis is the second one. The method returns the observation count. The caller then checks the observation axes of two histories against each other with [`assert_cs_history_obs`](@ref), and needs no `isnothing` test.
 
 # Arguments
 
   - `A`: A per-asset history, or `nothing`.
-  - `N`: Number of assets the model carries.
-  - `sym`: Name of the field, which the raise reports.
+  - `N`: Number of assets that the model carries.
+  - `sym`: Name of the field, for the error message.
 
 # Validation
 
@@ -214,14 +214,14 @@ end
 
 Check that two per-asset histories of a [`CrossSectionalFactorModel`](@ref) agree on the observation axis.
 
-A history that the model does not carry constrains nothing, so the pair is checked only when [`cs_history_assets`](@ref) returned a count for both.
+A history that the model does not carry needs no check. The method checks the pair only when [`cs_history_assets`](@ref) returns a count for both.
 
 # Arguments
 
   - `a`: Observation count of the first history, or `nothing`.
   - `b`: Observation count of the second history, or `nothing`.
-  - `asym`: Name of the first field, which the raise reports.
-  - `bsym`: Name of the second field, which the raise reports.
+  - `asym`: Name of the first field, for the error message.
+  - `bsym`: Name of the second field, for the error message.
 
 # Validation
 
@@ -256,8 +256,8 @@ The exposure history holds one slice per observation, and a slice has the shape 
 # Arguments
 
   - `Ms`: An exposure history `assets × factors × observations`, or `nothing`.
-  - `N`: Number of assets the model carries.
-  - `K`: Number of raw factors the model carries.
+  - `N`: Number of assets that the model carries.
+  - `K`: Number of raw factors that the model carries.
 
 # Validation
 
@@ -288,14 +288,14 @@ end
     assert_cs_regression_assets(csr::Nothing, N::Integer)
     assert_cs_regression_assets(csr::CrossSectionalRegression, N::Integer)
 
-Check the asset axis of the fit a [`CrossSectionalFactorModel`](@ref) nests against the asset count `N`.
+Check the asset axis of the fit that a [`CrossSectionalFactorModel`](@ref) nests, against the asset count `N`.
 
 The residuals of a [`CrossSectionalRegression`](@ref) hold one row per observation and one column per asset, so the asset axis is the second one, as it is for every per-asset history of the model.
 
 # Arguments
 
   - `csr`: The nested cross-sectional regression result, or `nothing`.
-  - `N`: Number of assets the model carries.
+  - `N`: Number of assets that the model carries.
 
 # Validation
 
@@ -324,12 +324,12 @@ end
 
 Check the Return Forecast of a [`CrossSectionalFactorModel`](@ref) against the asset count `N`.
 
-A model carries the Return Forecast its prior fitted, or `nothing`, and the absent case is the method over `Nothing`. The check reads the two fields every member of the family answers, `mu` and `hist`, and never the member's own fields, so a new member needs no new method here.
+A model carries the Return Forecast that its prior fitted, or `nothing`. The method over `Nothing` accepts an absent forecast. The check reads only `mu` and `hist`, the two fields that every member of the family has, so a new member needs no new method here.
 
 # Arguments
 
   - `rf`: Return Forecast Result, or `nothing`.
-  - `N`: Number of assets the model carries.
+  - `N`: Number of assets that the model carries.
 
 # Validation
 
@@ -462,7 +462,7 @@ end
 
 Check the row key of a [`CrossSectionalFactorModel`](@ref) against its fit.
 
-The row key names the observation of the returns data that each row of the block describes. `idx` holds the position of each row in the returns data that the prior read, and `ts` holds its timestamp. A key describes the rows of the fit, so a block that carries a key carries a fit, and the key has one entry for each row of the fit.
+The row key names the observation of the returns data that each row of the block describes. `idx` holds the position of each row in the returns data that the prior read, and `ts` holds its timestamp. A key describes the rows of the fit, so a block that carries a key must carry a fit, and the key has one entry for each row of the fit.
 
 # Arguments
 
@@ -502,11 +502,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Holds the loadings, the factor-orthogonal expected return and the fitted history of a factor model fitted per observation across the assets.
+Holds the loadings, the factor-orthogonal expected return and the histories of a factor model fitted across the assets.
 
-The result is the cross-sectional member of [`AbstractLoadingsRegressionResult`](@ref), so a consumer that re-bases a constraint or decomposes risk in the factor basis reads it exactly as it reads a [`Regression`](@ref). `M` carries the **raw** loadings, whose columns are the named original factors, because a constraint must be written in names a caller can put in an equation. Every field after `b` is optional, so a model that keeps its loadings and drops its histories is a member of the family, and a caller that asks for a dropped history reads `nothing`.
+The result is the cross-sectional member of [`AbstractLoadingsRegressionResult`](@ref). A consumer that re-bases a constraint or decomposes risk in the factor basis reads it as it reads a [`Regression`](@ref). `M` carries the **raw** loadings, and its columns are the named original factors, because a caller writes a constraint in these names. Every field after `b` is optional. A model can keep its loadings and drop its histories, and a read of a dropped history gives `nothing`.
 
-**An unset `L` reads back as `M`.** A [`@forward_properties`](@ref) `swap(L, M)` rule makes `csfm.L` return `csfm.M` whenever `L` was not given, as [`Regression`](@ref) behaves, so a consumer that decomposes risk in the factor basis needs no `Nothing` branch, and `isnothing(csfm.L)` is never true. Read `getfield(csfm, :L)` when the unset case must be told apart, as [`port_opt_view`](@ref) does.
+**An unset `L` reads back as `M`.** A [`@forward_properties`](@ref) `swap(L, M)` rule makes `csfm.L` return `csfm.M` when the caller gives no `L`, as in [`Regression`](@ref). Thus a consumer that decomposes risk in the factor basis needs no `Nothing` branch, and `isnothing(csfm.L)` is never true. To find whether `L` is unset, read `getfield(csfm, :L)`, as [`port_opt_view`](@ref) does.
 
 # Mathematical definition
 
@@ -521,14 +521,14 @@ The result is the cross-sectional member of [`AbstractLoadingsRegressionResult`]
 Where:
 
   - $(math_dict[:x_t_obs])
-  - ``b_{t}``: Intercept of observation ``t``, the ``t``-th entry of the intercept vector [`CrossSectionalRegression`](@ref) carries. The term is absent when the fit carries no intercept.
+  - ``b_{t}``: Intercept of observation ``t``, the ``t``-th entry of the intercept vector that [`CrossSectionalRegression`](@ref) carries. The term is absent when the fit carries no intercept.
   - ``\\boldsymbol{1}``: Vector of ones ``N \\times 1``.
   - ``\\mathbf{M}_{t}``: Exposure slice of observation ``t``, ``N \\times K``, the ``t``-th slice of `Ms`.
   - ``\\boldsymbol{f}_{t}``: Factor returns of observation ``t``, on the axis of ``\\mathbf{M}_{t}``.
-  - ``\\boldsymbol{\\varepsilon}_{t}``: Idiosyncratic returns of observation ``t``, the part of ``\\boldsymbol{x}_{t}`` the exposures and the intercept do not explain.
+  - ``\\boldsymbol{\\varepsilon}_{t}``: Idiosyncratic returns of observation ``t``, the part of ``\\boldsymbol{x}_{t}`` that the exposures and the intercept do not explain.
   - $(math_dict[:mu_er])
   - ``\\boldsymbol{\\mu}_{f}``: Expected factor returns ``K \\times 1``. A factor prior carries it, and this result does not.
-  - ``\\boldsymbol{b}``: Factor-orthogonal expected return ``N \\times 1``, `b`. It is the part of ``\\boldsymbol{\\mu}`` the factors do not span, so it is a term of the expected return and never a term of one observation.
+  - ``\\boldsymbol{b}``: Factor-orthogonal expected return ``N \\times 1``, `b`. It is the part of ``\\boldsymbol{\\mu}`` that the factors do not span, so it is a term of the expected return and never a term of one observation.
   - ``\\mathbf{M}``: Loadings matrix ``N \\times K`` of the factor model, `M`. It is the last slice of the exposure history.
   - $(math_dict[:N])
   - $(math_dict[:K])
@@ -585,7 +585,7 @@ Keywords correspond to the struct's fields.
   - If provided, `edof` and `ediv` each carry `size(M, 1)` entries.
   - If provided, `lag >= 0`.
   - If provided, `length(rf.mu) == size(M, 1)`, and `rf.hist` carries `size(M, 1)` columns when the member computes one.
-  - If provided, `fx` passes [`assert_observed_factor_returns`](@ref): `csr` is given, `fx` has the rows of `csr.f`, and the two fill the column count of `L` (or of `M` when `L` is unset).
+  - If provided, `fx` passes [`assert_observed_factor_returns`](@ref). That is, `csr` is given, `fx` has the rows of `csr.f`, and the two fill the column count of `L`, or of `M` when `L` is unset.
   - If provided, `fr` needs `fcb` and `csr`, and `size(fr) == (size(csr.f, 1), size(M, 2))`.
   - The rules of [`assert_cs_block_rows`](@ref) on `idx` and `ts`.
 
@@ -593,14 +593,14 @@ Keywords correspond to the struct's fields.
 
 `CrossSectionalFactorModel` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
 
-  - `M`, `L` and `b` are sliced on their **first** axis, which is the asset axis of a loadings result.
-  - `csr` is viewed by its own [`port_opt_view`](@ref) method.
-  - `Ms` is sliced on its **first** axis, which is the asset axis of a slice.
-  - `vs`, `rw`, `bw`, `amr` and `hist` are sliced on their **second** axis, which is the asset axis of a per-asset history.
-  - `esigma` is sliced by [`idiosyncratic_covariance_view`](@ref), on one axis or on both.
-  - `edof` and `ediv` are sliced on their only axis, which is the asset axis.
-  - `rf` is viewed by its own [`port_opt_view`](@ref) method, which cuts `mu` and `hist` on the asset axis.
-  - `nf`, `fam`, `fcb`, `unseen`, `lag`, `fx`, `fr`, `lambda`, `c`, `idx` and `ts` pass through unchanged. Each is indexed by factor, by observation, or by nothing at all, and none follows an asset selection.
+  - The method slices `M`, `L` and `b` on their **first** axis, which is the asset axis of a loadings result.
+  - The [`port_opt_view`](@ref) method of `csr` takes its view.
+  - The method slices `Ms` on its **first** axis, which is the asset axis of a slice.
+  - The method slices `vs`, `rw`, `bw`, `amr` and `hist` on their **second** axis, which is the asset axis of a per-asset history.
+  - [`idiosyncratic_covariance_view`](@ref) slices `esigma`, on one axis or on both.
+  - The method slices `edof` and `ediv` on their only axis, which is the asset axis.
+  - The [`port_opt_view`](@ref) method of `rf` takes its view, and cuts `mu` and `hist` on the asset axis.
+  - The method keeps `nf`, `fam`, `fcb`, `unseen`, `lag`, `fx`, `fr`, `lambda`, `c`, `idx` and `ts` unchanged. Their index is a factor, an observation, or nothing, and never an asset.
 
 # Examples
 
@@ -646,23 +646,23 @@ CrossSectionalFactorModel
 """
 @concrete struct CrossSectionalFactorModel <: AbstractLoadingsRegressionResult
     """
-    $(field_dict[:M]) Its columns are the named original factors, so a constraint written in a factor's name resolves against it.
+    $(field_dict[:M]) Its columns are the named original factors, so a constraint can use the name of a factor.
     """
     M
     """
-    $(field_dict[:L]) It is set only after a family re-basis, and an unset `L` reads back as `M`.
+    $(field_dict[:L]) Only a family re-basis sets it, and an unset `L` reads back as `M`.
     """
     L
     """
-    Factor-orthogonal expected return, one entry per asset. It is the part of the expected return the factors do not span, and it is not the per-observation intercept of the fit, which `csr` carries.
+    Factor-orthogonal expected return, one entry per asset. It is the part of the expected return that the factors do not span. It is not the per-observation intercept of the fit, which `csr` carries.
     """
     b
     """
-    The cross-sectional fit the model was built around. It carries the factor returns, the idiosyncratic returns, the eligible asset counts and the per-observation intercepts.
+    The cross-sectional fit that the model nests. It carries the factor returns, the idiosyncratic returns, the eligible asset counts and the per-observation intercepts.
     """
     csr
     """
-    Exposure history `assets × factors × observations`. Its last slice is the loadings matrix `M`. The constructor checks the two axes it shares with `M` and never the entries, so a caller that builds both keeps them in step itself.
+    Exposure history `assets × factors × observations`. Its last slice is the loadings matrix `M`. The constructor checks the two axes that it shares with `M`, but not the entries. A caller that builds both must make sure that the last slice equals `M`.
     """
     Ms
     """
@@ -682,15 +682,15 @@ CrossSectionalFactorModel
     """
     ediv
     """
-    Regression weight history `observations × assets`. Entry `(t, i)` is the weight asset `i` carried in the fit of observation `t`, and a weight of zero excluded the pair.
+    Regression weight history `observations × assets`. Entry `(t, i)` is the weight of asset `i` in the fit of observation `t`. A weight of zero excludes the asset from that fit.
     """
     rw
     """
-    Benchmark weight history `observations × assets`. Entry `(t, i)` is the weight asset `i` carried in the benchmark of observation `t`.
+    Benchmark weight history `observations × assets`. Entry `(t, i)` is the weight of asset `i` in the benchmark of observation `t`.
     """
     bw
     """
-    Name of each raw factor, one entry per column of `M`. The prior derives the axis from its Exposure Estimators and stores the answer here, so a consumer that names a factor reads one list.
+    Name of each raw factor, one entry per column of `M`. The prior derives the names from its Exposure Estimators and stores them here. A consumer that names a factor reads this one list.
     """
     nf
     """
@@ -698,11 +698,11 @@ CrossSectionalFactorModel
     """
     fam
     """
-    The family re-basis `L` is written in. It is present exactly when `L` is present. Its rows are the rows of `Ms`, one basis for the exposures of each observation, and its last row re-bases `M` into `L`. The factor return of row `t` of `csr.f` was fitted on the exposures of row `t - lag`, so it is written in the basis of row `t - lag`: a transform of a factor-return history reads the basis rows `1:(T - lag)` against the return rows `(1 + lag):T`.
+    The family re-basis of `L`. It is present if and only if `L` is present. Its rows are the rows of `Ms`, one basis for the exposures of each observation, and its last row re-bases `M` into `L`. The fit regresses row `t` of `csr.f` on the exposures of row `t - lag`, so that row is in the basis of row `t - lag`. Thus a transform of a factor-return history reads the basis rows `1:(T - lag)` against the return rows `(1 + lag):T`.
     """
     fcb
     """
-    The Unseen Member rule the fit regressed under. A consumer that rebuilds the design of each observation, the regression diagnostics and the standard errors of a [`factor_attribution`](@ref), calls [`unseen_member_design`](@ref) of the rule on `Ms`, `fcb` and `rw`, so it reads the design that the fit regressed on. A block without a family re-basis has no Unseen Member, so the rule changes nothing there.
+    The Unseen Member rule of the fit. The regression diagnostics and the standard errors of a [`factor_attribution`](@ref) rebuild the design of each observation. They call [`unseen_member_design`](@ref) of the rule on `Ms`, `fcb` and `rw`, so they read the design that the fit regressed on. A block without a family re-basis has no Unseen Member, so the rule has no effect there.
     """
     unseen
     """
@@ -710,27 +710,27 @@ CrossSectionalFactorModel
     """
     lag
     """
-    The Return Forecast the prior fitted, or `nothing`. Its `mu` is the forecast `b` was split out of, so a consumer reads the forecast the split consumed rather than refitting it.
+    The Return Forecast that the prior fitted, or `nothing`. The prior splits `b` out of its `mu`. A consumer reads the forecast that the split used from this field, and does not fit it again.
     """
     rf
     """
-    Returns of the observed factors, `observations × factors`, on the rows of `csr.f`, or `nothing` when the model has no observed factor. The fit observes them, for example the Currency Excess Returns of the Currency Factors, and does not estimate them, so `csr` does not carry them. The observed factors are the trailing columns of the raw axis and of the reduced axis, and [`cross_sectional_factor_returns`](@ref) reads them beside `csr.f`.
+    Returns of the observed factors, `observations × factors`, on the rows of `csr.f`, or `nothing` when the model has no observed factor. The fit observes these returns and does not estimate them, so `csr` does not carry them. An example is the Currency Excess Returns of the Currency Factors. The observed factors are the last columns of the raw axis and of the reduced axis, and [`cross_sectional_factor_returns`](@ref) puts them beside `csr.f`.
     """
     fx
     """
-    Factor returns on the raw factor axis, `observations × factors`, on the rows of `csr.f` and with one column per column of `M`, or `nothing`. A block with a family re-basis carries it, and a block with none leaves it `nothing`, because its raw axis is the axis of [`cross_sectional_factor_returns`](@ref). The fit states the factor returns in the reduced basis of row `t - lag`, and `fcb` holds the basis of the rows of the block alone, so it cannot expand the first `lag` rows. The prior expands every row with the basis of its own history, and a consumer that needs a dropped factor's return, for example [`factor_model_summary`](@ref) and [`factor_attribution`](@ref), reads it here.
+    Factor returns on the raw factor axis, `observations × factors`, on the rows of `csr.f` and with one column per column of `M`, or `nothing`. A block with a family re-basis carries it. A block with no re-basis leaves it `nothing`, because its raw axis is the axis of [`cross_sectional_factor_returns`](@ref). The fit states the factor returns in the reduced basis of row `t - lag`. `fcb` holds the bases of the rows of the block alone, so it cannot expand the first `lag` rows. The prior expands every row with the basis from its own history. A consumer that needs the return of a dropped factor reads it here, for example [`factor_model_summary`](@ref) and [`factor_attribution`](@ref).
     """
     fr
     """
-    Spanned Shrinkage the prior resolved, or `nothing` when the block was not built by a prior. A rule in the slot and a stated number are recorded alike, so a caller reads back the number the mean used.
+    The Spanned Shrinkage that the prior resolved, or `nothing` when no prior built the block. The field holds a number for a rule in the slot and for a stated number alike, so a caller reads the number that the mean used.
     """
     lambda
     """
-    Orthogonal Forecast Scale the prior resolved, or `nothing` when the block was not built by a prior. `b` is this scale times the unscaled orthogonal part of the Return Forecast.
+    The Orthogonal Forecast Scale that the prior resolved, or `nothing` when no prior built the block. `b` is this scale times the unscaled orthogonal part of the Return Forecast.
     """
     c
     """
-    Position of each row of the fit in the returns data that the prior read, or `nothing`. The fit drops the Descriptor warm-up and the exposure lag, so its first row is a later row of the data. A [`factor_attribution`](@ref) of a cross-validation reads it to find the rows of the block that each fold covers. A prior folded online counts the positions over every observation it folded.
+    Position of each row of the fit in the returns data that the prior read, or `nothing`. The fit drops the Descriptor warm-up and the exposure lag, so its first row is a later row of the data. A [`factor_attribution`](@ref) of a cross-validation reads it to find the rows of the block that each fold covers. For a prior fitted online, the positions count every observation that the fold read.
     """
     idx
     """
@@ -738,11 +738,11 @@ CrossSectionalFactorModel
     """
     ts
     """
-    Active-mask history `observations × assets`, on the rows of `csr.f`, or `nothing`. Entry `(t, i)` is true where asset `i` was active at the observation of row `t`. A prior fitted with `cache_reg = true` stores it, so its refit under new scenario weights reads the active assets of the latest row from the block and runs no regression. Every other fit leaves it `nothing`.
+    Active-mask history `observations × assets`, on the rows of `csr.f`, or `nothing`. Entry `(t, i)` is true when asset `i` is active at the observation of row `t`. A prior fitted with `cache_reg = true` stores it, so its refit under new scenario weights reads the active assets of the latest row from the block and runs no regression. Every other fit leaves it `nothing`.
     """
     amr
     """
-    Return Forecast history `observations × assets`, on the rows of `csr.f`, or `nothing`. It is the history that a Calibration Slot of the prior read. A prior fitted with `cache_reg = true` stores it when a slot reads it, so its refit under new scenario weights resolves the slot again from the block. Every other fit leaves it `nothing`.
+    Return Forecast history `observations × assets`, on the rows of `csr.f`, or `nothing`. It is the history that a Calibration Slot of the prior reads. A prior fitted with `cache_reg = true` stores it when a slot reads it, so its refit under new scenario weights resolves the slot again from the block. Every other fit leaves it `nothing`.
     """
     hist
     function CrossSectionalFactorModel(M::MatNum, L::Option{<:MatNum}, b::VecNum,
@@ -849,9 +849,9 @@ end
 """
     cross_sectional_factor_returns(csfm::CrossSectionalFactorModel) -> MatNum
 
-Return the factor returns of a [`CrossSectionalFactorModel`](@ref) on the axis of its loadings `L`: the factors the fit estimated, then the observed factors.
+Return the factor returns of a [`CrossSectionalFactorModel`](@ref) on the axis of its loadings `L`.
 
-The fit estimates `csr.f` on its own design axis, which is the reduced axis less the observed factors, and it observes the returns `fx`. The two side by side are the factor returns that the loadings `L` (or `M` when the model has no family re-basis) multiply. So the loadings of observation `t - lag` times row `t` of the answer, plus the idiosyncratic return of `t`, give the returns of observation `t` in the base currency.
+The factors that the fit estimated come first, and the observed factors come after them. The fit estimates `csr.f` on its design axis, which is the reduced axis less the observed factors. The fit observes the returns `fx`. Together, the two are the factor returns that the loadings `L` multiply, or `M` when the model has no family re-basis. The loadings of observation `t - lag` times row `t` of the result give the systematic returns of observation `t`, in the base currency. The intercept of `t`, when the fit carries one, and the idiosyncratic return of `t` give the remainder.
 
 # Algorithm
 
@@ -895,26 +895,26 @@ end
     idiosyncratic_variances(esigma::Nothing, rr::Regression)
     idiosyncratic_variances(esigma::Nothing, rr::CrossSectionalFactorModel)
 
-Read the idiosyncratic variance vector off a loadings block, whatever shape the block stores it in.
+Return the idiosyncratic variances of a loadings block, for each of the two shapes of `esigma`.
 
-Both members of [`AbstractLoadingsRegressionResult`](@ref) carry `esigma` under one name, and both admit the two shapes: a vector of variances, or a full covariance. A consumer that needs the variances alone — an [`AbstractUncertaintySetEstimator`](@ref) that weights the cross-section by the inverse idiosyncratic variance is the first one — asks for them here rather than testing the shape at its own site.
+Both members of [`AbstractLoadingsRegressionResult`](@ref) carry `esigma` under one name, and both accept a vector of variances or a full covariance. A consumer that needs the variances alone calls this function, and does not test the shape itself. The first such consumer is an [`AbstractUncertaintySetEstimator`](@ref) that weights the cross-section by the inverse idiosyncratic variance.
 
-The shape is the dispatch, as it is in [`assert_idiosyncratic_covariance`](@ref) and [`idiosyncratic_covariance_view`](@ref). The one-argument entry reads the field and forwards it beside the block, so the two refusals name the block they came from: a [`Regression`](@ref) is filled by the prior that lifts the factor moments, so its message names `rsd`, and a [`CrossSectionalFactorModel`](@ref) is filled by its own fit, so its message names the field.
+Each shape has its own method, as in [`assert_idiosyncratic_covariance`](@ref) and [`idiosyncratic_covariance_view`](@ref). The one-argument method reads the field and passes it with the block, so each of the two errors names the type of its block. The prior that lifts the factor moments fills the field of a [`Regression`](@ref), so its message names `rsd`. The fit of a [`CrossSectionalFactorModel`](@ref) fills its field, so its message names `esigma`.
 
-There is no fallback. A block that carries no idiosyncratic covariance cannot answer, and an answer of ones or of zeros is a different weighting rather than a missing one.
+The function has no fallback. A block that carries no idiosyncratic covariance raises an error. A value of ones or of zeros is a different weighting, and not a missing weighting.
 
 # Arguments
 
   - `esigma`: Idiosyncratic covariance, a vector of variances, a square matrix, or `nothing`.
-  - `rr`: The loadings block the field was read from, which the raise reports.
+  - `rr`: The loadings block that holds the field, for the error message.
 
 # Validation
 
-  - `!isnothing(esigma)`, raising an `IsNothingError`.
+  - `!isnothing(esigma)`. Raises an `IsNothingError`.
 
 # Returns
 
-  - `esigma::VecNum`: The idiosyncratic variances, one per asset. A vector comes back unchanged, and a matrix comes back as its diagonal.
+  - `esigma::VecNum`: The idiosyncratic variances, one per asset. The function returns a vector unchanged, and the diagonal of a matrix.
 
 # Examples
 
@@ -962,9 +962,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-State whether the model was fitted in a re-based factor family.
+State whether the fit of the model ran in a re-based factor family.
 
-`L` and `fcb` are present together and absent together, and the pair is present exactly when a Factor Family was re-based before the fit. The answer is therefore the presence of `L`, read with `getfield` rather than through property access: the `swap(L, M)` rule of [`CrossSectionalFactorModel`](@ref) makes `csfm.L` return `csfm.M` when `L` is unset, so a property read would answer `true` for every model.
+`L` and `fcb` are present together or absent together. The pair is present only when the prior re-based a Factor Family before the fit. So the function returns the presence of `L`. It reads `L` with `getfield`, and not through property access. The `swap(L, M)` rule of [`CrossSectionalFactorModel`](@ref) makes `csfm.L` return `csfm.M` when `L` is unset, so a property read gives `true` for every model.
 
 # Arguments
 
@@ -972,7 +972,7 @@ State whether the model was fitted in a re-based factor family.
 
 # Returns
 
-  - `val::Bool`: `true` when `L` is set, so the raw factor axis of `M` is a linear image of the re-based one and a factor covariance stated on it is singular; `false` when the fit ran in the raw basis.
+  - `val::Bool`: `true` when `L` is set. Then the raw factor axis of `M` is a linear image of the re-based axis, and a factor covariance on the raw axis is singular. `false` when the fit ran in the raw basis.
 
 # Examples
 
@@ -1002,17 +1002,17 @@ end
 """
     port_opt_view(csfm::CrossSectionalFactorModel, i, args...)
 
-Return a view of a [`CrossSectionalFactorModel`](@ref) result, selecting only the assets indexed by `i`.
+Return a view of a [`CrossSectionalFactorModel`](@ref) result over the assets that `i` indexes.
 
 # Algorithm
 
- 1. Read `L` with `getfield`, never through property access. The `swap(L, M)` rule of [`CrossSectionalFactorModel`](@ref) makes `csfm.L` return `csfm.M` when `L` is unset, so a property read would materialise `L` as a copy of `M` and lose the unset-ness.
- 2. Take a row view of `M`, of `L` when step 1 found a matrix, and an element view of `b`, giving the loadings and the factor-orthogonal expected return of the selected assets.
+ 1. Read `L` with `getfield`, never through property access. The `swap(L, M)` rule of [`CrossSectionalFactorModel`](@ref) makes `csfm.L` return `csfm.M` when `L` is unset. A property read gives a copy of `M` in place of `L`, and the view loses the fact that `L` is unset.
+ 2. Take a row view of `M`, and of `L` when step 1 found a matrix. Take an element view of `b`. These are the loadings and the factor-orthogonal expected return of the selected assets.
  3. View the nested fit with its own [`port_opt_view`](@ref) method, which cuts its residuals on the asset axis.
- 4. Take a view of `Ms` on its first axis, and of `vs`, `rw`, `bw`, `amr` and `hist` on their second axis, giving the histories of the selected assets.
+ 4. Take a view of `Ms` on its first axis, and of `vs`, `rw`, `bw`, `amr` and `hist` on their second axis. These are the histories of the selected assets.
  5. View `esigma` with [`idiosyncratic_covariance_view`](@ref), which reads its shape, and view `edof` and `ediv` with [`nothing_scalar_array_view`](@ref).
  6. View the Return Forecast with its own [`port_opt_view`](@ref) method, which cuts `mu` and `hist` on the asset axis.
- 7. Build a new [`CrossSectionalFactorModel`](@ref) from the views, passing `nf`, `fam`, `fcb`, `lag`, `fx`, `fr`, `lambda`, `c`, `idx` and `ts` through, which re-runs every guard of the constructor.
+ 7. Build a new [`CrossSectionalFactorModel`](@ref) from the views, with `nf`, `fam`, `fcb`, `unseen`, `lag`, `fx`, `fr`, `lambda`, `c`, `idx` and `ts` unchanged. The constructor runs every check again.
 
 # Arguments
 
@@ -1022,7 +1022,7 @@ Return a view of a [`CrossSectionalFactorModel`](@ref) result, selecting only th
 
 # Returns
 
-  - `csfm::CrossSectionalFactorModel`: A new result whose per-asset fields are restricted to the selected assets.
+  - `csfm::CrossSectionalFactorModel`: A new result with the per-asset fields of the selected assets only.
 
 # Examples
 
@@ -1090,7 +1090,7 @@ end
 
 Return the cross-sectional factor model unchanged.
 
-This method is a pass-through for [`CrossSectionalFactorModel`](@ref) results, as the method over [`Regression`](@ref) is for that result. A consumer that binds `RegE_Reg` takes either a result or an estimator, and calls `regression` on both.
+This method returns a [`CrossSectionalFactorModel`](@ref) as it is, as the method over [`Regression`](@ref) does for that result. A consumer with an argument of the type `RegE_Reg` accepts a result or an estimator, and calls `regression` on both.
 
 # Arguments
 
@@ -1114,7 +1114,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the answer of a Factor Model Diagnostic together with the names and the family labels of its factor axis.
 
-A diagnostic verb called on a [`CrossSectionalFactorModel`](@ref) returns it. The method of the same verb over bare histories returns the bare array, because it has no names to carry. [`port_opt_view`](@ref) selects factors of the answer by position, by name, or by family with a [`LabelGroup`](@ref). It cuts every factor dimension of `X`, and `nf` and `fam` with it. So a caller computes a diagnostic once, over every factor, and then selects the factors it reads.
+A diagnostic verb called on a [`CrossSectionalFactorModel`](@ref) returns it. The method of the same verb over bare histories returns the bare array, because it has no names to carry. [`port_opt_view`](@ref) selects factors of the answer by position, by name, or by family with a [`LabelGroup`](@ref). It cuts every factor dimension of `X`, and `nf` and `fam` with it. A caller can compute a diagnostic once, over every factor, and then selects the factors that it reads.
 
 # Fields
 
@@ -1211,7 +1211,7 @@ end
 
 Turn the factor index of a view of a diagnostic answer into positions on its factor axis.
 
-A position vector, a range and a `Colon` pass through. A name and a vector of names go through [`label_positions`](@ref), which refuses a name it cannot find. One integer becomes a range of one position through [`label_positions`](@ref), so the answer keeps its factor axis. A [`LabelGroup`](@ref) selects every factor whose family label is the group, in the order of the axis.
+The function returns a position vector, a range and a `Colon` unchanged. A name and a vector of names go through [`label_positions`](@ref), which refuses a name it cannot find. One integer becomes a range of one position through [`label_positions`](@ref), so the answer keeps its factor axis. A [`LabelGroup`](@ref) selects every factor whose family label is the group, in the order of the axis.
 
 # Algorithm
 
@@ -1347,9 +1347,9 @@ end
     cs_diagnostic_factor_names(fcb::Nothing, nf::VecStr)
     cs_diagnostic_factor_names(fcb::AbstractFactorFamilyBasis, nf::VecStr)
 
-Return the factor names of the axis a cross-sectional regression diagnostic answers on.
+Return the factor names of the axis that a cross-sectional regression diagnostic answers on.
 
-A regression diagnostic that carries a factor axis answers on the design of the regression: the reduced axis when the block carries a family re-basis, less the observed factors, which are its last columns and which the regression did not estimate. So the names of the raw axis do not label it. The one-argument verb maps them, and the [`FactorDiagnosticResult`](@ref) of a regression diagnostic carries its answer. The two-argument verb maps the names onto the whole reduced axis, observed factors included, which is the axis of the loadings `L`. It maps family labels the same way. A block that names no factor answers `nothing`.
+A regression diagnostic that carries a factor axis answers on the design axis of the regression. The design axis is the reduced axis, or the raw axis when the block has no family re-basis, less the observed factors. The observed factors are the last columns, and the regression does not estimate them. So the names of the raw axis do not label the design axis. The one-argument method maps the names onto the design axis, and the [`FactorDiagnosticResult`](@ref) of a regression diagnostic carries the result. The two-argument method maps the names onto the whole reduced axis, with the observed factors, which is the axis of the loadings `L`. It maps family labels the same way. Both methods give `nothing` for a block that names no factor.
 
 # Arguments
 
