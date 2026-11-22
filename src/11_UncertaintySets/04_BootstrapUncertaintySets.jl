@@ -1280,7 +1280,7 @@ This is the prior-result method of the verb. Only a set whose `pe` is `nothing` 
 
 This route is the only route of the library that bounds a covariance with no matrix of side ``N^{2}``. The ellipsoidal route fits `ue.ce` on the ``M \\times N^{2}`` deviations. A vectorised symmetric matrix has only ``N(N+1)/2`` free coordinates, so that shape is rank deficient at every sample size. The default matrix processing then repairs it into a matrix that the sample does not give.
 
-The map that [`norm_ball_deviation_factor`](@ref) builds is the scaled deviations. So it has the second moment of the sample exactly, at the rank ``\\min(M - 1, N(N+1)/2)``. [`k_norm_ball`](@ref) reads that rank, and not the side of a shape matrix. The chi-squared radius of the ellipsoidal route reads the same rank by default. It reads ``N^{2}`` degrees of freedom only if its [`ChiSqKUncertaintyAlgorithm`](@ref) has `ambient = true`.
+The map that [`norm_ball_deviation_factor`](@ref) builds is the scaled deviations. So it has the second moment of the sample exactly, at the rank ``\\min(M - 1, N(N+1)/2)``. [`k_norm_ball`](@ref) reads that rank, and not the side of a shape matrix. The chi-squared radius of the ellipsoidal route reads the same rank.
 
 # Algorithm
 

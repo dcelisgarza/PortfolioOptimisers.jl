@@ -504,7 +504,8 @@ end
                                                         MuUncertaintySetClass())
                 cov_ref = diag ? LinearAlgebra.Diagonal(cov) : cov
                 @test e.sigma == cov_ref
-                @test e.k == PortfolioOptimisers.k_ucs(method, q, samp, cov_ref)
+                @test e.k ==
+                      PortfolioOptimisers.k_ucs(method, q, samp, cov_ref, size(cov_ref, 1))
             end
         end
     end
@@ -757,13 +758,16 @@ end
                                             LinearAlgebra.Diagonal(ones(4)))
         end
         @testset "The chi-squared radius reads the dimension of the set (#1425)" begin
-            # Without `df`, `k_ucs` reads the side of the shape, which is the dimension of a
-            # shape of full rank: N on the mean axis, N^2 on a diagonal covariance shape.
+            # The chi-squared radius reads `df` alone, and `df` has no default: the side of
+            # the shape is too large on a full covariance shape.
             for p in (4, 16)
                 k = PortfolioOptimisers.k_ucs(ChiSqKUncertaintyAlgorithm(), 0.05, nothing,
-                                              LinearAlgebra.Diagonal(ones(p)))
+                                              LinearAlgebra.Diagonal(ones(16)), p)
                 @test k ≈ sqrt(quantile(Distributions.Chisq(p), 0.95))
             end
+            @test_throws MethodError PortfolioOptimisers.k_ucs(ChiSqKUncertaintyAlgorithm(),
+                                                               0.05, nothing,
+                                                               LinearAlgebra.Diagonal(ones(4)))
             # A symmetric N x N matrix has N(N+1)/2 free entries, so a full covariance
             # shape reads that many degrees of freedom. A diagonal shape keeps N^2, the
             # expected value of its statistic, and the mean axis reads N either way.
@@ -784,34 +788,32 @@ end
             k_free = sqrt(quantile(Distributions.Chisq(N * (N + 1) ÷ 2), 0.95))
             k_amb = sqrt(quantile(Distributions.Chisq(N^2), 0.95))
             S = Matrix{Float64}(LinearAlgebra.I, N^2, N^2)
-            # `ambient = true` reads the side of the shape, N^2, on every route.
-            for (km, want) in ((ChiSqKUncertaintyAlgorithm(), k_free),
-                               (ChiSqKUncertaintyAlgorithm(; ambient = true), k_amb))
-                e = PortfolioOptimisers.ellipsoidal_set(EllipsoidalUncertaintySetAlgorithm(km,
-                                                                                           false),
-                                                        0.05, nothing, S,
-                                                        SigmaUncertaintySetClass())
-                @test e.k ≈ want
-                ed = PortfolioOptimisers.ellipsoidal_set(EllipsoidalUncertaintySetAlgorithm(km,
-                                                                                            true),
-                                                         0.05, nothing, S,
-                                                         SigmaUncertaintySetClass())
-                @test ed.k ≈ k_amb
-                for d in (false, true)
-                    alg = NormBallUncertaintySetAlgorithm(; method = km, diagonal = d)
-                    nb = PortfolioOptimisers.norm_ball_set(alg, 0.05, nothing, S,
-                                                           SigmaUncertaintySetClass())
-                    @test nb.kappa ≈ (d ? k_amb : want)
-                end
-                @test PortfolioOptimisers.k_ucs(km, 0.05, nothing, S, 3) ≈
-                      (km.ambient ? k_amb : sqrt(quantile(Distributions.Chisq(3), 0.95)))
+            # A full shape reads N(N+1)/2 on every route, and a diagonal shape reads N^2.
+            km = ChiSqKUncertaintyAlgorithm()
+            e = PortfolioOptimisers.ellipsoidal_set(EllipsoidalUncertaintySetAlgorithm(km,
+                                                                                       false),
+                                                    0.05, nothing, S,
+                                                    SigmaUncertaintySetClass())
+            @test e.k ≈ k_free
+            ed = PortfolioOptimisers.ellipsoidal_set(EllipsoidalUncertaintySetAlgorithm(km,
+                                                                                        true),
+                                                     0.05, nothing, S,
+                                                     SigmaUncertaintySetClass())
+            @test ed.k ≈ k_amb
+            for d in (false, true)
+                alg = NormBallUncertaintySetAlgorithm(; method = km, diagonal = d)
+                nb = PortfolioOptimisers.norm_ball_set(alg, 0.05, nothing, S,
+                                                       SigmaUncertaintySetClass())
+                @test nb.kappa ≈ (d ? k_amb : k_free)
             end
+            @test PortfolioOptimisers.k_ucs(km, 0.05, nothing, S, 3) ≈
+                  sqrt(quantile(Distributions.Chisq(3), 0.95))
             # The empirical radius absorbs `df`, because its distances carry the dimension.
             Xs = randn(StableRNG(1425), 50, 3)
             C3 = Statistics.cov(Xs)
             @test PortfolioOptimisers.k_ucs(NormalKUncertaintyAlgorithm(), 0.05, Xs, C3,
                                             1) ==
-                  PortfolioOptimisers.k_ucs(NormalKUncertaintyAlgorithm(), 0.05, Xs, C3)
+                  PortfolioOptimisers.k_ucs(NormalKUncertaintyAlgorithm(), 0.05, Xs, C3, 3)
         end
         @testset "The full Normal covariance set holds its stated level (#1425)" begin
             # The error of a sample covariance is symmetric, so the Normal shape
@@ -826,16 +828,16 @@ end
             ell(km) = EllipsoidalUncertaintySetAlgorithm(; method = km, diagonal = false)
             sc = sigma_ucs(NormalUncertaintySet(; alg = ell(ChiSqKUncertaintyAlgorithm())),
                            X)
+            # The radius at N^2 = 25, the side of the shape, given as a number.
             sa = sigma_ucs(NormalUncertaintySet(;
-                                                alg = ell(ChiSqKUncertaintyAlgorithm(;
-                                                                                     ambient = true))),
-                           X)
+                                                alg = ell(sqrt(quantile(Distributions.Chisq(25),
+                                                                        0.95)))), X)
             sn = sigma_ucs(NormalUncertaintySet(; alg = ell(NormalKUncertaintyAlgorithm()),
                                                 n_sim = 20_000, rng = StableRNG(7)), X)
             @test sc.sigma == sa.sigma == sn.sigma
             @test sc.k ≈ sqrt(quantile(Distributions.Chisq(15), 0.95))
             @test sa.k ≈ sqrt(quantile(Distributions.Chisq(25), 0.95))
-            # Measured: 5.000 (chi-squared), 5.027 (empirical), 6.136 (ambient).
+            # Measured: 5.000 (chi-squared), 5.027 (empirical), 6.136 (side of the shape).
             @test isapprox(sn.k, sc.k; rtol = 0.02)
             @test sa.k / sn.k > 1.15
             # The coverage of each radius on errors drawn from the fitted covariance, one
@@ -1060,8 +1062,10 @@ end
             Z = randn(StableRNG(11), N, 5_000)
             Xa = transpose(cholesky(Symmetric(sigma_mu)).L * Z)
             Xb = transpose(cholesky(Symmetric(sigma)).L * Z)
-            ka = PortfolioOptimisers.k_ucs(NormalKUncertaintyAlgorithm(), q, Xa, sigma_mu)
-            kb = PortfolioOptimisers.k_ucs(NormalKUncertaintyAlgorithm(), q, Xb, sigma_mu)
+            ka = PortfolioOptimisers.k_ucs(NormalKUncertaintyAlgorithm(), q, Xa, sigma_mu,
+                                           N)
+            kb = PortfolioOptimisers.k_ucs(NormalKUncertaintyAlgorithm(), q, Xb, sigma_mu,
+                                           N)
             @test kb / ka ≈ sqrt(T)
         end
         @testset "The box halves the tail and the ellipsoid does not" begin
@@ -1095,7 +1099,7 @@ end
             # cover 1 - q: the box one entry at a time, the ellipsoid jointly.
             sigma_mu_e = sigma_mu
             k = PortfolioOptimisers.k_ucs(ChiSqKUncertaintyAlgorithm(), ue.q, nothing,
-                                          sigma_mu_e)
+                                          sigma_mu_e, size(sigma_mu_e, 1))
             E = cholesky(Symmetric(sigma_mu_e)).L * randn(StableRNG(9), N, 100_000)
             d2 = vec(sum(E .* (sigma_mu_e \ E); dims = 1))
             @test isapprox(mean(d2 .<= k^2), 1 - ue.q; atol = 5e-3)
@@ -1412,15 +1416,13 @@ end
             @test ucsc.kappa == 2.0
             @test ucsc.C == Cc
             @test isnothing(ucsc.val)
-            @test isa(CompactCovarianceUncertaintySet(2.0, Cc, Qc),
-                      CompactCovarianceUncertaintySet)
-            # The four positional arguments of a released version keep their meaning: the
-            # fourth is `val`, and the set has no row in `R` (ADR 0189).
+            # A set with no `R` has no row in it (ADR 0189). The positional constructor
+            # takes every field.
             Vc = Matrix(1.0 * LinearAlgebra.I(length(Cc)))
-            ucs4 = CompactCovarianceUncertaintySet(2.0, Cc, Qc, Vc)
+            ucs4 = CompactCovarianceUncertaintySet(; kappa = 2.0, C = Cc, Q = Qc, val = Vc)
             @test ucs4.val == Vc
             @test size(ucs4.R) == (0, size(Qc, 2))
-            @test isnothing(CompactCovarianceUncertaintySet(2.0, Cc, Qc, nothing).val)
+            @test_throws MethodError CompactCovarianceUncertaintySet(2.0, Cc, Qc, Vc)
             @test_throws DomainError CompactCovarianceUncertaintySet(; kappa = -1.0, C = Cc,
                                                                      Q = Qc)
             @test_throws DomainError CompactCovarianceUncertaintySet(; kappa = Inf, C = Cc,
@@ -1983,7 +1985,7 @@ end
             E730 = randn(StableRNG(5), 500, N730) * 1e-2
             km = NormalKUncertaintyAlgorithm()
             @test isapprox(PortfolioOptimisers.k_norm_ball(km, 0.05, E730, L730, N730),
-                           PortfolioOptimisers.k_ucs(km, 0.05, E730, S730))
+                           PortfolioOptimisers.k_ucs(km, 0.05, E730, S730, N730))
             # The chi-squared radius reads the degrees of freedom it is handed, and not
             # the row count of the map.
             @test PortfolioOptimisers.k_norm_ball(ChiSqKUncertaintyAlgorithm(), 0.05,
@@ -2117,7 +2119,7 @@ end
             # covariance of the deviations is rank deficient at every sample size. The
             # ellipsoid's shape is therefore the repaired one, and its radius reads the
             # N(N+1)/2 dimensions of the symmetric matrices (#1425, ADR 0188), capped at
-            # the rank n_sim - 1 of the sample, or N^2 under `ambient = true`. The map
+            # the rank n_sim - 1 of the sample. The map
             # carries the sample second moment exactly and its radius reads the rank the
             # sample has, so the two routes give one radius. At n_sim = 8 the cap binds:
             # 7 < N(N+1)/2 = 10.
@@ -2148,15 +2150,6 @@ end
                       sqrt(cquantile(Chisq(min(n_sim - 1, div(N730 * (N730 + 1), 2))),
                                      ueb.q))
                 @test se.k == sb.kappa
-                uea = ARCHUncertaintySet(;
-                                         alg = EllipsoidalUncertaintySetAlgorithm(;
-                                                                                  method = ChiSqKUncertaintyAlgorithm(;
-                                                                                                                      ambient = true),
-                                                                                  diagonal = false),
-                                         n_sim = n_sim, seed = 7)
-                sea = sigma_ucs(uea, X730)
-                @test sea.sigma == se.sigma
-                @test sea.k == sqrt(cquantile(Chisq(N730^2), ueb.q))
                 # The ellipsoid's shape is not the sample's own second moment, because the
                 # sample is rank deficient and the default matrix processing repairs it.
                 @test !isposdef(cov(Xd))

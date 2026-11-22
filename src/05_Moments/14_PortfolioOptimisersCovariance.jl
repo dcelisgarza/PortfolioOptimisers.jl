@@ -31,9 +31,9 @@ Keywords correspond to the struct's fields.
 
 The composite folds by composition. The state in `cache` selects one of two routes.
 
-If `cache` holds `nothing`, [`partial_fit!`](@ref) passes the observation to `ce.ce` and keeps no state of its own. This route works because `mp` needs only a moment and a count. `pdm` and `dt` read only `sigma`, and `dn` reads the effective sample ratio `T / N`. The one-argument [`Statistics.cov`](@ref) reads the folded matrix of the inner estimator. Then it applies `mp`. When `mp` denoises, it reads the count from [`effective_observation_count`](@ref), which is the same count that the batch fit reads. For an unweighted `ce` that count is `size(X, 1)`. For a weighted `ce` it is the count of its weights. An `mp.alg` of the caller is the one step that needs the sample itself. The fold refuses it with an error that names it.
+If `cache` holds `nothing`, [`partial_fit!`](@ref) passes the observation to `ce.ce` and keeps no state of its own. This route works because `mp` needs only a moment and a count. `pdm` and `dt` read only `sigma`, and `dn` reads the effective sample ratio `T / N`. The one-argument [`Statistics.cov`](@ref) reads the folded matrix of the inner estimator. Then it applies `mp`. When `mp` denoises, it reads the count from [`effective_observation_count`](@ref), which is the same count that the batch fit reads. For an unweighted `ce` that count is `size(X, 1)`. For a weighted `ce` it is the count of its weights. An `mp.alg` that reads the values of the sample, as [`reads_sample_values`](@ref) states, is the one step that needs the sample itself. The fold refuses it with an error that names it. An `mp.alg` that reads no value of the sample, such as the default [`LoGo`](@ref), runs on the folded matrix.
 
-If `cache` holds a [`SampleBufferState`](@ref), which [`Online`](@ref) seeds, the composite takes the buffer route. Then `cov(ce)` with no data runs the batch verb over the observations that the buffer kept. An `mp.alg` needs this route.
+If `cache` holds a [`SampleBufferState`](@ref), which [`Online`](@ref) seeds, the composite takes the buffer route. Then `cov(ce)` with no data runs the batch verb over the observations that the buffer kept. An `mp.alg` that reads the values of the sample needs this route.
 
 ## Propagated parameters
 
@@ -707,7 +707,7 @@ The composite is exact by composition and keeps no state of its own. `ce.ce` fol
 
 The step costs what the step of the inner estimator costs, which is `O(N²)`. The composite adds no cost.
 
-`ce.mp` needs only a moment and a count, with one exception. An `mp.alg` of the caller gets the whole sample. [`assert_shape_only_matrix_processing`](@ref) refuses it at the fold. The refusal cannot wait until `cov(ce)` with no data, because the rows are gone at that time.
+`ce.mp` needs only a moment and a count, with one exception. An `mp.alg` gets the whole sample, and it can read the values, as [`reads_sample_values`](@ref) states. [`assert_shape_only_matrix_processing`](@ref) refuses such a step at the fold. The default [`LoGo`](@ref) reads no value of the sample, so it folds. The refusal cannot wait until `cov(ce)` with no data, because the rows are gone at that time.
 
 # Algorithm
 
@@ -828,7 +828,7 @@ end
 
 Reads the covariance or the correlation of a buffered [`PortfolioOptimisersCovariance`](@ref) from a new fit over its buffer.
 
-This method makes the estimate on the buffer route. [`Online`](@ref) seeds this route, and an `mp.alg` of the caller needs it. The method runs the batch verb over the observations that the buffer kept, so it returns the same result as a batch fit over those rows, with `mp.alg`.
+This method makes the estimate on the buffer route. [`Online`](@ref) seeds this route, and an `mp.alg` that reads the values of the sample needs it. The method runs the batch verb over the observations that the buffer kept, so it returns the same result as a batch fit over those rows, with `mp.alg`.
 
 # Arguments
 
@@ -863,7 +863,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Answers whether [`partial_fit!`](@ref) folds a [`PortfolioOptimisersCovariance`](@ref).
 
-The composite folds by composition, so it folds exactly when the inner estimator folds and `mp` runs from the shape of the sample, as [`supports_shape_processing`](@ref) states. A [`MatrixProcessing`](@ref) passes when it has no `alg` that reads the sample. A matrix processing estimator of the caller never passes. A composite that a wrapper gave a buffer folds in all cases. This is the default buffer route of [`supports_partial_fit`](@ref), and it is the only route that lets an `mp.alg` run online.
+The composite folds by composition, so it folds exactly when the inner estimator folds and `mp` runs from the shape of the sample, as [`supports_shape_processing`](@ref) states. A [`MatrixProcessing`](@ref) passes when its `alg` reads no value of the sample, as [`reads_sample_values`](@ref) states. A matrix processing estimator of the caller never passes. A composite that a wrapper gave a buffer folds in all cases. This is the default buffer route of [`supports_partial_fit`](@ref), and it is the only route that lets an `mp.alg` that reads the values of the sample run online.
 
 # Arguments
 
@@ -922,15 +922,13 @@ function effective_observation_count(ce::PortfolioOptimisersCovariance{<:Any, <:
     return effective_observation_count(ce.ce; kwargs...)
 end
 # The repair, the denoising and the detoning of `MatrixProcessing` act on the fitted matrix and
-# drop no observation, so the variance of the composite counts the observations of `ce.ce`. A
-# custom `alg` step reads the sample itself, and its matrix need not rest on the observations
-# that `ce.ce` counts, so a composite with one states no count.
-function variance_count(ce::PortfolioOptimisersCovariance{<:Any,
-                                                          <:MatrixProcessing{<:Any, <:Any,
-                                                                             <:Any,
-                                                                             Nothing}},
+# drop no observation, so the variance of the composite counts the observations of `ce.ce`. An
+# `alg` step that reads no value of the sample, as `reads_sample_values` states, also acts on
+# the fitted matrix alone. An `alg` step that reads the sample itself can give a matrix that
+# does not rest on the observations that `ce.ce` counts, so a composite with one states no count.
+function variance_count(ce::PortfolioOptimisersCovariance{<:Any, <:MatrixProcessing},
                         X::MatNum, amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
-    return variance_count(ce.ce, X, amsk)
+    return reads_sample_values(ce.mp.alg) ? nothing : variance_count(ce.ce, X, amsk)
 end
 
 export PortfolioOptimisersCovariance

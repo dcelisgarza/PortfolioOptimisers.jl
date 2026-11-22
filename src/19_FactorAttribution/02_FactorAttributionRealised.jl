@@ -713,7 +713,7 @@ function realised_attribution(W::VecNum_MatNum, ret::VecNum, al::AlignedAttribut
     f_cov = [attribution_cov(view(f, :, k), retc) for k in 1:K]
     f_var_contrib = [attribution_cov(view(fpnl, :, k), retc) for k in 1:K]
     sers = if se
-        attribution_standard_errors(g, al, fam, sc.s1, T, kinds.leverage)
+        attribution_standard_errors(g, al, fam, sc.s1, T, kinds)
     else
         AttributionErrorsResult()
     end
@@ -979,7 +979,7 @@ function AttributionErrorsResult(; sys::Option{<:Number} = nothing,
 end
 """
     attribution_standard_errors(g::MatNum, al::AlignedAttributionBlock, fam::Option{<:VecStr},
-                                s1::Number, T::Integer, rule::AbstractUnknownEntryRule)
+                                s1::Number, T::Integer, kinds::KindwiseUnknown)
         -> AttributionErrorsResult
 
 Return the standard errors of the mean return contributions of a realised attribution.
@@ -992,7 +992,7 @@ The systematic and the idiosyncratic errors are equal. The portfolio return is o
 
 **An Unseen Member changes the design.** At an observation with an Unseen Member, the fit regressed on the reduced exposures times a change ``\\mathbf{P}_{t}``, and the factor returns are ``\\mathbf{P}_{t}`` times its coefficients. So the sandwich is taken on the changed design, and [`attribution_changed_covariance`](@ref) maps it to ``\\mathbf{P}_{t} \\mathbf{V}_{t} \\mathbf{P}_{t}^{\\intercal}``. The standard errors then do not depend on the member that the family drops, and an Unseen Member has an error of zero, because the rule states its return.
 
-**An unknown variance makes the error unknown.** The sandwich of an observation reads the idiosyncratic variance of every active pair with a non-zero regression weight. Where the block states no such variance, in the warm-up of the variance estimate for example, ``\\mathbf{V}_{t}`` is unknown, and every answer that sums over the observation is `NaN`. A zero variance would understate the error, and dropping the pair would give the covariance of a regression the fit did not run. A window after the warm-up, or a variance estimate with a shorter warm-up, states every entry. A pair outside the regression, or inactive, reads no variance.
+**An unknown variance is an unstated entry.** The sandwich of an observation reads the idiosyncratic variance of every active pair with a non-zero regression weight. The block can state no such variance, in the warm-up of the variance estimate for example. The rule of the `unstated` kind then reads the variance through [`attribution_standalone`](@ref). Under [`EntrywiseUnknown`](@ref), ``\\mathbf{V}_{t}`` is unknown, and every answer that sums over the observation is `NaN`. Under [`ZeroUnknown`](@ref), the variance is zero, so every answer is a lower bound of the error. Dropping the pair would give the covariance of a regression the fit did not run, so no rule drops it. A window after the warm-up, or a variance estimate with a shorter warm-up, states every entry. A pair outside the regression, or inactive, reads no variance.
 
 **A Leverage-One Pair makes the error unknown where the sandwich reads it.** The fit reproduces the return of a marked pair, so the variance of the pair is not identified, and the plug-in variance of the block is one of many values that fit the data. Under [`EntrywiseUnknown`](@ref) every answer whose sandwich gives a marked pair of the regression a coefficient that is not zero is `NaN`, through [`attribution_leverage_errors`](@ref). The pair stays in the sandwich. [`ZeroUnknown`](@ref) reads the plug-in variance, which is the answer of the oracle. One reduction, [`attribution_error_pass`](@ref), gives the answer and the two indicator sums of the test.
 
@@ -1024,7 +1024,7 @@ Where:
   - `fam`: The family label of each raw factor, or `nothing`.
   - `s1`: The factor a mean takes under the annualisation.
   - `T`: The number of aligned observations.
-  - `rule`: The rule for the variance of a Leverage-One Pair, the `leverage` kind of the rule of the attribution.
+  - `kinds`: The rule of each kind of unknown entry, from [`attribution_unknown_kinds`](@ref). The `unstated` kind reads an unknown variance, and the `leverage` kind reads the variance of a Leverage-One Pair.
 
 # Validation
 
@@ -1044,16 +1044,16 @@ Where:
 """
 function attribution_standard_errors(g::MatNum, al::AlignedAttributionBlock,
                                      fam::Option{<:VecStr}, s1::Number, T::Integer,
-                                     rule::AbstractUnknownEntryRule)::AttributionErrorsResult
+                                     kinds::KindwiseUnknown)::AttributionErrorsResult
     rw = assert_attribution_field(al.rw, :rw)
-    vs = assert_attribution_field(al.vs, :vs)
+    vs = attribution_standalone(kinds.unstated, assert_attribution_field(al.vs, :vs))
     red = attribution_reduce_for_errors(al.fcb, al.unseen, al.B, rw, g, al.no, T)
     reg = al.act .& .!iszero.(rw)
     pass(s2) = attribution_error_pass(s2, g, al, red, fam, s1)
-    # An active pair of the regression reads its variance, `NaN` when unknown; any other pair
-    # reads none, so its `NaN` must not reach the product `0 * NaN`.
+    # An active pair of the regression reads its variance after the rule of the `unstated` kind;
+    # any other pair reads none, so its `NaN` must not reach the product `0 * NaN`.
     ses = pass(ifelse.(reg, vs, zero.(vs)))
-    return attribution_leverage_errors(rule, al.h1, reg, ses, pass)
+    return attribution_leverage_errors(kinds.leverage, al.h1, reg, ses, pass)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

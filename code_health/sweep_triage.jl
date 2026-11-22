@@ -302,8 +302,8 @@ run needs comes from a committed file or from the tracker's own metadata.
 """
 function body_of(c::Candidate, commit::AbstractString)
     io = IOBuffer()
-    # The route of ADR 0240. A sweep ticket can wait for the batch of `dev-fixes`.
-    println(io, "**Lands on:** dev-fixes\n")
+    # The route of ADR 0240. A sweep ticket can wait for the batch of `dev`.
+    println(io, "**Lands on:** dev\n")
     println(io, ROUTING)
     println(io, "## Destination\n")
     if reopens(c)

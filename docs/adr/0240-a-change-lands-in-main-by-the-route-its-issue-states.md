@@ -189,3 +189,23 @@ stored base, the landing base is `origin/main`.
   session on its issue takes the branch.
 - A branch cut from `dev` before the switch moves with `git rebase --onto origin/main origin/dev`.
   The squash of #1817 gives `main` the tree of `dev`, so the rebase has no conflict.
+
+## Amendment (2026-11-21)
+
+The maintainer changed two parts of this decision.
+
+1. **The shared branch is `dev`, not `dev-fixes`.** `dev` did not retire when #1817 merged. After
+   the merge, `dev` moved to the squash commit on `main`, and the draft pull request #2227 takes
+   it into `main` as a batch. Each text above that names `dev-fixes` now reads `dev`: the route
+   value `**Lands on:** dev`, the push `git push origin HEAD:dev`, the landing base `origin/dev`,
+   and the glob `refs/heads/dev` of the guard in `code_health/gate_stamp.sh`. The rejected option
+   `agents/dev-fixes` is moot. After a batch merges, the maintainer moves `dev` to the squash
+   commit on `main`. A session with commits on the old `dev` moves them with
+   `git rebase --onto origin/dev <old base>`.
+2. **An issue closes when its fix is pushed, not when the pull request merges.** This replaces
+   item 3 of § *For every route*. When the push that holds the last part of the work reaches the
+   remote branch, the session closes the issue with `gh issue close`, on every route. A commit of
+   the work still names `Fix #N: …`, and a pull request of its own still names `Closes #N`, so
+   that the issue links the work. A commit of a part of the work names `Part of #N: …`, and the
+   issue stays open. The cost of § *Context* that a partial `Fix #N` closes an issue at the
+   release merge stays: write `Part of #N` for a partial commit.

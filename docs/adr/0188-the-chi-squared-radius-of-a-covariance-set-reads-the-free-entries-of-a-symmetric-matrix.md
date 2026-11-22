@@ -89,3 +89,21 @@ not repaired, the deviation route.
   cap, and the bootstrap ellipsoid on both rules, with the cap binding at 8 resamples.
   `test/test_10d_parity_uncertainty_sets.jl` pins the default as Better and the oracle's radius
   under `ambient = true` on both the Normal and the bootstrap norm ball.
+
+## Amendment (2026-11-21)
+
+`ChiSqKUncertaintyAlgorithm` has no field. The keyword `ambient` is gone, and so is the default
+`df = size(sigma_X, 1)` of the chi-squared method of `k_ucs`. Both read the side of the shape,
+which is the `N²` rule that the Decision found too large for its level. The keyword had no use
+other than to give the v0.32 numbers and the radius of the oracle, and a radius algorithm is the
+wrong place for a rule that the library calls a defect.
+
+The radius of the oracle stays reachable, as ADR 0186 requires. A plain number in the `method`
+slot is the radius, so `method = sqrt(quantile(Chisq(N^2), 1 - q))` gives the `N²` radius on the
+ellipsoid and on both norm-ball routes. `test/test_10d_parity_uncertainty_sets.jl` measures the
+oracle's radius that way.
+
+Every method of `k_ucs` takes `df` as a required argument, as every method of `k_norm_ball`
+already did. The default kept the four-argument call of a released version, and on the
+chi-squared method it gave the `N²` rule again. `NormalKUncertaintyAlgorithm` still ignores the
+value.

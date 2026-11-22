@@ -150,7 +150,6 @@ end
                                 # Public descriptor factories: one keyword call each, the
                                 # user's door to a named exposure (ADR 0135).
                                 :ReturnOnEquity => "public descriptor factory",
-                                :SalesToEnterpriseValue => "public descriptor factory",
                                 :LogMarketCap => "public descriptor factory",
                                 :EbitdaToEnterpriseValue => "public descriptor factory",
                                 :AssetsGrowthRate => "public descriptor factory",
@@ -257,7 +256,7 @@ end
                                                         (:factory, :rebuild_struct) => "(interface) the methods of `factory` that replace one field rebuild the estimator or the result through `rebuild_struct`, which many functions share (rule 3, rule 6, #2092). The pair, not the name, is kept, because other pairs of `factory` are still pending",
                                                         (:variance_series, :variance_series) => "(interface) the 2-argument form is the verb that a family overrides, as the exponentially weighted estimators do, and its generic method sends every other estimator to the 5-argument kernel of the window, which the windowed methods share (rule 3, #2092, the review of #2072)",
                                                         (:effective_observation_count, :observation_count) => "(interface) `observation_count` walks the composites by their fields, so its composites call it: it is a function of its own, not a worker of `effective_observation_count` (#2116, #2092)",
-                                                        (:partial_fit, :partial_fit!) => "(b) a measured loss (rule 4): the overrides of `Coskewness` and `Cokurtosis` fold one row in 0.29 ms and 2.53 MiB, and 38.19 ms and 151.3 MiB, where the driver `partial_fit!(copy_states(est), x)` takes 0.34 ms and 2.75 MiB, and 38.20 ms and 157.7 MiB, at 30 assets (#2092)",
+                                                        (:partial_fit, :partial_fit!) => "(b) a measured loss (rule 4): the overrides of `Coskewness` and `Cokurtosis` fold one row in 0.11 ms and 0.46 MiB, and 6.27 ms and 13.2 MiB, where the driver `partial_fit!(copy_states(est), x)` takes 0.13 ms and 0.67 MiB, and 6.86 ms and 19.6 MiB, at 30 assets (#2092, remeasured by #2228)",
                                                         # src/09_ConstraintGeneration (#2096).
                                                         (:rebase_linear_constraints, :project_linear_constraint) => "(interface) `project_linear_constraint` walks a `LinearConstraint` by its fields `ineq` and `eq`, so its composite method calls it: it is a function of its own, and its body does not move into `rebase_linear_constraints` (#2116, #2096)",
                                                         # src/11_UncertaintySets (#2098).

@@ -96,6 +96,15 @@ const DESCRIPTOR_LAG_CONSTRUCTORS = (AssetsGrowthRate, SalesGrowthRate, Issuance
         @test isnothing(BookLeverage().gt0)
         @test BookLeverage().nonneg == ["total_debt"]
         @test GrossMargin().nonneg == ["sales_ttm"]
+        # A debt and a sales figure are non-negative by construction, in every named ratio
+        # that reads them (ADR 0108, amendment of 2026-09-29).
+        @test DebtToAssets().nonneg == ["total_debt"]
+        @test SalesToPrice().nonneg == ["sales_ttm"]
+        @test GrossProfitability().nonneg == ["sales_ttm"]
+        @test AssetTurnover().nonneg == ["sales_ttm"]
+        @test SalesToEnterpriseValue().nonneg == ["sales_ttm"]
+        @test AssetTurnover(; num = "s").nonneg == ["s"]
+        @test GrossProfitability(; sales = "s").nonneg == ["s"]
         @test isnothing(GrossMargin().gt0)
         @test isnothing(PanelFieldRatio(; num = "a", den = "b").gt0)
         @test DividendToPrice().nonneg == ["dividends_ttm"]
@@ -381,6 +390,52 @@ end
         @test isnan(descriptor(DividendToPrice(), rdu)[1, 1])
         # The buybacks may be negative: the guard names the dividends alone.
         @test isa(descriptor(ShareholderYield(), rdp), Matrix{Float64})
+    end
+    @testset "Every ratio over a sales figure or a debt refuses a negative one" begin
+        sales = [1.0 2.0 3.0; 4.0 5.0 6.0; 7.0 8.0 9.0]
+        assets = 10 .* sales
+        ev = 2 .* sales
+        fields(s, d) = ["sales_ttm" => s, "cost_of_revenue_ttm" => 0.5 .* sales,
+                        "total_assets" => assets, "enterprise_value" => ev,
+                        "market_cap" => mp, "total_debt" => d]
+        sales_ratios = (SalesToPrice(), GrossProfitability(), AssetTurnover(),
+                        SalesToEnterpriseValue(), GrossMargin())
+        rdc = descriptor_hand_panel(fields(sales, debt); amsk = amsk)
+        for de in (sales_ratios..., DebtToAssets())
+            @test isa(descriptor(de, rdc), Matrix{Float64})
+        end
+        @test descriptor(AssetTurnover(), rdc)[2, 1] == 0.1
+        @test descriptor(DebtToAssets(), rdc)[2, 1] == 0.1
+        neg = copy(sales)
+        neg[2, 3] = -6.0
+        rdn = descriptor_hand_panel(fields(neg, debt); amsk = amsk)
+        for de in sales_ratios
+            @test_throws DomainError descriptor(de, rdn)
+        end
+        @test isa(descriptor(DebtToAssets(), rdn), Matrix{Float64})
+        # The message names the field, the value and the cell.
+        msg = sprint(showerror, try
+                         descriptor(SalesToPrice(), rdn)
+                     catch err
+                         err
+                     end)
+        @test occursin("\"sales_ttm\" must be non-negative", msg)
+        @test occursin("it is -6.0 at observation 2 for asset 3", msg)
+        # A zero sales figure is valid, and only the ratio over it is NaN.
+        neg[2, 3] = 0.0
+        rdz = descriptor_hand_panel(fields(neg, debt); amsk = amsk)
+        @test descriptor(SalesToPrice(), rdz)[2, 3] == 0.0
+        @test isnan(descriptor(GrossMargin(), rdz)[2, 3])
+        # A negative sales figure on an inactive cell is not read.
+        neg[2, 3] = 6.0
+        neg[3, 2] = -8.0
+        rdi = descriptor_hand_panel(fields(neg, debt); amsk = amsk)
+        @test isa(descriptor(SalesToPrice(), rdi), Matrix{Float64})
+        nd = copy(debt)
+        nd[1, 2] = -2.0
+        rdd = descriptor_hand_panel(fields(sales, nd); amsk = amsk)
+        @test_throws DomainError descriptor(DebtToAssets(), rdd)
+        @test isa(descriptor(AssetTurnover(), rdd), Matrix{Float64})
     end
     @testset "The logarithm and the passthrough" begin
         D = descriptor(PanelFieldLog(; field = "market_cap"), rd)

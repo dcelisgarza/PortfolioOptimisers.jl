@@ -24,4 +24,5 @@ matrix_processing
 matrix_processing_algorithm!(::Nothing, sigma::MatNum, args...; kwargs...)
 matrix_processing_algorithm(::Nothing, sigma::MatNum, args...; kwargs...)
 matrix_processing_posdef
+reads_sample_values
 ```

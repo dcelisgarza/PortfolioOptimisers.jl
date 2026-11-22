@@ -286,7 +286,6 @@ end
                 :AbstractClusteringResult, :AbstractClustersEstimator,
                 :AbstractCollapseAlgorithm, :AbstractConditionalValueatRiskViewFormulation,
                 :AbstractCrossSectionalRegressionResult, :AbstractDecompositionContract,
-                :AbstractDistanceAlgorithm, :AbstractDistanceEstimator,
                 :AbstractDrawdownSeries, :AbstractEntropicValueatRiskViewFormulation,
                 :AbstractEntropyPoolingAlgorithm, :AbstractEntropyPoolingOptAlgorithm,
                 :AbstractEntropyPoolingOptimiser, :AbstractEntropyPoolingTailView,

@@ -187,6 +187,11 @@ function distance(de::DistanceDistance, rho::MatNum, args...; kwargs...)
     D = distance(Distance(; power = de.power, alg = de.alg), rho, args...; kwargs...)
     return Distances.pairwise(de.metric, D, de.args...; dims = 2, de.kwargs...)
 end
+# The matrix method builds the base `Distance` from `de.alg`, and the metric reads that distance
+# matrix alone, so the estimator reads `X` only when its algorithm does.
+function reads_sample_values(de::DistanceDistance)
+    return reads_sample_values(de.alg)
+end
 """
     cor_and_dist(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::MatNum;
                  dims::Int = 1, kwargs...)

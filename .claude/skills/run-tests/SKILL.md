@@ -21,7 +21,9 @@ in a fresh bare process, not in a kaimon REPL. The `run-doctests` skill owns the
   `test/run_files.jl` explains every option. Rerun a failure that only CI shows with `--ci`.
 - **A targeted test is one whose result the change can alter.** Trace from the changed code to the
   test files that assert a value passing through it, add the file of the new test, and add the
-  censuses that read what the commit touched. A file that only names a changed type is not
+  censuses that read what the commit touched. `bash code_health/gate_stamp.sh reach` names the
+  prose censuses that read the changed texts, docstrings and `.md` pages included. The push guard
+  refuses the push until a green run of each one records its stamp. A file that only names a changed type is not
   targeted. After a rebase, run `bash code_health/gate_stamp.sh check`. Rerun the files it names
   that your change reaches, and paste the `drop` line it prints for the rest.
 - **Every line that your change adds to the code is covered before the push.** Run the targeted

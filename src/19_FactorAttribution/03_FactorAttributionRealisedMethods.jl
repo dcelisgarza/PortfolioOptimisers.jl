@@ -945,23 +945,24 @@ end
     attribution_standalone(rule::EntrywiseUnknown, A::AbstractArray)
     attribution_standalone(rule::ZeroUnknown, A::AbstractArray)
 
-Return the entries of the block that the standalone moments of the predicted asset axis read.
+Return the entries of the block that a number read off the block's own entries reads, after the rule for an unknown entry.
 
-The standalone volatility and mean of an asset are moments of the asset, not contributions, so they read the block's own entries. [`EntrywiseUnknown`](@ref) reads them as they are, so the model states no volatility for an asset whose idiosyncratic variance is unknown. [`ZeroUnknown`](@ref) reads every unknown entry as zero.
+Two numbers read the block's own entries. The standalone volatility and mean of an asset are moments of the asset, not contributions, so they read the entries of the asset on the predicted asset axis. The standard errors of a realised attribution read the idiosyncratic variance of every pair of the regression. [`EntrywiseUnknown`](@ref) reads the entries as they are, so the model states no volatility for an asset whose idiosyncratic variance is unknown, and no standard error for a window that reads such a variance. [`ZeroUnknown`](@ref) reads every unknown entry as zero.
 
 # Arguments
 
   - `rule`: The rule for an unknown entry.
-  - `A`: The loadings, the factor-orthogonal mean or the idiosyncratic block.
+  - `A`: The loadings, the factor-orthogonal mean, the idiosyncratic block, or the idiosyncratic variance history.
 
 # Returns
 
-  - `A::AbstractArray`: The entries the standalone moments read.
+  - `A::AbstractArray`: The entries the number reads.
 
 # Related
 
   - [`AbstractUnknownEntryRule`](@ref)
   - [`predicted_attribution_assets`](@ref)
+  - [`attribution_standard_errors`](@ref)
   - [`attribution_finite`](@ref)
 """
 function attribution_standalone(::EntrywiseUnknown, A::AbstractArray)

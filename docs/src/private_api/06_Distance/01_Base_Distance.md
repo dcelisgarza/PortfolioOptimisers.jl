@@ -1,10 +1,7 @@
 ```@meta
-Description = "Base Distance, private API of PortfolioOptimisers.jl: AbstractDistanceEstimator, AbstractDistanceAlgorithm."
+Description = "Base Distance has no private API in PortfolioOptimisers.jl; its names are in the public API."
 ```
 
 # Base Distance: private API
 
-```@docs
-AbstractDistanceEstimator
-AbstractDistanceAlgorithm
-```
+Every name of this topic is public. The [public page](@ref api-base-distance) documents them.

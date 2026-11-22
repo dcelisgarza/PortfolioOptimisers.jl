@@ -477,6 +477,43 @@ function distance(de::Distance{<:Any, <:CanonicalDistance}, rho::MatNum, args...
     return distance(Distance(; power = de.power, alg = SimpleDistance()), rho; kwargs...)
 end
 """
+    reads_sample_values(alg::Union{RhoDistanceAlgorithm, CanonicalDistance}) -> Bool
+    reads_sample_values(de::Distance) -> Bool
+
+[`Distance`](@ref) methods of [`reads_sample_values`](@ref).
+
+The matrix methods of [`distance`](@ref) above compute the distance of a [`RhoDistanceAlgorithm`](@ref) from the correlation matrix alone, and they ignore `X`. A [`CanonicalDistance`](@ref) selects [`SimpleDistance`](@ref) on a matrix. So both answer `false`, and a [`LoGo`](@ref) step over them runs from the state of an incremental fit. A `Distance` reads `X` only through its algorithm, so it gives the answer of `de.alg`. A distance algorithm of your own answers `true` unless it adds a method of its own.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`RhoDistanceAlgorithm`](@ref) or a [`CanonicalDistance`](@ref) answers `false`.
+ 2. A `Distance` answers `reads_sample_values(de.alg)`.
+
+# Arguments
+
+  - `alg`: The distance algorithm.
+  - `de`: The distance estimator.
+
+# Returns
+
+  - `flag::Bool`: `true` when the distance can read the values of `X`.
+
+# Related
+
+  - [`reads_sample_values`](@ref)
+  - [`RhoDistanceAlgorithm`](@ref)
+  - [`CanonicalDistance`](@ref)
+  - [`LoGo`](@ref)
+"""
+function reads_sample_values(::Union{RhoDistanceAlgorithm, CanonicalDistance})
+    return false
+end
+function reads_sample_values(de::Distance)
+    return reads_sample_values(de.alg)
+end
+"""
     cor_and_dist(de::Distance{<:Any,
                               <:Union{SimpleDistance, SimpleAbsoluteDistance,
                                       LogDistance, CorrelationDistance,

@@ -11,9 +11,9 @@ authors:
     orcid: 0000-0003-4622-2234
     affiliation: 1
 affiliations:
-  - name: Independent researcher
+  - name: Independent researcher, Oxford, UK
     index: 1
-date: 11 November 2026
+date: 22 November 2026
 bibliography: paper.bib
 ---
 
@@ -21,19 +21,14 @@ bibliography: paper.bib
 one, so MD025 cannot hold in this file. -->
 <!-- markdownlint-disable MD025 -->
 
-<!--
-DRAFT for the author (issue #2026). The prose of most sections comes from docs/paper/main.typ.
-Each comment below marks the text that is new. Rewrite it in your own words before submission.
--->
-
 # Summary
 
 Portfolio optimisation is the science of either minimising risk whilst keeping returns to
 acceptable levels, or maximising returns whilst keeping risk to acceptable levels, to some
 definition of acceptable, and with any number of additional constraints. There exist myriad
 statistical, pre- and post-processing algorithms, optimisations, and constraints that allow one to
-explore an extensive landscape of "optimal" portfolios. PortfolioOptimisers.jl is an attempt at
-providing as many of these as possible under a single banner and making it accessible to all.
+explore an extensive landscape of "optimal" portfolios. PortfolioOptimisers.jl aims to provide as
+many of these as possible under a single banner, and to make them accessible to all.
 
 The library is highly composable, so the many different components can be mixed and matched in
 arbitrary ways as long as they are compatible, providing users with the ability to create complex
@@ -46,123 +41,151 @@ usability.
 
 The field of portfolio optimisation was introduced by Markowitz [@markowitz1952]. The field has
 grown enormously since then, and so has the catalogue of that model's failure modes. The model
-summarises the entire distribution of returns in highly compressed summary statistics, which can
-be sensitive to outliers and atypical conditions of the lookback period. The optimiser then
-behaves as an error maximiser rather than a diversifier [@michaud1989], is acutely sensitive to
-the expected returns it is given [@best1991], and suffers roughly an order of magnitude more from
-errors in the means than from errors in the covariance [@chopra1993]. The equal weighted portfolio
-remains a stubborn out of sample benchmark [@demiguel2009naive]. Sixty years of responses, from
-constraints [@jagannathan2003] and shrinkage [@ledoit2004] to norm regularisation
-[@demiguel2009norm], robust formulations and hierarchical ones, are by now a literature of their
-own [@kolm2014; @cajasbook; @lopezdepradoml; @dppalomarbook].
+summarises the entire distribution of returns in its first two moments, the mean and the
+covariance, both of which can be sensitive to outliers and atypical conditions of the lookback
+period. The optimiser then behaves as an error maximiser rather than a diversifier [@michaud1989],
+is acutely sensitive to the expected returns it is given [@best1991], and suffers roughly an order
+of magnitude more from errors in the means than from errors in the covariance [@chopra1993]. In
+contrast, the completely naïve, equal weighted portfolio remains a stubborn out of sample benchmark
+[@demiguel2009naive] when the universe is sufficiently curated to remove obvious underperformers.
+Seven decades of responses, from constraints [@jagannathan2003] and shrinkage [@ledoit2004] to norm
+regularisation [@demiguel2009norm], robust formulations and hierarchical ones, are by now a
+literature of their own [@kolm2014; @cajasbook; @lopezdepradoml; @dppalomarbook].
 
 Unfortunately, most implementations live in disparate, unconnected, often proprietary, and/or
-bespoke codebases, which limit their applicability. There also exist myriad optimisation methods,
+bespoke research codebases, which limits their applicability. Yet the optimisation methods,
 pre-filtering, distribution and moment estimators, machine learning techniques, validation, and
-parameter tuning methods that can all be used together to improve the out of sample performance
-of a portfolio. PortfolioOptimisers.jl serves researchers and practitioners who need these
-methods in one framework, where any estimator feeds any optimiser that asks for it, and where a
-whole workflow can be cross-validated and tuned as a single unit.
+parameter tuning methods can all be used together to improve the out of sample performance of a
+portfolio.
+
+PortfolioOptimisers.jl serves researchers and practitioners who need these methods in one framework,
+where any estimator feeds any optimiser that asks for it, and where a whole workflow can be
+cross-validated and tuned as a single unit. Its documented and tested interfaces let users and
+maintainers extend it, and its modularity lets them swap components in and out.
 
 # State of the field
 
-Various advanced yet very usable libraries have been published only recently
-[@riskfolio; @skfolio]. Each has its own strengths, weaknesses, scope, and idiosyncrasies. To
-this day, only skfolio [@skfolio] has succeeded in providing a unified framework for the
-estimators, optimisers, validation and tuning of a portfolio. PortfolioOptimisers.jl provides an
-alternative that is not tied to the scikit-learn [@scikit-learn] or cvxpy [@cvxpy1; @cvxpy2]
-APIs and ecosystems, as well as providing different functionality and a different architectural
-philosophy.
+Various advanced and very usable libraries have been published only relatively recently
+[@riskfolio; @skfolio; @cvxportfolio1; @cvxportfolio2], each with its own strengths, weaknesses,
+scope, and idiosyncrasies. Earlier general-purpose libraries include PyPortfolioOpt
+[@pyportfolioopt] in Python, and PortfolioAnalytics [@portfolioanalytics] and fPortfolio
+[@fportfolio] in R. To the author's knowledge, only skfolio [@skfolio] provides a unified framework
+for the estimators, optimisers, validation and tuning of a portfolio. PortfolioOptimisers.jl
+provides an alternative that is not tied to the scikit-learn [@scikit-learn] or cvxpy
+[@cvxpy1; @cvxpy2] APIs and ecosystems, as well as providing different functionality and a
+different architectural philosophy.
 
-<!-- DRAFT: new text. JOSS asks why a new package and not a contribution to an existing one. -->
-A contribution to an existing package could not give three properties that motivated a new
-library. First, the solver-agnostic conic modelling of JuMP [@JuMP] lets every risk measure be a
-reformulation that any compatible solver, such as Clarabel [@clarabel], accepts. Second, multiple
-dispatch lets a user add a risk measure, a prior or an optimiser in their own package, and it
-composes with everything else without a change to the library. Third, the library is built around
-point-in-time data and online estimation, which change the inputs of every estimator, and which
-are hard to add to a design that assumes a fixed, complete panel of returns.
+A contribution to an existing package would not have satisfied the author's goals in
+providing such a flexible and powerful library. Among the most relevant reasons are the following:
+
+- The solver-agnostic declarative modelling of JuMP [@JuMP], alongside its rich and vibrant
+  ecosystem, is extremely powerful. With open-source solvers such as Clarabel [@clarabel], HiGHS
+  [@highs], and Pajarito [@pajarito] it solves problems that have traditionally required commercial
+  solvers, or that were out of reach for lack of suitable implementations.
+- Multiple dispatch lets users expand any and all functionality as long as they follow and/or
+  implement the necessary public interfaces, which are documented and tested.
+- The complete freedom to create and implement generalisations, extensions, improvements, and novel
+  methods without approval or being forced to maintain a fork.
 
 # Software design
 
-Every public type in the library is a subtype of one of three types. The exceptions are the
-covariance estimators, which subtype the covariance estimator of StatsBase.jl, one distance, which
-subtypes a metric of Distances.jl, and the error types. An `AbstractEstimator` contains all the parameters needed to
-estimate a particular quantity. An `AbstractResult` holds the quantities that an estimation
-returns: estimators are configuration, results are data. An `AbstractAlgorithm` modifies the
-behaviour of an estimator via multiple dispatch. The design rests on four pillars: well-defined
-type hierarchies, strongly typed immutable structs that validate their data at construction,
-compositional design, and defensive programming.
+The design rests on well-defined type hierarchies, strongly typed immutable structs that validate
+their data at construction, compositional design, and defensive programming that catches errors as
+early as possible.
 
-The functionality is grouped into three stages. Preprocessing ingests prices, treats gaps,
-preselects assets and computes returns. Processing estimates the prior statistics, uncovers the
-relational structure of the asset universe through clustering and network analysis, builds the
-constraints and the uncertainty sets, and optimises. Postprocessing scores the result:
-performance, attribution, forecast evaluation and regret. The preprocessing and processing steps
-can be bundled into a single pipeline object, which is itself an estimator, so it can be
-cross-validated and tuned as a unit.
+When it comes to typing, most public types in the library are subtypes of one of three types:
 
-A risk measure is an object, not a hard-coded branch. Any optimiser that takes one takes a vector
-of them, and every prior-derived quantity a measure needs may be given as a value or as the
-estimator that computes it, in which case it is refitted against the optimisation's own prior in
-every cross-validation fold. Constraints are built by estimators rather than written as matrices,
-so a constraint is stated once and rebuilt against whatever data it meets. Linear constraints can
-be written as equations in near-natural language, for instance `"AAPL <= 0.1"`.
+- `AbstractEstimator` contains all the parameters needed to estimate a particular quantity. These
+  types are the user-level vocabulary. They often nest within each other, but have meaningful
+  standalone use.
+- `AbstractResult` holds the quantities that an estimation returns: estimators are configuration,
+  results are data.
+- `AbstractAlgorithm` modifies the behaviour of an estimator via multiple dispatch. These types are
+  not used standalone, but as part of an estimator.
 
-At the time of writing, the library counts 57 risk measures, 22 covariance and correlation
-estimators, 13 priors, including Black-Litterman variants [@blacklitterman1992] and entropy
-pooling [@meucci2008], 20 optimisers, from mean risk with conditional value at risk
-[@rockafellar2000] and distributionally robust measures [@drcvar] to hierarchical risk parity
-[@hrp2016], 21 online portfolio selection rules [@lihoi2014], and eight cross-validation and
-tuning schemes, including combinatorial splits [@lopezdepradobook].
+The exceptions are the covariance estimators, which subtype the abstract covariance estimator of
+StatsBase.jl; a distance metric, which subtypes a metric of Distances.jl; and the error types, which
+follow Julia's error interfaces.
 
-Real universes change. Assets list late, delist, and are suspended. PortfolioOptimisers.jl never
-deletes a gap: the returns carry an asset panel whose masks say which assets are listed at each
-observation, and which of those have a finite return. Every optimiser fits on the assets it can
-trade and gives every other asset a weight of exactly zero, so each fold of a walk-forward runs
-on the universe of that fold, without survivorship or look-ahead bias.
+The library's functionality is grouped into three stages. The first two can be bundled into a
+pipeline, and some estimators of each of them can use the functionality of the other.
+
+1. Preprocessing ingests prices, treats gaps, preselects assets and computes returns.
+2. Processing estimates the prior statistics, uncovers the relational structure of the asset
+   universe through clustering and network analysis, builds the constraints and the uncertainty
+   sets, optimises, cross-validates, predicts, and tunes.
+3. Postprocessing scores the result: performance, attribution, forecast evaluation and regret.
+
+One of the central novelties of PortfolioOptimisers.jl is the concept that risk and return measures
+are fully fledged objects with their own scales, bounds, prior statistics, and parameters. Each
+measure therefore carries its own parameters, rather than placing them in the configuration of an
+optimiser or the arguments of a function. Many estimators accept vectors of measures, which they
+scalarise with one of several algorithms that use the scale of each measure, so users can compose
+risk and return expressions from different constituents. Some measures can also be pre- or
+dynamically configured, or take their configuration from the prior statistics. For example, a
+variance can use a preconfigured covariance matrix, take the prior covariance matrix from the
+optimisation estimator, or compute its own covariance matrix from input data given to the
+optimisation.
+
+Constraints and views are constructed by estimators using near natural language, for instance
+`"AAPL <= 0.1"`, rather than written as matrices, though explicit linear algebra constructs are
+also accepted. A constraint is therefore stated once and rebuilt against whatever data each fold of
+a cross-validation, or subset of the universe an optimisation meets.
+
+At the time of writing, the library counts 57 risk measures including robust ones [@drcvar], 22
+covariance and correlation estimators, 13 priors, including Black-Litterman variants
+[@blacklitterman1992] and entropy pooling [@meucci2008], 20 optimisers, from mean risk with
+conditional value at risk [@rockafellar2000] and distributionally robust measures to hierarchical
+risk parity [@hrp2016], 21 online portfolio selection rules [@lihoi2014], and eight
+cross-validation and tuning schemes, including combinatorial splits [@lopezdepradoml]. It also
+offers 20 types of constraints, costs and penalties, among them static and score-scaled bounds,
+budgets, joint, exclusion and set constraints, buy-in thresholds, lot units, fees including
+delisting and borrowing costs, graph, network and centrality constraints, tracking, turnover, and
+regularisation.
+
+Furthermore, the library is built with real use cases in mind, which often means dealing with messy
+data due to late listings, delistings, mismatched holidays, suspensions, etc. PortfolioOptimisers.jl
+never deletes a gap, though it can fill it during preprocessing: the returns carry an asset panel
+whose masks say which assets are listed at each observation, and which of those have a finite
+return. Every optimiser fits on the assets it can trade and gives every other asset a weight of
+exactly zero, so each fold of a walk-forward runs on the universe of that fold, without
+survivorship or look-ahead bias.
 
 # Research impact statement
 
-<!--
-DRAFT: new text. Add the evidence that you have: downloads from the Julia package server,
-GitHub stars, citations, talks, and users outside your own projects. Do not claim a number
-that you cannot show.
--->
 PortfolioOptimisers.jl is registered in the Julia General registry under the EUPL-1.2 licence.
-Its test suite covers 99% of the lines. Its public and private API are documented, and its examples
+Where a method has a reference implementation, the library measures its results against it. Its
+test suite covers 99% of the lines. Its public and private API are documented, and its examples
 cover the foundations, the moments and priors, the optimisers, the constraints and costs, the
 validation and tuning, and the post-processing, each executed by the documentation build. A
-toolchain of deterministic checks finds regressions, type instabilities, missing documentation
-and other defects on every commit and every week. Where a method has a reference implementation,
-the library measures its results against it. The library is the engine of a separate data and
-strategy pipeline by the same author.
+toolchain of deterministic checks finds regressions, type instabilities, missing documentation and
+references, and other defects on every commit, and every week. The library is the engine of a
+separate data and strategy pipeline by the same author.
+
+At the time of writing, the package receives about 136 downloads a month, mostly from the USA and
+Central Europe, and some from South Korea, Japan, India and Australia. With 31 stars on GitHub, it
+is, to the author's knowledge, the most starred and most downloaded portfolio optimisation package
+in the Julia ecosystem.
 
 # AI usage disclosure
 
-<!--
-DRAFT: new text. Check every fact below. JOSS asks for the tools and their versions, where they
-were used, and a confirmation that humans reviewed the output and made the core design decisions.
--->
-Generative AI tools were used to write code, tests, documentation and reviews of this library,
-and to draft this paper. A commit made with one of these tools carries a co-author trailer that
-names it: Claude Opus 5.5 or Claude Sonnet 5.5 (Anthropic), used through Claude Code, or GitHub
-Copilot. The tools were used for new features, bug
-fixes, tests, documentation, code review, and maintenance refactors.
+Until the release of Claude Sonnet 4.6 (Anthropic), the library was written entirely by hand, and
+its tests covered around 86% of the lines. From then on, AI tools were used to standardise the API
+documentation and to find and fix simple bugs. From Claude Opus 4.8 onwards, they assisted with the
+implementation of features and examples, and with code quality. From Claude Opus 5 onwards, they
+have been used heavily for new features, tests, documentation, the user guide, examples, bug fixes,
+and code review. Only the latest frontier models are used for new features and code review;
+smaller models do simple tasks that do not affect code quality. AI tools also helped to draft and
+proofread parts of this paper, and to check its feature counts.
 
-The author made the core design decisions. The architecture, the type hierarchy and each design
-choice are recorded in architecture decision records in the repository, and the author decided
-each one. The author reviewed the AI-assisted output. Its correctness is checked by the test
-suite, by the deterministic code-health checks described above, by doctests, and by comparison
-with reference implementations where they exist.
-
-For the long paper of the library, AI was used solely in an editorial capacity: to check that the
-feature list is comprehensive, accurate and current, to mend gaps in the references, and to
-proofread. This JOSS paper was drafted by Claude Opus 5.5 from the prose of that paper, and the
-author reviewed and edited it.
+The author designs and plans every feature, and reviews and edits all generated code and text. The
+issue tracker records the design, development, and testing of each change. Skills, standards, and
+deterministic checks, refined since the start, gate every change whatever its origin. They check
+code and prose quality, type stability, and docstring structure. They require full coverage and
+tests against the sources of each method, and they doctest the docstrings, which explain the API,
+algorithms and mathematics with references. Pull requests are extensively reviewed, and all issues
+found during review are fixed before they are merged.
 
 # Acknowledgements
 
-<!-- DRAFT: write your acknowledgements, or state that there are none. -->
-
-# References
+This work received no external funding.

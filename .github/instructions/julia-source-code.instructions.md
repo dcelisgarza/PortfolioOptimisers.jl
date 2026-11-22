@@ -28,6 +28,9 @@ reaches.
   replaces. A released number that moves is the same cost.
 - **Name the break.** State it in the commit and in `docs/src/migration.md`, where a user reads it.
   A docstring states the current behaviour alone.
+- **A bug fix is not a break.** A fix that makes the code do what its documentation states, such
+  as an option that a path ignored or a number that was wrong, ships in a patch release. The
+  commit states it, and `docs/src/migration.md` does not list it.
 - **An ADR binds by the reason that it states.** When that reason is a definition and not
   mathematics, correct the ADR in the fix, as `docs/adr/README.md` states. #1908 is the case:
   `RateRadius` and `RateSignificance` read the count of their siblings, against an amendment of
