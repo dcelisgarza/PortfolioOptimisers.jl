@@ -62,7 +62,7 @@ repos:
       - id: check-merge-conflict
         args: [--assume-in-merge]
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.50.0
+    rev: v0.50.1
     hooks:
       - id: markdownlint-fix
   - repo: https://github.com/citation-file-format/cffconvert
@@ -89,7 +89,7 @@ repos:
   # The spell check of the paper, in British English (`_typos.toml`). Five misspellings and an
   # American spelling reached the release PR of v0.33.0 with no check to catch them.
   - repo: https://github.com/crate-ci/typos
-    rev: v1.51.1
+    rev: v1.52.2
     hooks:
       - id: typos
         files: ^docs/paper/.*\.typ$

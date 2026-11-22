@@ -75,9 +75,11 @@
 //      build again to clear it.
 //   4. Cells run in a throwaway environment, so a plain #jl-pkg("PortfolioOptimisers")
 //      would resolve the REGISTERED release. The listing uses API that is newer
-//      than any release, so the paper devs this checkout instead, through the
-//      relative path "../..". That is resolved against the directory Julia was
-//      launched from, which is one more reason to launch from docs/paper. Once a
+//      than any release, so the hidden cell activates the docs environment
+//      instead, through joinpath(@__DIR__, ".."), and that environment's
+//      manifest points PortfolioOptimisers at this checkout. @__DIR__ is the
+//      directory Julia was launched from, which is one more reason to launch
+//      from docs/paper. Once a
 //      release catches up, a plain #jl-pkg("PortfolioOptimisers") is the better
 //      default for a paper: it then shows what a reader gets from the registry.
 //
@@ -138,13 +140,16 @@
 #set math.equation(numbering: "(1)")
 
 = Introduction
-The field of portfolio optimisation was introduced by Harry Markowitz's seminal 1952 paper, _Portfolio Selection_ @markowitz1952. The field has grown enormously since then, and so has the catalogue of that model's failure modes. It attempts to summarise the entire distribution of returns in highly compressed summary statistics, both of which can be sensitive to outliers and atypical conditions for the lookback period. The optimiser then behaves as an error maximiser rather than a diversifier @michaud1989, is acutely sensitive to the expected returns it is given @best1991, and suffers roughly an order of magnitude more from errors in the means than from errors in the covariance @chopra1993. The equal weighted portfolio remains a stubborn out of sample benchmark @demiguel2009naive. Sixty years of responses, from constraints @jagannathan2003 and shrinkage @ledoit2004 to norm regularisation @demiguel2009norm, robust formulations and hierarchical ones, are by now a literature of their own @kolm2014 @cajasbook @lopezdepradobook @dppalomarbook.
 
-Unfortunately, most implementations live in disparate, unconnected, often proprietary, and/or bespoke codebases, which limit their applicability. It is only recently that various advanced yet very usable libraries have been published @dppalomargithub @riskfolio @skfolio. However, each has its own strengths, weaknesses, scope, and idiosyncrasies. That is no different from #po, but it is our hope that this library serves as a unifying framework for the various techniques and methods available in the field, while also eventually providing a simple and intuitive interface for users, with advanced features for experts.
+The field of portfolio optimisation was introduced by Harry Markowitz's seminal 1952 paper, _Portfolio Selection_ @markowitz1952. The field has grown enormously since then, and so has the catalogue of that model's failure modes. It attempts to summarise the entire distribution of returns in its first two moments, the mean and the covariance, both of which can be sensitive to outliers and atypical conditions for the lookback period. The optimiser then behaves as an error maximiser rather than a diversifier @michaud1989, is acutely sensitive to the expected returns it is given @best1991, and suffers roughly an order of magnitude more from errors in the means than from errors in the covariance @chopra1993. In contrast, the completely naïve, equal weighted portfolio remains a stubborn out of sample benchmark @demiguel2009naive that tends to perform surprisingly well when the universe is sufficiently curated to avoid obvious underperformers. Seven decades of responses, from constraints @jagannathan2003 and shrinkage @ledoit2004 to norm regularisation @demiguel2009norm, robust formulations and hierarchical ones, are by now a literature of their own @kolm2014 @cajasbook @lopezdepradobook @dppalomarbook.
 
-There also exist myriad optimisation methods, pre-filtering, distribution and moment estimators, machine learning techniques, validation, and parameter tuning methods that can all be used together to improve the out-of sample performance of a portfolio. To this day, only skfolio @skfolio has succeeded in providing a unified framework for this. #po provides an alternative that is not tied to the scikit-learn @scikit-learn or cvxpy @cvxpy1 @cvxpy2 APIs and ecosystems, as well as providing different functionality and a different architectural philosophy.
+Unfortunately, most implementations live in disparate, unconnected, often proprietary, and/or bespoke research codebases, which limits their applicability. It is only relatively recently that various advanced yet very usable libraries have been published @dppalomargithub @riskfolio @skfolio @cvxportfolio1 @cvxportfolio2, each with its own strengths, weaknesses, scope, and idiosyncrasies. Earlier general-purpose libraries include PyPortfolioOpt @pyportfolioopt in Python, and PortfolioAnalytics @portfolioanalytics and fPortfolio @fportfolio in R. That is no different from #po, but it is our hope that this library serves as a unifying framework for the various techniques and methods available in the field, while also eventually providing a simple and intuitive interface for users, with advanced features for experts.
 
-@tab1 gives a sense of the scale at the time of writing. The library is actively maintained so its capabilities are constantly expanded and improved. Some have reached maturity, but new features in line with new research, user feedback, my own ideas, and AI assisted reviews are added regularly.
+There also exist myriad optimisation methods, pre-filtering, distribution and moment estimators, machine learning techniques, validation, and parameter tuning methods that can all be used together to improve the out of sample performance of a portfolio. To our knowledge, only skfolio @skfolio provides a unified framework for this. #po provides an alternative that is not tied to the scikit-learn @scikit-learn or cvxpy @cvxpy1 @cvxpy2 APIs and ecosystems, as well as providing different functionality and a different architectural philosophy.
+
+#po serves researchers and practitioners who need these methods in one framework, where any estimator feeds any optimiser that asks for it, and where a whole workflow can be cross-validated and tuned as a single unit. Its documented and tested interfaces let users and maintainers extend it, and its modularity lets them swap components in and out. #po succeeds our earlier Julia package, PortfolioOptimiser.jl, which is now archived.
+
+@tab1 gives a sense of the scale at the time of writing. The library is actively maintained so its capabilities are constantly expanded and improved. Some have reached maturity, but new features in line with new research, user feedback, our own ideas, and AI assisted reviews are added regularly.
 
 #show table: set par(first-line-indent: 0em, spacing: 0.6em, leading: 0.6em)
 #show table: set text(size: 9pt)
@@ -173,10 +178,10 @@ There also exist myriad optimisation methods, pre-filtering, distribution and mo
     [Distances and distances of distances, minimum spanning trees, Direct Bubble Hierarchical Trees, hierarchical clustering, k-means, eight centrality measures],
     [Uncertainty sets], [5],
     [Normal distribution, ARCH bootstrapped, delta, characteristic, and orthogonal to a factor model, in box, ellipsoidal, norm ball or compact form],
-    [Calibration rules], [14],
-    [Data-driven heuristics for significance levels, deformation parameters, ambiguity radii, norm ceilings, factor mean blends],
-    [Constraints, costs, penalties], [18],
-    [Weight bounds, three budget forms, linear equations, thresholds, risk budgets, factor exposure, two phylogeny forms, centrality, fees, turnover, two allocation sets of an online rule, and L2 or Lp weight penalties. Custom constraints and objectives are an abstract type to subtype, so they are not counted],
+    [Calibration rules], [12],
+    [Data-driven heuristics for significance levels, deformation parameters, ambiguity radii, factor mean blends. A count or a fraction of the sample or of the assets also sets a significance level or a norm ceiling],
+    [Constraints, costs, penalties], [20],
+    [Static and score-scaled weight bounds, three budget forms, linear equations, thresholds, risk budgets, factor exposure, two phylogeny forms, centrality, fees, turnover, lot units, two allocation sets of an online rule, and L2 or Lp weight penalties. Custom constraints and objectives are an abstract type to subtype, so they are not counted],
     [Optimisers], [20],
     [Equal weighted, inverse volatility, online portfolio selection, best constant rebalanced portfolio, mean risk, near optimal centering, risk budgeting, HRP, HERC, Schur, nested clustering, stacking, discrete allocation],
     [Online portfolio selection rules], [21],
@@ -434,11 +439,13 @@ The postprocessing stage scores what the processing stage produced. The forecast
 + Compositional design. This lets us build complex objects from simpler ones, enables code reuse, and aids in extensibility.
 + Defensive programming. This lets us catch errors as early as possible, and provides a clear and consistent interface to the user.
 
-With the exception of the covariance estimators, which subtype the covariance estimator of #statsbase, one distance, which subtypes a metric of #distances, and the error types, every public type in the library is a subtype of one of three types:
+When it comes to typing, most public types in the library are subtypes of one of three types:
 
-+ `AbstractEstimator`: these contain all the parameters needed to estimate a particular quantity, and are consumed by the functions that perform the estimation. They are the user-level vocabulary, they nest within each other, and they build more complex estimators.
++ `AbstractEstimator`: these contain all the parameters needed to estimate a particular quantity, and are consumed by the functions that perform the estimation. They are the user-level vocabulary, they often nest within each other but have meaningful standalone use.
 + `AbstractResult`: many estimators return more than one quantity, and those are returned in a result type. Estimators are configuration; results are data.
 + `AbstractAlgorithm`: these modify the behaviour of estimators via multiple dispatch. They are not used standalone, but as part of an estimator.
+
+The exceptions are the covariance estimators, which subtype the abstract covariance estimator of #statsbase; one distance metric, which subtypes a metric of #distances; and the error types, which follow Julia's error interfaces.
 
 The strict adherence to a well-defined type hierarchy lets developers and users alike extend and modify the library's behaviour without modifying the source code. A new risk measure, estimator, or optimiser can live in a user's own package and still compose with everything described here.
 
@@ -460,13 +467,15 @@ By being so thorough with our standards and automatic checks, we have found grea
 
 = Availability
 
-#po is registered under an EUPL-1.2 license in the Julia General registry, so `Pkg.add("PortfolioOptimisers")` is all that is needed. The listings in this paper are executed when it is built, so the paper is checked by the same standard as the rest of the project. The library is under active development, the issue tracker keeps ideas and roadmaps for new features, maintenance tasks, bug reports, and more. Contributions are very much appreciated and welcome.
+#po is registered under the EUPL-1.2 licence in the Julia General registry, so `Pkg.add("PortfolioOptimisers")` is all that is needed. The listings in this paper are executed when it is built, so the paper is checked by the same standard as the rest of the project. The library is under active development, the issue tracker keeps ideas and roadmaps for new features, maintenance tasks, bug reports, and more. Contributions are very much appreciated and welcome.
 
 We hope readers will find in #po an interesting, valuable, and trustworthy tool for their needs.
 
 = AI use disclosure
 
-AI was used in ensuring the paper covers a comprehensive, accurate, and current feature list; mending gaps in the references; and general proofreading and consistency checks throughout the document. It was used solely in an editorial capacity and did not contribute to the substantive content or conclusions of the paper.
+Until the release of Claude Sonnet 4.6 (Anthropic), the library was written entirely by hand, and its tests covered around 86% of the lines. From then on, AI tools were used to standardise the API documentation and to find and fix simple bugs. From Claude Opus 4.8 onwards, they assisted with the implementation of features and examples, and with code quality. From Claude Opus 5 onwards, they have been used heavily for new features, tests, documentation, the user guide, examples, bug fixes, and code review. Only the latest frontier models are used for new features and code review; smaller models do simple tasks that do not affect code quality. AI tools also helped to draft and proofread parts of this paper, to fill gaps in its references, and to check its feature counts.
+
+The author designs and plans every feature, and reviews and edits all generated code and text. The issue tracker records the design, development, and testing of each change, and the standards and checks described above gate every change whatever its origin.
 
 #show bibliography: set par(first-line-indent: 0em, spacing: 0.75em, leading: 0.6em)
 #show bibliography: set text(size: 9pt)
