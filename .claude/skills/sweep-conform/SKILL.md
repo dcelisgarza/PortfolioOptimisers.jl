@@ -133,7 +133,8 @@ that is current. GitHub shows the conflict on the pull request.
 **The landing base.** The `**Lands on:**` line of the issue names the route (ADR 0240). A sweep
 sub-issue lands on `dev` unless its line names another route. `<base>` below is the landing
 base: `origin/main` for a branch of your own, and `origin/dev` or `origin/dev-<feature>` for a
-shared branch. On a shared branch, run
+shared branch. A line that names `#<pr>` makes the head branch of that pull request a shared
+branch. On a shared branch, run
 `bash code_health/gate_stamp.sh base origin/<branch>` once, before the first gate. Every gate,
 stamp and check then measures against it.
 

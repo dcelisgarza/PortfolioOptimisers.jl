@@ -145,6 +145,16 @@ Each issue states its route in a `**Lands on:**` line, and every pull request me
 
 The maintainer can name another route for an issue.
 
+An issue from the review of an open pull request does not take its route from this table. It lands on the head branch of the pull request, and its line is `**Lands on:** #<pr>`, when one of these is true:
+
+- The fix changes code, text or a test that the pull request adds or changes.
+- The pull request makes the defect, makes it worse, or makes it reachable.
+- The pull request is wrong or incomplete without the fix.
+
+Any other such issue is independent, and it takes `own branch`. It does not land on `dev`, unless `dev` is the head branch of the pull request. The pull request does not merge while an issue with its number is open.
+
+The other rules of a change are these:
+
 - Name a branch for its feature, with the prefix `dev-`, for example `dev-concentration-limit`. A branch that holds research alone can take the prefix `research-`. It gets no push checks, and it does not merge into `main`.
 - A push to a branch of this repository runs the full CI, and the pull request shows those checks. A merge into `main` waits for them (ADR 0220).
 - A branch of a fork gets no push checks in this repository, so its pull request cannot merge. The maintainer pushes the branch of a fork to a `dev-` branch here, and the pull request from that branch merges.
