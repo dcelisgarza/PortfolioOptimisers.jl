@@ -252,9 +252,11 @@ then merges with a known defect, and its fix waits for the next batch.
    `origin/<head branch>`, stores that ref as its landing base, rebases, and pushes as a
    fast-forward. It never force-pushes. The issue closes at the push, as on every route.
 6. **The merge.** The pull request does not merge while such an issue is open. The session that
-   files the issue writes `Closes #<issue>` in the body of the pull request, and turns off
-   auto-merge with `gh pr merge <pr> --disable-auto`. The session that closes the last one turns
-   auto-merge on again, unless the pull request is a draft.
+   files the issue writes `Waits for #<issue>` in the body of the pull request, and turns off
+   auto-merge with `gh pr merge <pr> --disable-auto`. A `Closes #<issue>` at that time would close
+   the issue with no fix, when a person merges the pull request. The session that pushes the fix
+   changes the words to `Closes #<issue>`. After the last one, it turns auto-merge on again, unless
+   the pull request is a draft or the maintainer merges it.
 7. **After the merge.** When the pull request merged before the fix, the code is on `main`, and
    the route becomes `own branch`. The session that takes the issue changes the line.
 8. **The limits.** When the head branch of the pull request is `dev`, a part of it lands on `dev`.

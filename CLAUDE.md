@@ -65,8 +65,9 @@ name.
 
   Any other issue is independent, and it takes `own branch`. Write the reason for the route below
   the `**Lands on:**` line. The head branch is then shared for every session that pushes to it, so
-  the rules of *Shared branch* apply. Write `Closes #<issue>` in the body of the pull request, and
-  turn off auto-merge with `gh pr merge <pr> --disable-auto` until the last such issue closes.
+  the rules of *Shared branch* apply. Write `Waits for #<issue>` in the body of the pull request,
+  and change it to `Closes #<issue>` when the fix is pushed. Turn off auto-merge with
+  `gh pr merge <pr> --disable-auto` until the last such issue closes.
   When the pull request merged before the fix, the route becomes `own branch`. When `dev` itself is
   the head branch, a part of its pull request lands on `dev`. A sweep sub-issue keeps the route
   that its script writes.
