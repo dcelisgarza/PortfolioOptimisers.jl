@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the coordinates and the order of the last fit of a [`SpectralSeriation`](@ref), so that the next fit keeps its orientation.
 
-The online arm of a walk-forward writes it into the `cache` field of the member after each fold, see [`carry_fold_state`](@ref). The next fit projects these coordinates onto its own eigenspace, and breaks a tie by this order. The memory is not a sufficient statistic of the observations, so [`merge_states`](@ref) refuses two states.
+The online arm of a walk-forward writes it into the `cache` field of the member after each fold, see [`carry_fold_state`](@ref). The next fit projects these coordinates onto its own eigenspace, and breaks a tie by this order. So the order does not reverse from one fold to the next. The memory changes the turnover little, because the recursive bisection of a reversed order gives almost the same weights. The memory is not a sufficient statistic of the observations, so [`merge_states`](@ref) refuses two states.
 
 # Fields
 

@@ -369,7 +369,7 @@ rationale = "keyword-constructor-arity"
 
 # Two Partial Fit States check their values in their inner constructors by the same rule (#2197),
 # so that a fold, a rebuild and a lens write run the checks. Each constructor takes one argument
-# for each field: 13 for `SampleBufferState`, 11 for `ReturnsBufferState`.
+# for each field: 13 for `SampleBufferState`, 14 for `ReturnsBufferState`.
 [[exemption]]
 path = "src/01_Base/15_Online_a.jl"
 definition = "SampleBufferState"

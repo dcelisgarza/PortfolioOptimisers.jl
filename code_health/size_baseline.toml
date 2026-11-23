@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.4"
 julia_syntax = "1.0.2"
-commit = "96a62f857c"
+commit = "48591ae901"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { code = 35, doc = 0, comment = 5, blank = 4, total = 44 }
@@ -24,6 +24,7 @@ commit = "96a62f857c"
 "ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { code = 446, doc = 0, comment = 39, blank = 0, total = 485 }
 "ext/PortfolioOptimisersPlotsExt/13_CovarianceForecastPlots.jl" = { code = 317, doc = 426, comment = 13, blank = 235, total = 991 }
 "ext/PortfolioOptimisersPlotsExt/14_ReportFigures.jl" = { code = 80, doc = 0, comment = 15, blank = 0, total = 95 }
+"ext/PortfolioOptimisersPlotsExt/15_ExogenousGraphPlots.jl" = { code = 191, doc = 0, comment = 30, blank = 0, total = 221 }
 "ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { code = 45, doc = 0, comment = 8, blank = 5, total = 58 }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { code = 17, doc = 122, comment = 0, blank = 44, total = 183 }
 "src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { code = 218, doc = 0, comment = 24, blank = 0, total = 242 }
@@ -88,7 +89,7 @@ commit = "96a62f857c"
 "src/03_InputData/14_CrossSectionalTransforms.jl" = { code = 474, doc = 716, comment = 0, blank = 337, total = 1527 }
 "src/03_InputData/15_FeatureSelector.jl" = { code = 373, doc = 645, comment = 2, blank = 311, total = 1331 }
 "src/03_InputData/16_PanelDataFrame.jl" = { code = 152, doc = 296, comment = 1, blank = 135, total = 584 }
-"src/03_InputData/17_ReturnsBufferState.jl" = { code = 238, doc = 358, comment = 5, blank = 165, total = 766 }
+"src/03_InputData/17_ReturnsBufferState.jl" = { code = 270, doc = 390, comment = 6, blank = 171, total = 837 }
 "src/03_InputData/18_PreprocessingPartialFit.jl" = { code = 326, doc = 429, comment = 19, blank = 227, total = 1001 }
 "src/03_InputData/19_AssetPanelConcat.jl" = { code = 233, doc = 449, comment = 6, blank = 235, total = 923 }
 "src/03_InputData/20_PanelFieldValues.jl" = { code = 62, doc = 144, comment = 0, blank = 59, total = 265 }

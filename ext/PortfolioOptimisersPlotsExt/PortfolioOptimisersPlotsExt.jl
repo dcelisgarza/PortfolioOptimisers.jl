@@ -16,7 +16,8 @@ import PortfolioOptimisers: ArrNum, VecNum, MatNum, Arr3Num, Option, VecNum_VecV
                             result_investable_view, strip_liquidation_charges,
                             AbstractPredictionResult, PredRes_MultiPredRes, regret_series,
                             member_vector, prediction_weights, DocStringExtensions,
-                            @concrete
+                            @concrete, @argcheck, Graphs, VecInt, GraphUnion, OutEdges,
+                            consumer_graph, graph_entry_label, stored_entries
 
 # A result carries its weights on the caller's universe and its prior and fee on the one
 # the fit solved (ADR 0115), so every result arity below reads the three through
@@ -54,5 +55,6 @@ include("11_FactorDiagnosticsPlots.jl")
 include("12_ForecastEvaluationPlots.jl")
 include("13_CovarianceForecastPlots.jl")
 include("14_ReportFigures.jl")
+include("15_ExogenousGraphPlots.jl")
 
 end

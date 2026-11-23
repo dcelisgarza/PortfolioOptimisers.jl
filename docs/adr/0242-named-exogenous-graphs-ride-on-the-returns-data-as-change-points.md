@@ -121,9 +121,18 @@ that take a `ReturnsResult` or a `PricesResult` sit at the end of the files of t
   allocates a path string only for a consumer. No flag marks a check that already ran.
 - `prior(pe, rd)` does not check, because the inner method of a prior reads `X`, `F` and the panel
   and no consumer of a prior tree can read a graph.
-- The online buffer of `ReturnsBufferState` keeps no graph. A consumer that reads the data that
-  the buffer gives back refuses, because that data holds no graph. The online route of a series,
-  the Fold Context and a series whose node set changes stay in *Not yet specified* of map #2162.
+- The Fold Context of `ReturnsBufferState` owns the graphs, because no prior reads one (#2286). A
+  step joins its graphs to the held graphs with `graphs_vcat`, the rule of `vcat_observations`, and
+  a cap keeps the graphs of the rows that stay with `graphs_view`. So `optimise(opt)` with no data
+  reads the graph in force at the last row that it folded, and the online walk-forward equals the
+  batch walk-forward. A series whose node set changes needs no rule of its own, because each key
+  holds its own nodes. An integer key is a row, so the state counts its rows in `n`. The graph can
+  be the only column of a context, and a count read from the other columns gave zero there.
+- `plot_exogenous_graph` draws a graph, or the graph in force at the last row of the returns data
+  (#2287). It is a figure of its own and not a method of `plot_network`, which draws the network
+  that a phylogeny estimator fits to the returns. It sits in `PortfolioOptimisersPlotsExt` with a
+  layered layout of its own, because `graphplot` has none and GraphRecipes invalidates much of the
+  compiled code of a session (#2186).
 - The rule that joins two named graphs in one consumer belongs to #2203 and #2208.
 - The `PredictionReturnsResult` of a fold holds the graphs of its test rows, the view of
   `graph_view`, so `dependency_exposure` (#2173) reads the graph in force at each row of a fold.

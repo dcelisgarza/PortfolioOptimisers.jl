@@ -195,6 +195,7 @@ plot_portfolio_dashboard(res_ratio, rd; r = factory(Variance(), pr))
 #=
 This page shows some of the plots, not all. The library also plots networks and clusters
 ([`plot_network`](@ref), [`plot_dendrogram`](@ref), [`plot_clusters`](@ref),
+[`plot_exogenous_graph`](@ref),
 [`plot_centrality`](@ref)), cross-validation ([`plot_cv_scores`](@ref),
 [`plot_cv_dashboard`](@ref)), turnover ([`plot_turnover`](@ref)), and the higher moments
 ([`plot_coskewness`](@ref), [`plot_cokurtosis`](@ref)).

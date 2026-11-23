@@ -249,6 +249,88 @@
         ne = NetworkEstimator()
         @test is_plot(plot_network(ne, X, nx))
     end
+    @testset "plot_exogenous_graph (#2287)" begin
+        EXT = Base.get_extension(PortfolioOptimisers, :PortfolioOptimisersPlotsExt)
+        # A supply chain with an edge over a layer, a source that moves to its target, a cycle
+        # with a self-loop, a second component that is one cycle, and a node with no edge.
+        nodes = ["Phone", "Chip", "Wafer", "Car", "Steel", "Glass", "X1", "X2", "X3",
+                 "Alone"]
+        edges = [("Wafer", "Chip", 1.0), ("Chip", "Phone", 0.6), ("Wafer", "Phone", 0.2),
+                 ("Glass", "Phone", 0.5), ("Chip", "Car", 0.3), ("Car", "Steel", 0.8),
+                 ("Steel", "Car", -0.1), ("Steel", "Steel", 0.4), ("X1", "X2", 1.0),
+                 ("X2", "X3", 1.0), ("X3", "X1", 0.5)]
+        g = ExogenousGraph(; nodes = nodes, edges = edges)
+        x, y = EXT.layered_layout(g)
+        at = Dict(name => k for (k, name) in enumerate(nodes))
+        lay(name) = x[at[name]]
+        @test lay.(["Wafer", "Chip", "Phone", "Car", "Steel"]) == [1, 2, 3, 3, 4]
+        # The other rule would put `Glass` at layer 1.
+        @test lay("Glass") == 2
+        @test lay.(["X1", "X2", "X3"]) == [1, 2, 3]
+        # No two nodes share a point, and the components do not overlap.
+        @test allunique(zip(x, y))
+        comp(names) = extrema(y[at[name]] for name in names)
+        main = comp(nodes[1:6])
+        ring = comp(["X1", "X2", "X3"])
+        @test main[1] > ring[2] > y[at["Alone"]]
+        # The layout is the same for the same graph.
+        @test EXT.layered_layout(g) == (x, y)
+        # A straight edge, a bowed one over a layer, a reciprocal pair on two sides, a ring.
+        path(s, t, r = false) = EXT.graph_edge_path(x, y, at[s], at[t], r)
+        @test length(path("Wafer", "Chip")[1]) == 2
+        @test length(path("Wafer", "Phone")[1]) == 25
+        _, py = path("Car", "Steel", true)
+        _, qy = path("Steel", "Car", true)
+        mid(p) = p[13]
+        centre = (y[at["Car"]] + y[at["Steel"]]) / 2
+        @test (mid(py) - centre) * (mid(qy) - centre) < 0
+        rx, ry = path("Steel", "Steel")
+        @test rx[1] ≈ rx[end] && ry[1] ≈ ry[end] && all(>=(y[at["Steel"]] - 1e-12), ry)
+        # A bow over many layers stays within a row of its ends.
+        ly = EXT.graph_edge_path([1.0, 41.0], [0.0, 0.0], 1, 2, false)[2]
+        @test 0.7 < maximum(abs, ly) <= 0.75
+        # A barycentre sweep removes the one crossing of two crossed edges.
+        cross = ExogenousGraph(;
+                               edges = [("a", "d", 1.0), ("b", "c", 1.0), ("a", "e", 1.0),
+                                        ("b", "e", 1.0)])
+        cx, cy = EXT.layered_layout(cross)
+        pos = Dict(name => k for (k, name) in enumerate(cross.nodes))
+        @test (cy[pos["a"]] - cy[pos["b"]]) * (cy[pos["d"]] - cy[pos["c"]]) > 0
+        # A graph of one cycle and a graph with no edge have a layout.
+        @test is_plot(plot_exogenous_graph(ExogenousGraph(; nodes = ["a", "b"],
+                                                          A = zeros(2, 2))))
+        # The figure: one series for the negative edges, and the node series of each group.
+        plt = plot_exogenous_graph(g)
+        @test is_plot(plt)
+        n_nodes(p) = count(s -> s[:seriestype] == :scatter, p.series_list)
+        @test n_nodes(plt) == 1
+        @test any(s -> s[:linecolor] == StatsPlots.Plots.plot_color(:firebrick),
+                  plt.series_list)
+        @test n_nodes(plot_exogenous_graph(g;
+                                           groups = Dict("Car" => "Auto", "Chip" => "Tech"))) ==
+              3
+        # The returns data: the graph in force at the last row, by name, and a union.
+        h = ExogenousGraph(; edges = [("Phone", "Car", 1.0)])
+        rdg = ReturnsResult(; nx = ["Phone", "Car"], X = rand(6, 2),
+                            ng = ["supply", "peers"],
+                            G = [ExogenousGraphSeries(; ts = [1, 4], graphs = [h, g]), h])
+        n_labels(p) = length(p.subplots[1][:annotations])
+        @test n_labels(plot_exogenous_graph(rdg, "supply")) == 10
+        @test n_labels(plot_exogenous_graph(PortfolioOptimisers.port_opt_view(rdg, 1:3, :),
+                                            "supply")) == 2
+        @test n_labels(plot_exogenous_graph(rdg, GraphUnion(; ng = ["supply", "peers"]))) ==
+              10
+        @test n_nodes(plot_exogenous_graph(rdg, "supply")) == 2
+        @test n_nodes(plot_exogenous_graph(rdg, "peers")) == 1
+        @test_throws ArgumentError plot_exogenous_graph(rdg)
+        one_graph = ReturnsResult(; nx = ["Phone", "Car"], X = rand(6, 2), ng = ["supply"],
+                                  G = [h])
+        @test is_plot(plot_exogenous_graph(one_graph; title = "Supply"))
+        # The limits.
+        @test_throws ArgumentError plot_exogenous_graph(g; max_nodes = 9)
+        @test_throws ArgumentError plot_exogenous_graph(g; max_edges = 10)
+        @test is_plot(plot_exogenous_graph(g; max_nodes = 10, max_edges = 11))
+    end
 
     @testset "plot_centrality" begin
         cte = CentralityEstimator()

@@ -25,7 +25,7 @@ The verdicts:
     several graphs, the scaled walk, `LinearDecay` and `ReciprocalDecay`, a `FractionOf` and a
     rule budget, the readable mask in a fit, and HRP, Schur, NCO and HERC under a fold.
 =#
-using Test, PortfolioOptimisers, LinearAlgebra, SparseArrays, StableRNGs, Statistics
+using Test, PortfolioOptimisers, LinearAlgebra, SparseArrays, StableRNGs, Statistics, Dates
 include(joinpath(@__DIR__, "parity_harness.jl"))
 
 const WALK_NODES = vcat(["a$i" for i in 1:8], ["s$i" for i in 1:5])
@@ -409,4 +409,53 @@ end
                                                                           WalkDistance(),
                                                                           [0.0 1.5;
                                                                            1.5 0.0])
+end
+
+@testset "13. An online fold reads the graph in force, as a batch fit does (#2286)" begin
+    PO = PortfolioOptimisers
+    T, N = 90, 6
+    nx = ["a$i" for i in 1:N]
+    X = randn(StableRNG(2286), T, N) ./ 100
+    ts = Date(2024, 1, 1) .+ Day.(0:(T - 1))
+    # The nodes that are not assets differ in each snapshot.
+    function snapshot(seed, extra)
+        n = N + length(extra)
+        return ExogenousGraph(; nodes = vcat(nx, extra),
+                              A = abs.(randn(StableRNG(seed), n, n)) .* (1 .- I(n)))
+    end
+    gs = [snapshot(1, ["s1", "s2"]), snapshot(2, ["s3"]), snapshot(3, ["s1", "s4", "s5"])]
+    cle = ClustersEstimator(; de = WalkDistance(),
+                            alg = HClustAlgorithm(; linkage = WardLinkage()))
+    ser = HierarchicalSeriation(; cle = cle)
+    function head(H, pe)
+        opt = HierarchicalOptimiser(; pe = pe)
+        return if H === HierarchicalEqualRiskContribution
+            H(; opt = opt, cle = cle)
+        else
+            H(; opt = opt, ser = ser)
+        end
+    end
+    rows(r, i) = PO.port_opt_view(r, i, :)
+    G = (gs[1], ExogenousGraphSeries(; ts = [1, 41, 63], graphs = gs),
+         ExogenousGraphSeries(; ts = ts[[1, 41, 63]], graphs = gs))
+    for (g, t) in zip(G, (nothing, nothing, ts))
+        rd = ReturnsResult(; nx = nx, X = X, ts = t, ng = ["supply"], G = [g])
+        for H in (HierarchicalRiskParity, HierarchicalEqualRiskContribution,
+                  SchurComplementHierarchicalRiskParity)
+            opt = head(H, EmpiricalPrior())
+            o = foldl((o, s) -> partial_fit!(o, rows(rd, s:s)), 31:70;
+                      init = partial_fit!(opt, rows(rd, 1:30)))
+            @test optimise(o).w ≈ optimise(opt, rows(rd, 1:70)).w rtol = 1e-10
+            # Under a cap the window rolls over the change points.
+            for (pe, train) in ((Online(EmpiricalPrior()), true),
+                                (Online(EmpiricalPrior(); max_history = 40), false))
+                on = cross_val_predict(head(H, pe), rd, OnlineIndexWalkForward(40, 10))
+                ba = cross_val_predict(opt, rd,
+                                       IndexWalkForward(40, 10; expand_train = train))
+                @test length(on.pred) == length(ba.pred) == 5
+                @test all(isapprox(a.res.w, b.res.w; rtol = 1e-10)
+                          for (a, b) in zip(on.pred, ba.pred))
+            end
+        end
+    end
 end

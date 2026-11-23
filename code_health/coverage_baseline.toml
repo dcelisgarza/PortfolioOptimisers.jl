@@ -22,6 +22,7 @@ commit = "391be5e"
 "ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { lines = 180, misses = 0 }
 "ext/PortfolioOptimisersPlotsExt/13_CovarianceForecastPlots.jl" = { lines = 168, misses = 0 }
 "ext/PortfolioOptimisersPlotsExt/14_ReportFigures.jl" = { lines = 43, misses = 0 }
+"ext/PortfolioOptimisersPlotsExt/15_ExogenousGraphPlots.jl" = { lines = 139, misses = 0 }
 "ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { lines = 7, misses = 0 }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { lines = 7, misses = 0 }
 "src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { lines = 0, misses = 0 }
@@ -86,7 +87,7 @@ commit = "391be5e"
 "src/03_InputData/14_CrossSectionalTransforms.jl" = { lines = 313, misses = 0 }
 "src/03_InputData/15_FeatureSelector.jl" = { lines = 245, misses = 0 }
 "src/03_InputData/16_PanelDataFrame.jl" = { lines = 103, misses = 0 }
-"src/03_InputData/17_ReturnsBufferState.jl" = { lines = 110, misses = 0 }
+"src/03_InputData/17_ReturnsBufferState.jl" = { lines = 120, misses = 0 }
 "src/03_InputData/18_PreprocessingPartialFit.jl" = { lines = 207, misses = 0 }
 "src/03_InputData/19_AssetPanelConcat.jl" = { lines = 130, misses = 0 }
 "src/03_InputData/20_PanelFieldValues.jl" = { lines = 38, misses = 0 }
