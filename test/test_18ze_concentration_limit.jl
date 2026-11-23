@@ -36,10 +36,12 @@
         # The keys of the rule are registered under the index of the rule.
         @test haskey(r1.model, :conc_z_1)
         @test haskey(r1.model, :conc_sum_1)
+        # Under a constant budget the binary is the gate, so the model holds no gate variable.
+        @test !haskey(r1.model, :conc_g_1)
         # A ratio objective solves for scaled weights, and the rule holds after the scale.
         rr = solve(; obj = MaximumRatio(; rf = 0.0), conc = ConcentrationLimit())
         @test success(rr)
-        @test haskey(rr.model, :conc_zk_1)
+        @test haskey(rr.model, :conc_g_1)
         @test over(rr.w) <= 0.4 + tol
         @test maximum(rr.w) <= 0.1 + tol
     end

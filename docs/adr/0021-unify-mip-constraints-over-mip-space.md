@@ -70,3 +70,21 @@ constraint builders once against it.**
   (`run_mip_builder!`), which this ADR left space-specific — folding the sub-group cardinality
   path onto the seam. It also splits the unified file into an indicator layer plus topical
   emitter files (`05_MIPConstraints.jl` → `01_MIPIndicators.jl` + siblings).
+
+## Amendment (2026-11-23)
+
+The concentration limit (#2018, ADR 0245) gates a binary of its own, and it would have been the
+fifth copy of the rows that link a binary to a free budget `k`. The held bit, the long bit, the
+short bit and the exact cost budget held the other four.
+
+- **`declare_mip_gate!(model, sp, bin, gate, N, wb, ss)` declares the binaries and their gates.**
+  Under a numeric `k` the gate is the binary. Under a variable `k` the gate is a continuous
+  variable with its three big-M rows. The five sites call it, and it registers each key through
+  `state_set!`, so a second declaration under one key raises.
+- **`use_direct_mip_indicators` is gone.** The function tests `isa(k, Number)` in every space. The
+  shortcut of the asset space bound the unscaled weights of a `RiskBudgeting` head (#2275).
+- **`ConcentrationMIPSpace` is a member of the family.** It implements `mip_wx!` and `mip_key`. A
+  space that gates no weight bound has no `mip_bounds`.
+- The rows of the exact cost budget take the keys `cost_bgt_gd_ub` and `cost_bgt_gd_lb`, after
+  the form of the other gates, where they had `cost_bgt_gz_ub` and `cost_bgt_gz_lb`. Under a
+  numeric `k` the model holds no `cost_bgt_g`.

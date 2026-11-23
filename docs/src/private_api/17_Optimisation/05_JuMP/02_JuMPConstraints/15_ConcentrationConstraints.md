@@ -1,10 +1,10 @@
 ```@meta
-Description = "Concentration Constraints, private API of PortfolioOptimisers.jl: concentration_reading, set_concentration_constraints!."
+Description = "Concentration Constraints, private API of PortfolioOptimisers.jl: ConcentrationMIPSpace, set_concentration_constraints!."
 ```
 
 # [Concentration Constraints: private API](@id private-api-concentration-constraints)
 
 ```@docs
-concentration_reading
+ConcentrationMIPSpace
 set_concentration_constraints!
 ```

@@ -26,17 +26,15 @@ in a grilling session on 2026-11-23 (#2147).
 3. **Its own binary.** The rule has one binary for each position, "the position is over `t`". It
    is not the held bit of `HeldIndicators` or `LongShortIndicators`, because "held" and "over `t`"
    are two facts. The rows are `x_j <= t + (c - t) z_j`, `y_j >= x_j - c (1 - z_j)`, `y_j >= 0`
-   and `sum(y) <= s`. The feasible set is the rule itself. Under a free budget, each number is
-   multiplied by the budget scale of `get_k`, as the weight bounds are, and the binary gates the
-   product `z k` through a continuous variable and the big-M expression `ss`. The rows of rule `i`
-   take the keys `conc_<name>_i` under the prefix of the block, through `state_set!`.
-
-   The build departs from the resolution of #2147 in two places. It does not take the rule of
-   `use_direct_mip_indicators`, which reads a `RiskBudgeting` head as a unit budget. The weights of
-   that head sum to `k`, about 22 in the probe of #2018, so a row with the constant 1 binds the
-   wrong scale. Issue #2275 holds the same defect in the long-short bundle. And it does not reuse
-   `mip_wx!` and `mip_key`, because they gate `w` alone, and the rule gates a reading of `w`,
-   `lw` and `sw`, for more than one rule on one space.
+   and `sum(y) <= s`. The feasible set is the rule itself. Each number is multiplied by the budget
+   scale of `get_k`, as the weight bounds are. `declare_mip_gate!` declares the binary and its
+   gate `z k`. The held bit, the long and the short bits, and the binary of the exact cost budget
+   come from the same function, so the rows that link a binary to a free budget exist once
+   (ADR 0021). The rule is a member of the MIP space family, `ConcentrationMIPSpace`: its
+   `mip_wx!` gives the positions, which are a reading of `w`, `lw` and `sw`, and its `mip_key`
+   names rule `i` `conc_<name>_i` under the prefix of the block. The space has no `mip_bounds`,
+   because the rule states its cap on the positions. `mip_wb` does not serve the rule, because it
+   holds a position at zero when its bit is off, and the rule lets it rise to `t`.
 4. **The positions.** The field `set` takes what `smtx` takes. `nothing` makes each asset a
    position. An `AssetSetsMatrixEstimator` or a matrix makes each row a position, such as an
    issuer, so two share classes of one issuer are one position and the cap is on the issuer. The

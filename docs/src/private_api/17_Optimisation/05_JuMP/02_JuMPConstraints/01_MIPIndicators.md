@@ -18,7 +18,6 @@ mip_key
 mip_bit_space
 mip_wx!
 mip_bounds
-use_direct_mip_indicators
 held
 held_bin
 set_mip_indicators!
@@ -33,6 +32,7 @@ short_gate
 long_bin
 short_bin
 mip_wb
+declare_mip_gate!
 short_mip_threshold_constraints
 mip_constraints
 sign_mip_constraints

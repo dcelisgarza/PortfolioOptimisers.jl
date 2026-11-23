@@ -84,7 +84,7 @@ To make a new form, subtype `AbstractConcentrationAlgorithm` and implement the m
 
 ## Rows of the rule
 
-  - `PortfolioOptimisers.set_concentration_rows!(model::JuMP.Model, alg::AbstractConcentrationAlgorithm, cl::ConcentrationLimit, x::AbstractVector, wb::WeightBounds, ss::Option{<:Number}, i::Integer, prefix::Symbol) -> Nothing`: Add the rows of rule `i` on the positions `x`. Register each entry with `state_set!(model, prefix, name, i, val)`, so that two rules do not collide.
+  - `PortfolioOptimisers.set_concentration_rows!(model::JuMP.Model, alg::AbstractConcentrationAlgorithm, sp::ConcentrationMIPSpace, x::AbstractVector, wb::WeightBounds, ss::Option{<:Number}) -> Nothing`: Add the rows of the rule `sp.cl` on the positions `x`. Register each entry with `state_set!(model, Symbol(""), mip_key(sp, name), val)`, so that two rules do not collide.
 
 There is no fallback. [`concentration_margins`](@ref) reads the rule itself whatever the form, so a new form needs no method there.
 
@@ -637,7 +637,7 @@ end
 
 Return the reading of each asset that `pos` gives, from the weights and their long and short parts.
 
-The builder [`concentration_reading`](@ref) gives the variables of the parts of the model. [`concentration_margins`](@ref) gives the smallest parts of a weight vector, `max.(w, 0)` and `max.(-w, 0)`. Then the gross reading is `|w|`, and the long reading is the positive part of `w`.
+The builder [`mip_wx!`](@ref) gives the variables of the parts of the model. [`concentration_margins`](@ref) gives the smallest parts of a weight vector, `max.(w, 0)` and `max.(-w, 0)`. Then the gross reading is `|w|`, and the long reading is the positive part of `w`.
 
 # Algorithm
 
@@ -660,7 +660,7 @@ The method that Julia selects is the algorithm:
 # Related
 
   - [`concentration_margins`](@ref)
-  - [`concentration_reading`](@ref)
+  - [`ConcentrationMIPSpace`](@ref)
   - [`AbstractPositionReading`](@ref)
 """
 function position_reading(::GrossPosition, ::AbstractVector, lw::AbstractVector,
@@ -680,7 +680,7 @@ end
 
 Return the positions of a rule from the reading `v` of each asset: `v` itself when `set` is `nothing`, and `set * v` otherwise.
 
-[`concentration_margins`](@ref) gives it a vector of numbers, and the builder [`set_concentration_constraints!`](@ref) gives it a vector of model expressions.
+[`concentration_margins`](@ref) gives it a vector of numbers, and the builder [`mip_wx!`](@ref) gives it a vector of model expressions.
 
 # Arguments
 
@@ -694,7 +694,7 @@ Return the positions of a rule from the reading `v` of each asset: `v` itself wh
 # Related
 
   - [`concentration_margins`](@ref)
-  - [`set_concentration_constraints!`](@ref)
+  - [`ConcentrationMIPSpace`](@ref)
 """
 function concentration_positions(::Nothing, v::AbstractVector)
     return v
