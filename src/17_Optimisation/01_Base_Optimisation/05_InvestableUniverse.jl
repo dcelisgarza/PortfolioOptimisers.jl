@@ -165,6 +165,12 @@ end
 function feature_readable_mask(x::NetworkClustersEstimator, imsk::Option{<:BitVector}, rd)
     return feature_readable_mask(x.nte, imsk, rd)
 end
+function feature_readable_mask(x::HierarchicalSeriation, imsk::Option{<:BitVector}, rd)
+    return feature_readable_mask(x.cle, imsk, rd)
+end
+function feature_readable_mask(x::SpectralSeriation, imsk::Option{<:BitVector}, rd)
+    return feature_readable_mask(x.de, imsk, rd)
+end
 function feature_readable_mask(x::Union{CentralityEstimator, SemiDefinitePhylogenyEstimator,
                                         IntegerPhylogenyEstimator},
                                imsk::Option{<:BitVector}, rd)

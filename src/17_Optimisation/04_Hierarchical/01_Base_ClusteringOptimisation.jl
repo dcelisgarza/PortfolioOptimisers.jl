@@ -150,6 +150,8 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the fields that the results of hierarchical risk parity and hierarchical equal risk contribution share.
 
+The order or the clustering that the allocation read is not a shared field. [`HierarchicalRiskParityResult`](@ref) holds its seriation in `ser`, and [`HierarchicalEqualRiskContributionResult`](@ref) holds its clustering in `clr`.
+
 [`HierarchicalRiskParityResult`](@ref) and [`HierarchicalEqualRiskContributionResult`](@ref) each hold it as their first field, `hr`, as a JuMP result holds a [`JuMPOptimisationResult`](@ref) as `jr`. Each of the two adds the risk measures and the scalarisers of its own estimator, and ends in the fallback field `fb`.
 
 The core holds no `fb`. The generic `factory(res, fb)` rebuilds a result from all of its fields but the last, and puts `fb` in the last field. Each of the two results ends in `fb`, so that method keeps the core unchanged. The core is not an [`OptimisationResult`](@ref), so `factory(res, fb)` does not take it.
@@ -162,7 +164,6 @@ $(DocStringExtensions.FIELDS)
 
     HierarchicalResult(;
         pr::Option{<:AbstractPriorResult},
-        clr::Option{<:AbstractClusteringResult},
         wb::Option{<:WeightBounds},
         fees::Option{<:Fees},
         retcode::OptimisationReturnCode,
@@ -188,10 +189,6 @@ The keyword constructor expands `w` from the investable assets to the full unive
     """
     pr
     """
-    $(field_dict[:clr])
-    """
-    clr
-    """
     $(field_dict[:wb])
     """
     wb
@@ -212,21 +209,19 @@ The keyword constructor expands `w` from the investable assets to the full unive
     """
     imsk
     function HierarchicalResult(pr::Option{<:AbstractPriorResult},
-                                clr::Option{<:AbstractClusteringResult},
                                 wb::Option{<:WeightBounds}, fees::Option{<:Fees},
                                 retcode::OptimisationReturnCode, w::Option{<:VecNum},
                                 imsk::Option{<:BitVector})
-        return new{typeof(pr), typeof(clr), typeof(wb), typeof(fees), typeof(retcode),
-                   typeof(w), typeof(imsk)}(pr, clr, wb, fees, retcode, w, imsk)
+        return new{typeof(pr), typeof(wb), typeof(fees), typeof(retcode), typeof(w),
+                   typeof(imsk)}(pr, wb, fees, retcode, w, imsk)
     end
 end
-function HierarchicalResult(; pr::Option{<:AbstractPriorResult},
-                            clr::Option{<:AbstractClusteringResult},
-                            wb::Option{<:WeightBounds}, fees::Option{<:Fees},
-                            retcode::OptimisationReturnCode, w::Option{<:VecNum},
+function HierarchicalResult(; pr::Option{<:AbstractPriorResult}, wb::Option{<:WeightBounds},
+                            fees::Option{<:Fees}, retcode::OptimisationReturnCode,
+                            w::Option{<:VecNum},
                             imsk::Option{<:BitVector} = nothing)::HierarchicalResult
-    return HierarchicalResult(pr, clr, wb, fees, retcode,
-                              expand_investable_weights(imsk, w), imsk)
+    return HierarchicalResult(pr, wb, fees, retcode, expand_investable_weights(imsk, w),
+                              imsk)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -273,9 +268,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the weights and the fitted state of a hierarchical risk parity optimisation.
 
-[`HierarchicalRiskParity`](@ref) returns it. It holds the shared [`HierarchicalResult`](@ref) as `hr`, and the risk measure and the scalariser of its estimator, with the measure stored resolved.
+[`HierarchicalRiskParity`](@ref) returns it. It holds the shared [`HierarchicalResult`](@ref) as `hr`, the seriation result whose order the bisection split as `ser`, and the risk measure and the scalariser of its estimator, with the measure stored resolved. A [`HierarchicalSeriationResult`](@ref) in `ser` holds the clustering, `res.ser.clr`.
 
-Every property of `hr` reads through this type, so `res.w`, `res.pr`, `res.clr`, `res.wb`, `res.fees`, `res.retcode` and `res.imsk` read as if they were fields of `res`.
+Every property of `hr` reads through this type, so `res.w`, `res.pr`, `res.wb`, `res.fees`, `res.retcode` and `res.imsk` read as if they were fields of `res`.
 
 # Fields
 
@@ -285,6 +280,7 @@ $(DocStringExtensions.FIELDS)
 
     HierarchicalRiskParityResult(;
         hr::HierarchicalResult,
+        ser::AbstractSeriationResult,
         r::BaseRM_VecBaseRM,
         sca::Option{<:Scalariser},
         fb::Option{<:OptE_Opt_FbChain}
@@ -305,6 +301,10 @@ Keywords correspond to the struct's fields.
     """
     hr
     """
+    $(field_dict[:ser_res])
+    """
+    ser
+    """
     $(field_dict[:r_res])
     """
     r::BaseRM_VecBaseRM
@@ -316,20 +316,22 @@ Keywords correspond to the struct's fields.
     $(field_dict[:fb_res])
     """
     fb
-    function HierarchicalRiskParityResult(hr::HierarchicalResult, r::BaseRM_VecBaseRM,
+    function HierarchicalRiskParityResult(hr::HierarchicalResult,
+                                          ser::AbstractSeriationResult, r::BaseRM_VecBaseRM,
                                           sca::Option{<:Scalariser},
                                           fb::Option{<:OptE_Opt_FbChain})
-        return new{typeof(hr), typeof(fb)}(hr, r, sca, fb)
+        return new{typeof(hr), typeof(ser), typeof(fb)}(hr, ser, r, sca, fb)
     end
 end
-function HierarchicalRiskParityResult(; hr::HierarchicalResult, r::BaseRM_VecBaseRM,
+function HierarchicalRiskParityResult(; hr::HierarchicalResult,
+                                      ser::AbstractSeriationResult, r::BaseRM_VecBaseRM,
                                       sca::Option{<:Scalariser},
                                       fb::Option{<:OptE_Opt_FbChain})::HierarchicalRiskParityResult
-    return HierarchicalRiskParityResult(hr, r, sca, fb)
+    return HierarchicalRiskParityResult(hr, ser, r, sca, fb)
 end
 # Unique fields resolve directly; every other property forwards into the embedded core, so
-# `res.w`, `res.pr`, `res.clr`, `res.wb`, `res.fees` and `res.retcode` stay source-compatible
-# across the split. The rule is declared per leaf rather than on the abstract type, because
+# `res.w`, `res.pr`, `res.wb`, `res.fees` and `res.retcode` stay source-compatible across the
+# split. The rule is declared per leaf rather than on the abstract type, because
 # `SchurComplementHierarchicalRiskParityResult` joins the family with flat fields and has no `hr`.
 @forward_properties HierarchicalRiskParityResult begin
     forward(hr)
@@ -341,7 +343,7 @@ Holds the weights and the fitted state of a hierarchical equal risk contribution
 
 [`HierarchicalEqualRiskContribution`](@ref) returns it. It holds the shared [`HierarchicalResult`](@ref) as `hr`, and the two risk measures and the two scalarisers of its estimator, one pair inside the clusters and one pair across them. Both measures are stored resolved. The types of the measures and of the scalarisers are not type parameters of the Result, so the Results of two such estimators have one type, and a verb that reads them compiles one time.
 
-Every property of `hr` reads through this type, so `res.w`, `res.pr`, `res.clr`, `res.wb`, `res.fees`, `res.retcode` and `res.imsk` read as if they were fields of `res`.
+It also holds the clustering that cut the assets into clusters as `clr`. Every property of `hr` reads through this type, so `res.w`, `res.pr`, `res.wb`, `res.fees`, `res.retcode` and `res.imsk` read as if they were fields of `res`.
 
 # Fields
 
@@ -351,6 +353,7 @@ $(DocStringExtensions.FIELDS)
 
     HierarchicalEqualRiskContributionResult(;
         hr::HierarchicalResult,
+        clr::AbstractClusteringResult,
         ri::BaseRM_VecBaseRM,
         ro::BaseRM_VecBaseRM,
         scai::Option{<:Scalariser},
@@ -373,6 +376,10 @@ Keywords correspond to the struct's fields.
     """
     hr
     """
+    $(field_dict[:clr])
+    """
+    clr
+    """
     $(field_dict[:ri_res])
     """
     ri::BaseRM_VecBaseRM
@@ -393,20 +400,22 @@ Keywords correspond to the struct's fields.
     """
     fb
     function HierarchicalEqualRiskContributionResult(hr::HierarchicalResult,
+                                                     clr::AbstractClusteringResult,
                                                      ri::BaseRM_VecBaseRM,
                                                      ro::BaseRM_VecBaseRM,
                                                      scai::Option{<:Scalariser},
                                                      scao::Option{<:Scalariser},
                                                      fb::Option{<:OptE_Opt_FbChain})
-        return new{typeof(hr), typeof(fb)}(hr, ri, ro, scai, scao, fb)
+        return new{typeof(hr), typeof(clr), typeof(fb)}(hr, clr, ri, ro, scai, scao, fb)
     end
 end
 function HierarchicalEqualRiskContributionResult(; hr::HierarchicalResult,
+                                                 clr::AbstractClusteringResult,
                                                  ri::BaseRM_VecBaseRM, ro::BaseRM_VecBaseRM,
                                                  scai::Option{<:Scalariser},
                                                  scao::Option{<:Scalariser},
                                                  fb::Option{<:OptE_Opt_FbChain})::HierarchicalEqualRiskContributionResult
-    return HierarchicalEqualRiskContributionResult(hr, ri, ro, scai, scao, fb)
+    return HierarchicalEqualRiskContributionResult(hr, clr, ri, ro, scai, scao, fb)
 end
 @forward_properties HierarchicalEqualRiskContributionResult begin
     forward(hr)
@@ -445,9 +454,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Holds the prior, the clustering, the bounds and the fees that a hierarchical optimiser shares with its siblings.
+Holds the prior, the bounds and the fees that a hierarchical optimiser shares with its siblings.
 
-[`HierarchicalRiskParity`](@ref), [`HierarchicalEqualRiskContribution`](@ref) and [`SchurComplementHierarchicalRiskParity`](@ref) each hold one in their field `opt`. Each of them uses these fields to select the returns, fit the prior, cluster the assets, resolve the fees and the weight bounds, and finalise the weights.
+[`HierarchicalRiskParity`](@ref), [`HierarchicalEqualRiskContribution`](@ref) and [`SchurComplementHierarchicalRiskParity`](@ref) each hold one in their field `opt`. Each of them uses these fields to select the returns, fit the prior, resolve the fees and the weight bounds, and finalise the weights. The input that orders or cuts the assets is not shared: HRP and Schur hold a seriation in `ser`, and HERC holds a clustering in `cle`.
 
 # Fields
 
@@ -457,7 +466,6 @@ $(DocStringExtensions.FIELDS)
 
     HierarchicalOptimiser(;
         pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
-        cle::TD{<:HClE_HCl} = ClustersEstimator(),
         slv::Option{<:Slv_VecSlv} = nothing,
         wb::TD_Option{<:WbE_Wb} = WeightBounds(),
         fees::TD_Option{<:FeesE_Fees} = nothing,
@@ -467,7 +475,7 @@ $(DocStringExtensions.FIELDS)
         cache::Option{<:ReturnsBufferState} = nothing
     ) -> HierarchicalOptimiser
 
-Keywords correspond to the struct's fields. A field typed [`TD`](@ref) or [`TD_Option`](@ref) can hold a [`TimeDependent`](@ref) schedule, one value per fold, in place of a static value. A cross-validation fold loop resolves the schedule on each fold, and a fold-less `optimise` runs with the field at its static default. These fields are the problem definition: the prior estimator, the clustering estimator, the weight bounds, the fees, the asset sets and the weight finaliser. The fields `slv` and `strict` control the execution, and they are always static.
+Keywords correspond to the struct's fields. A field typed [`TD`](@ref) or [`TD_Option`](@ref) can hold a [`TimeDependent`](@ref) schedule, one value per fold, in place of a static value. A cross-validation fold loop resolves the schedule on each fold, and a fold-less `optimise` runs with the field at its static default. These fields are the problem definition: the prior estimator, the weight bounds, the fees, the asset sets and the weight finaliser. The fields `slv` and `strict` control the execution, and they are always static.
 
 ## Validation
 
@@ -496,7 +504,6 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref) or [`TD_O
 [`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
   - `pe`: Recursively indexed through [`obs_weights_view`](@ref).
-  - `cle`: Recursively indexed through [`obs_weights_view`](@ref).
   - `fees`: Recursively indexed through [`obs_weights_view`](@ref).
   - `cache`: Removed by [`obs_weights_view`](@ref), because a state has no slice on the observation axis.
 
@@ -528,41 +535,6 @@ HierarchicalOptimiser
          │      horizon ┼ nothing
          │   fill_limit ┼ nothing
          │        x_src ┴ nothing
-     cle ┼ ClustersEstimator
-         │      ce ┼ PortfolioOptimisersCovariance
-         │         │   ce ┼ Covariance
-         │         │      │    me ┼ SimpleExpectedReturns
-         │         │      │       │   w ┴ nothing
-         │         │      │    ce ┼ GeneralCovariance
-         │         │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-         │         │      │       │    w ┴ nothing
-         │         │      │   alg ┼ FullMoment()
-         │         │      │     w ┴ nothing
-         │         │   mp ┼ MatrixProcessing
-         │         │      │     pdm ┼ Posdef
-         │         │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-         │         │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-         │         │      │      dn ┼ nothing
-         │         │      │      dt ┼ nothing
-         │         │      │     alg ┼ nothing
-         │         │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-         │      de ┼ Distance
-         │         │   power ┼ nothing
-         │         │     alg ┴ CanonicalDistance()
-         │     alg ┼ HClustAlgorithm
-         │         │       linkage ┼ WardLinkage
-         │         │               │   presquared ┴ Bool: false
-         │         │   branchorder ┴ OptimalLeafOrder()
-         │     onc ┼ OptimalNumberClusters
-         │         │   max_k ┼ nothing
-         │         │     alg ┼ SecondOrderDifference
-         │         │         │   alg ┼ StandardisedValue
-         │         │         │       │   mv ┼ MeanValue
-         │         │         │       │      │   w ┴ nothing
-         │         │         │       │   sv ┼ StdValue
-         │         │         │       │      │           w ┼ nothing
-         │         │         │       │      │   corrected ┴ Bool: true
-         │   x_src ┴ nothing
      slv ┼ nothing
       wb ┼ WeightBounds
          │   lb ┼ Float64: 0.0
@@ -589,10 +561,6 @@ HierarchicalOptimiser
     $(field_dict[:pe])
     """
     @vprop @oprop pe
-    """
-    $(field_dict[:cle])
-    """
-    @oprop cle
     """
     $(field_dict[:slv])
     """
@@ -621,9 +589,8 @@ HierarchicalOptimiser
     $(field_dict[:cache_opt])
     """
     @fprop @vprop cache
-    function HierarchicalOptimiser(pe::Onl{<:TD{<:PrE_Pr}}, cle::TD{<:HClE_HCl},
-                                   slv::Option{<:Slv_VecSlv}, wb::TD_Option{<:WbE_Wb},
-                                   fees::TD_Option{<:FeesE_Fees},
+    function HierarchicalOptimiser(pe::Onl{<:TD{<:PrE_Pr}}, slv::Option{<:Slv_VecSlv},
+                                   wb::TD_Option{<:WbE_Wb}, fees::TD_Option{<:FeesE_Fees},
                                    sets::TD_Option{<:UniverseSets},
                                    wf::TD{<:WeightFinaliser}, strict::Bool,
                                    cache::Option{<:ReturnsBufferState})
@@ -631,17 +598,14 @@ HierarchicalOptimiser
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         assert_time_dependent_substitution(HierarchicalOptimiser,
-                                           (; pe, cle, slv, wb, fees, sets, wf, strict),
+                                           (; pe, slv, wb, fees, sets, wf, strict),
                                            hierarchical_optimiser_td_defaults())
-        return new{typeof(pe), typeof(cle), typeof(slv), typeof(wb), typeof(fees),
-                   typeof(sets), typeof(wf), typeof(strict), typeof(cache)}(pe, cle, slv,
-                                                                            wb, fees, sets,
-                                                                            wf, strict,
-                                                                            cache)
+        return new{typeof(pe), typeof(slv), typeof(wb), typeof(fees), typeof(sets),
+                   typeof(wf), typeof(strict), typeof(cache)}(pe, slv, wb, fees, sets, wf,
+                                                              strict, cache)
     end
 end
 function HierarchicalOptimiser(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
-                               cle::TD{<:HClE_HCl} = ClustersEstimator(),
                                slv::Option{<:Slv_VecSlv} = nothing,
                                wb::TD_Option{<:WbE_Wb} = WeightBounds(),
                                fees::TD_Option{<:FeesE_Fees} = nothing,
@@ -649,7 +613,7 @@ function HierarchicalOptimiser(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
                                wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                                strict::Bool = false,
                                cache::Option{<:ReturnsBufferState} = nothing)::HierarchicalOptimiser
-    return HierarchicalOptimiser(pe, cle, slv, wb, fees, sets, wf, strict, cache)
+    return HierarchicalOptimiser(pe, slv, wb, fees, sets, wf, strict, cache)
 end
 function non_investable_universe(opt::HierarchicalOptimiser, ni::VecStr)
     return rebuild_struct(opt, (; sets = non_investable_sets(opt.sets, ni)))
@@ -661,7 +625,7 @@ end
 
 Walk the readers of a hierarchical head, for the warning of a forgotten raw reader and the gap rule of the head.
 
-The group of a hierarchical head is the head, the configuration that it holds in `opt`, and every reader in their slots: the prior `opt.pe`, the clustering `opt.cle`, and the readers inside the risk measures. [`field_frames`](@ref) walks every field. The walk stops at a fallback, because it is a head with its own group. A configuration that takes an online step with no head answers for its own slots. [`NestedClustered`](@ref) holds its prior in `pe` and has a method of its own.
+The group of a hierarchical head is the head, the configuration that it holds in `opt`, and every reader in their slots: the prior `opt.pe`, the seriation `ser` of HRP and Schur or the clustering `cle` of HERC, and the readers inside the risk measures. [`field_frames`](@ref) walks every field. The walk stops at a fallback, because it is a head with its own group. A configuration that takes an online step with no head answers for its own slots. [`NestedClustered`](@ref) holds its prior in `pe` and has a method of its own.
 
 # Arguments
 
@@ -694,7 +658,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the one copy of the static defaults of the schedulable fields of [`HierarchicalOptimiser`](@ref).
 
-The constructor reads it to try each value of a schedule, and [`time_dependent_field_defaults`](@ref) returns it, so the two agree on the fold-less value of each field. It names `pe`, `cle`, `wb` and `wf`. The fields `fees` and `sets` default to `nothing`, so they have no entry.
+The constructor reads it to try each value of a schedule, and [`time_dependent_field_defaults`](@ref) returns it, so the two agree on the fold-less value of each field. It names `pe`, `wb` and `wf`. The fields `fees` and `sets` default to `nothing`, so they have no entry.
 
 # Returns
 
@@ -707,8 +671,7 @@ The constructor reads it to try each value of a schedule, and [`time_dependent_f
   - [`assert_time_dependent_substitution`](@ref)
 """
 function hierarchical_optimiser_td_defaults()::NamedTuple
-    return (; pe = EmpiricalPrior(), cle = ClustersEstimator(), wb = WeightBounds(),
-            wf = IterativeWeightFinaliser())
+    return (; pe = EmpiricalPrior(), wb = WeightBounds(), wf = IterativeWeightFinaliser())
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -743,7 +706,7 @@ It returns [`hierarchical_optimiser_td_defaults`](@ref), which the constructor a
 
 # Returns
 
-  - `defaults::NamedTuple`: The static default of `pe`, `cle`, `wb` and `wf`.
+  - `defaults::NamedTuple`: The static default of `pe`, `wb` and `wf`.
 
 # Related
 

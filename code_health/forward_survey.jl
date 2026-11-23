@@ -1180,6 +1180,9 @@ const RULED_DEFAULTS = Dict{Symbol, Tuple{String, String}}(#
                                                            :pipeline_step_factory =>
                                                                ("keep (b)",
                                                                 "a policy of the pipeline: only the optimiser and a nested pipeline take the weights (#2074)"),
+                                                           :carry_fold_state =>
+                                                               ("keep (default)",
+                                                                "one step of the online arm: an estimator that keeps no memory of its fit, which is every estimator but a spectral seriation in HRP or Schur, passes through, as a traversal owns the identity on a leaf (#2174)"),
                                                            :reset_time_dependent_step =>
                                                                ("keep (b)",
                                                                 "its `TimeDependent` arm throws for a fit with no folds, a job that differs from the method of the owner (#2074)"))

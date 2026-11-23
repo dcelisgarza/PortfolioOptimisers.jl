@@ -6,6 +6,9 @@ unique_key_dict!(arg_dict, :arg_dict,
                  # Phylogeny.
                  :cle => "`cle`: Clusters estimator.",#
                  :clr => "`clr`: Clusters result.",#
+                 :ser => "`ser`: The seriation that orders the assets for the bisection, a member of [`AbstractSeriationEstimator`](@ref) or a seriation result of [`AbstractSeriationResult`](@ref). A result is used as it is.",#
+                 :ser_res => "`ser`: The seriation result whose order the bisection split, a member of [`AbstractSeriationResult`](@ref).",#
+                 :ser_order => "`order`: The assets in their order, a permutation of the assets.",#
                  :plr => "`plr`: Phylogeny result.",#
                  :nte => "`nte`: Network estimator.",#
                  :cte => "`cte`: Centrality estimator.",#

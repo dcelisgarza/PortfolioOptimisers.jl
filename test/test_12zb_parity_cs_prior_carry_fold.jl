@@ -214,7 +214,8 @@ PortfolioOptimisers.lookback(::ImpliedVolatilityLevel) = 1
         # and gives the batch weights. The clustering reads the returns data, so the plain
         # method of `ImpliedVolatility` reads the assets whose returns have no gap.
         cle = ClustersEstimator(; ce = ImpliedVolatility(; ppy = 252))
-        hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pe, cle = cle))
+        hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pe),
+                                     ser = HierarchicalSeriation(; cle = cle))
         rdc = po.port_opt_view(rdi, :,
                                findall(j -> all(isfinite, view(rdi.X, :, j)),
                                        axes(rdi.X, 2)))
@@ -227,11 +228,12 @@ PortfolioOptimisers.lookback(::ImpliedVolatilityLevel) = 1
         # surface pair them (#1655).
         cle = ClustersEstimator(; ce = ImpliedVolatility(; ppy = 252),
                                 x_src = PriorSource())
-        hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pe, cle = cle))
+        hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pe),
+                                     ser = HierarchicalSeriation(; cle = cle))
         res = optimise(hrp, rdc)
         @test size(res.pr.X, 1) < size(rdc.X, 1)
         n = size(res.pr.X, 1)
-        @test res.clr.res.order ==
+        @test res.ser.order ==
               clusterise(cle, res.pr.X; iv = rdc.iv[(end - n + 1):end, :], ivpa = rdc.ivpa).res.order
         o = foldl((o, k) -> partial_fit!(o, rows(rdc, (edges[k] + 1):edges[k + 1])), 1:3;
                   init = hrp)

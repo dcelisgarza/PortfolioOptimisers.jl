@@ -248,6 +248,8 @@
         :AbstractSearchCrossValidationResult,
         :AbstractSearchReduction,
         :AbstractSelectionRule,
+        :AbstractSeriationEstimator,
+        :AbstractSeriationResult,
         :AbstractShrunkExpectedReturnsIntensity,
         :AbstractSignificanceCalibrationAlgorithm,
         :AbstractSortingNetworkMerge,

@@ -3,7 +3,7 @@ include(joinpath(@__DIR__, "test17_setup.jl"))
 @testset "HierarchicalRiskParity" begin
     df = CSV.read(joinpath(@__DIR__, "./assets/HierarchicalRiskParity1.csv.gz"), DataFrame)
     for (i, r) in pairs(rs)
-        res = optimise(HierarchicalRiskParity(; r = r, opt = opt))
+        res = optimise(HierarchicalRiskParity(; r = r, opt = opt, ser = ser))
         @test isa(res.retcode, OptimisationSuccess)
         success = isapprox(res.w, df[!, i]; rtol = 5e-7)
         if !success
@@ -23,7 +23,7 @@ end
                                                    Variance(;
                                                             settings = RiskMeasureSettings(;
                                                                                            scale = 2e2))],
-                                              opt = opt, sca = sca))
+                                              opt = opt, ser = ser, sca = sca))
         @test isa(res.retcode, OptimisationSuccess)
         success = isapprox(res.w, df[!, i])
         if !success
@@ -79,7 +79,7 @@ end
     end
     # One measure: the allocation, and the weights sum to one before the finaliser.
     res = optimise(HierarchicalRiskParity(), rdx)
-    ord = res.clr.res.order
+    ord = res.ser.order
     wi = bisect(ord, single_pair(res.r, X))
     @test isapprox(res.w, wi; atol = 1e-15)
     @test isapprox(sum(wi), 1; atol = 1e-15)
@@ -148,7 +148,7 @@ end
         rr = optimise(HierarchicalRiskParity(; r = rv, sca = sca), rdx)
         pairs_k = [single_pair(r, X) for r in rr.r]
         scales = [r.settings.scale for r in rr.r]
-        wv = bisect(rr.clr.res.order,
+        wv = bisect(rr.ser.order,
                     (L, R) -> f([p(L, R) .* s for (p, s) in zip(pairs_k, scales)]))
         @test isapprox(rr.w, wv; atol = 1e-15)
     end
@@ -160,8 +160,13 @@ end
                                                                                       scale = 37.0))),
                    rdx).w == res.w
     @test optimise(HierarchicalRiskParity(; r = [Variance()]), rdx).w == res.w
-    # `branchorder` reaches `_optimise` and changes nothing.
-    @test optimise(HierarchicalRiskParity(), rdx; branchorder = :r).w == res.w
+    # The branch order is a field of the clustering algorithm (#2174), and its default is
+    # the default of the seriation.
+    bo = HierarchicalSeriation(;
+                               cle = ClustersEstimator(;
+                                                       alg = HClustAlgorithm(;
+                                                                             branchorder = OptimalLeafOrder())))
+    @test optimise(HierarchicalRiskParity(; ser = bo), rdx).w == res.w
     # A float sample of another width keeps its type.
     r32 = optimise(HierarchicalRiskParity(), ReturnsResult(; nx = rdx.nx, X = Float32.(X)))
     @test eltype(r32.w) == Float32
@@ -261,28 +266,28 @@ end
 
     imsk = BitVector([true, false, true, true, false])
     wr = [0.2, 0.3, 0.5]
-    hk = HierarchicalResult(; pr = nothing, clr = nothing, wb = nothing, fees = nothing,
+    hk = HierarchicalResult(; pr = nothing, wb = nothing, fees = nothing,
                             retcode = OptimisationSuccess(), w = wr, imsk = imsk)
 
     @testset "HierarchicalResult expands in the keyword constructor alone" begin
         @test hk.w == [0.2, 0.0, 0.3, 0.5, 0.0]
-        hp = HierarchicalResult(nothing, nothing, nothing, nothing, OptimisationSuccess(),
-                                wr, imsk)
+        hp = HierarchicalResult(nothing, nothing, nothing, OptimisationSuccess(), wr, imsk)
         @test hp.w === wr
-        hn = HierarchicalResult(; pr = nothing, clr = nothing, wb = nothing, fees = nothing,
+        hn = HierarchicalResult(; pr = nothing, wb = nothing, fees = nothing,
                                 retcode = OptimisationSuccess(), w = wr)
         @test hn.w === wr
     end
 
     @testset "A leaf result reads every property of its core" begin
-        for res in
-            (HierarchicalRiskParityResult(; hr = hk, r = Variance(), sca = SumScalariser(),
-                                          fb = nothing),
-             HierarchicalEqualRiskContributionResult(; hr = hk, ri = Variance(),
-                                                     ro = Variance(),
-                                                     scai = SumScalariser(),
-                                                     scao = SumScalariser(), fb = nothing))
-            for p in (:pr, :clr, :wb, :fees, :retcode, :w, :imsk)
+        for res in (HierarchicalRiskParityResult(; hr = hk,
+                                                 ser = FixedSeriationResult(; order = [1, 2, 3]),
+                                                 r = Variance(), sca = SumScalariser(),
+                                                 fb = nothing),
+                    HierarchicalEqualRiskContributionResult(; hr = hk, clr = clr, ri = Variance(),
+                                                            ro = Variance(),
+                                                            scai = SumScalariser(),
+                                                            scao = SumScalariser(), fb = nothing))
+            for p in (:pr, :wb, :fees, :retcode, :w, :imsk)
                 @test getproperty(res, p) === getproperty(hk, p)
             end
             @test PO.result_investable_mask(res) === imsk
@@ -299,7 +304,7 @@ end
 
         h0 = HierarchicalOptimiser()
         d = PO.hierarchical_optimiser_td_defaults()
-        @test keys(d) == (:pe, :cle, :wb, :wf)
+        @test keys(d) == (:pe, :wb, :wf)
         for k in keys(d)
             @test typeof(getfield(h0, k)) == typeof(d[k])
         end

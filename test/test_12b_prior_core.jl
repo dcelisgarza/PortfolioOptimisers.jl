@@ -2018,12 +2018,12 @@ end
     hrp = HierarchicalRiskParity(;
                                  opt = HierarchicalOptimiser(;
                                                              pe = EmpiricalPrior(;
-                                                                                 max_scenarios = n),
-                                                             cle = clp))
+                                                                                 max_scenarios = n)),
+                                 ser = HierarchicalSeriation(; cle = clp))
     res = optimise(hrp, rdi)
-    @test res.clr.res.order == clt.res.order
+    @test res.ser.order == clt.res.order
     @test isapprox(sum(res.w), 1)
-    @test optimise(hrp, rdc).clr.res.order == clt.res.order
+    @test optimise(hrp, rdc).ser.order == clt.res.order
 end
 
 @testset "The prior carrier's `w` is documented as observation weights" begin

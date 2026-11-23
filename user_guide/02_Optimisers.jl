@@ -135,16 +135,18 @@ against these classes.
 ## 3. Clustering optimisers
 
 A clustering optimiser builds the weights from a hierarchy of the assets and not from one
-program. It takes a [`HierarchicalOptimiser`](@ref) that holds the prior and a clustering of the
-assets. [`HierarchicalRiskParity`](@ref) (HRP) is the best known.
-[`HierarchicalEqualRiskContribution`](@ref) and
-[`SchurComplementHierarchicalRiskParity`](@ref) are in the same family. See
+program. It takes a [`HierarchicalOptimiser`](@ref) that holds the prior, and a clustering of the
+assets. The clustering sits in the seriation of [`HierarchicalRiskParity`](@ref) (HRP), the best
+known, and in the `cle` field of [`HierarchicalEqualRiskContribution`](@ref).
+[`SchurComplementHierarchicalRiskParity`](@ref) is in the same family. See
 [Clustering Optimisers](@ref example-clustering-optimisers).
 =#
 
 clr = clusterise(ClustersEstimator(), pr.X)
-hopt = HierarchicalOptimiser(; pe = pr, cle = clr)
-res_hrp = optimise(HierarchicalRiskParity(; opt = hopt, r = Variance()))
+hopt = HierarchicalOptimiser(; pe = pr)
+res_hrp = optimise(HierarchicalRiskParity(; opt = hopt,
+                                          ser = HierarchicalSeriation(; cle = clr),
+                                          r = Variance()))
 
 #=
 ### 3.1 Clustering on something other than the returns
@@ -181,8 +183,8 @@ vals_z = ["nx_sector", "nx_revenue"]
 rd_z = ReturnsResult(; nx = rd.nx, X = rd.X, ts = rd.ts,
                      pnl = asset_panel(panel_input(sets_z, vals_z)))
 
-res_hrp_z = optimise(HierarchicalRiskParity(;
-                                            opt = HierarchicalOptimiser(; pe = pr,
+res_hrp_z = optimise(HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pr),
+                                            ser = HierarchicalSeriation(;
                                                                         cle = ClustersEstimator(;
                                                                                                 de = FeatureDistance())),
                                             r = Variance()), rd_z)
@@ -246,7 +248,7 @@ plot_stacked_bar_composition(results, rd; xticks = (1:length(labels), labels))
 #src   family: naive (InverseVolatility/EqualWeighted), JuMP (MeanRisk MinimumRisk + RiskBudgeting),
 #src   clustering (HierarchicalRiskParity), meta (NestedClustered/NCO). Variants/objectives
 #src   deferred to the 3_optimisers examples via cross-links.
-#src - Clustering needs clusterise(ClustersEstimator(), pr.X) → HierarchicalOptimiser(; pe, cle).
+#src - Clustering needs clusterise(ClustersEstimator(), pr.X) → HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe), ser = HierarchicalSeriation(; cle)).
 #src   NCO needs inner opti (pe=pr) + outer opto (no pe), matching examples/3_optimisers/07.
 #src - VERIFIED end-to-end on kaimon (session f102cae9): all 6 optimisers OptimisationSuccess,
 #src   weights sum≈1, len 20. Default ClustersEstimator() clusters cleanly (no explicit DBHT

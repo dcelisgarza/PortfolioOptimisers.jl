@@ -72,7 +72,8 @@ cvg = CoveragePolicy()
 pe = EmpiricalPrior(; me = SimpleExpectedReturns(; cvg = cvg),
                     ce = PortfolioOptimisersCovariance(; ce = Covariance(; cvg = cvg)))
 cle = ClustersEstimator(; ce = pe.ce)
-hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pe, cle = cle))
+hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pe),
+                             ser = HierarchicalSeriation(; cle = cle))
 
 batch = IndexWalkForward(100, 40; purged_size = 3, expand_train = true)
 online = OnlineIndexWalkForward(100, 40; purged_size = 3)
@@ -145,8 +146,8 @@ stepped = OnlineIndexWalkForward(103, 40; purged_size = 3)
 hrp_cap = HierarchicalRiskParity(;
                                  opt = HierarchicalOptimiser(;
                                                              pe = Online(pe;
-                                                                         max_history = 100),
-                                                             cle = cle))
+                                                                         max_history = 100)),
+                                 ser = HierarchicalSeriation(; cle = cle))
 
 weights(cross_val_predict(hrp_cap, rd, stepped)) ==
 weights(cross_val_predict(hrp, rd, rolling))

@@ -12,18 +12,18 @@ The constructor's substitution check and [`time_dependent_field_defaults`](@ref)
   - [`assert_time_dependent_substitution`](@ref)
 """
 function hierarchical_risk_parity_td_defaults()::NamedTuple
-    return (; r = Variance(), sca = nothing)
+    return (; ser = HierarchicalSeriation(), r = Variance(), sca = nothing)
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Allocates weights by recursively bisecting the dendrogram's leaf order and splitting each part's weight in inverse proportion to the risk of its two halves.
 
-This is the Hierarchical Risk Parity algorithm. It clusters the assets, orders the leaves, then splits that order until every part holds one asset. The split is stage 3 of [lopezdeprado2016](@cite), recursive bisection, which measures the risk of a half as a variance. Section 12.1.3 of [cajas2025](@cite) extends it to any risk measure, and so does this type. It solves no optimisation problem, so it accepts a risk measure that is not convex. The resolved weight bounds clamp the split factor at every split, and the weight finaliser of `opt` acts on the result. [`_optimise`](@ref) states the steps.
+This is the Hierarchical Risk Parity algorithm. It orders the assets with the seriation `ser`, then splits that order until every part holds one asset. The default seriation clusters the assets and orders the leaves of the dendrogram, as [lopezdeprado2016](@cite) does. A [`SpectralSeriation`](@ref) orders them with no tree, and a [`FixedSeriationResult`](@ref) states the order. The split is stage 3 of [lopezdeprado2016](@cite), recursive bisection, which measures the risk of a half as a variance. Section 12.1.3 of [cajas2025](@cite) extends it to any risk measure, and so does this type. It solves no optimisation problem, so it accepts a risk measure that is not convex. The resolved weight bounds clamp the split factor at every split, and the weight finaliser of `opt` acts on the result. [`_optimise`](@ref) states the steps.
 
 # Mathematical definition
 
-The leaf order of the dendrogram is the root part. A part ``C`` of more than one asset splits into its two halves ``C_1`` and ``C_2``. The split repeats on each half until every part holds one asset. The part's weight ``W(C)`` divides between the two halves:
+The order of the seriation is the root part. A part ``C`` of more than one asset splits into its two halves ``C_1`` and ``C_2``. The split repeats on each half until every part holds one asset. The part's weight ``W(C)`` divides between the two halves:
 
 ```math
 \\begin{align}
@@ -58,12 +58,13 @@ $(DocStringExtensions.FIELDS)
 
     HierarchicalRiskParity(;
         opt::HierarchicalOptimiser = HierarchicalOptimiser(),
+        ser::TD{<:SerE_SerR} = HierarchicalSeriation(),
         r::TD{<:OptRM_VecOptRM} = Variance(),
         sca::TD_Option{<:Scalariser} = nothing,
         fb::TDO_Option{<:OptE_Opt} = nothing
     ) -> HierarchicalRiskParity
 
-Keywords correspond to the struct's fields. Fields typed [`TD`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value. The risk measure, the scalariser and the fallback are problem definition, so a cross-validation fold loop resolves them per fold. A fold-less `optimise` runs with each at its static default, which is `nothing` for `fb`.
+Keywords correspond to the struct's fields. Fields typed [`TD`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value. The seriation, the risk measure, the scalariser and the fallback are problem definition, so a cross-validation fold loop resolves them per fold. A fold-less `optimise` runs with each at its static default, which is `nothing` for `fb`.
 
 ## Validation
 
@@ -86,9 +87,15 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref) or [`TDO_O
 `HierarchicalRiskParity` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
 
   - The method reads the returns matrix `X` as its third argument. When `opt.pe` holds a prior result, the method replaces `X` with `opt.pe.X`, so it views the children against the observations of that prior, not against the caller's matrix.
-  - `r` and `opt` recurse through [`port_opt_view`](@ref) with that matrix.
+  - `r`, `opt` and `ser` recurse through [`port_opt_view`](@ref) with that matrix. A [`FixedSeriationResult`](@ref) keeps the assets of the view in its order.
   - `fb` recurses through [`view_child`](@ref) with that matrix.
   - `sca` stays unchanged.
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `ser`: Recursively indexed through [`obs_weights_view`](@ref).
 
 # Examples
 
@@ -119,41 +126,6 @@ HierarchicalRiskParity
       │          │      horizon ┼ nothing
       │          │   fill_limit ┼ nothing
       │          │        x_src ┴ nothing
-      │      cle ┼ ClustersEstimator
-      │          │      ce ┼ PortfolioOptimisersCovariance
-      │          │         │   ce ┼ Covariance
-      │          │         │      │    me ┼ SimpleExpectedReturns
-      │          │         │      │       │   w ┴ nothing
-      │          │         │      │    ce ┼ GeneralCovariance
-      │          │         │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │          │         │      │       │    w ┴ nothing
-      │          │         │      │   alg ┼ FullMoment()
-      │          │         │      │     w ┴ nothing
-      │          │         │   mp ┼ MatrixProcessing
-      │          │         │      │     pdm ┼ Posdef
-      │          │         │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │          │         │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │          │         │      │      dn ┼ nothing
-      │          │         │      │      dt ┼ nothing
-      │          │         │      │     alg ┼ nothing
-      │          │         │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │          │      de ┼ Distance
-      │          │         │   power ┼ nothing
-      │          │         │     alg ┴ CanonicalDistance()
-      │          │     alg ┼ HClustAlgorithm
-      │          │         │       linkage ┼ WardLinkage
-      │          │         │               │   presquared ┴ Bool: false
-      │          │         │   branchorder ┴ OptimalLeafOrder()
-      │          │     onc ┼ OptimalNumberClusters
-      │          │         │   max_k ┼ nothing
-      │          │         │     alg ┼ SecondOrderDifference
-      │          │         │         │   alg ┼ StandardisedValue
-      │          │         │         │       │   mv ┼ MeanValue
-      │          │         │         │       │      │   w ┴ nothing
-      │          │         │         │       │   sv ┼ StdValue
-      │          │         │         │       │      │           w ┼ nothing
-      │          │         │         │       │      │   corrected ┴ Bool: true
-      │          │   x_src ┴ nothing
       │      slv ┼ nothing
       │       wb ┼ WeightBounds
       │          │   lb ┼ Float64: 0.0
@@ -163,6 +135,42 @@ HierarchicalRiskParity
       │       wf ┼ IterativeWeightFinaliser
       │          │   iter ┴ Int64: 100
       │   strict ┴ Bool: false
+  ser ┼ HierarchicalSeriation
+      │   cle ┼ ClustersEstimator
+      │       │      ce ┼ PortfolioOptimisersCovariance
+      │       │         │   ce ┼ Covariance
+      │       │         │      │    me ┼ SimpleExpectedReturns
+      │       │         │      │       │   w ┴ nothing
+      │       │         │      │    ce ┼ GeneralCovariance
+      │       │         │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │       │         │      │       │    w ┴ nothing
+      │       │         │      │   alg ┼ FullMoment()
+      │       │         │      │     w ┴ nothing
+      │       │         │   mp ┼ MatrixProcessing
+      │       │         │      │     pdm ┼ Posdef
+      │       │         │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │       │         │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │       │         │      │      dn ┼ nothing
+      │       │         │      │      dt ┼ nothing
+      │       │         │      │     alg ┼ nothing
+      │       │         │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+      │       │      de ┼ Distance
+      │       │         │   power ┼ nothing
+      │       │         │     alg ┴ CanonicalDistance()
+      │       │     alg ┼ HClustAlgorithm
+      │       │         │       linkage ┼ WardLinkage
+      │       │         │               │   presquared ┴ Bool: false
+      │       │         │   branchorder ┴ OptimalLeafOrder()
+      │       │     onc ┼ OptimalNumberClusters
+      │       │         │   max_k ┼ nothing
+      │       │         │     alg ┼ SecondOrderDifference
+      │       │         │         │   alg ┼ StandardisedValue
+      │       │         │         │       │   mv ┼ MeanValue
+      │       │         │         │       │      │   w ┴ nothing
+      │       │         │         │       │   sv ┼ StdValue
+      │       │         │         │       │      │           w ┼ nothing
+      │       │         │         │       │      │   corrected ┴ Bool: true
+      │       │   x_src ┴ nothing
     r ┼ Variance
       │    settings ┼ RiskMeasureSettings
       │             │   scale ┼ Float64: 1.0
@@ -203,6 +211,10 @@ HierarchicalRiskParity
     """
     @fprop opt
     """
+    $(field_dict[:ser])
+    """
+    @oprop ser
+    """
     $(field_dict[:r])
     """
     @fprop r
@@ -214,27 +226,29 @@ HierarchicalRiskParity
     $(field_dict[:fb])
     """
     @fprop fb
-    function HierarchicalRiskParity(opt::HierarchicalOptimiser, r::TD{<:OptRM_VecOptRM},
-                                    sca::TD_Option{<:Scalariser},
+    function HierarchicalRiskParity(opt::HierarchicalOptimiser, ser::TD{<:SerE_SerR},
+                                    r::TD{<:OptRM_VecOptRM}, sca::TD_Option{<:Scalariser},
                                     fb::TDO_Option{<:OptE_Opt})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :HierarchicalRiskParity)
         if isa(r, AbstractVector)
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
         end
         assert_risk_measure_required(r, :HierarchicalRiskParity)
-        assert_time_dependent_substitution(HierarchicalRiskParity, (; opt, r, sca, fb),
+        assert_time_dependent_substitution(HierarchicalRiskParity, (; opt, ser, r, sca, fb),
                                            hierarchical_risk_parity_td_defaults())
         assert_data_benchmark_prior(r, opt.pe, :r, :HierarchicalRiskParity, "opt.pe")
-        est = new{typeof(opt), typeof(r), typeof(sca), typeof(fb)}(opt, r, sca, fb)
+        est = new{typeof(opt), typeof(ser), typeof(r), typeof(sca), typeof(fb)}(opt, ser, r,
+                                                                                sca, fb)
         warn_raw_readers(est)
         return est
     end
 end
 function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptimiser(),
+                                ser::TD{<:SerE_SerR} = HierarchicalSeriation(),
                                 r::TD{<:OptRM_VecOptRM} = Variance(),
                                 sca::TD_Option{<:Scalariser} = nothing,
                                 fb::TDO_Option{<:OptE_Opt} = nothing)::HierarchicalRiskParity
-    return HierarchicalRiskParity(opt, r, sca, fb)
+    return HierarchicalRiskParity(opt, ser, r, sca, fb)
 end
 function time_dependent_field_defaults(::HierarchicalRiskParity)::NamedTuple
     return hierarchical_risk_parity_td_defaults()
@@ -275,8 +289,8 @@ function port_opt_view(hrp::HierarchicalRiskParity, i, X::MatNum,
     X = isa(hrp.opt.pe, AbstractPriorResult) ? hrp.opt.pe.X : X
     r = port_opt_view(hrp.r, i, X)
     opt = port_opt_view(hrp.opt, i, X)
-    return HierarchicalRiskParity(; r = r, opt = opt, sca = hrp.sca,
-                                  fb = view_child(hrp.fb, i, X))
+    return HierarchicalRiskParity(; r = r, opt = opt, ser = port_opt_view(hrp.ser, i, X),
+                                  sca = hrp.sca, fb = view_child(hrp.fb, i, X))
 end
 """
     bind_data_benchmark(hrp::HierarchicalRiskParity, rd::ReturnsResult)
@@ -390,11 +404,11 @@ Recursive bisection splits the leaf order of the dendrogram, so that order is an
  3. Find the Investable Mask `imsk` of `pr`. Resolve the fees `fees` on the full universe, and place them on the assets of `imsk`.
  4. Remove the two liquidation charges, `lq` and `flq`, from `fees`, giving `cfees`, the fees that the risks read.
  5. Reduce `pr`, `hrp` and `rd` to the assets of `imsk`, with [`investable_reduction`](@ref). `X` is the returns matrix of the reduced `pr`.
- 6. Cluster the assets with `opt.cle`, giving `clr`. The leaf order `clr.res.order` is the order of the branch order of the clustering algorithm.
+ 6. Order the assets with `ser`, through [`seriate`](@ref), giving the seriation result `ser`. A distance reader that refuses an asset gives a fit again without it. Check that the order covers the reduced universe with [`assert_seriation_universe`](@ref).
  7. Resolve the risk measure `r` against `pr` and `opt.slv`, with [`factory`](@ref).
  8. Compute the risk of each asset held alone, `rku`, with [`unitary_expected_risks`](@ref).
  9. Resolve the weight bounds `wb` from `opt.wb` and `opt.sets`. Expand a side that resolves to a scalar or to `nothing` to one bound per asset, because [`split_factor_weight_constraints`](@ref) sums the bounds of each half.
-10. Set every entry of `w` to one, and set `items` to the one part `clr.res.order`.
+10. Set every entry of `w` to one, and set `items` to the one part `ser.order`.
 11. Replace each part in `items` that holds more than one asset by its two halves. Stop when `items` is empty.
 12. For each pair of halves `lc` and `rc`, write their naive risk parity weights into the two columns of `wu`, and compute their risks `lrisk` and `rrisk` with [`expected_risk`](@ref).
 13. Form the split factor `alpha`, and clamp it with [`split_factor_weight_constraints`](@ref).
@@ -405,7 +419,7 @@ Recursive bisection splits the leaf order of the dendrogram, so that order is an
 # Arguments
 
   - `hrp`: The hierarchical risk parity optimiser to use.
-  - $(arg_dict[:rd]) When `hrp.opt.pe` holds a prior result, the allocation reads no returns from `rd`, but a fallback or the clusterisation can.
+  - $(arg_dict[:rd]) When `hrp.opt.pe` holds a prior result, the allocation reads no returns from `rd`, but a fallback or the seriation can.
   - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
   - `kwargs`: Ignored.
 
@@ -415,7 +429,7 @@ Recursive bisection splits the leaf order of the dendrogram, so that order is an
   - [`optimise`](@ref)
   - [`_optimise`](@ref)
 """
-function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
+function _optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:OptimisationRiskMeasure},
                    rd::ReturnsResult = ReturnsResult(); rmsk::Option{BitVector} = nothing,
                    kwargs...)
     hrp = reset_time_dependent_estimator(hrp)
@@ -432,7 +446,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     # A fit again after a refusal of the distance reader passes its mask as `rmsk`.
-    imsk = distance_reader_entry_mask(hrp.opt.cle, pr, rd, hrp.opt.strict; rmsk = rmsk)
+    imsk = distance_reader_entry_mask(hrp.ser, pr, rd, hrp.opt.strict; rmsk = rmsk)
     fees = investable_fees_view(fees_constraints(hrp.opt.fees, hrp.opt.sets;
                                                  strict = hrp.opt.strict, datatype = T),
                                 imsk, pr.X)
@@ -449,20 +463,18 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     _, pr, hrp, rd = investable_reduction(pr, hrp, rd, imsk)
     hrp = bind_data_benchmark(hrp, rd)
     X = pr.X
-    # Recursive bisection splits `clr.res.order`, the leaf order of the branch order of
-    # the clustering algorithm.
-    # A distance reader that refuses an asset the prior kept raises before it clusters. Fit
+    # Recursive bisection splits the order of the seriation.
+    # A distance reader that refuses an asset the prior kept raises before it orders. Fit
     # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
-    clr = distance_reader_call(clusterise, hrp.opt.cle, pr; rd = rd, iv = rd.iv,
-                               ivpa = rd.ivpa)
-    if clr isa DistanceReaderRefusalError
+    ser = distance_reader_call(seriate, hrp.ser, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa)
+    if ser isa DistanceReaderRefusalError
         return _optimise(rebuild_struct(hrp0,
                                         (; opt = rebuild_struct(hrp0.opt, (; pe = pr0)))),
                          rd0;
-                         rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
+                         rmsk = distance_reader_refusal_mask(ser, imsk, rd0,
                                                              hrp0.opt.strict), kwargs...)
     end
-    assert_clustering_universe(clr, size(X, 2))
+    assert_seriation_universe(ser, size(X, 2))
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{T}(undef, size(X, 2), 2)
     rku = unitary_expected_risks(r, X, cfees)
@@ -472,7 +484,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     # each half, so this call expands such a side to one bound per asset.
     wb = weight_bounds_constraints(wb; N = size(X, 2), datatype = T)
     w = ones(T, size(X, 2))
-    items = [clr.res.order]
+    items = [ser.order]
     while length(items) > 0
         items = [i[j:k] for i in items
                  for (j, k) in ((1, div(length(i), 2)), (1 + div(length(i), 2), length(i)))
@@ -497,11 +509,11 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     end
     retcode, w = finalise_weight_bounds(hrp.opt.wf, wb, w / sum(w))
     return HierarchicalRiskParityResult(;
-                                        hr = HierarchicalResult(; pr = pr, clr = clr,
-                                                                wb = wb, fees = fees,
+                                        hr = HierarchicalResult(; pr = pr, wb = wb,
+                                                                fees = fees,
                                                                 retcode = retcode, w = w,
-                                                                imsk = imsk), r = r,
-                                        sca = hrp.sca, fb = nothing)
+                                                                imsk = imsk), ser = ser,
+                                        r = r, sca = hrp.sca, fb = nothing)
 end
 """
     hrp_scalarised_risk(sca::Option{<:Scalariser}, wu::MatNum, rkus::VecVecNum, lc::VecNum,
@@ -593,7 +605,7 @@ Run the Hierarchical Risk Parity optimisation for a vector of risk measures, sca
 # Arguments
 
   - `hrp`: The hierarchical risk parity optimiser to use, with a vector of risk measures.
-  - $(arg_dict[:rd]) When `hrp.opt.pe` holds a prior result, the allocation reads no returns from `rd`, but a fallback or the clusterisation can.
+  - $(arg_dict[:rd]) When `hrp.opt.pe` holds a prior result, the allocation reads no returns from `rd`, but a fallback or the seriation can.
   - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
   - `kwargs`: Ignored.
 
@@ -604,7 +616,7 @@ Run the Hierarchical Risk Parity optimisation for a vector of risk measures, sca
   - [`optimise`](@ref)
   - [`_optimise`](@ref)
 """
-function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
+function _optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:VecOptRM},
                    rd::ReturnsResult = ReturnsResult(); rmsk::Option{BitVector} = nothing,
                    kwargs...)
     hrp = reset_time_dependent_estimator(hrp)
@@ -621,7 +633,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     # A fit again after a refusal of the distance reader passes its mask as `rmsk`.
-    imsk = distance_reader_entry_mask(hrp.opt.cle, pr, rd, hrp.opt.strict; rmsk = rmsk)
+    imsk = distance_reader_entry_mask(hrp.ser, pr, rd, hrp.opt.strict; rmsk = rmsk)
     fees = investable_fees_view(fees_constraints(hrp.opt.fees, hrp.opt.sets;
                                                  strict = hrp.opt.strict, datatype = T),
                                 imsk, pr.X)
@@ -638,20 +650,18 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     _, pr, hrp, rd = investable_reduction(pr, hrp, rd, imsk)
     hrp = bind_data_benchmark(hrp, rd)
     X = pr.X
-    # Recursive bisection splits `clr.res.order`, the leaf order of the branch order of
-    # the clustering algorithm.
-    # A distance reader that refuses an asset the prior kept raises before it clusters. Fit
+    # Recursive bisection splits the order of the seriation.
+    # A distance reader that refuses an asset the prior kept raises before it orders. Fit
     # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
-    clr = distance_reader_call(clusterise, hrp.opt.cle, pr; rd = rd, iv = rd.iv,
-                               ivpa = rd.ivpa)
-    if clr isa DistanceReaderRefusalError
+    ser = distance_reader_call(seriate, hrp.ser, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa)
+    if ser isa DistanceReaderRefusalError
         return _optimise(rebuild_struct(hrp0,
                                         (; opt = rebuild_struct(hrp0.opt, (; pe = pr0)))),
                          rd0;
-                         rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
+                         rmsk = distance_reader_refusal_mask(ser, imsk, rd0,
                                                              hrp0.opt.strict), kwargs...)
     end
-    assert_clustering_universe(clr, size(X, 2))
+    assert_seriation_universe(ser, size(X, 2))
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{T}(undef, size(X, 2), 2)
     rkus = [unitary_expected_risks(ri, X, cfees) for ri in r]
@@ -660,7 +670,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     # As in the single-measure method: one bound per asset on each side.
     wb = weight_bounds_constraints(wb; N = size(X, 2), datatype = T)
     w = ones(T, size(X, 2))
-    items = [clr.res.order]
+    items = [ser.order]
     while length(items) > 0
         items = [i[j:k] for i in items
                  for (j, k) in ((1, div(length(i), 2)), (1 + div(length(i), 2), length(i)))
@@ -679,12 +689,44 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     end
     retcode, w = finalise_weight_bounds(hrp.opt.wf, wb, w / sum(w))
     return HierarchicalRiskParityResult(;
-                                        hr = HierarchicalResult(; pr = pr, clr = clr,
-                                                                wb = wb, fees = fees,
+                                        hr = HierarchicalResult(; pr = pr, wb = wb,
+                                                                fees = fees,
                                                                 retcode = retcode, w = w,
-                                                                imsk = imsk), r = r,
-                                        sca = hrp.sca, fb = nothing)
+                                                                imsk = imsk), ser = ser,
+                                        r = r, sca = hrp.sca, fb = nothing)
 end
 @pipe_delegates HierarchicalRiskParity opt
 @pipe_route_sigma_ucs HierarchicalRiskParity
+"""
+    pipe_route(x::HierarchicalRiskParity, t::Val{:cle}, v)
+    pipe_accepts(x::HierarchicalRiskParity, t::Val{:cle}) -> Bool
+    pipe_route(x::SchurComplementHierarchicalRiskParity, t::Val{:cle}, v)
+    pipe_accepts(x::SchurComplementHierarchicalRiskParity, t::Val{:cle}) -> Bool
+
+Route the clustering of a [`Pipeline`](@ref) into the seriation `ser` of HRP or Schur.
+
+The configuration `opt` holds no clustering, so the target goes to `x.ser`. A [`HierarchicalSeriation`](@ref) has the field `cle`, and takes the clustering there. A seriation with no field `cle`, such as a [`SpectralSeriation`](@ref), reads no tree, so the optional target passes without a change, see [`unroutable_target`](@ref).
+
+# Arguments
+
+  - `x`: The optimiser.
+  - `t`: The target `:cle`.
+  - `v`: The clustering result.
+
+# Returns
+
+  - `x′`: The optimiser with the clustering in its seriation, or `flag::Bool` for `pipe_accepts`.
+
+# Related
+
+  - [`pipe_route`](@ref)
+  - [`pipe_accepts`](@ref)
+  - [`HierarchicalSeriation`](@ref)
+"""
+function pipe_route(x::HierarchicalRiskParity, t::Val{:cle}, v)
+    return Accessors.set(x, Accessors.PropertyLens{:ser}(), pipe_route(x.ser, t, v))
+end
+function pipe_accepts(x::HierarchicalRiskParity, t::Val{:cle})::Bool
+    return pipe_accepts(x.ser, t)
+end
 export HierarchicalRiskParity

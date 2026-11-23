@@ -184,15 +184,16 @@ end
     # producer never meets the unreduced block, and no weight lands outside the mask.
     opt = HierarchicalOptimiser(;
                                 pe = CrossSectionalFactorPrior(; lambda = 1,
-                                                               factors = factors),
+                                                               factors = factors))
+    ser = HierarchicalSeriation(;
                                 cle = ClustersEstimator(;
                                                         de = FeatureDistance(;
                                                                              ape = RegressionPanel())))
-    res = optimise(HierarchicalRiskParity(; opt = opt), rdp)
+    res = optimise(HierarchicalRiskParity(; opt = opt, ser = ser), rdp)
     @test isa(res.retcode, OptimisationSuccess)
     @test isapprox(sum(res.w), 1)
     @test all(iszero, res.w[.!msk])
-    @test feature_labels(opt.cle.de, res.pr, rdr, rdr.X) ==
+    @test feature_labels(ser.cle.de, res.pr, rdr, rdr.X) ==
           ["loadings" => n for n in prr.rr.nf]
 end
 @testset "PhylogenyPanel grades a graph, and its labels are the assets" begin

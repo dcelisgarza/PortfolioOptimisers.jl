@@ -148,9 +148,11 @@ end
         clx = ClustersEstimator(; x_src = ExcessSource())
         jopt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv)
         jexc = JuMPOptimiser(; pe = epx, slv = slv)
-        hexc = HierarchicalOptimiser(; pe = epx, cle = clx)
-        fams = (MeanRisk(; opt = jexc), HierarchicalRiskParity(; opt = hexc),
-                HierarchicalEqualRiskContribution(; opt = hexc),
+        hexc = HierarchicalOptimiser(; pe = epx)
+        fams = (MeanRisk(; opt = jexc),
+                HierarchicalRiskParity(; opt = hexc,
+                                       ser = HierarchicalSeriation(; cle = clx)),
+                HierarchicalEqualRiskContribution(; opt = hexc, cle = clx),
                 InverseVolatility(; pe = epx),
                 NestedClustered(; pe = epx, cle = clx, opti = MeanRisk(; opt = jopt),
                                 opto = MeanRisk(; opt = jopt)),

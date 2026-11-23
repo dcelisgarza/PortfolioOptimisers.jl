@@ -78,7 +78,12 @@ end
     slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                  check_sol = (; allow_local = true, allow_almost = true),
                  settings = Dict("verbose" => false))
-    hopt(de) = HierarchicalOptimiser(; cle = ClustersEstimator(; de = de), slv = slv)
+    function hrp_of(de)
+        return HierarchicalRiskParity(; opt = HierarchicalOptimiser(; slv = slv),
+                                      ser = HierarchicalSeriation(;
+                                                                  cle = ClustersEstimator(;
+                                                                                          de = de)))
+    end
     plain_hrp() = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; slv = slv))
 
     T, N, K, k = 250, 8, 3, 3
@@ -302,11 +307,9 @@ end
                                      HierarchicalEqualRiskContribution(;
                                                                        opt = HierarchicalOptimiser(;
                                                                                                    slv = slv))],
-                             opto = HierarchicalRiskParity(; opt = hopt(de)), ex = seq)
+                             opto = hrp_of(de), ex = seq)
         mk_nco(de) = NestedClustered(; cle = ClustersEstimator(; de = FeatureDistance()),
-                                     opti = plain_hrp(),
-                                     opto = HierarchicalRiskParity(; opt = hopt(de)),
-                                     ex = seq)
+                                     opti = plain_hrp(), opto = hrp_of(de), ex = seq)
         # `wi` is the matrix whose columns are the inner solutions laid out on the full
         # universe -- exactly what the outer result was built from. Stacking's inner
         # optimisers all see the whole universe; NestedClustered's see one cluster each.
@@ -351,12 +354,10 @@ end
                                      HierarchicalEqualRiskContribution(;
                                                                        opt = HierarchicalOptimiser(;
                                                                                                    slv = slv))],
-                             opto = HierarchicalRiskParity(; opt = hopt(de)), cv = cvopt,
-                             ex = seq)
+                             opto = hrp_of(de), cv = cvopt, ex = seq)
         mk_nco(de) = NestedClustered(; cle = ClustersEstimator(; de = FeatureDistance()),
-                                     opti = plain_hrp(),
-                                     opto = HierarchicalRiskParity(; opt = hopt(de)),
-                                     cv = cvopt, ex = seq)
+                                     opti = plain_hrp(), opto = hrp_of(de), cv = cvopt,
+                                     ex = seq)
         for mk in (mk_st, mk_nco)
             for (rd, nfeat) in ((rd_r, K), (rd_3d, K))
                 ro = RecordingDistance(FeatureDistance(; alg = StackObservations()))
@@ -417,15 +418,17 @@ end
                               opti = HierarchicalRiskParity(;
                                                             opt = HierarchicalOptimiser(;
                                                                                         pe = pec,
-                                                                                        cle = cli,
-                                                                                        slv = slv)),
+                                                                                        slv = slv),
+                                                            ser = HierarchicalSeriation(;
+                                                                                        cle = cli)),
                               opto = HierarchicalRiskParity(;
                                                             opt = HierarchicalOptimiser(;
                                                                                         pe = pec,
+                                                                                        slv = slv),
+                                                            ser = HierarchicalSeriation(;
                                                                                         cle = ClustersEstimator(;
                                                                                                                 ce = cec,
-                                                                                                                de = rm),
-                                                                                        slv = slv)),
+                                                                                                                de = rm))),
                               cv = KFold(; n = 3), ex = seq)
         resm = optimise(ncm, rd_m)
         @test assignments(resm.clr) == [1, 2, 2, 2, 1, 2, 2, 2]
@@ -458,7 +461,7 @@ end
                               HierarchicalEqualRiskContribution(;
                                                                 opt = HierarchicalOptimiser(;
                                                                                             slv = slv))],
-                      opto = HierarchicalRiskParity(; opt = hopt(ro)), cv = cvopt, ex = seq)
+                      opto = hrp_of(ro), cv = cvopt, ex = seq)
         res = optimise(st, rd_sq)
         @test isapprox(sum(res.w), 1)
         Zo = ro.seen[1]
@@ -478,9 +481,7 @@ end
         =#
         rn = RecordingDistance(FeatureDistance(; alg = StackObservations()))
         nco = NestedClustered(; cle = ClustersEstimator(; de = FeatureDistance()),
-                              opti = plain_hrp(),
-                              opto = HierarchicalRiskParity(; opt = hopt(rn)), cv = cvopt,
-                              ex = seq)
+                              opti = plain_hrp(), opto = hrp_of(rn), cv = cvopt, ex = seq)
         res = optimise(nco, rd_sq)
         @test isapprox(sum(res.w), 1)
         Zn = rn.seen[1]
@@ -501,9 +502,7 @@ end
                                 pnl = sqpanel(nx, Z3sq))
         r3 = RecordingDistance(FeatureDistance(; alg = StackObservations()))
         nco3 = NestedClustered(; cle = ClustersEstimator(; de = FeatureDistance()),
-                               opti = plain_hrp(),
-                               opto = HierarchicalRiskParity(; opt = hopt(r3)), cv = cvopt,
-                               ex = seq)
+                               opti = plain_hrp(), opto = hrp_of(r3), cv = cvopt, ex = seq)
         optimise(nco3, rd_3dsq)
         Z3o = r3.seen[1]
         @test size(Z3o, 3) == T
@@ -773,8 +772,7 @@ end
         =#
         function outer_features(rd)
             ro = RecordingDistance(FeatureDistance(; alg = StackObservations()))
-            nco = NestedClustered(; opti = plain_hrp(),
-                                  opto = HierarchicalRiskParity(; opt = hopt(ro)), ex = seq)
+            nco = NestedClustered(; opti = plain_hrp(), opto = hrp_of(ro), ex = seq)
             res = optimise(nco, rd)
             idx = assignments(res.clr)
             Wn = zeros(N, res.clr.k)
@@ -880,8 +878,7 @@ end
         # the same returns with no implied volatilities. The outer recorder reads the
         # collapsed rates (#1926).
         ri = RecordingDistance(Distance())
-        nci = NestedClustered(; opti = plain_hrp(),
-                              opto = HierarchicalRiskParity(; opt = hopt(ri)), ex = seq)
+        nci = NestedClustered(; opti = plain_hrp(), opto = hrp_of(ri), ex = seq)
         rdiv = ReturnsResult(; nx = nx, X = X, ts = ts, iv = abs.(X) .* 10 .+ 0.1)
         @test isnothing(rdiv.ivpa)
         resiv = optimise(nci, rdiv)
@@ -929,9 +926,7 @@ end
         # meta-optimiser, with and without cross-validation. The cash rule divides by
         # nothing, so its fit is the reference that each mask and each rule must equal.
         cvopt = KFold(; n = 3)
-        outer() = HierarchicalRiskParity(;
-                                         opt = hopt(FeatureDistance(;
-                                                                    alg = StackObservations())))
+        outer() = hrp_of(FeatureDistance(; alg = StackObservations()))
         function metas(pcol)
             return [NestedClustered(; cle = ClustersEstimator(; de = FeatureDistance()),
                                     opti = plain_hrp(), opto = outer(), pcol = pcol,

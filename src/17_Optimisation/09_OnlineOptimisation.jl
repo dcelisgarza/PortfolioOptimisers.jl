@@ -791,6 +791,58 @@ function online_state_seed(opt::Union{JuMPOptimiser, BaseClusteringOptimisationE
     return throw(ArgumentError("`Online` wraps the prior, not the `$(typeof(opt).name.name)` that holds it: the optimiser's window is its prior's, so declare the step as `pe = Online(prior; max_history = …)` and the fold context follows the prior's buffer."))
 end
 """
+    carry_fold_state(est::Union{HierarchicalRiskParity{<:Any, <:SpectralSeriation},
+                                SchurComplementHierarchicalRiskParity{<:Any, <:SpectralSeriation}},
+                     pred::PredictionResult)
+    carry_fold_state(est::Union{HierarchicalRiskParity{<:Any, <:SpectralSeriation},
+                                SchurComplementHierarchicalRiskParity{<:Any, <:SpectralSeriation}},
+                     res::Union{HierarchicalRiskParityResult{<:Any, <:SpectralSeriationResult},
+                                SchurComplementHierarchicalRiskParityResult{<:Any, <:Any,
+                                                                            <:SpectralSeriationResult}})
+
+Write the coordinates and the order of the spectral fit of a fold into the memory `cache` of the seriation of HRP or Schur.
+
+This is the fold memory of [`SpectralSeriation`](@ref) in the online arm of a walk-forward. The next fold projects these coordinates onto its own eigenspace, and breaks a tie by this order. The memory is over the universe of the estimator, `NaN` at an asset that the fold did not order, see [`seriation_state`](@ref).
+
+# Algorithm
+
+ 1. Read the optimisation result `res` of the prediction `pred`, and dispatch on it.
+ 2. When `res` is the result of HRP or Schur with a [`SpectralSeriationResult`](@ref) in `ser`, return `est` with its seriation rebuilt around the new memory. A fallback result, or a result of another seriation, takes the generic method, which returns `est` unchanged.
+
+# Arguments
+
+  - `est`: The threaded estimator.
+  - `pred`: The prediction of the fold.
+  - `res`: The optimisation result of the prediction.
+
+# Returns
+
+  - `est`: The estimator with the new memory, or `est` itself.
+
+# Related
+
+  - [`carry_fold_state`](@ref)
+  - [`SpectralSeriationState`](@ref)
+  - [`seriation_state`](@ref)
+"""
+function carry_fold_state(est::Union{HierarchicalRiskParity{<:Any, <:SpectralSeriation},
+                                     SchurComplementHierarchicalRiskParity{<:Any,
+                                                                           <:SpectralSeriation}},
+                          pred::PredictionResult)
+    return carry_fold_state(est, pred.res)
+end
+function carry_fold_state(est::Union{HierarchicalRiskParity{<:Any, <:SpectralSeriation},
+                                     SchurComplementHierarchicalRiskParity{<:Any,
+                                                                           <:SpectralSeriation}},
+                          res::Union{HierarchicalRiskParityResult{<:Any,
+                                                                  <:SpectralSeriationResult},
+                                     SchurComplementHierarchicalRiskParityResult{<:Any,
+                                                                                 <:Any,
+                                                                                 <:SpectralSeriationResult}})
+    cache = seriation_state(res.ser, result_investable_mask(res))
+    return rebuild_struct(est, (; ser = rebuild_struct(est.ser, (; cache = cache))))
+end
+"""
     update_online_estimator(opt::JuMPOptimisationEstimator)
     update_online_estimator(opt::Union{HierarchicalRiskParity, HierarchicalEqualRiskContribution, SchurComplementHierarchicalRiskParity})
     update_online_estimator(opt::Union{JuMPOptimiser, BaseClusteringOptimisationEstimator, InverseVolatility, NestedClustered, BaseStackingOptimisationEstimator, BaseSubsetResamplingOptimisationEstimator})

@@ -180,7 +180,8 @@ function holds_precomputed(x, ::Type{T})::Bool where {T}
     return any(e -> isa(e, T) || isa(e, AbstractVector) && any(y -> isa(y, T), e), entries)
 end
 """
-    assert_internal_optimiser(opt::ClusteringOptimisationEstimator)
+    assert_internal_optimiser(opt::HierarchicalEqualRiskContribution)
+    assert_internal_optimiser(opt::Union{HierarchicalRiskParity, SchurComplementHierarchicalRiskParity})
     assert_internal_optimiser(opt::JuMPOptimisationEstimator)
     assert_internal_optimiser(opt::VecOptE_Opt_TD)
     assert_internal_optimiser(opt::NestedClustered)
@@ -195,7 +196,8 @@ Each cluster solves its problem over its own assets, so each input of the inner 
 
 # Validation
 
-  - A clustering optimiser: `opt.opt.cle` holds no `AbstractClusteringResult`.
+  - A [`HierarchicalEqualRiskContribution`](@ref): `opt.cle` holds no `AbstractClusteringResult`.
+  - A [`HierarchicalRiskParity`](@ref) or a [`SchurComplementHierarchicalRiskParity`](@ref): `opt.ser` holds no [`HierarchicalSeriationResult`](@ref), and no [`HierarchicalSeriation`](@ref) whose `cle` is an `AbstractClusteringResult`. A [`FixedSeriationResult`](@ref) and a [`SpectralSeriationResult`](@ref) pass, because their view keeps the assets of the cluster in their order.
   - A JuMP optimiser: `opt` passes [`assert_rc_variance`](@ref) and [`assert_rc_pl`](@ref). `opt.opt.lcse`, `opt.opt.cte`, `opt.opt.gcarde` and `opt.opt.sgcarde` hold no `LinearConstraint`, and `opt.opt.ple` holds no `AbstractPhylogenyConstraintResult`.
   - A vector of optimisers: each entry passes.
   - A [`NestedClustered`](@ref): `opt.cle` holds no `AbstractClusteringResult`, and `opt.opto` passes [`assert_external_optimiser`](@ref). When `opt.opti` is not `opt.opto`, it passes this function.
@@ -212,9 +214,17 @@ The methods throw an `ArgumentError` otherwise.
   - [`assert_external_optimiser`](@ref)
   - [`holds_precomputed`](@ref)
 """
-function assert_internal_optimiser(opt::ClusteringOptimisationEstimator)::Nothing
-    @argcheck(!holds_precomputed(opt.opt.cle, AbstractClusteringResult),
-              ArgumentError("opt.opt.cle cannot be a precomputed AbstractClusteringResult, or a TimeDependent schedule whose entries or default hold one; use an estimator instead"))
+function assert_internal_optimiser(opt::HierarchicalEqualRiskContribution)::Nothing
+    @argcheck(!holds_precomputed(opt.cle, AbstractClusteringResult),
+              ArgumentError("opt.cle cannot be a precomputed AbstractClusteringResult, or a TimeDependent schedule whose entries or default hold one; use an estimator instead"))
+    return nothing
+end
+function assert_internal_optimiser(opt::Union{HierarchicalRiskParity,
+                                              SchurComplementHierarchicalRiskParity})::Nothing
+    entries = isa(opt.ser, TimeDependent) ? time_dependent_entries(opt.ser) : (opt.ser,)
+    @argcheck(!any(e -> isa(e, HierarchicalSeriationResult) ||
+                        isa(e, HierarchicalSeriation{<:AbstractClusteringResult}), entries),
+              ArgumentError("opt.ser cannot hold a precomputed clustering, as a HierarchicalSeriationResult or a HierarchicalSeriation of an AbstractClusteringResult, or a TimeDependent schedule whose entries or default hold one, because a view onto a cluster cannot slice a dendrogram; use an estimator, or a FixedSeriationResult, instead"))
     return nothing
 end
 """

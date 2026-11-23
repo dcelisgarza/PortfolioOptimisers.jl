@@ -115,8 +115,8 @@ assets is what keeps the JuMP families cheap.
         rdb = ReturnsResult(; nx = nx, X = X, ts = ts, nb = ["BM"], B = Bv)
         epx = EmpiricalPrior(; x_src = ExcessSource())
         for opt in (MeanRisk(; opt = JuMPOptimiser(; pe = epx, slv = slv)),
-                    HierarchicalRiskParity(;
-                                           opt = HierarchicalOptimiser(; pe = epx,
+                    HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = epx),
+                                           ser = HierarchicalSeriation(;
                                                                        cle = ClustersEstimator(;
                                                                                                x_src = ExcessSource()))))
             b = cross_val_predict(opt, rdb, batch_cv)

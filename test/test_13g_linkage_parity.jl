@@ -285,10 +285,10 @@ end
                            res = Clustering.Hclust(clr.res.merges, clr.res.heights, order,
                                                    clr.res.linkage), S = clr.S, D = clr.D,
                            k = clr.k)
-            opt = HierarchicalOptimiser(; cle = pin)
-            w = optimise(HierarchicalRiskParity(; opt = opt), rd).w
+            ser = HierarchicalSeriation(; cle = pin)
+            w = optimise(HierarchicalRiskParity(; ser = ser), rd).w
             hrp = max(hrp, maximum(abs, w - Hr[(n + 1):(2n)]))
-            ws = optimise(SchurComplementHierarchicalRiskParity(; opt = opt), rd).w
+            ws = optimise(SchurComplementHierarchicalRiskParity(; ser = ser), rd).w
             wos = lnk_rows(SC, n, s)[1, 1:n]
             # The oracle's gamma search misses the first turning point here (#2176).
             if (n, s) == (10, 19) && m != "Weighted"
@@ -300,10 +300,7 @@ end
             HEr = lnk_rows(HE, n, s)
             for (i, k) in pairs((2, 3, 5))
                 clk = Clusters(; res = clr.res, S = clr.S, D = clr.D, k = k)
-                wk = optimise(HierarchicalEqualRiskContribution(;
-                                                                opt = HierarchicalOptimiser(;
-                                                                                            cle = clk)),
-                              rd).w
+                wk = optimise(HierarchicalEqualRiskContribution(; cle = clk), rd).w
                 if maximum(lnk_rows(F, n, s)[k, 2:(1 + n)]) < k
                     # The oracle's `fcluster` gives fewer than `k` clusters.
                     herc_fewer += 1

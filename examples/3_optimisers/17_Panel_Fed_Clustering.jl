@@ -310,8 +310,9 @@ function backtest(de)
     return cross_val_predict(HierarchicalRiskParity(;
                                                     opt = HierarchicalOptimiser(;
                                                                                 pe = EmpiricalPrior(),
-                                                                                cle = cle,
                                                                                 slv = slv),
+                                                    ser = HierarchicalSeriation(;
+                                                                                cle = cle),
                                                     r = Variance()), rd, walk)
 end
 
@@ -425,10 +426,11 @@ pretty_table(collapse_rows; title = "One time-varying panel, four collapse rules
 bt_tv = cross_val_predict(HierarchicalRiskParity(;
                                                  opt = HierarchicalOptimiser(;
                                                                              pe = EmpiricalPrior(),
+                                                                             slv = slv),
+                                                 ser = HierarchicalSeriation(;
                                                                              cle = ClustersEstimator(;
                                                                                                      de = FeatureDistance(),
-                                                                                                     onc = onc),
-                                                                             slv = slv),
+                                                                                                     onc = onc)),
                                                  r = Variance()), rd_tv, walk)
 
 pretty_table(DataFrame([backtest_row("Static panel", last(results[2])),

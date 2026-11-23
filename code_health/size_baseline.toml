@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.4"
 julia_syntax = "1.0.2"
-commit = "6175a28437"
+commit = "dcde7d2b85"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { code = 35, doc = 0, comment = 5, blank = 4, total = 44 }
@@ -232,6 +232,8 @@ commit = "6175a28437"
 "src/08_Phylogeny/10_PhylogenyClustering.jl" = { code = 61, doc = 125, comment = 14, blank = 55, total = 255 }
 "src/08_Phylogeny/11_PhylogenyMatrix.jl" = { code = 35, doc = 109, comment = 9, blank = 54, total = 207 }
 "src/08_Phylogeny/12_AssetPhylogeny.jl" = { code = 13, doc = 65, comment = 0, blank = 34, total = 112 }
+"src/08_Phylogeny/13_Seriation.jl" = { code = 63, doc = 224, comment = 1, blank = 99, total = 387 }
+"src/08_Phylogeny/14_SpectralSeriation.jl" = { code = 196, doc = 305, comment = 0, blank = 133, total = 634 }
 "src/09_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { code = 41, doc = 169, comment = 0, blank = 95, total = 305 }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl" = { code = 478, doc = 934, comment = 28, blank = 418, total = 1858 }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl" = { code = 370, doc = 545, comment = 42, blank = 235, total = 1192 }

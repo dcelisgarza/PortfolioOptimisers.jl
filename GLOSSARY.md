@@ -71,6 +71,7 @@ On a Carry Fold, a Batch Choice that moves changes only the basis of the factor 
 
 **Fold Context**
 What an optimiser keeps beside its Prior Estimator when it takes the online step. It has two parts. The first part is every column of the `ReturnsResult` that the prior does not own, each as a buffer of its own. These are the benchmark and timestamp columns, and the factor column and the Exogenous Series only when the tree of the prior never reads them. The second part is the context that the first step pins and every later step checks: the asset, factor and benchmark names and a static Asset Panel. A `ReturnsBufferState` in the Partial Fit State slot of the optimiser holds the Fold Context. From it, `optimise(opt)` with no data rebuilds the `ReturnsResult` that a batch fit over the same observations would have read. The prior owns the returns, and nothing else holds a second copy. A head that holds no prior is the bottom of its own chain and keeps the returns in its Fold Context.
+A member above the prior can keep a memory of its own last fit, beside the Fold Context: a `SpectralSeriation` in the seriation of HRP or Schur holds a `SpectralSeriationState` in its `cache`. The online arm writes it after each fold, through `carry_fold_state`, and the next fold reads it. It is not a sufficient statistic, so `merge_states` refuses it, and an ordinary walk-forward keeps none. ADR 0137 amended.
 A Pipeline holds a Fold Context too, but only when its prior step owns the rows. The Pipeline is the one outer estimator whose own estimator is not the row owner, because `inject_context` overrides the prior of the optimiser with the prior of the step. When the optimiser step owns the rows, that optimiser already holds the context. ADR 0142. No step pins a time-varying Asset Panel. Its active mask goes into the returns buffer beside the rows, and the call with no data rebuilds the panel from it. ADR 0137.
 An Online Portfolio Selection head (§4.1) is the one optimiser that takes a step of its own above the prior, and it steps its fallback beside it. Its call with no data returns a Recursion Result. Its state pins the same names and static panel, and it records the timestamps. It holds no column, because the call rebuilds nothing. ADR 0137 amended, ADR 0155.
 *Avoid*: reading it as a second Sample Buffer. It holds no returns where a prior does, and it never holds an estimate. And reading `optimise(opt)` with no data as an online solve. It rebuilds the `ReturnsResult` and runs the ordinary batch path, so nothing above the prior takes a step of its own.
@@ -932,11 +933,15 @@ Beside the family, not in it: `BestConstantRebalancedPortfolio` · BCRP · bench
 
 ### 4.2 Clustering (Non-JuMP)
 
-- **HierarchicalRiskParity (HRP)**: recursive bisection of the cluster tree, allocating by risk.
+- **HierarchicalRiskParity (HRP)**: recursive bisection of the order of a Seriation, allocating by risk.
 - **HierarchicalEqualRiskContribution (HERC)**: splits weight down the cluster tree between whole clusters in inverse proportion to their risk, then inside each cluster in inverse proportion to each asset's own risk. Despite the name, the clusters do not contribute equally to risk.
 - **SchurComplementHierarchicalRiskParity (SCHRP)**: HRP augmented with a Schur-complement step.
 
-`HierarchicalOptimiser` is the shared configuration for these.
+`HierarchicalOptimiser` is the shared configuration for these: the prior, the bounds, the fees and the finaliser. HRP and Schur hold a Seriation in `ser`, and HERC holds a clustering in `cle`.
+
+**Seriation**
+An order of the assets that puts related assets next to each other. HRP and Schur bisect it, so it is an input of their weights. The field `ser` holds a member of the Open Family `AbstractSeriationEstimator`, whose verb is `seriate`, or a result of `AbstractSeriationResult`, whose one key is `order`. `HierarchicalSeriation(; cle)` takes the leaf order of a dendrogram, so its Branch Order decides it. `SpectralSeriation` sorts the coordinates of the leading eigenspace of a Laplacian of the distances, with no tree, and keeps a memory of its last fit in the online arm. `FixedSeriationResult(order)` states the order, such as an order by sector or the order of another implementation in a parity test; a view of it keeps the assets of the view in their order. HERC and NCO cut the tree into clusters and take no Seriation. ADR 0055 amended.
+*Avoid*: "leaf order" for an order that no tree gave; "the `clr` of an HRP result", which is `res.ser.clr` now.
 
 **Branch Order**
 The rule that flips the merges of a dendrogram to give its leaf permutation. It never changes the merge tree or the cluster memberships. It is the field `branchorder` of `HClustAlgorithm` and `DBHT`, a member of the Open Family `AbstractBranchOrder`, whose verb is `order_branches!`. No verb takes it as a keyword.

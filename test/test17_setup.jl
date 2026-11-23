@@ -38,7 +38,8 @@ slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 pr = prior(HighOrderPriorEstimator(), rd)
 clr = clusterise(ClustersEstimator(), pr)
 w0 = range(; start = inv(size(pr.X, 2)), stop = inv(size(pr.X, 2)), length = size(pr.X, 2))
-opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv)
+opt = HierarchicalOptimiser(; pe = pr, slv = slv)
+ser = HierarchicalSeriation(; cle = clr)
 rs = [EqualRisk(), Variance(), StandardDeviation(), UncertaintySetVariance(),
       LowOrderMoment(), HighOrderMoment(), Kurtosis(), NegativeSkewness(), ValueatRisk(),
       ValueatRiskRange(), ConditionalValueatRisk(),

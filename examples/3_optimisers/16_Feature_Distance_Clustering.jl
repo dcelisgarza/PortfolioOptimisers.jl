@@ -223,14 +223,12 @@ estimator takes it from there.
 =#
 
 hrp_cor = optimise(HierarchicalRiskParity(;
-                                          opt = HierarchicalOptimiser(; pe = pr,
-                                                                      cle = cle_cor,
-                                                                      slv = slv),
+                                          opt = HierarchicalOptimiser(; pe = pr, slv = slv),
+                                          ser = HierarchicalSeriation(; cle = cle_cor),
                                           r = Variance()), rd)
 hrp_fea = optimise(HierarchicalRiskParity(;
-                                          opt = HierarchicalOptimiser(; pe = pr,
-                                                                      cle = cle_fea,
-                                                                      slv = slv),
+                                          opt = HierarchicalOptimiser(; pe = pr, slv = slv),
+                                          ser = HierarchicalSeriation(; cle = cle_fea),
                                           r = Variance()), rd)
 
 pretty_table(DataFrame("Asset" => rd.nx, "HRP correlation" => hrp_cor.w,
@@ -745,13 +743,15 @@ group. A selector that named `"sector"` resolves unchanged on the outer panel.
 nco = NestedClustered(; pe = pr, cle = cle_fea,
                       opti = HierarchicalRiskParity(;
                                                     opt = HierarchicalOptimiser(; pe = pr,
-                                                                                cle = cle_cor,
                                                                                 slv = slv),
+                                                    ser = HierarchicalSeriation(;
+                                                                                cle = cle_cor),
                                                     r = Variance()),
                       opto = HierarchicalRiskParity(;
                                                     opt = HierarchicalOptimiser(;
-                                                                                cle = cle_fea,
                                                                                 slv = slv),
+                                                    ser = HierarchicalSeriation(;
+                                                                                cle = cle_fea),
                                                     r = Variance()))
 res_nco = optimise(nco, rd)
 println("Outer problem solved on the collapsed panel: ",
@@ -861,15 +861,17 @@ walk = IndexWalkForward(252, 63)
 bt_cor = cross_val_predict(HierarchicalRiskParity(;
                                                   opt = HierarchicalOptimiser(;
                                                                               pe = EmpiricalPrior(),
-                                                                              cle = ClustersEstimator(),
                                                                               slv = slv),
+                                                  ser = HierarchicalSeriation(;
+                                                                              cle = ClustersEstimator()),
                                                   r = Variance()), rdb, walk)
 bt_fea = cross_val_predict(HierarchicalRiskParity(;
                                                   opt = HierarchicalOptimiser(;
                                                                               pe = EmpiricalPrior(),
-                                                                              cle = ClustersEstimator(;
-                                                                                                      de = FeatureDistance()),
                                                                               slv = slv),
+                                                  ser = HierarchicalSeriation(;
+                                                                              cle = ClustersEstimator(;
+                                                                                                      de = FeatureDistance())),
                                                   r = Variance()), rdbz, walk)
 
 function backtest_row(name, p)

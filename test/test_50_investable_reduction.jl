@@ -507,7 +507,7 @@ end
                              optimise(HierarchicalRiskParity(; r = rs, opt = optk), rdk))
     # The clustering is built from the reduced prior, so it holds one leaf per live asset.
     res = optimise(HierarchicalRiskParity(; opt = optn), rd)
-    @test length(assignments(res.clr)) == length(keep)
+    @test length(assignments(res.ser.clr)) == length(keep)
 end
 
 @testset "Hierarchical Equal Risk Contribution reduces and expands" begin
@@ -595,24 +595,21 @@ end
 @testset "A pre-fitted clustering of the wrong width is refused" begin
     # `clusterise` returns a fitted result unchanged and nothing slices its leaf order, so a
     # clustering of the full universe against a reduced one would index the wrong columns.
-    clr = optimise(HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pr)), rd).clr
+    clr = optimise(HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pr)), rd).ser.clr
     @test length(assignments(clr)) == N
     # The same clustering is correct when nothing is reduced.
-    res = optimise(HierarchicalRiskParity(;
-                                          opt = HierarchicalOptimiser(; pe = pr, cle = clr)),
-                   rd)
+    res = optimise(HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pr),
+                                          ser = HierarchicalSeriation(; cle = clr)), rd)
     @test isa(res.retcode, PortfolioOptimisers.OptimisationSuccess)
     # And refused when the mask has narrowed the universe under it.
-    for opt in
-        (HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = prn, cle = clr)),
-         HierarchicalEqualRiskContribution(;
-                                           opt = HierarchicalOptimiser(; pe = prn,
-                                                                       cle = clr)),
-         SchurComplementHierarchicalRiskParity(;
-                                               opt = HierarchicalOptimiser(; pe = prn,
-                                                                           cle = clr)),
-         NestedClustered(; pe = prn, cle = clr, opti = HierarchicalRiskParity(),
-                         opto = HierarchicalRiskParity()))
+    for opt in (HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = prn),
+                                       ser = HierarchicalSeriation(; cle = clr)),
+                HierarchicalEqualRiskContribution(; opt = HierarchicalOptimiser(; pe = prn),
+                                                  cle = clr),
+                SchurComplementHierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = prn),
+                                                      ser = HierarchicalSeriation(; cle = clr)),
+                NestedClustered(; pe = prn, cle = clr, opti = HierarchicalRiskParity(),
+                                opto = HierarchicalRiskParity()))
         @test_throws DimensionMismatch optimise(opt, rd)
     end
 end

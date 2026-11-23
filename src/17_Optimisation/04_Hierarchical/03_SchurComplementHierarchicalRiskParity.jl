@@ -16,7 +16,7 @@ const Sd_Var = Union{StandardDeviation, Variance}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Holds the weights of a Schur complement allocation, with the prior, the clustering and the parameters that produced them.
+Holds the weights of a Schur complement allocation, with the prior, the seriation and the parameters that produced them.
 
 [`SchurComplementHierarchicalRiskParity`](@ref) returns it. It also holds the resolved weight bounds, the resolved fees, the resolved risk measure, the value of ``\\gamma`` the allocation ran at, the return code and the fallback.
 
@@ -37,7 +37,7 @@ $(DocStringExtensions.FIELDS)
     SchurComplementHierarchicalRiskParityResult(;
         pr::Option{<:AbstractPriorResult},
         wb::Option{<:WeightBounds},
-        clr::Option{<:AbstractClusteringResult},
+        ser::AbstractSeriationResult,
         fees::Option{<:Fees},
         r::Union{Sd_Var, VecBaseRM},
         gamma::Union{Number, VecNum},
@@ -70,9 +70,9 @@ Keywords correspond to the struct's fields.
     """
     wb
     """
-    $(field_dict[:clr])
+    $(field_dict[:ser_res])
     """
-    clr
+    ser
     """
     $(field_dict[:fees])
     """
@@ -103,7 +103,7 @@ Keywords correspond to the struct's fields.
     fb
     function SchurComplementHierarchicalRiskParityResult(pr::Option{<:AbstractPriorResult},
                                                          wb::Option{<:WeightBounds},
-                                                         clr::Option{<:AbstractClusteringResult},
+                                                         ser::AbstractSeriationResult,
                                                          fees::Option{<:Fees},
                                                          r::Union{Sd_Var, VecBaseRM},
                                                          gamma::Union{Number, VecNum},
@@ -111,15 +111,15 @@ Keywords correspond to the struct's fields.
                                                          w::Option{<:VecNum},
                                                          imsk::Option{<:BitVector},
                                                          fb::Option{<:OptE_Opt_FbChain})
-        return new{typeof(pr), typeof(wb), typeof(clr), typeof(fees), typeof(gamma),
-                   typeof(retcode), typeof(w), typeof(imsk), typeof(fb)}(pr, wb, clr, fees,
+        return new{typeof(pr), typeof(wb), typeof(ser), typeof(fees), typeof(gamma),
+                   typeof(retcode), typeof(w), typeof(imsk), typeof(fb)}(pr, wb, ser, fees,
                                                                          r, gamma, retcode,
                                                                          w, imsk, fb)
     end
 end
 function SchurComplementHierarchicalRiskParityResult(; pr::Option{<:AbstractPriorResult},
                                                      wb::Option{<:WeightBounds},
-                                                     clr::Option{<:AbstractClusteringResult},
+                                                     ser::AbstractSeriationResult,
                                                      fees::Option{<:Fees},
                                                      r::Union{Sd_Var, VecBaseRM},
                                                      gamma::Union{Number, VecNum},
@@ -127,7 +127,7 @@ function SchurComplementHierarchicalRiskParityResult(; pr::Option{<:AbstractPrio
                                                      w::Option{<:VecNum},
                                                      imsk::Option{<:BitVector} = nothing,
                                                      fb::Option{<:OptE_Opt_FbChain})::SchurComplementHierarchicalRiskParityResult
-    return SchurComplementHierarchicalRiskParityResult(pr, wb, clr, fees, r, gamma, retcode,
+    return SchurComplementHierarchicalRiskParityResult(pr, wb, ser, fees, r, gamma, retcode,
                                                        expand_investable_weights(imsk, w),
                                                        imsk, fb)
 end
@@ -474,7 +474,7 @@ The substitution check of the constructor, [`assert_time_dependent_substitution`
   - [`assert_time_dependent_substitution`](@ref)
 """
 function schur_complement_hrp_td_defaults()::NamedTuple
-    return (; params = SchurComplementParams())
+    return (; ser = HierarchicalSeriation(), params = SchurComplementParams())
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -534,7 +534,7 @@ The fit of [`optimise`](@ref) runs these steps.
  2. Compute the prior `pr` with `opt.pe`, and the investable mask `imsk` of the prior.
  3. Resolve the fees `fees` on the full asset universe.
  4. Reduce `pr`, the estimator and `rd` to the investable universe.
- 5. Cluster the reduced prior with `opt.cle`, giving `clr`. The leaf order `clr.res.order` is the input of the recursion.
+ 5. Order the assets of the reduced prior with `ser`, through [`seriate`](@ref), giving the seriation result `ser`. Its order `ser.order` is the input of the recursion.
  6. Resolve the weight bounds `wb` on the investable universe, with one bound per asset on each side.
  7. Run [`schur_complement_weights`](@ref) with `params`, giving the weights `w`, the value `gamma` it ran at, and the resolved measure `r`. When `params` is a vector, run it once per bundle, add the weights of each bundle times the `r.settings.scale` of the bundle into `w`, and divide `w` by its sum.
  8. Check that the recursion produced weights, with [`assert_schur_weights`](@ref).
@@ -573,8 +573,14 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref) or [`TDO_
 `SchurComplementHierarchicalRiskParity` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
 
   - The method reads the returns matrix `X` as its third argument. When `opt.pe` already holds a prior result, the method replaces `X` with `opt.pe.X`, so it views the children against the observations of the prior and not against the matrix of the caller.
-  - `opt` and `params` recurse through [`port_opt_view`](@ref) with that matrix.
+  - `opt`, `ser` and `params` recurse through [`port_opt_view`](@ref) with that matrix. A [`FixedSeriationResult`](@ref) keeps the assets of the view in its order.
   - The method views `fb` through [`view_child`](@ref), which views an estimator fallback at `i` and keeps a precomputed result as it is.
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `ser`: Recursively indexed through [`obs_weights_view`](@ref).
 
 # Examples
 
@@ -605,41 +611,6 @@ SchurComplementHierarchicalRiskParity
          │          │      horizon ┼ nothing
          │          │   fill_limit ┼ nothing
          │          │        x_src ┴ nothing
-         │      cle ┼ ClustersEstimator
-         │          │      ce ┼ PortfolioOptimisersCovariance
-         │          │         │   ce ┼ Covariance
-         │          │         │      │    me ┼ SimpleExpectedReturns
-         │          │         │      │       │   w ┴ nothing
-         │          │         │      │    ce ┼ GeneralCovariance
-         │          │         │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-         │          │         │      │       │    w ┴ nothing
-         │          │         │      │   alg ┼ FullMoment()
-         │          │         │      │     w ┴ nothing
-         │          │         │   mp ┼ MatrixProcessing
-         │          │         │      │     pdm ┼ Posdef
-         │          │         │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-         │          │         │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-         │          │         │      │      dn ┼ nothing
-         │          │         │      │      dt ┼ nothing
-         │          │         │      │     alg ┼ nothing
-         │          │         │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-         │          │      de ┼ Distance
-         │          │         │   power ┼ nothing
-         │          │         │     alg ┴ CanonicalDistance()
-         │          │     alg ┼ HClustAlgorithm
-         │          │         │       linkage ┼ WardLinkage
-         │          │         │               │   presquared ┴ Bool: false
-         │          │         │   branchorder ┴ OptimalLeafOrder()
-         │          │     onc ┼ OptimalNumberClusters
-         │          │         │   max_k ┼ nothing
-         │          │         │     alg ┼ SecondOrderDifference
-         │          │         │         │   alg ┼ StandardisedValue
-         │          │         │         │       │   mv ┼ MeanValue
-         │          │         │         │       │      │   w ┴ nothing
-         │          │         │         │       │   sv ┼ StdValue
-         │          │         │         │       │      │           w ┼ nothing
-         │          │         │         │       │      │   corrected ┴ Bool: true
-         │          │   x_src ┴ nothing
          │      slv ┼ nothing
          │       wb ┼ WeightBounds
          │          │   lb ┼ Float64: 0.0
@@ -649,6 +620,42 @@ SchurComplementHierarchicalRiskParity
          │       wf ┼ IterativeWeightFinaliser
          │          │   iter ┴ Int64: 100
          │   strict ┴ Bool: false
+     ser ┼ HierarchicalSeriation
+         │   cle ┼ ClustersEstimator
+         │       │      ce ┼ PortfolioOptimisersCovariance
+         │       │         │   ce ┼ Covariance
+         │       │         │      │    me ┼ SimpleExpectedReturns
+         │       │         │      │       │   w ┴ nothing
+         │       │         │      │    ce ┼ GeneralCovariance
+         │       │         │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+         │       │         │      │       │    w ┴ nothing
+         │       │         │      │   alg ┼ FullMoment()
+         │       │         │      │     w ┴ nothing
+         │       │         │   mp ┼ MatrixProcessing
+         │       │         │      │     pdm ┼ Posdef
+         │       │         │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+         │       │         │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+         │       │         │      │      dn ┼ nothing
+         │       │         │      │      dt ┼ nothing
+         │       │         │      │     alg ┼ nothing
+         │       │         │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+         │       │      de ┼ Distance
+         │       │         │   power ┼ nothing
+         │       │         │     alg ┴ CanonicalDistance()
+         │       │     alg ┼ HClustAlgorithm
+         │       │         │       linkage ┼ WardLinkage
+         │       │         │               │   presquared ┴ Bool: false
+         │       │         │   branchorder ┴ OptimalLeafOrder()
+         │       │     onc ┼ OptimalNumberClusters
+         │       │         │   max_k ┼ nothing
+         │       │         │     alg ┼ SecondOrderDifference
+         │       │         │         │   alg ┼ StandardisedValue
+         │       │         │         │       │   mv ┼ MeanValue
+         │       │         │         │       │      │   w ┴ nothing
+         │       │         │         │       │   sv ┼ StdValue
+         │       │         │         │       │      │           w ┼ nothing
+         │       │         │         │       │      │   corrected ┴ Bool: true
+         │       │   x_src ┴ nothing
   params ┼ SchurComplementParams
          │       r ┼ Variance
          │         │    settings ┼ RiskMeasureSettings
@@ -703,6 +710,10 @@ SchurComplementHierarchicalRiskParity
     """
     @fprop opt
     """
+    $(field_dict[:ser])
+    """
+    @oprop ser
+    """
     $(field_dict[:params])
     """
     params
@@ -711,6 +722,7 @@ SchurComplementHierarchicalRiskParity
     """
     @fprop fb
     function SchurComplementHierarchicalRiskParity(opt::HierarchicalOptimiser,
+                                                   ser::TD{<:SerE_SerR},
                                                    params::TD{<:ScP_VecScP},
                                                    fb::TDO_Option{<:OptE_Opt})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb,
@@ -719,18 +731,20 @@ SchurComplementHierarchicalRiskParity
             @argcheck(!isempty(params), IsEmptyError("params cannot be empty"))
         end
         assert_time_dependent_substitution(SchurComplementHierarchicalRiskParity,
-                                           (; opt, params, fb),
+                                           (; opt, ser, params, fb),
                                            schur_complement_hrp_td_defaults())
-        est = new{typeof(opt), typeof(params), typeof(fb)}(opt, params, fb)
+        est = new{typeof(opt), typeof(ser), typeof(params), typeof(fb)}(opt, ser, params,
+                                                                        fb)
         warn_raw_readers(est)
         return est
     end
 end
 function SchurComplementHierarchicalRiskParity(;
                                                opt::HierarchicalOptimiser = HierarchicalOptimiser(),
+                                               ser::TD{<:SerE_SerR} = HierarchicalSeriation(),
                                                params::TD{<:ScP_VecScP} = SchurComplementParams(),
                                                fb::TDO_Option{<:OptE_Opt} = nothing)::SchurComplementHierarchicalRiskParity
-    return SchurComplementHierarchicalRiskParity(opt, params, fb)
+    return SchurComplementHierarchicalRiskParity(opt, ser, params, fb)
 end
 function time_dependent_field_defaults(::SchurComplementHierarchicalRiskParity)::NamedTuple
     return schur_complement_hrp_td_defaults()
@@ -768,7 +782,9 @@ function port_opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum,
     X = isa(sh.opt.pe, AbstractPriorResult) ? sh.opt.pe.X : X
     opt = port_opt_view(sh.opt, i, X)
     params = port_opt_view(sh.params, i, X)
-    return SchurComplementHierarchicalRiskParity(; opt = opt, params = params,
+    return SchurComplementHierarchicalRiskParity(; opt = opt,
+                                                 ser = port_opt_view(sh.ser, i, X),
+                                                 params = params,
                                                  fb = view_child(sh.fb, i, X))
 end
 function non_investable_universe(sh::SchurComplementHierarchicalRiskParity, ni::VecStr)
@@ -1271,7 +1287,7 @@ Recursive bisection splits the leaf order of the dendrogram, so that order is th
   - [`optimise`](@ref)
   - [`_optimise`](@ref)
 """
-function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
+function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, <:Any},
                    rd::ReturnsResult = ReturnsResult(); rmsk::Option{BitVector} = nothing,
                    kwargs...)
     sh = reset_time_dependent_estimator(sh)
@@ -1284,7 +1300,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     # A fit again after a refusal of the distance reader passes its mask as `rmsk`.
-    imsk = distance_reader_entry_mask(sh.opt.cle, pr, rd, sh.opt.strict; rmsk = rmsk)
+    imsk = distance_reader_entry_mask(sh.ser, pr, rd, sh.opt.strict; rmsk = rmsk)
     # A split factor is a quotient of two risks, so the weights, their bounds and the fee
     # take the type of the returns. A `Float32` sample stays in `Float32`.
     T = eltype(pr.X)
@@ -1299,21 +1315,19 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     sh0, pr0, rd0 = sh, pr, rd
     _, pr, sh, rd = investable_reduction(pr, sh, rd, imsk)
     X = pr.X
-    # Recursive bisection splits `clr.res.order`, the leaf order of the branch order of
-    # the clustering algorithm.
-    # A distance reader that refuses an asset the prior kept raises before it clusters. Fit
+    # Recursive bisection splits the order of the seriation.
+    # A distance reader that refuses an asset the prior kept raises before it orders. Fit
     # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
-    clr = distance_reader_call(clusterise, sh.opt.cle, pr; rd = rd, iv = rd.iv,
-                               ivpa = rd.ivpa)
-    if clr isa DistanceReaderRefusalError
+    ser = distance_reader_call(seriate, sh.ser, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa)
+    if ser isa DistanceReaderRefusalError
         return _optimise(rebuild_struct(sh0,
                                         (; opt = rebuild_struct(sh0.opt, (; pe = pr0)))),
                          rd0;
-                         rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
+                         rmsk = distance_reader_refusal_mask(ser, imsk, rd0,
                                                              sh0.opt.strict), kwargs...)
     end
-    assert_clustering_universe(clr, size(X, 2))
-    items = [clr.res.order]
+    assert_seriation_universe(ser, size(X, 2))
+    items = [ser.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; rd = rd, N = size(X, 2),
                                    strict = sh.opt.strict, datatype = T)
     # The estimator method keeps a scalar or a `nothing` side. The split sums the bounds of
@@ -1322,7 +1336,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     w, gamma, r = schur_complement_weights(pr, items, wb, sh.params)
     assert_schur_weights(w, gamma)
     retcode, w = finalise_weight_bounds(sh.opt.wf, wb, w)
-    return SchurComplementHierarchicalRiskParityResult(; pr = pr, wb = wb, clr = clr,
+    return SchurComplementHierarchicalRiskParityResult(; pr = pr, wb = wb, ser = ser,
                                                        fees = fees, r = r, gamma = gamma,
                                                        retcode = retcode, w = w,
                                                        imsk = imsk, fb = nothing)
@@ -1364,7 +1378,8 @@ The denominator is the sum of the blended weights, because each ``\\boldsymbol{w
   - [`optimise`](@ref)
   - [`_optimise`](@ref)
 """
-function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVector},
+function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any,
+                                                             <:AbstractVector},
                    rd::ReturnsResult = ReturnsResult(); rmsk::Option{BitVector} = nothing,
                    kwargs...)
     sh = reset_time_dependent_estimator(sh)
@@ -1377,7 +1392,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     # A fit again after a refusal of the distance reader passes its mask as `rmsk`.
-    imsk = distance_reader_entry_mask(sh.opt.cle, pr, rd, sh.opt.strict; rmsk = rmsk)
+    imsk = distance_reader_entry_mask(sh.ser, pr, rd, sh.opt.strict; rmsk = rmsk)
     # A split factor is a quotient of two risks, so the weights, their bounds and the fee
     # take the type of the returns. A `Float32` sample stays in `Float32`.
     T = eltype(pr.X)
@@ -1392,21 +1407,19 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     sh0, pr0, rd0 = sh, pr, rd
     _, pr, sh, rd = investable_reduction(pr, sh, rd, imsk)
     X = pr.X
-    # Recursive bisection splits `clr.res.order`, the leaf order of the branch order of
-    # the clustering algorithm.
-    # A distance reader that refuses an asset the prior kept raises before it clusters. Fit
+    # Recursive bisection splits the order of the seriation.
+    # A distance reader that refuses an asset the prior kept raises before it orders. Fit
     # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
-    clr = distance_reader_call(clusterise, sh.opt.cle, pr; rd = rd, iv = rd.iv,
-                               ivpa = rd.ivpa)
-    if clr isa DistanceReaderRefusalError
+    ser = distance_reader_call(seriate, sh.ser, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa)
+    if ser isa DistanceReaderRefusalError
         return _optimise(rebuild_struct(sh0,
                                         (; opt = rebuild_struct(sh0.opt, (; pe = pr0)))),
                          rd0;
-                         rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
+                         rmsk = distance_reader_refusal_mask(ser, imsk, rd0,
                                                              sh0.opt.strict), kwargs...)
     end
-    assert_clustering_universe(clr, size(X, 2))
-    items = [clr.res.order]
+    assert_seriation_universe(ser, size(X, 2))
+    items = [ser.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; rd = rd, N = size(X, 2),
                                    strict = sh.opt.strict, datatype = T)
     # As in the single-measure method: one bound per asset on each side.
@@ -1426,11 +1439,17 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
         rs[i] = ri
     end
     retcode, w = finalise_weight_bounds(sh.opt.wf, wb, w / sum(w))
-    return SchurComplementHierarchicalRiskParityResult(; pr = pr, wb = wb, clr = clr,
+    return SchurComplementHierarchicalRiskParityResult(; pr = pr, wb = wb, ser = ser,
                                                        fees = fees, r = [rs...],
                                                        gamma = [gammas...],
                                                        retcode = retcode, w = w,
                                                        imsk = imsk, fb = nothing)
+end
+function pipe_route(x::SchurComplementHierarchicalRiskParity, t::Val{:cle}, v)
+    return Accessors.set(x, Accessors.PropertyLens{:ser}(), pipe_route(x.ser, t, v))
+end
+function pipe_accepts(x::SchurComplementHierarchicalRiskParity, t::Val{:cle})::Bool
+    return pipe_accepts(x.ser, t)
 end
 
 export SchurComplementHierarchicalRiskParityResult, SchurComplementParams,

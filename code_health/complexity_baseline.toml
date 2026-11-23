@@ -5,7 +5,7 @@
 julia = "1.13.4"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "6175a28437"
+commit = "dcde7d2b85"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 6, cog_sum = 4, arg_sum = 16, macros = [] }
@@ -231,6 +231,8 @@ commit = "6175a28437"
 "src/08_Phylogeny/10_PhylogenyClustering.jl" = { cyc = 2, cog = 1, arg = 6, cyc_sum = 7, cog_sum = 2, arg_sum = 28, macros = [] }
 "src/08_Phylogeny/11_PhylogenyMatrix.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 7, cog_sum = 2, arg_sum = 15, macros = [] }
 "src/08_Phylogeny/12_AssetPhylogeny.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 3, cog_sum = 2, arg_sum = 11, macros = [] }
+"src/08_Phylogeny/13_Seriation.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 13, cog_sum = 4, arg_sum = 20, macros = ["@propagatable"] }
+"src/08_Phylogeny/14_SpectralSeriation.jl" = { cyc = 7, cog = 11, arg = 5, cyc_sum = 39, cog_sum = 37, arg_sum = 44, macros = ["@propagatable"] }
 "src/09_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { cyc = 4, cog = 4, arg = 3, cyc_sum = 12, cog_sum = 8, arg_sum = 6, macros = [] }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl" = { cyc = 15, cog = 27, arg = 6, cyc_sum = 112, cog_sum = 114, arg_sum = 66, macros = ["@forward_properties"] }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl" = { cyc = 20, cog = 47, arg = 7, cyc_sum = 73, cog_sum = 101, arg_sum = 28, macros = [] }
@@ -353,7 +355,7 @@ commit = "6175a28437"
 "src/17_Optimisation/04_Hierarchical/01_Base_ClusteringOptimisation.jl" = { cyc = 3, cog = 2, arg = 9, cyc_sum = 31, cog_sum = 16, arg_sum = 49, macros = ["@forward_properties", "@propagatable"] }
 "src/17_Optimisation/04_Hierarchical/02_HierarchicalRiskParity.jl" = { cyc = 4, cog = 5, arg = 8, cyc_sum = 26, cog_sum = 22, arg_sum = 31, macros = ["@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }
 "src/17_Optimisation/04_Hierarchical/03_SchurComplementHierarchicalRiskParity.jl" = { cyc = 11, cog = 20, arg = 10, cyc_sum = 66, cog_sum = 76, arg_sum = 68, macros = ["@propagatable"] }
-"src/17_Optimisation/04_Hierarchical/04_HierarchicalEqualRiskContribution.jl" = { cyc = 6, cog = 9, arg = 7, cyc_sum = 36, cog_sum = 32, arg_sum = 55, macros = ["@propagatable"] }
+"src/17_Optimisation/04_Hierarchical/04_HierarchicalEqualRiskContribution.jl" = { cyc = 6, cog = 9, arg = 8, cyc_sum = 35, cog_sum = 32, arg_sum = 51, macros = ["@propagatable"] }
 "src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/01_JuMPOptimisationTypes.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 27, cog_sum = 14, arg_sum = 48, macros = [] }
 "src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/02_JuMPModelAccessors.jl" = { cyc = 2, cog = 2, arg = 3, cyc_sum = 18, cog_sum = 3, arg_sum = 23, macros = [] }
 "src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/03_JuMPModelState.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 22, cog_sum = 2, arg_sum = 61, macros = [] }

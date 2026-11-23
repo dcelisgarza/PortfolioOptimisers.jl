@@ -285,10 +285,9 @@ end
         @test setdiff(axes(fx.rd.X, 2), keep) == 2:5
         rdh = PO.port_opt_view(fx.rd, :, keep)
         # The oracle clusters the fitted rows of the prior (#1689).
-        hrp = HierarchicalRiskParity(;
-                                     opt = HierarchicalOptimiser(; pe = est(),
-                                                                 cle = ClustersEstimator(;
-                                                                                         x_src = PriorSource())))
+        cleh = ClustersEstimator(; x_src = PriorSource())
+        hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = est()),
+                                     ser = HierarchicalSeriation(; cle = cleh))
         res = optimise(hrp, rdh)
         hcv = cross_val_predict(hrp, rdh, wf)
         # Every stage but the leaf ordering is at parity: with the library's leaf order the
@@ -301,18 +300,26 @@ end
         # The tree is the oracle's: the same merge heights (measured maxrel 9.8e-16) and the
         # same clusters. The oracle sorts its merges by height.
         L = load("Hrp", "Linkage")
-        @test parity_compare(sort(res.clr.res.heights), sort(L[:, 3]); name = "heights").ok
+        @test parity_compare(sort(res.ser.clr.res.heights), sort(L[:, 3]); name = "heights").ok
         # Better (#1494): the library's order is the exact optimal leaf ordering, 15.888. The
         # oracle's "optimal" order of the same tree sums to 16.065, so the orders differ, and
         # so do the weights. The library's heuristic order summed to 15.921 before.
-        D = res.clr.D
+        D = res.ser.clr.D
         adj(o) = sum(D[o[i], o[i + 1]] for i in 1:(length(o) - 1))
         lo = Int.(loadv("Hrp", "Leaves")) .+ 1
-        @test res.clr.res.order != lo
-        @test adj(res.clr.res.order) < adj(lo) - 0.1
-        @test maxabs(res.w, loadv("Hrp", "W")) > 1e-3
+        # Check 4 of #2174: the oracle's order costs more than ours, so it misses the optimum.
+        @test adj(res.ser.order) <= adj(lo) + 1e-12
+        @test_broken adj(lo) <= adj(res.ser.order) + 1e-12
+        # On the oracle's order, the library's bisection gives the oracle's weights (#2174).
+        hpin = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = est()),
+                                      ser = FixedSeriationResult(; order = lo))
+        @test parity_compare(optimise(hpin, rdh).w, loadv("Hrp", "W"); rtol = 1e-12,
+                             name = "hrp pinned").ok
+        # The weights of each fold differ, because the oracle's order of each fold misses the
+        # optimum too. The fixture holds no order of a fold, so the pin covers the full fit.
         Wof = load("Hrp", "FoldW")
-        @test all(maxabs(p.res.w, Wof[:, k]) > 1e-3 for (k, p) in enumerate(hcv.pred))
+        @test_broken all(maxabs(p.res.w, Wof[:, k]) <= 1e-10
+                         for (k, p) in enumerate(hcv.pred))
     end
 
     @testset "Observed factors through a walk-forward and the meta-optimisers" begin

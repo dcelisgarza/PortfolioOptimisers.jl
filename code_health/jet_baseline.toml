@@ -8,7 +8,7 @@ jet = "0.13.3"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "6175a28437"
+commit = "dcde7d2b85"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -237,6 +237,8 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/08_Phylogeny/10_PhylogenyClustering.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/11_PhylogenyMatrix.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/12_AssetPhylogeny.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/13_Seriation.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/14_SpectralSeriation.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl" = { raw = 1, reviewed = 1 }
@@ -686,6 +688,8 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/08_Phylogeny/10_PhylogenyClustering.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/11_PhylogenyMatrix.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/12_AssetPhylogeny.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/13_Seriation.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/14_SpectralSeriation.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl" = { raw = 0, reviewed = 0 }
@@ -1135,6 +1139,8 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/08_Phylogeny/10_PhylogenyClustering.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/11_PhylogenyMatrix.jl" = { raw = 2, reviewed = 2 }
 "src/08_Phylogeny/12_AssetPhylogeny.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/13_Seriation.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/14_SpectralSeriation.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl" = { raw = 0, reviewed = 0 }

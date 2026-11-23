@@ -186,7 +186,7 @@ end
 
 @testset "A square feature matrix drives an optimisation end to end" begin
     mk(ape) = HierarchicalRiskParity(;
-                                     opt = HierarchicalOptimiser(;
+                                     ser = HierarchicalSeriation(;
                                                                  cle = ClustersEstimator(;
                                                                                          de = FeatureDistance(;
                                                                                                               ape = ape))))

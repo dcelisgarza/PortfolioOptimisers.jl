@@ -635,8 +635,9 @@ Internal machinery — not part of the user-facing API.
 # Algorithm
 
  1. `:sigma_ucs`: the path `"r.ucs"`, or `"r[i].ucs"` for each element `i` of a vector that is an `UncertaintySetVariance`. Only an optimiser that [`@pipe_route_sigma_ucs`](@ref) declares accepts this target, and each one has a field `r`.
- 2. A target with a field of the same name in `x`: the name of the field.
- 3. Otherwise the paths in the configuration of `x`, after its field name, see [`pipe_config_paths`](@ref).
+ 2. `:cle` in [`HierarchicalRiskParity`](@ref) or [`SchurComplementHierarchicalRiskParity`](@ref): the paths in the seriation `ser`, after `"ser"`, such as `"ser.cle"`, because [`pipe_route`](@ref) puts the clustering there.
+ 3. A target with a field of the same name in `x`: the name of the field.
+ 4. Otherwise the paths in the configuration of `x`, after its field name, see [`pipe_config_paths`](@ref).
 
 # Arguments
 
@@ -658,6 +659,12 @@ function pipe_target_paths(x, t::Val{target})::Vector{String} where {target}
 end
 function pipe_target_paths(::JuMPOptimiser, ::Val{:mu_ucs})::Vector{String}
     return ["ret.ucs"]
+end
+function pipe_target_paths(x::Union{HierarchicalRiskParity,
+                                    SchurComplementHierarchicalRiskParity},
+                           t::Val{:cle})::Vector{String}
+    # `pipe_route` puts a clustering into the seriation `ser` of HRP and Schur (#2174).
+    return [join_path("ser", p) for p in pipe_target_paths(x.ser, t)]
 end
 function pipe_target_paths(x, t::Val{:sigma_ucs})::Vector{String}
     # Only an optimiser that `@pipe_route_sigma_ucs` declares accepts the target, and each

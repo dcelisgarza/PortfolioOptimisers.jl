@@ -230,6 +230,8 @@ commit = "391be5e"
 "src/08_Phylogeny/10_PhylogenyClustering.jl" = { lines = 35, misses = 0 }
 "src/08_Phylogeny/11_PhylogenyMatrix.jl" = { lines = 25, misses = 0 }
 "src/08_Phylogeny/12_AssetPhylogeny.jl" = { lines = 9, misses = 0 }
+"src/08_Phylogeny/13_Seriation.jl" = { lines = 31, misses = 0 }
+"src/08_Phylogeny/14_SpectralSeriation.jl" = { lines = 116, misses = 0 }
 "src/09_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { lines = 26, misses = 0 }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl" = { lines = 269, misses = 0 }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl" = { lines = 242, misses = 0 }

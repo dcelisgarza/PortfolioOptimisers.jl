@@ -64,7 +64,11 @@ onl_jump(pe) = JuMPOptimiser(; pe = pe, slv = ONL_SLV)
 # prior fills in its own returns. So it states the same policy and reads the observed cells
 # (ADR 0211, decision 8): a plain one would leave the young asset out of the universe.
 const ONL_CLE = ClustersEstimator(; ce = ONL_PE.ce)
-onl_hier(pe; cle = ClustersEstimator()) = HierarchicalOptimiser(; pe = pe, cle = cle)
+onl_hier(pe) = HierarchicalOptimiser(; pe = pe)
+function onl_hrp(pe; cle = ClustersEstimator())
+    return HierarchicalRiskParity(; opt = onl_hier(pe),
+                                  ser = HierarchicalSeriation(; cle = cle))
+end
 onl_weights(res) = [p.res.w for p in res.pred]
 onl_masks(res) = [p.res.imsk for p in res.pred]
 # The Investable Mask of a training window under the policy, written out by hand: an asset
@@ -139,8 +143,8 @@ end
     # Through a JuMP optimiser and a hierarchical one over the policy prior, whose moments
     # carry an exact seam: the JuMP head to the solver's tolerance, the hierarchical one to
     # the bit, because the available-case batch arm is the fold.
-    for (opt, tol) in ((MeanRisk(; opt = onl_jump(ONL_PE)), 1e-5),
-                       (HierarchicalRiskParity(; opt = onl_hier(ONL_PE; cle = ONL_CLE)), 0.0))
+    for (opt, tol) in
+        ((MeanRisk(; opt = onl_jump(ONL_PE)), 1e-5), (onl_hrp(ONL_PE; cle = ONL_CLE), 0.0))
         b = cross_val_predict(opt, ONL_RD, ONL_BATCH)
         o = cross_val_predict(opt, ONL_RD, ONL_ONLINE)
         @test length(o.pred) == length(b.pred) == length(ONL_TRAIN)
@@ -188,7 +192,7 @@ end
     for (pe, tol, mask) in
         ((plain, 1e-15, onl_coverage_mask), (every, 0.0, onl_policy_mask),
          (mixed, 0.0, onl_coverage_mask))
-        opt = HierarchicalRiskParity(; opt = onl_hier(pe; cle = ONL_CLE))
+        opt = onl_hrp(pe; cle = ONL_CLE)
         b = cross_val_predict(opt, ONL_RD, ONL_BATCH)
         o = cross_val_predict(opt, ONL_RD, ONL_ONLINE)
         for (pb, po, tr) in zip(b.pred, o.pred, ONL_TRAIN)
@@ -234,8 +238,7 @@ end
                              MeanRisk(; opt = onl_jump(cap(EmpiricalPrior())))),
                             (HierarchicalRiskParity(; opt = onl_hier(EmpiricalPrior())),
                              HierarchicalRiskParity(; opt = onl_hier(cap(EmpiricalPrior())))),
-                            (HierarchicalRiskParity(; opt = onl_hier(ONL_PE; cle = ONL_CLE)),
-                             HierarchicalRiskParity(; opt = onl_hier(cap(ONL_PE); cle = ONL_CLE))))
+                            (onl_hrp(ONL_PE; cle = ONL_CLE), onl_hrp(cap(ONL_PE); cle = ONL_CLE)))
         b = cross_val_predict(batch, ONL_RD, rolling)
         o = cross_val_predict(online, ONL_RD, stepped)
         @test length(o.pred) == length(b.pred) == n_splits(rolling, ONL_RD)
@@ -253,8 +256,7 @@ end
     gs(cv) = GridSearchCrossValidation(grid; cv = cv, r = r, train_score = true)
     rs(cv) = RandomisedSearchCrossValidation(grid; cv = cv, r = r, n_iter = 2,
                                              seed = 20260912)
-    for opt in (MeanRisk(; opt = onl_jump(ONL_PE)),
-                HierarchicalRiskParity(; opt = onl_hier(ONL_PE; cle = ONL_CLE)))
+    for opt in (MeanRisk(; opt = onl_jump(ONL_PE)), onl_hrp(ONL_PE; cle = ONL_CLE))
         b = search_cross_validation(opt, gs(ONL_BATCH), ONL_RD)
         o = search_cross_validation(opt, gs(ONL_ONLINE), ONL_RD)
         @test size(o.test_scores) == size(b.test_scores) == (length(ONL_TRAIN), 3)
@@ -291,7 +293,7 @@ end
         to = minimum(@elapsed(cross_val_predict(opt, ONL_RD, ONL_ONLINE)) for _ in 1:3)
         return tb, to, to / tb
     end
-    tb, to, rh = ratio(HierarchicalRiskParity(; opt = onl_hier(ONL_PE; cle = ONL_CLE)))
+    tb, to, rh = ratio(onl_hrp(ONL_PE; cle = ONL_CLE))
     println("online / batch, hierarchical head over the policy prior: ",
             round(to * 1e3; digits = 2), " ms / ", round(tb * 1e3; digits = 2), " ms = ",
             round(rh; digits = 3))
