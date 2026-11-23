@@ -175,6 +175,11 @@ const NOT_A_CHOICE = Dict{Symbol, Symbol}(
                                           # drawdown measure.
                                           :NetReturnsRiskSeries => :internal,
                                           :DrawdownRiskSeries => :internal,
+                                          # The request that a tracking builder puts into the
+                                          # bound slot of the measure that it tracks (#2283).
+                                          # The capability is the tracking measure, and a caller
+                                          # never holds the request.
+                                          :TrackedRiskBound => :internal,
                                           # The geometry token that `AdaptiveSubgradient`
                                           # constructs at every step from the gradient mass
                                           # it has accrued (ADR 0168). The capability is

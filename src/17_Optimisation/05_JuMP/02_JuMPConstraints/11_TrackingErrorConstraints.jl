@@ -12,8 +12,8 @@ The method on `tres = nothing` adds no row. A tracking error whose type or norm 
   - [`SquaredL2Norm`](@ref): The same cone, with the bound square-rooted, because `err` bounds the *squared* error that [`norm_error`](@ref) reports.
   - [`LpNorm`](@ref): Enforces a scaled Lp norm via power cone.
   - [`LInfNorm`](@ref): Enforces `‖net_X - wb * k‖_∞ ≤ err` via NormInfinityCone.
-  - [`IndependentVariableTracking`](@ref): Substitutes `w - wb` for `w` and applies the chosen risk constraint.
-  - [`DependentVariableTracking`](@ref): Constrains the difference between portfolio risk and benchmark risk. The inner build reads the lifted matrix of the head's weights, [`weights_prefix`](@ref). The bound holds from above only, ``R(\\boldsymbol{w}) \\leq R(\\boldsymbol{w}_b) + \\mathrm{err}``, for every inner measure whose model is an upper bound on the risk, as [`DependentVariableTracking`](@ref) states. A portfolio whose risk is below the benchmark risk by more than `err` also satisfies it.
+  - [`IndependentVariableTracking`](@ref): Substitutes `w - wb` for `w` and builds the chosen risk. `err` bounds the expression that the bound of that risk acts on, [`set_tracked_risk_constraints!`](@ref), which has degree one in the weights.
+  - [`DependentVariableTracking`](@ref): Constrains the difference between portfolio risk and benchmark risk, with the portfolio risk stated at degree one, [`set_degree_one_tracked_risk!`](@ref). The inner build reads the lifted matrix of the head's weights, [`weights_prefix`](@ref). The bound holds from above only, ``R(\\boldsymbol{w}) \\leq R(\\boldsymbol{w}_b) + \\mathrm{err}``, for every inner measure whose model is an upper bound on the risk, as [`DependentVariableTracking`](@ref) states. A portfolio whose risk is below the benchmark risk by more than `err` also satisfies it.
 
 The collection method iterates over all tracking errors in `tres`.
 
@@ -57,6 +57,8 @@ Where:
 
   - [`TrackingError`](@ref)
   - [`RiskTrackingError`](@ref)
+  - [`set_tracked_risk_constraints!`](@ref)
+  - [`set_degree_one_tracked_risk!`](@ref)
   - [`L1Norm`](@ref)
   - [`L2Norm`](@ref)
   - [`LpNorm`](@ref)
@@ -212,10 +214,11 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     sc = get_constraint_scale(model)
     tprefix = nested_prefix(prefix, :tr_ir_, i)
     state_set!(model, tprefix, :w, JuMP.@expression(model, w - wb * k))
-    risk_expr = set_risk_constraints!(model, 1, r, opt, pr, pl, fees, args...;
-                                      prefix = tprefix, kwargs...)
-    state_set!(model, prefix, :cter_, i,
-               JuMP.@constraint(model, sc * (risk_expr - err * k) <= 0))
+    ask = TrackedRiskBound(tprefix, false, err, false)
+    _, expr, map = set_tracked_risk_constraints!(model, r, ask, opt, pr, pl, fees, args...;
+                                                 kwargs...)
+    ub = variance_risk_bounds_val(map, err)
+    state_set!(model, prefix, :cter_, i, JuMP.@constraint(model, sc * (expr - ub * k) <= 0))
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
@@ -236,18 +239,22 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     tprefix = nested_prefix(prefix, :tr_dr_, i)
     state_set!(model, tprefix, :w, get_w(model, prefix))
     state_set!(model, tprefix, :w_owner, weights_prefix(model, prefix))
-    risk_expr = set_risk_constraints!(model, 1, ri, opt, pr, pl, fees, args...;
-                                      prefix = tprefix, kwargs...)
+    ask = TrackedRiskBound(tprefix, false, rb, true)
+    _, expr, map = set_tracked_risk_constraints!(model, ri, ask, opt, pr, pl, fees, args...;
+                                                 kwargs...)
+    risk_expr, m = set_degree_one_tracked_risk!(model, map.bound, expr, map, rb;
+                                                prefix = tprefix)
     # The risk difference is its own entry name. It was `Symbol(key, i)` — the *composed*
     # key with the index appended a second time — which put entry 1 at `:tr_dr_11`, the
     # key `tr_dr` itself takes at entry 11.
     dr = state_set!(model, prefix, :tr_dr_diff_, i,
                     JuMP.@expression(model, risk_expr - rb * k))
     state_set!(model, prefix, :cter_noc_, i,
-               JuMP.@constraint(model, [sc * tr_dr
-                                        sc * dr] in JuMP.MOI.NormOneCone(2)))
+               JuMP.@constraint(model,
+                                [sc * tr_dr / m
+                                 sc * dr / m] in JuMP.MOI.NormOneCone(2)))
     state_set!(model, prefix, :cter_, i,
-               JuMP.@constraint(model, sc * (tr_dr - err * k) <= 0))
+               JuMP.@constraint(model, sc * (tr_dr - err * k) / bound_scale(err) <= 0))
     return nothing
 end
 """

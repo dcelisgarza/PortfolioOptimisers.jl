@@ -1781,11 +1781,9 @@ end
                                      r = ConditionalValueatRisk(; settings = ub))
         @test isnothing(rt.r.settings.ub)
         @test !rt.r.settings.rke
-        # The dependent mode warns for a measure whose model is a quadratic expression.
-        @test_logs (:warn, r"not guaranteed to work") RiskTrackingRiskMeasure(;
-                                                                              tr = WeightsTracking(;
-                                                                                                   w = wb),
-                                                                              alg = DependentVariableTracking())
+        # The dependent mode takes a measure whose model is a quadratic expression (#2283).
+        @test_logs RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb),
+                                           alg = DependentVariableTracking())
         @test_logs RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb))
     end
 

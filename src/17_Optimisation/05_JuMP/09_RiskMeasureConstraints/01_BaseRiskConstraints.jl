@@ -506,6 +506,7 @@ The type of `ub` and the owner `opt` select the method.
   - A `nothing` bound adds nothing.
   - A number adds one row. The row bounds `r_expr` from above when `flag` is `true`, and from below when it is `false`.
   - A [`Front_NumVec`](@ref) adds an entry to the `:risk_frontier` registry, and the frontier solve reads the entry later. The owner of the entry is written as `nothing`, because the measure is not known here. [`set_risk_frontier_owner!`](@ref) writes the owner afterwards.
+  - A [`TrackedRiskBound`](@ref) adds no row. It registers `r_expr` and the request under the namespace of the request, and the tracking builder reads both, as [`set_tracked_risk_constraints!`](@ref) states. Every owner honours it.
 
 Under a ratio objective the head divides the weights by ``k`` after the solve, so the row bounds the risk of the weights that the head returns. That is exact for a risk expression of degree one in the weights. A builder whose risk expression has a higher degree passes a separate expression of degree one, as [`set_variance_risk_bounds_and_expression!`](@ref) does. [`RiskBudgeting`](@ref) also divides the weights by ``k``, and [`set_risk_epigraphs!`](@ref) states the rule for a risk that reads [`effective_k`](@ref).
 
@@ -514,6 +515,7 @@ Under a ratio objective the head divides the weights by ``k`` after the solve, s
 ## Expressions
 
   - `risk_frontier`: registered by the frontier method on its first call. It is a vector of entries `(<key>_ub_var, <key>_ub) => (R, ub, flag, nothing)`, and each later call appends one entry.
+  - `tracked_risk_bound`: registered under `ub.prefix` by the methods for a [`TrackedRiskBound`](@ref), the pair `(R, ub)`.
 
 ## Constraints
 
@@ -532,7 +534,7 @@ Where:
   - $(arg_dict[:model])
   - `opt`: The owner of the constraint, a [`RiskConstraintOwner`](@ref).
   - `r_expr::JuMP.AbstractJuMPScalar`: The risk expression to bound.
-  - `ub`: The bound. It is `nothing`, a number, or a [`Front_NumVec`](@ref), which is a vector of bounds or a [`Frontier`](@ref).
+  - `ub`: The bound. It is `nothing`, a number, a [`TrackedRiskBound`](@ref), or a [`Front_NumVec`](@ref), which is a vector of bounds or a [`Frontier`](@ref).
   - `key::Symbol`: The Model State key of the risk expression. The row and the frontier entry take their keys from it.
   - `flag::Bool`: `true` for an upper bound and `false` for a lower bound (default: `true`).
 
@@ -555,6 +557,16 @@ Where:
 """
 function set_risk_upper_bound!(::JuMP.Model, ::RiskConstraintOwner, r_expr, ::Nothing, key,
                                flag::Bool = true)
+    return nothing
+end
+function set_risk_upper_bound!(model::JuMP.Model, ::JuMPOptimisationEstimator, r_expr,
+                               ub::TrackedRiskBound, key, flag::Bool = true)
+    state_set!(model, ub.prefix, :tracked_risk_bound, (r_expr, ub))
+    return nothing
+end
+function set_risk_upper_bound!(model::JuMP.Model, ::AbstractProgrammeAllocationSet, r_expr,
+                               ub::TrackedRiskBound, key, flag::Bool = true)
+    state_set!(model, ub.prefix, :tracked_risk_bound, (r_expr, ub))
     return nothing
 end
 function set_risk_upper_bound!(::JuMP.Model, opt::JuMPOptimisationEstimator, r_expr, ub,
@@ -784,6 +796,59 @@ function set_unindexed_risk_bounds_and_expression!(model::JuMP.Model,
     return nothing
 end
 """
+    reads_risk_term(settings::RiskMeasureSettings)
+
+Returns `true` when an objective reads the risk expression of a measure.
+
+The objective reads the expression of a measure with `rke = true`, and the expression of a tracked measure whose tracking measure has `rke = true`. The tracking constructors clear the `rke` of the tracked measure, so the second case is the `rke` of its [`TrackedRiskBound`](@ref).
+
+# Arguments
+
+  - `settings::RiskMeasureSettings`: The settings of the measure.
+
+# Returns
+
+  - `flag::Bool`: Whether an objective reads the risk expression.
+
+# Related
+
+  - [`set_risk_epigraphs!`](@ref)
+  - [`TrackedRiskBound`](@ref)
+"""
+function reads_risk_term(settings::RiskMeasureSettings)
+    ub = settings.ub
+    return settings.rke || (isa(ub, TrackedRiskBound) && ub.rke)
+end
+"""
+    risk_bound_level(ub::Number)
+    risk_bound_level(ub::TrackedRiskBound)
+    risk_bound_level(ub::Option{<:Front_NumVec})
+
+Returns the level of a bound, and whether a conversion of the bound has to hold at every level.
+
+# Arguments
+
+  - `ub`: The bound of a measure.
+
+# Returns
+
+  - `(level, exact)`: The number and `false`, the `level` and the `exact` of a [`TrackedRiskBound`](@ref), or `0` and `true` for a [`Front_NumVec`](@ref) and for no bound.
+
+# Related
+
+  - [`TrackedRiskBound`](@ref)
+  - [`set_even_moment_bound!`](@ref)
+"""
+function risk_bound_level(ub::Number)
+    return ub, false
+end
+function risk_bound_level(ub::TrackedRiskBound)
+    return ub.level, ub.exact
+end
+function risk_bound_level(::Option{<:Front_NumVec})
+    return 0, true
+end
+"""
     set_risk_epigraphs!(build, model::JuMP.Model, rke::Bool, bounded::Bool;
                         prefix::Symbol = Symbol(""))
 
@@ -792,6 +857,8 @@ Builds the model of a risk of degree above one, and returns the risk that the ob
 The row of [`set_risk_upper_bound!`](@ref) multiplies the bound by ``k``, so it needs a risk of degree one in the unscaled weights ``\\boldsymbol{y} = k \\boldsymbol{w}`` and ``k``. A builder gets that degree when its model divides by ``k``. The objective of [`RiskBudgeting`](@ref) needs a risk of ``\\boldsymbol{y}`` alone, so the same model divides by `1`, [`effective_k`](@ref). Only that head records a unit budget, and only there do the two readers need two models.
 
 The second model is a cost of the bounded measure alone. A measure without a bound, and every measure under another head, builds one model. A measure that is only a bound, with `rke = false`, builds one model too, which divides by ``k``.
+
+A tracking measure states its own bound on the measure that it tracks, so the tracked measure takes a [`TrackedRiskBound`](@ref) and counts as bounded.
 
 Two builders do not call this function. The bound of a [`Variance`](@ref) acts on its deviation, of degree one, and the bound of an even moment acts on the model of [`set_even_moment_bound!`](@ref).
 
@@ -824,7 +891,7 @@ Where:
 
   - `build`: A function of the scale and of the namespace. It adds the model of the measure under that namespace, and returns its risk.
   - $(arg_dict[:model])
-  - `rke::Bool`: `true` when the risk is a term of the objective, `settings.rke`.
+  - `rke::Bool`: `true` when an objective reads the risk, [`reads_risk_term`](@ref).
   - `bounded::Bool`: `true` when the measure has a bound.
 
 # Keyword arguments
@@ -840,6 +907,7 @@ Where:
   - [`set_unit_budget!`](@ref)
   - [`effective_k`](@ref)
   - [`get_k`](@ref)
+  - [`reads_risk_term`](@ref)
   - [`set_risk_upper_bound!`](@ref)
   - [`set_sdp_constraints!`](@ref)
   - [`set_variance_deviation!`](@ref)

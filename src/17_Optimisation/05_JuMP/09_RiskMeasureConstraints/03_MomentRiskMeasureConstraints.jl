@@ -285,12 +285,13 @@ Convert an upper-bound value to the appropriate scale for the second-moment boun
 
 Scales `ub` by `inv(factor)` and, when the formulation is not `SOCRiskExpr`, applies a
 square-root transformation to convert from variance to standard-deviation units. Returns
-`nothing` when `ub` is `nothing`.
+`nothing` when `ub` is `nothing`. A `Frontier` and a [`TrackedRiskBound`](@ref) take the
+scale and the transformation as their `factor` and their `bound`.
 
 # Arguments
 
   - `alg::SecondMomentFormulation`: Second-moment risk formulation (e.g. `SOCRiskExpr`).
-  - `ub`: Upper bound value (scalar, vector, `Frontier`, or `nothing`).
+  - `ub`: Upper bound value (scalar, vector, `Frontier`, [`TrackedRiskBound`](@ref), or `nothing`).
   - `factor::Number`: Variance correction factor.
 
 # Returns
@@ -306,6 +307,13 @@ function second_moment_bound_val(::SecondMomentFormulation, ub::Frontier, factor
 end
 function second_moment_bound_val(::SOCRiskExpr, ub::Frontier, factor::Number)
     return Frontier(ub.N, inv(factor), LinearBound())
+end
+function second_moment_bound_val(::SecondMomentFormulation, ub::TrackedRiskBound,
+                                 factor::Number)
+    return TrackedRiskBound(ub, inv(factor), SquareRootBound())
+end
+function second_moment_bound_val(::SOCRiskExpr, ub::TrackedRiskBound, factor::Number)
+    return TrackedRiskBound(ub, inv(factor), LinearBound())
 end
 function second_moment_bound_val(::SecondMomentFormulation, ub::VecNum, factor::Number)
     return inv(factor) * sqrt.(ub)
@@ -406,7 +414,7 @@ Add an even moment to `model`, bound it by `settings.ub`, and add it to the risk
 
 The target scales with ``k``, because the model subtracts it from the returns of the unscaled weights.
 
-Under a unit budget the moment has degree two in the unscaled weights, and the row of [`set_risk_upper_bound!`](@ref) needs degree one. [`set_even_moment_bound!`](@ref) then adds the model that the bound acts on, with ``k`` in its cones. A measure with `rke = false` adds that model alone. A measure without a bound, and every measure under another head, adds one model.
+Under a unit budget the moment has degree two in the unscaled weights, and the row of [`set_risk_upper_bound!`](@ref) needs degree one. [`set_even_moment_bound!`](@ref) then adds the model that the bound acts on, with ``k`` in its cones. That model is exact at the level of the bound alone. A [`TrackedRiskBound`](@ref) that has to hold at every level adds a second epigraph, with ``k`` in its cones and in units of the level. A bound whose [`risk_bound_level`](@ref) is zero has no unit, and [`set_risk_epigraphs!`](@ref) then adds a second epigraph in the units of the moment. A measure that no objective reads adds the model of its bound alone. A measure without a bound, and every measure under another head, adds one model.
 
 # Arguments
 
@@ -418,7 +426,7 @@ Under a unit budget the moment has degree two in the unscaled weights, and the r
 
 # Returns
 
-  - `risk`: The epigraph variable of the even moment, the risk expression. Under a unit budget it is the expression of [`set_even_moment_bound!`](@ref) when the measure is only a bound.
+  - `risk`: The epigraph variable of the even moment, the risk expression. Under a unit budget it is the expression that the bound acts on when the measure is only a bound.
 
 # Related
 
@@ -427,6 +435,7 @@ Under a unit budget the moment has degree two in the unscaled weights, and the r
   - [`set_risk_constraints!`](@ref)
   - [`set_even_moment_risk!`](@ref)
   - [`set_even_moment_bound!`](@ref)
+  - [`even_moment_bound_val`](@ref)
   - [`calc_risk_constraint_target`](@ref)
   - [`set_variance_risk_bounds_and_expression!`](@ref)
 """
@@ -440,34 +449,46 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     tgt = calc_risk_constraint_target(model, r, w, pr.mu, get_k(model))
     net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
     T = length(net_X)
-    wi = checked_observation_weights(nothing_scalar_array_selector(r.w, pr.w), net_X)
+    ow = checked_observation_weights(nothing_scalar_array_selector(r.w, pr.w), net_X)
     # A row of weight zero does not change the moment, but the power cone row of a large loss
     # can stop the solver far from the optimum, as in the EVaR and power-norm programmes.
-    rows = positive_weight_rows(wi, T)
+    rows = positive_weight_rows(ow, T)
     even_moment = state_set!(model, prefix, :even_moment_, i,
                              JuMP.@expression(model, net_X .- tgt))
-    Td = T - r.alg.ddof
-    if !isnothing(wi)
-        Td = Td / T * sum(wi)
-        wi = view(wi, rows)
+    # Each name is assigned once, because the closure below captures it.
+    Td, wi = if isnothing(ow)
+        T - r.alg.ddof, nothing
+    else
+        (T - r.alg.ddof) / T * sum(ow), view(ow, rows)
     end
     ub = r.settings.ub
-    if isa(ub, Number) && shared_has(model, :unit_budget)
-        bound = set_even_moment_bound!(model, i, r.alg, even_moment, rows, wi, Td, ub;
-                                       prefix = prefix)
-        # The expression of the bound is in units of the bound.
-        ub = one(ub)
+    level, exact = risk_bound_level(ub)
+    # A level of zero gives the model of the bound no unit.
+    if level > zero(level) && shared_has(model, :unit_budget)
+        bound = if exact
+            bp = nested_prefix(prefix, :bound_)
+            scaled_moment = state_set!(model, bp, :even_moment_, i,
+                                       JuMP.@expression(model, even_moment ./ sqrt(level)))
+            set_even_moment_risk!(model, i, r.alg, scaled_moment, rows, wi, Td,
+                                  get_k(model); prefix = bp)
+        else
+            set_even_moment_bound!(model, i, r.alg, even_moment, rows, wi, Td, level;
+                                   prefix = prefix)
+        end
+        ub = even_moment_bound_val(ub)
         # A measure that is only a bound has no term to build.
-        risk = if r.settings.rke
-            set_even_moment_risk!(model, i, r.alg, even_moment, rows, wi, Td;
-                                  prefix = prefix)
+        risk = if reads_risk_term(r.settings)
+            set_even_moment_risk!(model, i, r.alg, even_moment, rows, wi, Td,
+                                  effective_k(model); prefix = prefix)
         else
             bound
         end
     else
-        risk = set_even_moment_risk!(model, i, r.alg, even_moment, rows, wi, Td;
-                                     prefix = prefix)
-        bound = risk
+        risk, bound = set_risk_epigraphs!(model, reads_risk_term(r.settings),
+                                          !isnothing(ub); prefix = prefix) do k, p
+            return set_even_moment_risk!(model, i, r.alg, even_moment, rows, wi, Td, k;
+                                         prefix = p)
+        end
     end
     set_variance_risk_bounds_and_expression!(model, opt, bound, ub, :even_moment_risk_, i,
                                              risk, r.settings; prefix = prefix)
@@ -569,7 +590,7 @@ Where:
   - $(math_dict[:I_pos_obs])
   - ``T_d = T - \\mathrm{ddof}``: Effective sample size.
   - $(math_dict[:T])
-  - ``k``: Budget-scaling / homogenisation variable. The cone reads ``1`` in its place under a unit budget, [`effective_k`](@ref). The target ``\\mu`` always scales with the variable.
+  - ``k``: Budget-scaling / homogenisation variable, the `k` argument. The objective reads ``1`` in its place under a unit budget, [`effective_k`](@ref), so the model minimises the moment of the unscaled weights. The target ``\\mu`` always scales with the variable.
   - ``p``: Order parameter; the moment order is ``2p``.
   - ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal\\boldsymbol{w}``: Portfolio return at time ``t``.
   - ``\\mu``: Target return.
@@ -584,6 +605,7 @@ Where:
   - `rows`: The observations of positive weight.
   - `wi`: The positive observation weights, or `nothing`.
   - `Td::Number`: The effective sample size.
+  - `k`: The scale that the cones divide by, [`effective_k`](@ref) or [`get_k`](@ref).
 
 # Keyword arguments
 
@@ -602,11 +624,8 @@ Where:
 """
 function set_even_moment_risk!(model::JuMP.Model, i::Any, alg::EvenMoment,
                                even_moment::VecJuMPScalar, rows, wi::Option{<:VecNum},
-                               Td::Number; prefix::Symbol = Symbol(""))
+                               Td::Number, k; prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
-    # The cone reads the unit budget, so the model minimises the moment of the unscaled
-    # weights.
-    k = effective_k(model)
     N = length(rows)
     u = state_set!(model, prefix, :even_moment_u_, i, JuMP.@variable(model, [1:N]))
     t = state_set!(model, prefix, :even_moment_t_, i, JuMP.@variable(model, [1:N]))
@@ -628,6 +647,33 @@ function set_even_moment_risk!(model::JuMP.Model, i::Any, alg::EvenMoment,
                JuMP.@constraint(model, [j = 1:N],
                                 [sc * t[j], sc * k, sc * dev[j]] in JuMP.MOI.PowerCone(0.5)))
     return even_moment_risk
+end
+"""
+    even_moment_bound_val(ub::Number)
+    even_moment_bound_val(ub::TrackedRiskBound)
+
+Converts a bound into the units of the expression of [`set_even_moment_bound!`](@ref).
+
+The expression is in units of the bound, so a bound of one number is `1`. A [`TrackedRiskBound`](@ref) takes the inverse of its `level` as its `factor`. Away from the level the expression of [`set_even_moment_bound!`](@ref) is a power of the risk, so the conversion holds at the level alone. The scaled epigraph of a request with `exact = true` is the risk in units of the level, so the conversion holds at every level.
+
+# Arguments
+
+  - `ub`: The bound, whose [`risk_bound_level`](@ref) is positive.
+
+# Returns
+
+  - `ub`: The converted bound.
+
+# Related
+
+  - [`set_even_moment_bound!`](@ref)
+  - [`risk_bound_level`](@ref)
+"""
+function even_moment_bound_val(ub::Number)
+    return one(ub)
+end
+function even_moment_bound_val(ub::TrackedRiskBound)
+    return TrackedRiskBound(ub, inv(ub.level), LinearBound())
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

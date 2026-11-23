@@ -399,7 +399,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     Bi = [reshape(sqrt(vals_A[N_eig - j]) * view(vecs_A, :, N_eig - j), N, N)
           for j in 0:(Nf - 1)]
     bounded = !isnothing(r.settings.ub)
-    (sqrt_kurtosis_risk, x_kurt), (bound, _) = set_risk_epigraphs!(model, r.settings.rke,
+    (sqrt_kurtosis_risk, x_kurt), (bound, _) = set_risk_epigraphs!(model,
+                                                                   reads_risk_term(r.settings),
                                                                    bounded; prefix = prefix
                                                                    ) do k, p
         W = set_sdp_constraints!(model, k; prefix = prefix)
@@ -533,7 +534,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
         transpose(matrix_square_root(r.mtx_sqrt, S2 * r.kt * transpose(S2)))
     end
     bounded = !isnothing(r.settings.ub)
-    (sqrt_kurtosis_risk, x_kurt), (bound, _) = set_risk_epigraphs!(model, r.settings.rke,
+    (sqrt_kurtosis_risk, x_kurt), (bound, _) = set_risk_epigraphs!(model,
+                                                                   reads_risk_term(r.settings),
                                                                    bounded; prefix = prefix
                                                                    ) do k, p
         W = set_sdp_constraints!(model, k; prefix = prefix)

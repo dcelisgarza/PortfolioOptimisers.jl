@@ -143,3 +143,11 @@ exact on the weights and needs no second lift. The bound of an even moment takes
 of `set_even_moment_bound!`, in units of the bound. On 96 small models Clarabel solved all of them in
 that form, and 32 with the norm of order `2p` or with a copy of the epigraph with `k` in its
 cones.
+
+A tracking builder has the same need for a tracked measure of any degree (#2283), and it cannot call
+`set_risk_epigraphs!` for it. It puts a `TrackedRiskBound` into the bound slot of the tracked measure.
+The builder of the measure converts this request as it converts a bound, and `set_risk_upper_bound!`
+registers the expression of degree one in place of a row. The tracking builder then writes its own row,
+so the keys of the rows do not move, and every head honours the bound. The rejected form gave the
+tracked measure the bound as its own `settings.ub`. A `FactorRiskContribution` ignores that bound, and the
+dependent mode needs an expression and not a row.

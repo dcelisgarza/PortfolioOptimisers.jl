@@ -145,8 +145,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::VarianceSkewKurtosi
                                                LinearBound(), SquaredBound()),
                                         r.kt.settings.ub)
     bounded = !all(isnothing, (vr_bound, sk_bound, kt_bound, r.settings.ub))
-    objective, bounds = set_risk_epigraphs!(model, r.settings.rke, bounded; prefix = prefix
-                                            ) do k, p
+    objective, bounds = set_risk_epigraphs!(model, reads_risk_term(r.settings), bounded;
+                                            prefix = prefix) do k, p
         W1 = state_build!(model, p, :W1_vr_sk_kt) do
             W1_vr_sk_kt = JuMP.@variable(model, [1:N, 1:N], Symmetric)
             W2_vr_sk_kt = state_set!(model, p, :W2_vr_sk_kt,

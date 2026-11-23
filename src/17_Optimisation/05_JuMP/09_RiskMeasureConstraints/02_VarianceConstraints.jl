@@ -613,12 +613,14 @@ A caller states the bound of a second moment in the units of the measure. A form
   - [`SquareRootBound`](@ref): The square root of the bound, entry by entry for a vector.
   - [`SquaredBound`](@ref): The square of the bound, entry by entry for a vector.
 
-A [`Frontier`](@ref) keeps its `N`, and takes `bound` as its [`FrontierBoundEstimator`](@ref) with a `factor` of `1`. The frontier solve converts the ends of its span when it builds the sweep. `nothing` gives `nothing`.
+A [`Frontier`](@ref) keeps its `N`, and takes `bound` as its [`FrontierBoundEstimator`](@ref) with a `factor` of `1`. The frontier solve converts the ends of its span when it builds the sweep. A [`TrackedRiskBound`](@ref) takes `bound` and a `factor` of `1` in the same way. `nothing` gives `nothing`.
+
+A [`TrackedRiskBound`](@ref) that a builder converted is a conversion too. Its methods apply its `bound`, then multiply by its `factor`, and they give the bound of a tracking measure in the units of the expression of the tracked measure.
 
 # Arguments
 
-  - `bound::FrontierBoundEstimator`: The conversion.
-  - `ub`: The bound, a number, a vector, a [`Frontier`](@ref) or `nothing`.
+  - `bound`: The conversion, a [`FrontierBoundEstimator`](@ref) or a [`TrackedRiskBound`](@ref) that a builder converted.
+  - `ub`: The bound, a number, a vector, a [`Frontier`](@ref), a [`TrackedRiskBound`](@ref) or `nothing`.
 
 # Returns
 
@@ -632,6 +634,7 @@ A [`Frontier`](@ref) keeps its `N`, and takes `bound` as its [`FrontierBoundEsti
   - [`SquaredBound`](@ref)
   - [`variance_risk_bounds_expr`](@ref)
   - [`Frontier`](@ref)
+  - [`TrackedRiskBound`](@ref)
 """
 function variance_risk_bounds_val(bound::FrontierBoundEstimator, ub::Frontier)
     return Frontier(ub.N, 1, bound)
@@ -650,6 +653,18 @@ function variance_risk_bounds_val(::SquaredBound, ub::VecNum)
 end
 function variance_risk_bounds_val(::SquaredBound, ub::Number)
     return ub^2
+end
+function variance_risk_bounds_val(bound::FrontierBoundEstimator, ub::TrackedRiskBound)
+    return TrackedRiskBound(ub, 1, bound)
+end
+function variance_risk_bounds_val(map::TrackedRiskBound, ub::Num_VecNum)
+    return map.factor * variance_risk_bounds_val(map.bound, ub)
+end
+function variance_risk_bounds_val(map::TrackedRiskBound, ub::Frontier)
+    return Frontier(ub.N, map.factor, map.bound)
+end
+function variance_risk_bounds_val(map::TrackedRiskBound, ub::TrackedRiskBound)
+    return TrackedRiskBound(ub, map.factor, map.bound)
 end
 function variance_risk_bounds_val(::Any, ::Nothing)
     return nothing
@@ -818,6 +833,8 @@ The risk-contribution rows of `r.rc` read the diagonal of `sigma_W_`, one entry 
 
 When [`sdp_objective_lift_flag`](@ref) is `true`, under [`MaximumRatio`](@ref) with [`SquareRootRatio`](@ref), the objective term and the rows read ``\\mathbf{W}_c`` of [`set_sdp_frc_objective_lift!`](@ref) in place of ``\\mathbf{W}_z``, so the term has degree two and the model maximises the Sharpe ratio. The bound reads ``\\mathbf{W}_z``, and the method builds that trace only when `settings.ub` holds a bound.
 
+A namespace that owns its weights, such as the weight difference of an [`IndependentVariableTracking`](@ref), holds weights that are not a function of ``\\boldsymbol{z}`` alone, so the lift does not state their variance. There the method builds the second-order cone formulation of [`set_variance_risk!`](@ref) on those weights.
+
 # JuMP formulation
 
 ## Variables
@@ -861,6 +878,10 @@ $(val_dict[:relax])
   - $(arg_dict[:pr])
   - `b::MatNum`: ``\\mathbf{P}``, the basis that maps the decision vector to the asset weights.
 
+# Validation
+
+  - `r.rc` is `nothing` when the namespace owns its weights, because its rows state the contributions of the factors to the variance of the portfolio. Raises an `ArgumentError`.
+
 # Returns
 
   - `variance_risk`: The variance expression.
@@ -876,6 +897,19 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                                opt::FactorRiskContribution, pr::AbstractPriorResult, ::Any,
                                ::Any, b::MatNum, args...; prefix::Symbol = Symbol(""),
                                kwargs...)
+    # A build that owns its weights, the weight difference of a tracking measure, is not a
+    # function of the decision vector alone, so no lift of that vector states its variance.
+    if weights_prefix(model, prefix) !== Symbol("")
+        @argcheck(isnothing(r.rc),
+                  ArgumentError("the `rc` of a `Variance` under a `FactorRiskContribution` bounds the contributions of the factors to the variance of the portfolio, so the `Variance` that an independent tracking measure applies to the weight difference cannot hold it; got $(r.rc). Remove `rc` from the tracked measure."))
+        variance_risk = set_variance_risk!(model, i, r, pr, SquareRootBound();
+                                           prefix = prefix)
+        dev, name = variance_risk_bounds_expr(model, i, SquareRootBound(); prefix = prefix)
+        ub = variance_risk_bounds_val(SquareRootBound(), r.settings.ub)
+        set_variance_risk_bounds_and_expression!(model, opt, dev, ub, name, i,
+                                                 variance_risk, r.settings; prefix = prefix)
+        return variance_risk
+    end
     mark_objective_variance!(model, prefix, r.settings)
     rc = linear_constraints(r.rc, opt.sets; datatype = eltype(pr.X),
                             strict = opt.opt.strict)
@@ -1326,8 +1360,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVaria
                                                                prefix = prefix)
     elseif !sdp_objective_lift_flag(model, r.ratio_alg, r.settings)
         ub = r.settings.ub
-        objective, bounds = set_risk_epigraphs!(model, r.settings.rke, !isnothing(ub);
-                                                prefix = prefix) do k, p
+        objective, bounds = set_risk_epigraphs!(model, reads_risk_term(r.settings),
+                                                !isnothing(ub); prefix = prefix) do k, p
             return set_ucs_variance_risk!(model, i, ucs, sigma, r.mtx_sqrt; prefix = p,
                                           W = set_sdp_constraints!(model, k;
                                                                    prefix = prefix))

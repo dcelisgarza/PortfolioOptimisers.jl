@@ -22,6 +22,7 @@ VecOptRM
 OptRM_VecOptRM
 VecRM
 RM_VecRM
+TrackedRiskBound
 RkRtBounds
 Front_NumVec
 RiskInputKind
