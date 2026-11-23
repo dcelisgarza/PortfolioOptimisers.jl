@@ -71,7 +71,8 @@
 #   GATE_STAMP_REF       the ref a gate is measured against. Default: the landing base, which
 #                        is origin/main when `base` stored none.
 #   GATE_STAMP_BRANCH    the globs, split on spaces, of the remote branches the guard protects,
-#                        the branches of ADR 0240. Default: refs/heads/agents/* refs/heads/dev.
+#                        the branches of ADR 0240. Default: refs/heads/dev refs/heads/dev-*, and
+#                        refs/heads/agents/*, the prefix until 2026-11-23.
 #   GATE_STAMP_REQUIRED  the gates a push that changes src/ or ext/ needs. Default:
 #                        "jet size complexity perf doctest coverage". The tests set it empty.
 #   GATE_STAMP_CENSUS    empty turns off the demand for the prose censuses. Default: on. The
@@ -157,7 +158,7 @@ waive() {
 }
 
 # Print the landing base, or store a new one. The landing base is the branch the worktree lands on
-# (ADR 0240): `origin/main` for a branch of its own, `origin/dev` or `origin/agents/<map>-…`
+# (ADR 0240): `origin/main` for a branch of its own, `origin/dev` or `origin/dev-<feature>`
 # for a shared branch. Every stamp and every check reads it.
 landing_base() {
     if [ $# -eq 0 ]; then
@@ -386,7 +387,7 @@ moved_files() {
 # does not have. On a shared branch, the base is the shared branch itself.
 check() {
     acts || return 0
-    local protected=${GATE_STAMP_BRANCH:-refs/heads/agents/* refs/heads/dev}
+    local protected=${GATE_STAMP_BRANCH:-refs/heads/dev refs/heads/dev-* refs/heads/agents/*}
     if [ -n "${PRE_COMMIT_REMOTE_BRANCH:-}" ]; then
         local glob globs hit_branch=0
         # `read -a` splits the list on spaces and expands no pathname. Each glob is unquoted in

@@ -139,14 +139,15 @@ Each issue states its route in a `**Lands on:**` line, and every pull request me
 
 | `**Lands on:**` | For                                                                                                      | Branch                                              |
 |:----------------|:---------------------------------------------------------------------------------------------------------|:----------------------------------------------------|
-| `own branch`    | a standalone feature, an important correctness fix, a large performance fix                              | `agents/<issue>-<slug>`, with its own pull request  |
+| `own branch`    | a standalone feature, an important correctness fix, a large performance fix                              | `dev-<feature>`, with its own pull request          |
 | `dev`           | a sweep sub-issue, an ergonomics change, a small performance fix, an unusual composition bug, a docs fix | `dev`, which the maintainer merges as a batch       |
-| `map #<map>`    | a ticket of a map whose tickets make sense on `main` only together                                       | `agents/<map>-<slug>`, one pull request for the map |
+| `map #<map>`    | a ticket of a map whose tickets make sense on `main` only together                                       | `dev-<feature>`, one pull request for the map       |
 
 The maintainer can name another route for an issue.
 
+- Name a branch for its feature, with the prefix `dev-`, for example `dev-concentration-limit`. A branch that holds research alone can take the prefix `research-`. It gets no push checks, and it does not merge into `main`.
 - A push to a branch of this repository runs the full CI, and the pull request shows those checks. A merge into `main` waits for them (ADR 0220).
-- A branch of a fork gets no push checks in this repository, so its pull request cannot merge. The maintainer pushes the branch of a fork to an `agents/` branch here, and the pull request from that branch merges.
+- A branch of a fork gets no push checks in this repository, so its pull request cannot merge. The maintainer pushes the branch of a fork to a `dev-` branch here, and the pull request from that branch merges.
 - The base of a pull request need not be current. Rebase only when GitHub shows a conflict with `main`.
 - Name the issue in the commit message, as `Fix #<issue>: …`. A pull request of its own also writes `Closes #<issue>` in its body, so that the pull request links the issue.
 - Close the issue when the push that holds the last part of its fix reaches the remote branch, with `gh issue close <issue> --comment "Fixed in <sha> on <branch>."`. Do not wait for the merge into `main`. A commit of a part of the work names `Part of #<issue>: …`, and the issue stays open.
@@ -266,7 +267,7 @@ A release can come from any commit of `main` whose push checks are green. It can
 
 To create a new release, you can follow these simple steps:
 
-- Create a branch `agents/release-x.y.z` from `origin/main`. A branch outside `agents/` gets no push checks, and its pull request cannot merge.
+- Create a branch `dev-release-x.y.z` from `origin/main`. A branch with no `dev` prefix gets no push checks, and its pull request cannot merge.
 
 - Update `version` in `Project.toml`
 - Create a commit "Release vx.y.z", push, create a PR, wait for it to pass, merge the PR.

@@ -209,3 +209,20 @@ The maintainer changed two parts of this decision.
    that the issue links the work. A commit of a part of the work names `Part of #N: …`, and the
    issue stays open. The cost of § *Context* that a partial `Fix #N` closes an issue at the
    release merge stays: write `Part of #N` for a partial commit.
+
+## Amendment (2026-11-23)
+
+The maintainer changed the names of the branches.
+
+1. **A branch takes the name `dev-<feature>`.** The prefix is `dev-`, and the rest names the
+   feature, for example `dev-concentration-limit`. The name of a map branch is the feature of the
+   map, and a release branch is `dev-release-x.y.z`. Each text above that names
+   `agents/<issue>-<slug>` or `agents/<map>-<slug>` now reads `dev-<feature>`.
+2. **A branch that holds research alone can take the prefix `research-`.** No push filter matches
+   it, so a push runs no CI. The ruleset of `main` refuses its merge, because it has no push
+   checks. Work that lands moves to a `dev-` branch.
+3. **The tools.** The push filter `dev*` and the `dev` clause of the condition of ADR 0220 already
+   match `dev-<feature>`, so no workflow changes. The guard of `code_health/gate_stamp.sh` acts on
+   a push to `refs/heads/dev`, `refs/heads/dev-*` and `refs/heads/agents/*`.
+4. **The old prefix.** No session makes a new `agents/` branch. A branch that has the prefix keeps
+   its name until it merges, so the filter `agents/**` and the glob of the guard stay until then.
