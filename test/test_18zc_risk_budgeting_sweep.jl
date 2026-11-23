@@ -185,6 +185,112 @@ end
     end
 end
 
+@testset "RiskBudgeting sweep: a bound on a risk of degree above one bounds the risk of the weights (#2279)" begin
+    prh = prior(HighOrderPriorEstimator(), RBS_RD)
+    S = prh.sigma
+    plg = PO.SemiDefinitePhylogeny(;
+                                   A = [0.0 1 0 0 0; 1 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0;
+                                        0 0 0 0 0], p = 1e-6)
+    box = BoxUncertaintySet(; lb = S - 0.1 * abs.(S), ub = S + 0.1 * abs.(S))
+    ell = EllipsoidalUncertaintySet(; sigma = Matrix(1e-12 * I(25)), k = 1.0,
+                                    class = PO.SigmaUncertaintySetClass())
+    cases = [("variance with a phylogeny", s -> Variance(; settings = s), plg, 1e4),
+             ("box", s -> UncertaintySetVariance(; ucs = box, settings = s), nothing, 1e4),
+             ("ellipsoid", s -> UncertaintySetVariance(; ucs = ell, settings = s), nothing,
+              1e4),
+             ("kurtosis", s -> Kurtosis(; alg = SOCRiskExpr(), settings = s), nothing, 1e4),
+             ("approximate kurtosis",
+              s -> Kurtosis(; N = 5, alg = SOCRiskExpr(), settings = s), nothing, 1e4),
+             ("even moment", s -> LowOrderMoment(; alg = EvenMoment(), settings = s),
+              nothing, 1),
+             ("even lower moment",
+              s -> LowOrderMoment(; alg = EvenMoment(; alg = SemiMoment()), settings = s),
+              nothing, 1),
+             ("weighted even moment",
+              s -> LowOrderMoment(; w = pweights(range(0.5, 1.5; length = 300)),
+                                  alg = EvenMoment(), settings = s), nothing, 1),
+             ("variance, skewness and kurtosis", s -> VarianceSkewKurtosis(; settings = s),
+              nothing, 1e4)]
+    function solve(r, plg, so)
+        opt = JuMPOptimiser(; pe = prh, slv = RBS_SLV, ple = plg, so = so)
+        return optimise(RiskBudgeting(; opt = opt, r = r), RBS_RD)
+    end
+    for (name, f, pl, so) in cases
+        @testset "$name" begin
+            r0 = f(RiskMeasureSettings())
+            R(w) = expected_risk(factory(r0, prh, RBS_SLV), w, RBS_X)
+            free = solve(r0, pl, so)
+            @test isa(free.retcode, OptimisationSuccess)
+            # A bound that does not bind leaves the book, and one that binds holds the
+            # risk of the weights at the bound.
+            loose = solve(f(RiskMeasureSettings(; ub = 1.5 * R(free.w))), pl, so)
+            @test isa(loose.retcode, OptimisationSuccess)
+            @test isapprox(loose.w, free.w; rtol = 2e-3)
+            ub = 0.97 * R(free.w)
+            tight = solve(f(RiskMeasureSettings(; ub = ub)), pl, so)
+            @test isa(tight.retcode, OptimisationSuccess)
+            @test isapprox(R(tight.w), ub; rtol = 1e-3)
+            # A measure that is only a bound, beside the risk that the budget reads.
+            only = solve([StandardDeviation(),
+                          f(RiskMeasureSettings(; ub = ub, rke = false))], pl, so)
+            @test isa(only.retcode, OptimisationSuccess)
+            @test R(only.w) <= ub * (1 + 2e-3)
+        end
+    end
+end
+
+@testset "RiskBudgeting sweep: only a bounded risk of degree above one pays for its bound (#2279)" begin
+    size_of(m) = (JuMP.num_variables(m),
+                  JuMP.num_constraints(m; count_variable_in_set_constraints = true))
+    prh = prior(HighOrderPriorEstimator(), RBS_RD)
+    opt = JuMPOptimiser(; pe = prh, slv = RBS_SLV)
+    added(f, head) = size_of(head(f(RiskMeasureSettings(; ub = 1.0))).model) .-
+                     size_of(head(f(RiskMeasureSettings())).model)
+    rb(r) = optimise(RiskBudgeting(; opt = opt, r = r), RBS_RD)
+    mr(r) = optimise(MeanRisk(; opt = opt, r = r), RBS_RD)
+    ratio(r) = optimise(MeanRisk(; opt = opt, r = r, obj = MaximumRatio()), RBS_RD)
+    even = s -> LowOrderMoment(; alg = EvenMoment(), settings = s)
+    kurt = s -> Kurtosis(; settings = s)
+    # The bound of a measure of degree one, and of a second-order cone variance, is one row.
+    for f in (s -> StandardDeviation(; settings = s), s -> Variance(; settings = s),
+              s -> ConditionalValueatRisk(; settings = s),
+              s -> LowOrderMoment(; alg = SecondMoment(), settings = s))
+        @test added(f, rb) == (0, 1)
+    end
+    # Under another head the bound of every measure is one row.
+    for f in (even, kurt), head in (mr, ratio)
+        @test added(f, head) == (0, 1)
+    end
+    # A bounded risk of degree above one pays for a second model under risk budgeting.
+    @test all(added(even, rb) .> (0, 1))
+    @test all(added(kurt, rb) .> (0, 1))
+    # A measure that is only a bound builds the model of its bound alone.
+    m = rb([StandardDeviation(), even(RiskMeasureSettings(; ub = 1.0, rke = false))]).model
+    @test haskey(m, :bound_even_moment_risk_2)
+    @test !haskey(m, :even_moment_risk_2)
+    @test haskey(m, :even_moment_risk_2_ub)
+    # Two measures on one weight vector share the lift of the bound.
+    m = rb([kurt(RiskMeasureSettings(; ub = 1.0)),
+            Kurtosis(; N = 5, settings = RiskMeasureSettings(; ub = 1.0))]).model
+    @test size(m[:bound_W]) == size(m[:W]) == (5, 5)
+end
+
+@testset "RiskBudgeting sweep: the bounds of the terms of VarianceSkewKurtosis (#2279)" begin
+    prh = prior(HighOrderPriorEstimator(), RBS_RD)
+    opt = JuMPOptimiser(; pe = prh, slv = RBS_SLV, so = 1e4)
+    solve(r) = optimise(RiskBudgeting(; opt = opt, r = r), RBS_RD)
+    free = solve(VarianceSkewKurtosis())
+    vr = dot(free.w, prh.sigma, free.w)
+    res = solve(VarianceSkewKurtosis(;
+                                     vr = Variance(;
+                                                   settings = RiskMeasureSettings(;
+                                                                                  ub = 0.97 *
+                                                                                       vr,
+                                                                                  rke = false))))
+    @test isa(res.retcode, OptimisationSuccess)
+    @test isapprox(dot(res.w, prh.sigma, res.w), 0.97 * vr; rtol = 1e-3)
+end
+
 @testset "RiskBudgeting sweep: the factor form gives the budgeted factor contributions" begin
     S = RBS_PR.sigma
     bf = [0.3, 0.7]

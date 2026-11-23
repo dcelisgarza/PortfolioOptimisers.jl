@@ -329,6 +329,72 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Add the deviation of a variance to `model`, the norm of ``\\mathbf{G} \\boldsymbol{w}``, and return its variable.
+
+The bound of a variance acts on the deviation, which has degree one in the weights. Both second-order cone methods of [`set_variance_risk!`](@ref) add it. Under a unit budget, [`set_risk_constraints!`](@ref) adds it for the bound of a variance in the semidefinite formulation.
+
+# JuMP formulation
+
+## Variables
+
+  - `w`: read from the model.
+  - `dev_`: created, ``\\sigma``.
+
+## Constraints
+
+  - `cdev_soc_`: ``(s_c \\sigma, s_c \\mathbf{G} \\boldsymbol{w}) \\in \\mathcal{K}_{2}``, which is ``\\sigma \\geq \\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_2``.
+
+Each name carries the index `i` of the measure, and the namespace `prefix`.
+
+Where:
+
+  - $(math_dict[:sigma_epi])
+  - $(math_dict[:G_cov_factor])
+  - $(math_dict[:w_port])
+  - $(math_dict[:K_q_norm])
+  - $(math_dict[:sc_scale])
+
+## Relaxation
+
+$(val_dict[:relax])
+
+  - `dev_` lies at or above ``\\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_2``. A bound on it is exact, because the weights satisfy it when their variance is at most the square of the bound.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::Variance`: The measure.
+  - $(arg_dict[:pr_sigma])
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace of the build (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `dev`: The deviation variable.
+
+# Related
+
+  - [`set_variance_risk!`](@ref)
+  - [`variance_risk_bounds_expr`](@ref)
+  - [`chol_sigma_selector`](@ref)
+"""
+function set_variance_deviation!(model::JuMP.Model, i::Any, r::Variance,
+                                 pr::Option{<:AbstractPriorResult};
+                                 prefix::Symbol = Symbol(""))
+    sc = get_constraint_scale(model)
+    w = get_w(model, prefix)
+    G = chol_sigma_selector(model, pr, r)
+    dev = state_set!(model, prefix, :dev_, i, JuMP.@variable(model))
+    state_set!(model, prefix, :cdev_soc_, i,
+               JuMP.@constraint(model, [sc * dev; sc * G * w] in JuMP.SecondOrderCone()))
+    return dev
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Build the variance expression of the formulation that `flag` or `r.alg` selects.
 
 The methods on [`LinearBound`](@ref) build the semidefinite formulation, and the next docstring states them. The methods on [`SquareRootBound`](@ref) dispatch on `r.alg`. Both second-order cone methods build the deviation ``\\sigma`` with its cone, because the bound acts on ``\\sigma`` in the units of a standard deviation. [`SquaredSOCRiskExpr`](@ref) states the variance as ``\\sigma^2``, and [`QuadRiskExpr`](@ref) states it as the quadratic form.
@@ -394,25 +460,16 @@ function set_variance_risk!(model::JuMP.Model, i::Any,
                             r::Variance{<:Any, <:Any, <:Any, <:Any, <:SquaredSOCRiskExpr},
                             pr::Option{<:AbstractPriorResult}, ::SquareRootBound;
                             prefix::Symbol = Symbol(""))
-    sc = get_constraint_scale(model)
-    w = get_w(model, prefix)
-    G = chol_sigma_selector(model, pr, r)
-    dev = state_set!(model, prefix, :dev_, i, JuMP.@variable(model))
-    state_set!(model, prefix, :cdev_soc_, i,
-               JuMP.@constraint(model, [sc * dev; sc * G * w] in JuMP.SecondOrderCone()))
+    dev = set_variance_deviation!(model, i, r, pr; prefix = prefix)
     return state_set!(model, prefix, :variance_risk_, i, JuMP.@expression(model, dev^2))
 end
 function set_variance_risk!(model::JuMP.Model, i::Any,
                             r::Variance{<:Any, <:Any, <:Any, <:Any, <:QuadRiskExpr},
                             pr::Option{<:AbstractPriorResult}, ::SquareRootBound;
                             prefix::Symbol = Symbol(""))
-    sc = get_constraint_scale(model)
     w = get_w(model, prefix)
     sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
-    G = chol_sigma_selector(model, pr, r)
-    dev = state_set!(model, prefix, :dev_, i, JuMP.@variable(model))
-    state_set!(model, prefix, :cdev_soc_, i,
-               JuMP.@constraint(model, [sc * dev; sc * G * w] in JuMP.SecondOrderCone()))
+    set_variance_deviation!(model, i, r, pr; prefix = prefix)
     return state_set!(model, prefix, :variance_risk_, i,
                       JuMP.@expression(model, LinearAlgebra.dot(w, sigma, w)))
 end
@@ -701,7 +758,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add a variance to `model`, bound it by `settings.ub`, and add it to the risk that the objective reads.
 
-The bound `settings.ub` is in the units of a variance. [`variance_risk_bounds_expr`](@ref) names the expression of degree one that it acts on, and [`variance_risk_bounds_val`](@ref) converts it to the units of that expression.
+The bound `settings.ub` is in the units of a variance. [`variance_risk_bounds_expr`](@ref) names the expression of degree one that it acts on, and [`variance_risk_bounds_val`](@ref) converts it to the units of that expression. Under a unit budget the trace of the semidefinite formulation has degree two in the weights, so the bound acts on the deviation of [`set_variance_deviation!`](@ref). That bound is exact on the weights, and it needs no second lift.
 
 When the variance is a positive term of the objective's risk, the builder marks `variance_flag` on the namespace that owns the weights, [`mark_objective_variance!`](@ref). A semidefinite phylogeny on the same weights then adds no `p · tr(W)` penalty when the objective minimises the risk. A variance that is only a bound does not mark the flag, and the penalty stays. [`sdp_variance_flag!`](@ref) selects the formulation, and the source of the covariance matrix, the measure or the prior, does not change it. A measure that holds its matrix reads no prior, so a programme Allocation Set that reads no rows passes `pr = nothing`.
 
@@ -722,6 +779,7 @@ When the variance is a positive term of the objective's risk, the builder marks 
 
   - [`Variance`](@ref)
   - [`set_risk!`](@ref)
+  - [`set_variance_deviation!`](@ref)
   - [`set_variance_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance, opt::RiskBoundOwner,
@@ -730,6 +788,14 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance, opt::Risk
     mark_objective_variance!(model, prefix, r.settings)
     variance_risk, sdp_flag = set_risk!(model, i, r, opt, pr, pl, args...; prefix = prefix,
                                         kwargs...)
+    # Under a unit budget the trace has degree two in the weights and degree zero in `k`, so
+    # the bound acts on the deviation, which has degree one.
+    if isa(sdp_flag, LinearBound) &&
+       !isnothing(r.settings.ub) &&
+       shared_has(model, :unit_budget)
+        set_variance_deviation!(model, i, r, pr; prefix = prefix)
+        sdp_flag = SquareRootBound()
+    end
     ub = variance_risk_bounds_val(sdp_flag, r.settings.ub)
     # Without a bound, the lift of the objective builds no expression for one to read.
     var_bound_expr, var_bound_name = if isnothing(ub)
@@ -1135,7 +1201,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the expression that the bound of an uncertainty-set variance acts on, the bound in its units, and the bare Model State name of the expression.
 
-The row of [`set_risk_upper_bound!`](@ref) multiplies the bound by ``k``, so it needs an expression of degree one in the weights and ``k``. The box, the ellipsoid and the norm ball state their worst case over the lifted matrix of [`set_sdp_constraints!`](@ref), which has degree one, so the fall-through method returns the risk expression, the bound and the name unchanged. The compact worst case ``d^2 + \\kappa t^2`` has degree two. Its method adds the square root as a second-order cone variable, and converts the bound with [`variance_risk_bounds_val`](@ref). A compact set without a bound takes the fall-through method and adds nothing.
+The row of [`set_risk_upper_bound!`](@ref) multiplies the bound by ``k``, so it needs an expression of degree one in the weights and ``k``. The box, the ellipsoid and the norm ball state their worst case over the lifted matrix of [`set_sdp_constraints!`](@ref) with the corner ``k``, which has degree one, so the fall-through method returns the risk expression, the bound and the name unchanged. The compact worst case ``d^2 + \\kappa t^2`` has degree two. Its method adds the square root as a second-order cone variable, and converts the bound with [`variance_risk_bounds_val`](@ref). A compact set without a bound takes the fall-through method and adds nothing.
 
 # JuMP formulation
 
@@ -1214,6 +1280,8 @@ The set is the measure's own `ucs`, fitted with [`sigma_ucs`](@ref) when it is a
 
 When [`sdp_lifted_set`](@ref) and [`sdp_objective_lift_flag`](@ref) are both `true`, the objective term of the box, the ellipsoid or the norm ball reads the lift with a constant corner of [`set_sdp_objective_lift!`](@ref), so it has degree two under [`MaximumRatio`](@ref). [`set_ucs_variance_risk!`](@ref) then builds the term on that lift, with its own names under the namespace `lift_`, and builds the worst case on the lift of [`set_sdp_constraints!`](@ref) for the bound only when `settings.ub` holds one.
 
+Under a unit budget the lift of the objective has the corner `1`, so its worst case has degree two. When `settings.ub` holds a bound, [`set_risk_epigraphs!`](@ref) builds the worst case a second time, on a lift with the corner ``k``, and the bound acts on it.
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -1237,6 +1305,7 @@ When [`sdp_lifted_set`](@ref) and [`sdp_objective_lift_flag`](@ref) are both `tr
   - [`UncertaintySetVariance`](@ref)
   - [`set_ucs_variance_risk!`](@ref)
   - [`ucs_variance_risk_bounds!`](@ref)
+  - [`set_risk_epigraphs!`](@ref)
   - [`sigma_ucs`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVariance,
@@ -1248,13 +1317,23 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVaria
     # The prior travels beside the returns, because an `AbstractPriorUncertaintySetEstimator`
     # is fitted from the optimisation's own prior result rather than from returns data.
     ucs = sigma_ucs(r.ucs, rd, pr; kwargs...)
-    if !(sdp_lifted_set(ucs) && sdp_objective_lift_flag(model, r.ratio_alg, r.settings))
+    if !sdp_lifted_set(ucs)
         ucs_variance_risk, name = set_ucs_variance_risk!(model, i, ucs, sigma, r.mtx_sqrt;
                                                          prefix = prefix)
         bound_expr, ub, bound_name = ucs_variance_risk_bounds!(model, i, ucs,
                                                                ucs_variance_risk, name,
                                                                r.settings.ub;
                                                                prefix = prefix)
+    elseif !sdp_objective_lift_flag(model, r.ratio_alg, r.settings)
+        ub = r.settings.ub
+        objective, bounds = set_risk_epigraphs!(model, r.settings.rke, !isnothing(ub);
+                                                prefix = prefix) do k, p
+            return set_ucs_variance_risk!(model, i, ucs, sigma, r.mtx_sqrt; prefix = p,
+                                          W = set_sdp_constraints!(model, k;
+                                                                   prefix = prefix))
+        end
+        ucs_variance_risk = objective[1]
+        bound_expr, bound_name = bounds
     else
         # The objective term reads the lift with a constant corner, under names of their
         # own, so it has degree two under `MaximumRatio`. The bound reads the lift with the

@@ -507,7 +507,7 @@ The type of `ub` and the owner `opt` select the method.
   - A number adds one row. The row bounds `r_expr` from above when `flag` is `true`, and from below when it is `false`.
   - A [`Front_NumVec`](@ref) adds an entry to the `:risk_frontier` registry, and the frontier solve reads the entry later. The owner of the entry is written as `nothing`, because the measure is not known here. [`set_risk_frontier_owner!`](@ref) writes the owner afterwards.
 
-Under a ratio objective the head divides the weights by ``k`` after the solve, so the row bounds the risk of the weights that the head returns. That is exact for a risk expression of degree one in the weights. A builder whose risk expression has a higher degree passes a separate expression of degree one, as [`set_variance_risk_bounds_and_expression!`](@ref) does.
+Under a ratio objective the head divides the weights by ``k`` after the solve, so the row bounds the risk of the weights that the head returns. That is exact for a risk expression of degree one in the weights. A builder whose risk expression has a higher degree passes a separate expression of degree one, as [`set_variance_risk_bounds_and_expression!`](@ref) does. [`RiskBudgeting`](@ref) also divides the weights by ``k``, and [`set_risk_epigraphs!`](@ref) states the rule for a risk that reads [`effective_k`](@ref).
 
 # JuMP formulation
 
@@ -782,6 +782,78 @@ function set_unindexed_risk_bounds_and_expression!(model::JuMP.Model,
     set_risk_upper_bound!(model, opt, r_expr_ub, ub, state_key(prefix, name))
     set_risk_expression!(model, r_expr, settings.scale, settings.rke)
     return nothing
+end
+"""
+    set_risk_epigraphs!(build, model::JuMP.Model, rke::Bool, bounded::Bool;
+                        prefix::Symbol = Symbol(""))
+
+Builds the model of a risk of degree above one, and returns the risk that the objective reads and the risk that the bound acts on.
+
+The row of [`set_risk_upper_bound!`](@ref) multiplies the bound by ``k``, so it needs a risk of degree one in the unscaled weights ``\\boldsymbol{y} = k \\boldsymbol{w}`` and ``k``. A builder gets that degree when its model divides by ``k``. The objective of [`RiskBudgeting`](@ref) needs a risk of ``\\boldsymbol{y}`` alone, so the same model divides by `1`, [`effective_k`](@ref). Only that head records a unit budget, and only there do the two readers need two models.
+
+The second model is a cost of the bounded measure alone. A measure without a bound, and every measure under another head, builds one model. A measure that is only a bound, with `rke = false`, builds one model too, which divides by ``k``.
+
+Two builders do not call this function. The bound of a [`Variance`](@ref) acts on its deviation, of degree one, and the bound of an even moment acts on the model of [`set_even_moment_bound!`](@ref).
+
+# Algorithm
+
+ 1. When the model has no unit budget or the measure has no bound, call `build` with [`effective_k`](@ref) under `prefix`, and return its value two times.
+ 2. Otherwise call `build` with [`get_k`](@ref) under the namespace `bound_` nested in `prefix`, giving `bound`.
+ 3. When `rke` is `false`, return `bound` two times.
+ 4. Otherwise call `build` with [`effective_k`](@ref) under `prefix`, giving `risk`, and return `risk` and `bound`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathcal{R}_{1}(\\boldsymbol{y}) &= k^{d} R(\\boldsymbol{w})\\,, \\\\
+\\mathcal{R}_{k}(\\boldsymbol{y}) &= k R(\\boldsymbol{w}) \\leq u k \\quad\\Leftrightarrow\\quad R(\\boldsymbol{w}) \\leq u\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathcal{R}_{1}``: The risk of the objective, with `1` as the scale.
+  - ``\\mathcal{R}_{k}``: The risk that the bound acts on, with ``k`` as the scale.
+  - ``R``: The risk measure, of degree ``d``.
+  - $(math_dict[:y_homog])
+  - $(math_dict[:w_port])
+  - ``u``: The bound.
+
+# Arguments
+
+  - `build`: A function of the scale and of the namespace. It adds the model of the measure under that namespace, and returns its risk.
+  - $(arg_dict[:model])
+  - `rke::Bool`: `true` when the risk is a term of the objective, `settings.rke`.
+  - `bounded::Bool`: `true` when the measure has a bound.
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace of the build (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `(risk, bound)`: The risk that the objective reads, and the risk that the bound acts on.
+
+# Related
+
+  - [`set_unit_budget!`](@ref)
+  - [`effective_k`](@ref)
+  - [`get_k`](@ref)
+  - [`set_risk_upper_bound!`](@ref)
+  - [`set_sdp_constraints!`](@ref)
+  - [`set_variance_deviation!`](@ref)
+  - [`set_even_moment_bound!`](@ref)
+"""
+function set_risk_epigraphs!(build, model::JuMP.Model, rke::Bool, bounded::Bool;
+                             prefix::Symbol = Symbol(""))
+    if !bounded || !shared_has(model, :unit_budget)
+        risk = build(effective_k(model), prefix)
+        return risk, risk
+    end
+    bound = build(get_k(model), nested_prefix(prefix, :bound_))
+    risk = rke ? build(effective_k(model), prefix) : bound
+    return risk, bound
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

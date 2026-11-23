@@ -209,7 +209,7 @@ end
 
 Return the scale that the builder of a risk or of a penalty divides a power of the weights by: `1` under a unit budget, and `model[:k]` otherwise.
 
-A risk such as ``\\lVert \\boldsymbol{y} \\rVert_2^2 / k`` has degree one in the scaled weights ``\\boldsymbol{y} = k \\boldsymbol{w}``. A ratio objective needs that degree. [`RiskBudgeting`](@ref) needs a risk of ``\\boldsymbol{y}`` alone, because a division by the variable `k` adds a term to the risk contributions. A builder that multiplies a bound by the budget reads [`get_k`](@ref), under every head.
+A risk such as ``\\lVert \\boldsymbol{y} \\rVert_2^2 / k`` has degree one in the scaled weights ``\\boldsymbol{y} = k \\boldsymbol{w}``. A ratio objective needs that degree. [`RiskBudgeting`](@ref) needs a risk of ``\\boldsymbol{y}`` alone, because a division by the variable `k` adds a term to the risk contributions. A builder that multiplies a bound by the budget reads [`get_k`](@ref), under every head. A builder that gives one expression to the objective and to a bound builds it with each scale under a unit budget, [`set_risk_epigraphs!`](@ref).
 
 # Validation
 
@@ -219,6 +219,7 @@ A risk such as ``\\lVert \\boldsymbol{y} \\rVert_2^2 / k`` has degree one in the
 
   - [`set_unit_budget!`](@ref)
   - [`get_k`](@ref)
+  - [`set_risk_epigraphs!`](@ref)
 """
 function effective_k(model::JuMP.Model)
     return ifelse(haskey(model, :unit_budget), 1, get_k(model))

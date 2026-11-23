@@ -5,7 +5,7 @@
 julia = "1.13.4"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "958c716372"
+commit = "13757d377c"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 6, cog_sum = 4, arg_sum = 16, macros = [] }
@@ -379,7 +379,7 @@ commit = "958c716372"
 "src/17_Optimisation/05_JuMP/08_RelaxedRiskBudgeting.jl" = { cyc = 3, cog = 3, arg = 9, cyc_sum = 27, cog_sum = 16, arg_sum = 61, macros = ["@forward_properties", "@pipe_delegates", "@pipe_route_rkb", "@propagatable"] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/01_BaseRiskConstraints.jl" = { cyc = 4, cog = 4, arg = 9, cyc_sum = 48, cog_sum = 27, arg_sum = 128, macros = [] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/02_VarianceConstraints.jl" = { cyc = 6, cog = 8, arg = 11, cyc_sum = 67, cog_sum = 46, arg_sum = 188, macros = [] }
-"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/03_MomentRiskMeasureConstraints.jl" = { cyc = 3, cog = 4, arg = 9, cyc_sum = 25, cog_sum = 11, arg_sum = 106, macros = [] }
+"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/03_MomentRiskMeasureConstraints.jl" = { cyc = 5, cog = 7, arg = 9, cyc_sum = 33, cog_sum = 18, arg_sum = 135, macros = [] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/04_KurtosisConstraints.jl" = { cyc = 2, cog = 2, arg = 8, cyc_sum = 13, cog_sum = 6, arg_sum = 51, macros = [] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/05_NegativeSkewnessConstraints.jl" = { cyc = 2, cog = 2, arg = 8, cyc_sum = 7, cog_sum = 3, arg_sum = 32, macros = [] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/01_XatRiskConstraints.jl" = { cyc = 3, cog = 4, arg = 11, cyc_sum = 22, cog_sum = 13, arg_sum = 92, macros = [] }

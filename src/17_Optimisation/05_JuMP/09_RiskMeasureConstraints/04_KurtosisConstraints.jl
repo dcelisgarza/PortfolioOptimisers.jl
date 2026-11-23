@@ -159,7 +159,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Bound the epigraph of the square root of the kurtosis, and add the risk expression of the formulation that `r.alg` selects.
 
-Both formulations of [`set_risk_constraints!`](@ref) for [`Kurtosis`](@ref) end with this call. The bound acts on ``g`` under every formulation. Under [`SOCRiskExpr`](@ref) the risk expression is ``g``, in the units of the square root of the fourth moment, and `settings.ub` is in the same units. Under the other three the risk expression is in the units of the fourth moment, and the bound row reads the square root of `settings.ub`. [`set_risk_upper_bound!`](@ref) adds the bound row, and [`set_risk_expression!`](@ref) adds the risk expression to `risk_vec`.
+Both formulations of [`set_risk_constraints!`](@ref) for [`Kurtosis`](@ref) end with this call. The bound acts on ``g`` under every formulation, and on the epigraph `bound` with the scale ``k`` under a unit budget. Under [`SOCRiskExpr`](@ref) the risk expression is ``g``, in the units of the square root of the fourth moment, and `settings.ub` is in the same units. Under the other three the risk expression is in the units of the fourth moment, and the bound row reads the square root of `settings.ub`. [`set_variance_risk_bounds_and_expression!`](@ref) adds the bound row, and adds the risk expression to `risk_vec`.
 
 # JuMP formulation
 
@@ -204,6 +204,7 @@ The relation of ``\\lVert \\boldsymbol{x}_{kt} \\rVert_2^2`` to the fourth momen
   - $(arg_dict[:opt_rjumpe])
   - `sqrt_kurtosis_risk::JuMP.AbstractJuMPScalar`: ``g``.
   - `x_kurt`: ``\\boldsymbol{x}_{kt}``. The methods for [`SOCRiskExpr`](@ref) and [`SquaredSOCRiskExpr`](@ref) do not read it.
+  - `bound::JuMP.AbstractJuMPScalar`: The epigraph that the bound acts on. It is ``g``, except under a unit budget, where [`set_risk_epigraphs!`](@ref) builds it with the scale ``k``.
   - $(arg_dict[:ci])
 
 # Keyword arguments
@@ -217,52 +218,52 @@ The relation of ``\\lVert \\boldsymbol{x}_{kt} \\rVert_2^2`` to the fourth momen
 # Related
 
   - [`set_risk_constraints!`](@ref)
-  - [`set_risk_bounds_and_expression!`](@ref)
-  - [`set_risk_upper_bound!`](@ref)
-  - [`set_risk_expression!`](@ref)
+  - [`set_risk_epigraphs!`](@ref)
+  - [`set_variance_risk_bounds_and_expression!`](@ref)
   - [`variance_risk_bounds_val`](@ref)
 """
 function set_kurtosis_risk!(model::JuMP.Model,
                             r::Kurtosis{<:Any, <:Any, <:Any, <:SOCRiskExpr},
                             opt::RiskConstraintOwner,
-                            sqrt_kurtosis_risk::JuMP.AbstractJuMPScalar, ::Any, i;
-                            prefix::Symbol = Symbol(""))
-    set_risk_bounds_and_expression!(model, opt, sqrt_kurtosis_risk, r.settings,
-                                    :kurtosis_risk_, i; prefix = prefix)
+                            sqrt_kurtosis_risk::JuMP.AbstractJuMPScalar, ::Any,
+                            bound::JuMP.AbstractJuMPScalar, i; prefix::Symbol = Symbol(""))
+    set_variance_risk_bounds_and_expression!(model, opt, bound, r.settings.ub,
+                                             :kurtosis_risk_, i, sqrt_kurtosis_risk,
+                                             r.settings; prefix = prefix)
     return sqrt_kurtosis_risk
 end
 function set_kurtosis_risk!(model::JuMP.Model,
                             r::Kurtosis{<:Any, <:Any, <:Any, <:SquaredSOCRiskExpr},
                             opt::RiskConstraintOwner,
-                            sqrt_kurtosis_risk::JuMP.AbstractJuMPScalar, ::Any, i;
-                            prefix::Symbol = Symbol(""))
+                            sqrt_kurtosis_risk::JuMP.AbstractJuMPScalar, ::Any,
+                            bound::JuMP.AbstractJuMPScalar, i; prefix::Symbol = Symbol(""))
     qsqrt_kurtosis_risk = state_set!(model, prefix, :sq_kurtosis_risk_, i,
                                      JuMP.@expression(model, sqrt_kurtosis_risk^2))
     ub = variance_risk_bounds_val(SquareRootBound(), r.settings.ub)
-    set_risk_upper_bound!(model, opt, sqrt_kurtosis_risk, ub,
-                          state_key(prefix, :kurtosis_risk_, i))
-    set_risk_expression!(model, qsqrt_kurtosis_risk, r.settings.scale, r.settings.rke)
+    set_variance_risk_bounds_and_expression!(model, opt, bound, ub, :kurtosis_risk_, i,
+                                             qsqrt_kurtosis_risk, r.settings;
+                                             prefix = prefix)
     return qsqrt_kurtosis_risk
 end
 function set_kurtosis_risk!(model::JuMP.Model,
                             r::Kurtosis{<:Any, <:Any, <:Any, <:QuadRiskExpr},
                             opt::RiskConstraintOwner,
-                            sqrt_kurtosis_risk::JuMP.AbstractJuMPScalar, x_kurt, i;
-                            prefix::Symbol = Symbol(""))
+                            sqrt_kurtosis_risk::JuMP.AbstractJuMPScalar, x_kurt,
+                            bound::JuMP.AbstractJuMPScalar, i; prefix::Symbol = Symbol(""))
     qsqrt_kurtosis_risk = state_set!(model, prefix, :qd_kurtosis_risk_, i,
                                      JuMP.@expression(model,
                                                       LinearAlgebra.dot(x_kurt, x_kurt)))
     ub = variance_risk_bounds_val(SquareRootBound(), r.settings.ub)
-    set_risk_upper_bound!(model, opt, sqrt_kurtosis_risk, ub,
-                          state_key(prefix, :kurtosis_risk_, i))
-    set_risk_expression!(model, qsqrt_kurtosis_risk, r.settings.scale, r.settings.rke)
+    set_variance_risk_bounds_and_expression!(model, opt, bound, ub, :kurtosis_risk_, i,
+                                             qsqrt_kurtosis_risk, r.settings;
+                                             prefix = prefix)
     return qsqrt_kurtosis_risk
 end
 function set_kurtosis_risk!(model::JuMP.Model,
                             r::Kurtosis{<:Any, <:Any, <:Any, <:RSOCRiskExpr},
                             opt::RiskConstraintOwner,
-                            sqrt_kurtosis_risk::JuMP.AbstractJuMPScalar, x_kurt, i;
-                            prefix::Symbol = Symbol(""))
+                            sqrt_kurtosis_risk::JuMP.AbstractJuMPScalar, x_kurt,
+                            bound::JuMP.AbstractJuMPScalar, i; prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
     tkurtosis = state_set!(model, prefix, :tkurtosis_risk_, i, JuMP.@variable(model))
     state_set!(model, prefix, :ckurtosis_rsoc_, i,
@@ -271,9 +272,8 @@ function set_kurtosis_risk!(model::JuMP.Model,
                                  sc * 0.5
                                  sc * x_kurt] in JuMP.RotatedSecondOrderCone()))
     ub = variance_risk_bounds_val(SquareRootBound(), r.settings.ub)
-    set_risk_upper_bound!(model, opt, sqrt_kurtosis_risk, ub,
-                          state_key(prefix, :kurtosis_risk_, i))
-    set_risk_expression!(model, tkurtosis, r.settings.scale, r.settings.rke)
+    set_variance_risk_bounds_and_expression!(model, opt, bound, ub, :kurtosis_risk_, i,
+                                             tkurtosis, r.settings; prefix = prefix)
     return tkurtosis
 end
 """
@@ -307,13 +307,12 @@ The model replaces ``\\boldsymbol{w} \\boldsymbol{w}^\\intercal`` with the lift 
 # Algorithm
 
  1. Check that `r.kt` or `pr` holds a cokurtosis matrix, with [`assert_high_order_quantity`](@ref).
- 2. Read `sc`, the constraint scale, and `W`, the lift of [`set_sdp_constraints!`](@ref).
+ 2. Read `sc`, the constraint scale.
  3. Compute `Nf`, which is `r.N` clamped to `1:N`, times `N`.
- 4. Create `sqrt_kurtosis_risk` and `x_kurt`, and register them under their keys.
- 5. Read `vals_A` and `vecs_A`, the spectrum of `r.kt` from [`cokurtosis_spectrum`](@ref), else the spectrum of the prior's matrix from [`get_kt_Akt_pm`](@ref).
- 6. Build `Bi`, the matrices of the `Nf` largest eigenvalues.
- 7. Register the two rows below under their keys.
- 8. Bound `sqrt_kurtosis_risk` and add the risk expression with [`set_kurtosis_risk!`](@ref), and return the risk expression.
+ 4. Read `vals_A` and `vecs_A`, the spectrum of `r.kt` from [`cokurtosis_spectrum`](@ref), else the spectrum of the prior's matrix from [`get_kt_Akt_pm`](@ref).
+ 5. Build `Bi`, the matrices of the `Nf` largest eigenvalues.
+ 6. Build the epigraph with [`set_risk_epigraphs!`](@ref): read the lift `W` of [`set_sdp_constraints!`](@ref), create `sqrt_kurtosis_risk` and `x_kurt`, and register the two rows below under their keys. Under a unit budget a bounded measure builds a second epigraph, `bound`, for its bound.
+ 7. Bound `sqrt_kurtosis_risk` and add the risk expression with [`set_kurtosis_risk!`](@ref), and return the risk expression.
 
 # JuMP formulation
 
@@ -388,13 +387,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                prefix::Symbol = Symbol(""), kwargs...)
     assert_high_order_quantity(r.kt, pr, :Kurtosis, :kt, :CokurtosisEstimator)
     sc = get_constraint_scale(model)
-    W = set_sdp_constraints!(model; prefix = prefix)
-    N = size(W, 1)
-    f = clamp(r.N, 1, N)
-    Nf = f * N
-    sqrt_kurtosis_risk = state_set!(model, prefix, :kurtosis_risk_, i,
-                                    JuMP.@variable(model))
-    x_kurt = state_set!(model, prefix, :x_kurt_, i, JuMP.@variable(model, [1:Nf]))
+    N = length(get_w(model, prefix))
+    Nf = clamp(r.N, 1, N) * N
     vals_A, vecs_A = if isnothing(r.kt)
         get_kt_Akt_pm(model, pr)
     else
@@ -404,15 +398,23 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     N_eig = length(vals_A)
     Bi = [reshape(sqrt(vals_A[N_eig - j]) * view(vecs_A, :, N_eig - j), N, N)
           for j in 0:(Nf - 1)]
-    state_set!(model, prefix, :capprox_kurt_soc_, i,
-               JuMP.@constraint(model,
-                                [sc * sqrt_kurtosis_risk; sc * x_kurt] in
-                                JuMP.SecondOrderCone()))
-    state_set!(model, prefix, :capprox_kurt_, i,
-               JuMP.@constraint(model, [j = 1:Nf],
-                                sc * (x_kurt[j] - LinearAlgebra.dot(transpose(Bi[j]), W)) ==
-                                0))
-    return set_kurtosis_risk!(model, r, opt, sqrt_kurtosis_risk, x_kurt, i; prefix = prefix)
+    bounded = !isnothing(r.settings.ub)
+    (sqrt_kurtosis_risk, x_kurt), (bound, _) = set_risk_epigraphs!(model, r.settings.rke,
+                                                                   bounded; prefix = prefix
+                                                                   ) do k, p
+        W = set_sdp_constraints!(model, k; prefix = prefix)
+        g = state_set!(model, p, :kurtosis_risk_, i, JuMP.@variable(model))
+        x = state_set!(model, p, :x_kurt_, i, JuMP.@variable(model, [1:Nf]))
+        state_set!(model, p, :capprox_kurt_soc_, i,
+                   JuMP.@constraint(model, [sc * g; sc * x] in JuMP.SecondOrderCone()))
+        state_set!(model, p, :capprox_kurt_, i,
+                   JuMP.@constraint(model, [j = 1:Nf],
+                                    sc * (x[j] - LinearAlgebra.dot(transpose(Bi[j]), W)) ==
+                                    0))
+        return g, x
+    end
+    return set_kurtosis_risk!(model, r, opt, sqrt_kurtosis_risk, x_kurt, bound, i;
+                              prefix = prefix)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -443,13 +445,11 @@ Where:
 # Algorithm
 
  1. Check that `r.kt` or `pr` holds a cokurtosis matrix, with [`assert_high_order_quantity`](@ref).
- 2. Read `sc`, the constraint scale, and `W`, the lift of [`set_sdp_constraints!`](@ref).
- 3. Read `L2` and `S2` for the size of `W`, with [`dup_elim_sum_selector`](@ref).
+ 2. Read `sc`, the constraint scale.
+ 3. Read `L2` and `S2` for the number of assets, with [`dup_elim_sum_selector`](@ref).
  4. Read `G`, the factor of `r.kt` projected by `S2` under `r.mtx_sqrt`, else the factor of the prior's matrix from [`get_chol_or_Gkt_pm`](@ref).
- 5. Create `sqrt_kurtosis_risk`, and register it under its key.
- 6. Build `L2W` once for the namespace, and build `x_kurt`.
- 7. Register the cone row below under its key.
- 8. Bound `sqrt_kurtosis_risk` and add the risk expression with [`set_kurtosis_risk!`](@ref), and return the risk expression.
+ 5. Build the epigraph with [`set_risk_epigraphs!`](@ref): read the lift `W` of [`set_sdp_constraints!`](@ref), create `sqrt_kurtosis_risk`, build `L2W` once for the namespace, build `x_kurt`, and register the cone row below. Under a unit budget a bounded measure builds a second epigraph, `bound`, for its bound.
+ 6. Bound `sqrt_kurtosis_risk` and add the risk expression with [`set_kurtosis_risk!`](@ref), and return the risk expression.
 
 # JuMP formulation
 
@@ -526,22 +526,26 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                prefix::Symbol = Symbol(""), kwargs...)
     assert_high_order_quantity(r.kt, pr, :Kurtosis, :kt, :CokurtosisEstimator)
     sc = get_constraint_scale(model)
-    W = set_sdp_constraints!(model; prefix = prefix)
-    L2, S2 = dup_elim_sum_selector(pr, size(W, 1))[2:3]
+    L2, S2 = dup_elim_sum_selector(pr, length(get_w(model, prefix)))[2:3]
     G = if isnothing(r.kt)
         get_chol_or_Gkt_pm(model, pr, r.mtx_sqrt)
     else
         transpose(matrix_square_root(r.mtx_sqrt, S2 * r.kt * transpose(S2)))
     end
-    sqrt_kurtosis_risk = state_set!(model, prefix, :kurtosis_risk_, i,
-                                    JuMP.@variable(model))
-    L2W = state_build!(model, prefix, :L2W) do
-        JuMP.@expression(model, L2 * vec(W))
+    bounded = !isnothing(r.settings.ub)
+    (sqrt_kurtosis_risk, x_kurt), (bound, _) = set_risk_epigraphs!(model, r.settings.rke,
+                                                                   bounded; prefix = prefix
+                                                                   ) do k, p
+        W = set_sdp_constraints!(model, k; prefix = prefix)
+        g = state_set!(model, p, :kurtosis_risk_, i, JuMP.@variable(model))
+        L2W = state_build!(model, p, :L2W) do
+            JuMP.@expression(model, L2 * vec(W))
+        end
+        x = state_set!(model, p, :x_kurt_, i, JuMP.@expression(model, G * L2W))
+        state_set!(model, p, :ckurt_soc_, i,
+                   JuMP.@constraint(model, [sc * g; sc * x] in JuMP.SecondOrderCone()))
+        return g, x
     end
-    x_kurt = state_set!(model, prefix, :x_kurt_, i, JuMP.@expression(model, G * L2W))
-    state_set!(model, prefix, :ckurt_soc_, i,
-               JuMP.@constraint(model,
-                                [sc * sqrt_kurtosis_risk; sc * x_kurt] in
-                                JuMP.SecondOrderCone()))
-    return set_kurtosis_risk!(model, r, opt, sqrt_kurtosis_risk, x_kurt, i; prefix = prefix)
+    return set_kurtosis_risk!(model, r, opt, sqrt_kurtosis_risk, x_kurt, bound, i;
+                              prefix = prefix)
 end
