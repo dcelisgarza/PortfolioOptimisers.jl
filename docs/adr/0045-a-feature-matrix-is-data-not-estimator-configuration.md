@@ -1237,3 +1237,10 @@ static shape `assets × features` and the dispatch on `Arr3Num` do not change.
 2026-09-05 and 2026-09-06 state that the lift "indexes a leading observation axis" through
 `RepeatedLeading`, read `RepeatedObservations`: a lifted vector is `observations × assets`, and a
 lifted matrix is `assets × labels × observations`.
+
+## Amendment (2026-11-23, #2193)
+
+**The default metric of § 5 is `ChordDist`, not `AngularDist`.** [ADR
+0243](0243-the-default-feature-metric-is-the-chord-because-it-is-euclidean.md) records the change.
+The angle is not Euclidean, and the default Ward linkage needs a Euclidean distance. `AngularDist`
+and `AngularSimilarity` stay as options, with the rest of § 5 unchanged.

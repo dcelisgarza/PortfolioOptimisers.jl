@@ -10,6 +10,7 @@ ExponentialSimilarity
 GeneralExponentialSimilarity
 ComplementSimilarity
 AngularSimilarity
+ChordSimilarity
 ```
 
 ## References

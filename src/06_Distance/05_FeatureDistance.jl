@@ -5,6 +5,8 @@ Measures the angle between two feature vectors as a fraction of ``\\pi``.
 
 The angular distance satisfies the triangle inequality, so it is a true metric, and a hierarchy built from it is well defined. `Distances.CosineDist`, which is ``1 - \\cos``, does not satisfy it. Lemma 3 of [vandongen2012](@cite) states that the angle ``\\arccos`` of a cosine or of a correlation is a metric, and it shows that ``1 - \\cos`` is not one. Section 1 of [charikar2002](@cite) divides the angle by ``\\pi``. The metric maps ``[-1,\\,1] \\to [1,\\,0]``, so it is bounded, it is invariant to a positive scale of an asset's feature vector, and it accepts signed features. Its exact similarity counterpart is [`AngularSimilarity`](@ref), which recovers the cosine from the distance alone.
 
+The angular distance is a metric, but it is not Euclidean. The feature vectors `(1, 0)`, `(0, 1)`, `(-1, 0)` and `(0, -1)` are at `0.5` from each neighbour and at `1` from the opposite vector. For four points ``a``, ``b``, ``c`` and ``d`` of a Euclidean space, the sum of the squares of the four sides of the quadrilateral less the sum of the squares of its two diagonals is ``\\lVert a - b + c - d\\rVert^{2} \\geq 0``. Here it is ``4 \\cdot 0.25 - 2 = -1``. The Ward update of [`WardLinkage`](@ref) is correct for a Euclidean distance alone, so [`ChordDist`](@ref), not this metric, is the default of [`FeatureDistance`](@ref). A walk-forward measurement found no consistent difference out of sample between this metric and `Distances.CosineDist`. They change the leaf order, the number of clusters and some weights, but with no consistent sign.
+
 A zero feature vector has no direction, so its cosine is undefined. The metric puts two zero vectors at distance `0`, because they are identical. It puts a zero vector at distance `1` from every non-zero vector, the largest distance. This convention keeps ``S = \\cos(\\pi D)`` true at every entry of the matching similarity matrix.
 
 # Mathematical definition
@@ -49,6 +51,7 @@ One matrix multiplication replaces ``N^{2}`` scalar calls, and it is the faster 
 # Related
 
   - [`AngularSimilarity`](@ref)
+  - [`ChordDist`](@ref)
   - [`FeatureDistance`](@ref)
   - [`default_similarity`](@ref)
   - [`Distances.jl`](https://docs.juliahub.com/General/Distances/stable/)
@@ -92,6 +95,103 @@ function Distances._pairwise!(::AngularDist, r::AbstractMatrix, a::AbstractMatri
 end
 function default_similarity(::AngularDist)::AngularSimilarity
     return AngularSimilarity()
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Measures half the chord between the directions of two feature vectors. It is the default metric of [`FeatureDistance`](@ref).
+
+The chord is the distance between the unit vectors ``\\hat{\\boldsymbol{z}}_{i}`` and ``\\hat{\\boldsymbol{z}}_{j}``, so ``\\lVert\\hat{\\boldsymbol{z}}_{i} - \\hat{\\boldsymbol{z}}_{j}\\rVert^{2} = 2(1 - \\cos)``. Half of it is ``\\sqrt{(1 - \\cos) / 2}``, the form of [`SimpleDistance`](@ref) on the returns path with the cosine in place of the correlation. Equation 4 of Section 3 of [gower1966](@cite) gives ``\\Delta = \\sqrt{2(1 - S)}``, twice this distance, from a similarity matrix ``S`` with a unit diagonal, and the matrix of cosines is one.
+
+The metric is Euclidean, because the points ``\\hat{\\boldsymbol{z}}_{i} / 2`` realise it in the feature space. This is the reason that it is the default. The default linkage of [`HClustAlgorithm`](@ref) is [`WardLinkage`](@ref), and the Ward update is correct for a Euclidean distance alone. [`AngularDist`](@ref) is a metric, but it is not Euclidean. The metric maps ``[-1,\\,1] \\to [1,\\,0]``, so it is bounded, it is invariant to a positive scale of an asset's feature vector, and it accepts signed features. Its exact similarity counterpart is [`ChordSimilarity`](@ref).
+
+A zero feature vector has no direction, so its cosine is undefined. The metric puts two zero vectors at distance `0`, and a zero vector at distance `1` from every non-zero vector, as [`AngularDist`](@ref) does. This convention keeps ``S = 1 - 2D^{2}`` true at every entry of the matching similarity matrix.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+d_{i,\\,j} &= \\sqrt{\\dfrac{1}{2}\\left(1 - \\dfrac{\\boldsymbol{z}_{i} \\cdot \\boldsymbol{z}_{j}}{\\lVert\\boldsymbol{z}_{i}\\rVert \\lVert\\boldsymbol{z}_{j}\\rVert}\\right)} = \\dfrac{1}{2}\\left\\lVert \\dfrac{\\boldsymbol{z}_{i}}{\\lVert\\boldsymbol{z}_{i}\\rVert} - \\dfrac{\\boldsymbol{z}_{j}}{\\lVert\\boldsymbol{z}_{j}\\rVert} \\right\\rVert\\,,
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:d_ij_dist])
+  - $(math_dict[:z_i_feature])
+
+# Algorithm
+
+The metric has two paths, and both are part of its contract. The elementwise method measures one pair of feature vectors, and `Distances._pairwise!` measures a whole matrix.
+
+The elementwise method, `ChordDist()(a, b)`:
+
+ 1. Promote the element types of `a` and `b`, and take `T` as the type of the square root of `one` of that type. An `Int` or a `Rational{Int}` input gives `Float64`, and every float type keeps its own type. `Distances.result_type` gives the same `T`.
+ 2. Take the norm `na` of `a` and the norm `nb` of `b`.
+ 3. Return `zero(T)` when both norms are zero, and `one(T)` when exactly one of them is zero.
+ 4. Divide the dot product of `a` and `b` by `na * nb` to get the cosine.
+ 5. Clamp the cosine to ``[-1,\\,1]``, subtract it from `1`, halve the result, and take its square root.
+
+The matrix method, `Distances._pairwise!(::ChordDist, r, a)`, receives `a` with one column per asset:
+
+ 1. Pass the whole matrix to the `Distances.CosineDist` kernel. The kernel writes ``1 - \\cos`` into `r` with one BLAS `gemm` call, and leaves `NaN` at each entry of a zero column.
+ 2. Mark the zero columns of `a` in the mask `z`.
+ 3. Rewrite every entry of `r` in place. A diagonal entry and an entry of two zero columns become `zero(T)`. An entry of a zero column and a non-zero column becomes `one(T)`. Every other entry becomes ``\\sqrt{r_{i,\\,j} / 2}``, after a clamp of ``r_{i,\\,j}`` to ``[0,\\,2]``.
+
+!!! note "The two paths differ on the diagonal, and the matrix path is the correct one"
+
+    The cosine of a vector with itself rounds to a value near `1`, not always to `1`. The square root has an infinite derivative at `0`, so a residual of one unit in the last place gives a distance near `1e-8` in `Float64`. The matrix path writes an exact zero on the diagonal. [`FeatureDistance`](@ref) reaches the metric through the matrix entry points alone, so it never sees the residual.
+
+# Related
+
+  - [`ChordSimilarity`](@ref)
+  - [`AngularDist`](@ref)
+  - [`SimpleDistance`](@ref)
+  - [`FeatureDistance`](@ref)
+  - [`WardLinkage`](@ref)
+  - [`default_similarity`](@ref)
+  - [`Distances.jl`](https://docs.juliahub.com/General/Distances/stable/)
+
+# References
+
+  - $(ref_dict[:gower1966]) Section 3, Equation 4.
+  - $(ref_dict[:mullner2011]) Figure 2, for the Ward update on a Euclidean distance.
+"""
+struct ChordDist <: Distances.Metric end
+function (::ChordDist)(a, b)
+    T = Distances.result_type(ChordDist(), eltype(a), eltype(b))
+    na = LinearAlgebra.norm(a)
+    nb = LinearAlgebra.norm(b)
+    if iszero(na) && iszero(nb)
+        return zero(T)
+    elseif iszero(na) || iszero(nb)
+        return one(T)
+    end
+    c = clamp(T(LinearAlgebra.dot(a, b) / (na * nb)), -one(T), one(T))
+    return sqrt((one(T) - c) / 2)
+end
+function Distances.result_type(::ChordDist, a::Type, b::Type)
+    return typeof(sqrt(one(promote_type(a, b))))
+end
+# The `ChordDist` docstring's `# Algorithm` section states both paths and why the matrix path
+# writes the diagonal.
+function Distances._pairwise!(::ChordDist, r::AbstractMatrix, a::AbstractMatrix)
+    Distances._pairwise!(Distances.CosineDist(), r, a)
+    T = eltype(r)
+    z = [iszero(LinearAlgebra.norm(view(a, :, j))) for j in axes(a, 2)]
+    @inbounds for j in axes(r, 2), i in axes(r, 1)
+        r[i, j] = if i == j || (z[i] && z[j])
+            zero(T)
+        elseif z[i] || z[j]
+            one(T)
+        else
+            sqrt(clamp(r[i, j], zero(T), 2 * one(T)) / 2)
+        end
+    end
+    return r
+end
+function default_similarity(::ChordDist)::ChordSimilarity
+    return ChordSimilarity()
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -713,15 +813,21 @@ Applies a metric to the rows of a feature matrix to make a distance matrix.
 
 A feature matrix describes the assets by their exposures, memberships, loadings or adjacencies, not by their returns. This estimator is a sibling of [`Distance`](@ref) and [`DistanceDistance`](@ref). These two read a correlation matrix. This estimator never reads one, and it works where the returns hold no useful data, or where no returns exist.
 
+The default metric is [`ChordDist`](@ref). It is Euclidean, so the Ward update of [`WardLinkage`](@ref), the default linkage of [`HClustAlgorithm`](@ref), is correct on it. It has the form of [`SimpleDistance`](@ref) on the returns path, with the cosine of the features in place of the correlation.
+
 The estimator accepts each `Distances.SemiMetric`, and a user-defined one too. Every metric has a similarity, so no combination throws on this path. The remarks below are about the metric that a caller chooses, not about this type.
+
+!!! note "What a feature distance gives out of sample"
+
+    A walk-forward measurement compared four feature kinds with the distances of [`Distance`](@ref) and [`DistanceDistance`](@ref), which read the returns alone. The kinds were a sector taxonomy, volatility and momentum, a [`PhylogenyPanel`](@ref) and the factor loadings of a [`RegressionPanel`](@ref). The data were 20 stocks of the S&P 500 over 1990 to 2022 and 36 stocks of the NYSE (O) set over 1962 to 1984. The optimisers were [`HierarchicalRiskParity`](@ref), [`HierarchicalEqualRiskContribution`](@ref), [`SchurComplementHierarchicalRiskParity`](@ref) and [`NestedClustered`](@ref). No feature kind gave a lower risk or a higher Sharpe ratio out of sample than the returns-only distances on both data sets. The one gain was a lower turnover from a fixed taxonomy. On the NYSE (O) set, that gain cost 2 to 4 % more volatility under three of the four optimisers. Use this estimator where the returns hold no useful data, or to impose a structure that the returns do not show, and not to lower the risk.
 
 !!! warning "A metric is not automatically in the domain of the similarity"
 
-    [`ComplementSimilarity`](@ref) is the default for each metric other than [`AngularDist`](@ref). Under it, a distance above `1` gives a negative similarity, and a distance above `2` gives a similarity below `-1`. [`plot_clusters`](@ref) clips such a similarity with no warning. The first limit is `1`, so a bounded metric can cross it too. `Distances.CosineDist` and `Distances.CorrDist` have a bound of `2`, and they cross `1` at every negative cosine or correlation. `Distances.Euclidean` has no bound, and it crosses `2` on features of large magnitude.
+    [`ComplementSimilarity`](@ref) is the default for each metric other than [`AngularDist`](@ref) and [`ChordDist`](@ref). Under it, a distance above `1` gives a negative similarity, and a distance above `2` gives a similarity below `-1`. [`plot_clusters`](@ref) clips such a similarity with no warning. The first limit is `1`, so a bounded metric can cross it too. `Distances.CosineDist` and `Distances.CorrDist` have a bound of `2`, and they cross `1` at every negative cosine or correlation. `Distances.Euclidean` has no bound, and it crosses `2` on features of large magnitude.
 
     This warning applies to this path alone. When this estimator is the `de` of a [`NetworkEstimator`](@ref), [`DBHT`](@ref) or [`LoGo`](@ref), its distance matrix goes to the PMFG path. There, the similarity field of that estimator applies, not `sim`. [`assert_similarity_domain`](@ref) refuses a distance above `1` under [`ComplementSimilarity`](@ref), and a non-finite distance under [`MaximumDistanceSimilarity`](@ref).
 
-Every metric other than [`AngularDist`](@ref) and `Distances.CorrDist` changes when the feature vector of an asset changes scale. [`AngularDist`](@ref) is invariant to a positive scale of the feature vector of an asset, but it changes when one feature changes scale across the assets. Standardise features of different scales before use. `Distances.CorrDist` cannot measure a single feature. Each feature vector is then constant, and `Distances.CorrDist` leaves `NaN` against a constant feature vector that is not zero.
+Every metric other than [`ChordDist`](@ref), [`AngularDist`](@ref) and `Distances.CorrDist` changes when the feature vector of an asset changes scale. [`ChordDist`](@ref) and [`AngularDist`](@ref) are invariant to a positive scale of the feature vector of an asset, but they change when one feature changes scale across the assets. Standardise features of different scales before use. `Distances.CorrDist` cannot measure a single feature. Each feature vector is then constant, and `Distances.CorrDist` leaves `NaN` against a constant feature vector that is not zero.
 
 `Distances.Jaccard` is the general Ruzicka form over the non-negative reals, not the Jaccard index of two binary sets. On signed input it returns values up to `2`, with no error. `Distances.Jaccard`, `Distances.BrayCurtis` and `Distances.ChiSqDist` need a non-negative feature matrix. The constructor does not know the feature matrix, so [`assert_metric_domain`](@ref) checks it in the kernel.
 
@@ -767,7 +873,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     FeatureDistance(;
-        metric::Distances.SemiMetric = AngularDist(),
+        metric::Distances.SemiMetric = ChordDist(),
         alg::AbstractFeatureCollapseAlgorithm = LastRow(),
         sim::AbstractSimilarityMatrixAlgorithm = default_similarity(metric),
         ape::Option{<:AbstractAssetPanelEstimator} = nothing,
@@ -793,9 +899,9 @@ Keywords correspond to the struct's fields. The constructor sets `sim` to [`defa
 ```jldoctest
 julia> FeatureDistance()
 FeatureDistance
-  metric ┼ AngularDist: AngularDist()
+  metric ┼ ChordDist: ChordDist()
      alg ┼ LastRow()
-     sim ┼ AngularSimilarity()
+     sim ┼ ChordSimilarity()
      ape ┼ nothing
      sel ┼ nothing
   strict ┴ Bool: false
@@ -813,6 +919,7 @@ FeatureDistance
 # Related
 
   - [`AbstractDistanceEstimator`](@ref)
+  - [`ChordDist`](@ref)
   - [`AngularDist`](@ref)
   - [`AbstractFeatureCollapseAlgorithm`](@ref)
   - [`AbstractSimilarityMatrixAlgorithm`](@ref)
@@ -863,7 +970,7 @@ FeatureDistance
                    typeof(strict)}(metric, alg, sim, ape, sel, strict)
     end
 end
-function FeatureDistance(; metric::Distances.SemiMetric = AngularDist(),
+function FeatureDistance(; metric::Distances.SemiMetric = ChordDist(),
                          alg::AbstractFeatureCollapseAlgorithm = LastRow(),
                          sim::AbstractSimilarityMatrixAlgorithm = default_similarity(metric),
                          ape::Option{<:AbstractAssetPanelEstimator} = nothing,
@@ -919,7 +1026,7 @@ Validate a feature matrix at the entry point of [`distance`](@ref) and [`cor_and
 
 The checks read every cell of `Z`. On a window that holds an unreadable cell, [`distance`](@ref) gives it the copy from [`blank_unreadable`](@ref), which holds a zero at each such cell. So the checks find a fault only in the readable cells, which are the cells that the collapse reads.
 
-The check refuses a non-finite entry, because no metric makes a usable distance from it. The Minkowski family gives `Inf`, the cosine family gives `NaN`, and a clustering cannot use either. The check accepts a degenerate input that a metric can measure. A zero feature vector has a documented convention, which [`AngularDist`](@ref) states, and a duplicate or constant feature is valid input.
+The check refuses a non-finite entry, because no metric makes a usable distance from it. The Minkowski family gives `Inf`, the cosine family gives `NaN`, and a clustering cannot use either. The check accepts a degenerate input that a metric can measure. A zero feature vector has a documented convention, which [`ChordDist`](@ref) and [`AngularDist`](@ref) state, and a duplicate or constant feature is valid input.
 
 # Algorithm
 
@@ -999,7 +1106,7 @@ Apply the convention for a zero feature vector to `D` in place. Two zero vectors
 
 The function rewrites only the entries that the metric left as `NaN`. A zero feature vector is valid input, so no check at construction can find it. A metric that divides by a norm cannot measure it. The cosine family gives `NaN` against every vector, and `Distances.Jaccard` and `Distances.BrayCurtis` give `NaN` between two zero vectors. The Minkowski family puts a zero vector at the origin and measures it. Because the function rewrites only `NaN` entries, it corrects the first metrics and leaves the Minkowski family unchanged.
 
-This convention keeps ``S = \\cos(\\pi D)`` true at every entry. With it, [`AngularSimilarity`](@ref) gives `+1` between two zero vectors and `-1` between a zero vector and a non-zero vector, with a diagonal of ones. `Distances.pairwise` always writes an exact zero diagonal, so the function does not change the diagonal.
+This convention keeps ``S = 1 - 2D^{2}`` true at every entry under [`ChordSimilarity`](@ref), and ``S = \\cos(\\pi D)`` under [`AngularSimilarity`](@ref). With it, each of the two gives `+1` between two zero vectors and `-1` between a zero vector and a non-zero vector, with a diagonal of ones. `Distances.pairwise` always writes an exact zero diagonal, so the function does not change the diagonal.
 
 # Algorithm
 
@@ -1020,6 +1127,7 @@ This convention keeps ``S = \\cos(\\pi D)`` true at every entry. With it, [`Angu
 # Related
 
   - [`zero_feature_vectors`](@ref)
+  - [`ChordDist`](@ref)
   - [`AngularDist`](@ref)
   - [`FeatureDistance`](@ref)
 """
@@ -1307,9 +1415,9 @@ julia> Z = [1.0 0.0; 0.0 1.0; 1.0 1.0];
 
 julia> distance(FeatureDistance(), Z)
 3×3 Matrix{Float64}:
- 0.0   0.5   0.25
- 0.5   0.0   0.25
- 0.25  0.25  0.0
+ 0.0       0.707107  0.382683
+ 0.707107  0.0       0.382683
+ 0.382683  0.382683  0.0
 ```
 
 # Related
@@ -1345,7 +1453,7 @@ end
 
 Compute the similarity and distance matrices from a feature matrix.
 
-The similarity is `distance_to_similarity(de.sim; D = D)`, which the call computes from the distance matrix that it returns. `S` and `D` come from one measurement, not from two independent estimates. Under [`AggregateDistances`](@ref), the similarity comes from the aggregated distance, so the convention for a zero feature vector holds in `S` too, because ``\\mathrm{mean}(\\cos(\\pi D_{t})) \\neq \\cos(\\pi\\,\\mathrm{mean}(D_{t}))``.
+The similarity is `distance_to_similarity(de.sim; D = D)`, which the call computes from the distance matrix that it returns. `S` and `D` come from one measurement, not from two independent estimates. Under [`AggregateDistances`](@ref), the similarity comes from the aggregated distance, so the convention for a zero feature vector holds in `S` too. The similarity of the default [`ChordSimilarity`](@ref) is not linear in the distance, so ``\\mathrm{mean}(1 - 2D_{t}^{2}) \\neq 1 - 2\\,\\mathrm{mean}(D_{t})^{2}``.
 
 # Algorithm
 
@@ -1377,9 +1485,9 @@ julia> S, D = cor_and_dist(FeatureDistance(), Z);
 
 julia> S
 3×3 Matrix{Float64}:
- 1.0          6.12323e-17  0.707107
- 6.12323e-17  1.0          0.707107
- 0.707107     0.707107     1.0
+  1.0          -2.22045e-16  0.707107
+ -2.22045e-16   1.0          0.707107
+  0.707107      0.707107     1.0
 ```
 
 # Related
@@ -1716,7 +1824,7 @@ function cor_and_dist(de::FeatureDistance, ::Any, X; pr = nothing, rd = nothing,
     return cor_and_dist(de, Z; dims = 1, amsk = A, nx = feature_asset_names(pr, rd))
 end
 
-export AngularDist, MeanCollapse, MedianCollapse, AggregateFeatures, AggregateDistances,
-       StackObservations, FeatureDistance, LastRow, LastActiveRow, RefusePair,
-       DropFewerRows, FeatureFallback
+export AngularDist, ChordDist, MeanCollapse, MedianCollapse, AggregateFeatures,
+       AggregateDistances, StackObservations, FeatureDistance, LastRow, LastActiveRow,
+       RefusePair, DropFewerRows, FeatureFallback
 public LastObservation, AbstractEmptyPairAlgorithm, collapse_rows

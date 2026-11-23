@@ -476,27 +476,127 @@
                 @test eltype(distance(FeatureDistance(; alg = alg), Z3)) === Float32
             end
         end
+        @testset "ChordDist, the default metric, and ChordSimilarity (#2193)" begin
+            cdm = ChordDist()
+            @test cdm isa DS.Metric
+            @test FeatureDistance().metric === cdm
+            @test PortfolioOptimisers.default_similarity(cdm) === ChordSimilarity()
+            # The kernel is the closed form sqrt((1 - cos) / 2) = ‖â - b̂‖ / 2. The diagonal is
+            # left out: the docstring states the residual of a vector against itself there.
+            Z = randn(rng, 9, 4)
+            for i in 1:9, j in 1:9
+                i == j && continue
+                a = Z[i, :]
+                b = Z[j, :]
+                c = dot(a, b) / (norm(a) * norm(b))
+                @test isapprox(cdm(a, b), sqrt((1 - c) / 2); atol = 1e-8)
+                @test isapprox(cdm(a, b), norm(a / norm(a) - b / norm(b)) / 2; atol = 1e-8)
+            end
+            # The zero-vector rule of `AngularDist`: 0 between two zero vectors, 1 against
+            # a non-zero one, on both paths.
+            @test iszero(cdm(zeros(3), zeros(3)))
+            @test isone(cdm(zeros(3), [1.0, 2.0, 0.0]))
+            @test isone(cdm([1.0, 2.0, 0.0], zeros(3)))
+            # The clamp: a cosine that rounds above 1 or below -1 gives no `NaN` and no
+            # distance outside [0, 1].
+            @test cdm([1.0, 0.0], [-1.0, 0.0]) == 1.0
+            for _ in 1:200
+                a = randn(rng, 5)
+                for b in (3.7 .* a, -0.3 .* a)
+                    d = cdm(a, b)
+                    @test !isnan(d) && 0 <= d <= 1
+                end
+            end
+            # `_pairwise!` against the scalar call, with zero rows and on either `dims`.
+            for N in (2, 5, 50), K in (1, 3, 30)
+                Zp = randn(rng, N, K)
+                @test isapprox(DS.pairwise(cdm, Zp; dims = 1),
+                               elementwise_pairwise(cdm, Zp); atol = 1e-8)
+            end
+            Zz = randn(rng, 8, 4)
+            Zz[2, :] .= 0
+            Zz[5, :] .= 0
+            Dz = DS.pairwise(cdm, Zz; dims = 1)
+            @test isapprox(Dz, elementwise_pairwise(cdm, Zz); atol = 1e-8)
+            @test isapprox(Dz, DS.pairwise(cdm, permutedims(Zz); dims = 2))
+            @test all(iszero, Dz[[2, 5], [2, 5]])
+            @test all(isone, Dz[[2, 5], [1, 3, 4, 6, 7, 8]])
+            @test all(iszero, diag(Dz))
+            # The type follows `sqrt`: an integer widens and a float keeps its type.
+            for (Ti, To) in ((Int, Float64), (Rational{Int}, Float64), (Float32, Float32),
+                             (BigFloat, BigFloat))
+                @test DS.result_type(cdm, Ti, Ti) === To
+                @test typeof(cdm(Ti[1, 2, 0], Ti[2, 1, 1])) === To
+                @test typeof(cdm(zeros(Ti, 3), zeros(Ti, 3))) === To
+                @test eltype(DS.pairwise(cdm, Ti[1 2; 2 1; 3 3; 0 0]; dims = 1)) === To
+            end
+            # `ChordSimilarity` is the exact inverse: it recovers the cosine, and the
+            # zero-vector convention gives +1 and -1.
+            Zc = randn(rng, 40, 7)
+            Dc = DS.pairwise(cdm, Zc; dims = 1)
+            Sc = PortfolioOptimisers.distance_to_similarity(ChordSimilarity(); D = Dc)
+            @test isapprox(Sc,
+                           one(eltype(Zc)) .- DS.pairwise(DS.CosineDist(), Zc; dims = 1);
+                           atol = 1e-12)
+            @test PortfolioOptimisers.distance_to_similarity(ChordSimilarity();
+                                                             D = [0.0 1.0; 1.0 0.0]) ==
+                  [1.0 -1.0; -1.0 1.0]
+            @test eltype(PortfolioOptimisers.distance_to_similarity(ChordSimilarity();
+                                                                    D = Float32.(Dc))) ===
+                  Float32
+            # The chord is Euclidean: the doubly centred -D²/2 has no negative eigenvalue.
+            n = size(Dc, 1)
+            Jc = I - fill(1 / n, n, n)
+            @test minimum(eigvals(Symmetric(-Jc * (Dc .^ 2) * Jc / 2))) > -1e-12
+            # The angle is not, on the four points of the `AngularDist` docstring: the sides
+            # squared less the diagonals squared is ‖a - b + c - d‖² >= 0 in a Euclidean space.
+            Zq = [1.0 0.0; 0.0 1.0; -1.0 0.0; 0.0 -1.0]
+            quad(D) = D[1, 2]^2 + D[2, 3]^2 + D[3, 4]^2 + D[4, 1]^2 - D[1, 3]^2 - D[2, 4]^2
+            @test isapprox(quad(DS.pairwise(AngularDist(), Zq; dims = 1)), -1.0)
+            @test isapprox(quad(DS.pairwise(cdm, Zq; dims = 1)), 0.0; atol = 1e-12)
+            # The wrong pair of the warning: an angular 0.5 reads as a cosine of 0.5, not 0.
+            @test PortfolioOptimisers.distance_to_similarity(ChordSimilarity();
+                                                             D = fill(0.5, 1, 1))[1] == 0.5
+            # A ratio metric: `StackObservations` rescales nothing.
+            @test PortfolioOptimisers.stack_rescale(cdm, 0.3, 1:2, 5) == 0.3
+            # It goes negative, so the PMFG path refuses it at construction.
+            @test_throws TypeError NetworkEstimator(; alg = ChordSimilarity())
+            @test_throws TypeError DBHT(; sim = ChordSimilarity())
+            @test_throws TypeError LoGo(; sim = ChordSimilarity())
+        end
         @testset "2-D feature matrices" begin
             Z = [1.0 0.0; 0.0 1.0; 1.0 1.0]
             de = FeatureDistance()
-            @test de.metric === AngularDist()
+            @test de.metric === ChordDist()
             @test de.alg === LastRow()
-            # `sim` is defaulted from the metric, and `AngularDist` gets the exact inverse.
-            @test de.sim === AngularSimilarity()
+            # `sim` is defaulted from the metric, and each of the two direction metrics gets
+            # its exact inverse.
+            @test de.sim === ChordSimilarity()
+            @test FeatureDistance(; metric = AngularDist()).sim === AngularSimilarity()
             @test FeatureDistance(; metric = DS.CosineDist()).sim === ComplementSimilarity()
             D = distance(de, Z)
             @test issymmetric(D)
             @test all(iszero, diag(D))
-            @test isapprox(D, [0.0 0.5 0.25; 0.5 0.0 0.25; 0.25 0.25 0.0])
+            dc = sqrt((1 - 1 / sqrt(2)) / 2)
+            @test isapprox(D, [0.0 sqrt(0.5) dc; sqrt(0.5) 0.0 dc; dc dc 0.0])
             # `cor_and_dist`'s first slot is the similarity, derived from this very `D`.
             S, D2 = cor_and_dist(de, Z)
             @test D2 == D
-            @test isapprox(S, cos.(pi .* D))
-            # `AngularSimilarity` recovers the cosine similarity exactly, with no `Z`.
+            @test isapprox(S, 1 .- 2 .* D .^ 2)
+            # Under `AngularDist`, the same matrix takes the angles, and `cos(πD)` inverts it.
+            dea = FeatureDistance(; metric = AngularDist())
+            Da = distance(dea, Z)
+            @test isapprox(Da, [0.0 0.5 0.25; 0.5 0.0 0.25; 0.25 0.25 0.0])
+            Sa, _ = cor_and_dist(dea, Z)
+            @test isapprox(Sa, cos.(pi .* Da))
+            # Each inverse recovers the cosine similarity exactly, with no `Z`.
             Zc = randn(rng, 40, 7)
-            Sc, _ = cor_and_dist(de, Zc)
-            @test isapprox(Sc,
-                           one(eltype(Zc)) .- DS.pairwise(DS.CosineDist(), Zc; dims = 1))
+            for dex in (de, dea)
+                Sc, _ = cor_and_dist(dex, Zc)
+                @test isapprox(Sc,
+                               one(eltype(Zc)) .-
+                               DS.pairwise(DS.CosineDist(), Zc; dims = 1))
+            end
             # Every `SemiMetric` yields a similarity; nothing throws.
             Se, De = cor_and_dist(FeatureDistance(; metric = DS.Euclidean()), Zc)
             @test isapprox(Se, one(eltype(De)) .- De)
@@ -513,7 +613,7 @@
         end
         @testset "Degenerate 2-D inputs" begin
             de = FeatureDistance()
-            # A single feature: every asset is on one ray, so the angular distance is 0.
+            # A single feature: every asset is on one ray, so the chord distance is 0.
             # `CorrDist` is NaN against any constant row, hence unusable here (#162).
             Z1 = reshape([1.0, 2.0, 3.0], 3, 1)
             @test all(iszero, distance(de, Z1))
@@ -522,7 +622,8 @@
             # Zero rows: valid input the metric cannot measure. The patch rewrites only the
             # entries the metric left as NaN.
             Zz = [1.0 0.0; 0.0 0.0; 0.0 0.0; 1.0 1.0]
-            for metric in (AngularDist(), DS.CosineDist(), DS.Jaccard(), DS.BrayCurtis())
+            for metric in (ChordDist(), AngularDist(), DS.CosineDist(), DS.Jaccard(),
+                           DS.BrayCurtis())
                 D = distance(FeatureDistance(; metric = metric), Zz)
                 @test !any(isnan, D)
                 @test iszero(D[2, 3])
@@ -599,8 +700,8 @@
             # closes the chain, so `factory` installs threaded weights.
             fd = factory(FeatureDistance(; alg = AggregateFeatures()), w)
             @test fd.alg.w === w
-            @test fd.metric === AngularDist()
-            @test fd.sim === AngularSimilarity()
+            @test fd.metric === ChordDist()
+            @test fd.sim === ChordSimilarity()
             # The rules with no observation axis to weight ignore threaded weights.
             @test factory(FeatureDistance(), w).alg === LastRow()
             # `FeatureDistance` must be `@propagatable`, or `ClustersEstimator`'s `@fprop de`
@@ -774,8 +875,8 @@
                     fde = FeatureDistance(; alg = alg)
                     S, D = cor_and_dist(fde, Zin)
                     @test D == distance(fde, Zin)
-                    # `AngularSimilarity` is the exact inverse of `AngularDist`.
-                    @test isapprox(S, cos.(pi .* D))
+                    # `ChordSimilarity` is the exact inverse of `ChordDist`.
+                    @test isapprox(S, 1 .- 2 .* D .^ 2)
                 end
             end
         end

@@ -414,13 +414,13 @@ Rescale the distance `d` of a pair, measured on the coordinates `idx` of a stack
 
 # Mathematical definition
 
-| Metric                                                                                                                                          | Rescale                                            |
-|:----------------------------------------------------------------------------------------------------------------------------------------------- |:-------------------------------------------------- |
-| `Distances.Cityblock`, `Distances.TotalVariation`, `Distances.SqEuclidean`, `Distances.ChiSqDist`                                               | ``d \\cdot L / n``                                 |
-| `Distances.Euclidean`                                                                                                                           | ``d \\cdot \\sqrt{L / n}``                         |
-| `Distances.Minkowski`                                                                                                                           | ``d \\cdot (L / n)^{1/p}``                         |
-| A weighted form                                                                                                                                 | the ratio of the weight sums in place of ``L / n`` |
-| [`AngularDist`](@ref), `Distances.CosineDist`, `Distances.CorrDist`, `Distances.Jaccard`, `Distances.BrayCurtis`, and the three mean deviations | none                                               |
+| Metric                                                                                                                                                               | Rescale                                            |
+|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------- |:-------------------------------------------------- |
+| `Distances.Cityblock`, `Distances.TotalVariation`, `Distances.SqEuclidean`, `Distances.ChiSqDist`                                                                    | ``d \\cdot L / n``                                 |
+| `Distances.Euclidean`                                                                                                                                                | ``d \\cdot \\sqrt{L / n}``                         |
+| `Distances.Minkowski`                                                                                                                                                | ``d \\cdot (L / n)^{1/p}``                         |
+| A weighted form                                                                                                                                                      | the ratio of the weight sums in place of ``L / n`` |
+| [`AngularDist`](@ref), [`ChordDist`](@ref), `Distances.CosineDist`, `Distances.CorrDist`, `Distances.Jaccard`, `Distances.BrayCurtis`, and the three mean deviations | none                                               |
 
 Where ``L`` is `len` and ``n`` is the length of `idx`. The coordinates of one row carry the features of one observation, so ``L / n`` is ``T`` over the count of shared rows. A weighted form takes ``W / W_{n}``, where ``W`` is the sum of its weights and ``W_{n}`` is the sum of its weights at `idx`.
 
@@ -454,8 +454,8 @@ The method that Julia selects is the algorithm.
 function stack_rescale(metric::Distances.SemiMetric, ::Number, ::AbstractVector, ::Integer)
     return throw(ArgumentError("StackObservations measures a pair of assets on the rows at which both are active, and rescales the distance of a pair that shares fewer rows than the window to the whole window. The metric $(nameof(typeof(metric))) has no rescale. Add a method `PortfolioOptimisers.stack_rescale(metric::$(nameof(typeof(metric))), d, idx, len)` that returns `d`, measured on the coordinates `idx` of the stack, rescaled to its `len` coordinates. Or use AggregateDistances, which needs no rescale."))
 end
-function stack_rescale(::Union{AngularDist, Distances.CosineDist, Distances.CorrDist,
-                               Distances.Jaccard, Distances.BrayCurtis,
+function stack_rescale(::Union{AngularDist, ChordDist, Distances.CosineDist,
+                               Distances.CorrDist, Distances.Jaccard, Distances.BrayCurtis,
                                Distances.MeanAbsDeviation, Distances.MeanSqDeviation,
                                Distances.RMSDeviation}, d::Number, ::AbstractVector,
                        ::Integer)

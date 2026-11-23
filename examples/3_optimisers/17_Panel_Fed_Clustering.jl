@@ -103,7 +103,7 @@ field, and that is a decision rather than a gap. The right transform follows fro
 column holds, and a level, a ratio, a rank and a logarithm each ask for a different one. The
 panel builder does not guess which you have.
 
-It matters here because the default [`AngularDist`](@ref) does not change when you rescale the
+It matters here because the default [`ChordDist`](@ref) does not change when you rescale the
 whole row of an asset, and it does change when you rescale one column. Stack the five columns
 without standardising them, and `log_mcap` is the largest entry of every row, so every row
 points mostly along the `log_mcap` axis. A difference in `log_mcap` between two assets then
@@ -343,6 +343,16 @@ pretty_table(DataFrame([backtest_row(name, p) for (name, p) in results]);
 Read the `Mean weight change` column. Each hierarchy built from the panel moves its weights
 less between rebalances than the one built from the correlations, because a table that does
 not change between folds gives a tree that does not change either.
+
+The lower turnover is the gain to expect, and a lower risk is not. A walk-forward measurement on
+20 stocks of the S&P 500 and on 36 stocks of the NYSE (O) set compared feature distances with the
+returns-only distances, under [`HierarchicalRiskParity`](@ref),
+[`HierarchicalEqualRiskContribution`](@ref), [`SchurComplementHierarchicalRiskParity`](@ref) and
+[`NestedClustered`](@ref). No feature kind gave a lower risk or a higher Sharpe ratio out of
+sample on both data sets. The derived panels, [`PhylogenyPanel`](@ref) and
+[`RegressionPanel`](@ref), did not beat the returns-only distances that they derive from. The one
+pass was [`NestedClustered`](@ref) with factor loadings on one data set over 31 folds, and chance
+can explain one pass in about 75 comparisons.
 =#
 
 plot_portfolio_cumulative_returns(last(results[2]))
@@ -451,7 +461,7 @@ fields, so the shape of the input is not the only difference between the two row
   - A fill policy is compulsory. The default `alg = nothing` refuses a blank rather than let it
     become a zero in the matrix. A static input takes [`ConstantPanelFill`](@ref), and the two
     directional policies need an observation axis and are refused without one.
-  - You standardise the table, before the panel is built. The default [`AngularDist`](@ref)
+  - You standardise the table, before the panel is built. The default [`ChordDist`](@ref)
     does not change when you rescale a row, and it does change when you rescale a column.
   - `sel` names fields, so you write a hierarchy in the words of your own table. An
     `:observed` entry turns "was this reported" into a feature.

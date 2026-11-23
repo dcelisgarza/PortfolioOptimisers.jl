@@ -24,7 +24,7 @@ Union of the tree algorithms and the non-negative similarity algorithms.
 
 It is the bound of the `alg` field of a [`NetworkEstimator`](@ref), and of the `alg` argument of [`calc_weighted_adjacency`](@ref). A tree algorithm selects a minimum spanning tree, and a similarity algorithm selects a PMFG.
 
-The similarity members come from [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref), and not from the wider [`AbstractSimilarityMatrixAlgorithm`](@ref). The similarity branch builds a PMFG, and the consumers of a PMFG cannot take a negative weight. [`MaximumDistanceSimilarity`](@ref), [`ExponentialSimilarity`](@ref), [`GeneralExponentialSimilarity`](@ref) and [`ComplementSimilarity`](@ref) are members, and [`AngularSimilarity`](@ref) is not.
+The similarity members come from [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref), and not from the wider [`AbstractSimilarityMatrixAlgorithm`](@ref). The similarity branch builds a PMFG, and the consumers of a PMFG cannot take a negative weight. [`MaximumDistanceSimilarity`](@ref), [`ExponentialSimilarity`](@ref), [`GeneralExponentialSimilarity`](@ref) and [`ComplementSimilarity`](@ref) are members, and [`AngularSimilarity`](@ref) and [`ChordSimilarity`](@ref) are not.
 
 # Related
 

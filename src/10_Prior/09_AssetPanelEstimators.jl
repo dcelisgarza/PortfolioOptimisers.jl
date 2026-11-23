@@ -72,6 +72,10 @@ The diagonal is ``f(0)``, the largest entry of ``\\mathbf{Z}``, because a decay 
 
 `decay = nothing` scores `1` at every separation, so `Proximity(; decay = nothing)` gives `1` inside the budget and `0` outside it. The result is the indicator of the neighbourhood that the budget selects, not a matrix of ones.
 
+!!! note "What the proximity gives out of sample"
+
+    Under [`LinearDecay`](@ref) and under [`ExponentialDecay`](@ref), the proximity did not give a lower risk or a higher Sharpe ratio out of sample than the distances that read the returns alone. [`PhylogenyPanel`](@ref) states the measurement.
+
 # Hop counts and path lengths
 
 A `Z` graded over hop counts and a `Z` graded over path lengths are both valid inputs to every consumer, but their values do not compare. The budgets have different units, the supports differ, and under [`LinearDecay`](@ref) the scales differ too. On real data the two separations order the pairs almost alike, and [`PathLength`](@ref) states the measurement. That agreement does not make the numbers of one run comparable with the numbers of another.
@@ -137,7 +141,7 @@ end
 
 Turn a graph source or a partition source into a square `assets × assets` feature matrix.
 
-This is the kernel of [`PhylogenyPanel`](@ref). Every method returns a matrix of element type `eltype(X)`, which is the element type of the returns. It is never the `Int` or `BitMatrix` that the phylogeny routines give, so [`AngularDist`](@ref) keeps its BLAS `gemm` path and a `Float32` history gives a `Float32` matrix.
+This is the kernel of [`PhylogenyPanel`](@ref). Every method returns a matrix of element type `eltype(X)`, which is the element type of the returns. It is never the `Int` or `BitMatrix` that the phylogeny routines give, so [`ChordDist`](@ref) and [`AngularDist`](@ref) keep their BLAS `gemm` path and a `Float32` history gives a `Float32` matrix.
 
 `pl` is an estimator, a [`NetworkEstimator`](@ref) or a [`ClustersEstimator`](@ref). It is never a precomputed [`PhylogenyResult`](@ref) or [`Clusters`](@ref), because an Estimator does not hold a Result. So each call builds the structure from `X`, and the structure follows a cross-validation fold or the subproblem of a meta-optimiser.
 
@@ -232,7 +236,7 @@ This is the loop of the [`Proximity`](@ref) method of [`phylogeny_features`](@re
   - `sep`: Separation algorithm that measured `d`, forwarded to [`is_related`](@ref).
   - `d`: Separation matrix from [`separation_matrix`](@ref).
   - `dmax`: Separation budget from [`separation_budget`](@ref).
-  - `et`: Element type of the result. [`phylogeny_features`](@ref) passes `eltype(X)`, so that [`AngularDist`](@ref) keeps its BLAS `gemm` path.
+  - `et`: Element type of the result. [`phylogeny_features`](@ref) passes `eltype(X)`, so that [`ChordDist`](@ref) and [`AngularDist`](@ref) keep their BLAS `gemm` path.
 
 # Returns
 
@@ -406,6 +410,10 @@ Builds an Asset Panel that holds the factor loadings of the wrapped prior.
 
 Both matrices have one row per asset, so the asset axis of the panel is the asset axis of the returns data, with no transpose. The label axis holds factors or reduced dimensions, not assets, so a loadings panel is never square in the sense of [`features_are_assets`](@ref).
 
+!!! note "What the loadings give out of sample"
+
+    A walk-forward measurement compared the loadings of this producer, under [`FactorPrior`](@ref), with the distances that read the returns alone under the same prior. [`NestedClustered`](@ref) with the loadings had a lower risk on one data set, over 31 folds. It was one pass in about 75 comparisons of feature distances, so chance can explain it. Under [`HierarchicalRiskParity`](@ref), [`HierarchicalEqualRiskContribution`](@ref) and [`SchurComplementHierarchicalRiskParity`](@ref), the loadings gave no lower risk and no higher Sharpe ratio. [`FeatureDistance`](@ref) states the whole measurement.
+
 # Validation
 
   - The call supplies a prior result. Raises an [`IsNothingError`](@ref) that names the call site.
@@ -438,6 +446,10 @@ In an `assets × assets` proximity matrix, feature `k` of a row reads "is close 
 
 It is the one producer whose label axis is the asset axis, and it needs no flag for that. It refits, so a subproblem gets its own square matrix over its own assets, not a slice of a larger matrix. Where a panel supplied by hand meets a view, [`features_are_assets`](@ref) compares the labels of the field with the asset names of the returns data.
 
+!!! note "What the producer gives out of sample"
+
+    The graph of this producer comes from the correlation of the returns, so the producer derives from the returns-only distances. A walk-forward measurement on two data sets compared it with them, under [`Proximity`](@ref) with [`LinearDecay`](@ref) and with [`ExponentialDecay`](@ref). Under [`HierarchicalRiskParity`](@ref), [`HierarchicalEqualRiskContribution`](@ref), [`SchurComplementHierarchicalRiskParity`](@ref) and [`NestedClustered`](@ref), it gave no lower risk and no higher Sharpe ratio out of sample on both data sets. [`FeatureDistance`](@ref) states the whole measurement.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -465,24 +477,24 @@ Keywords correspond to the struct's fields.
 
 # Why the diagonal includes self
 
-The diagonal selects between two different algorithms. The table measures a three-node path `1 - 2 - 3` under the default [`AngularDist`](@ref) and the default one-hop budget. The decay is `nothing`, so the diagonal is the only difference between the two columns.
+The diagonal selects between two different algorithms. The table measures a three-node path `1 - 2 - 3` under the default [`ChordDist`](@ref) and the default one-hop budget. The decay is `nothing`, so the diagonal is the only difference between the two columns.
 
 | pair            | zero diagonal | self included |
 |:--------------- | -------------:| -------------:|
-| `1`-`3`, 2 hops | 0.0           | 0.333         |
-| `1`-`2`, 1 hop  | 0.5           | 0.196         |
+| `1`-`3`, 2 hops | 0.0           | 0.5           |
+| `1`-`2`, 1 hop  | 0.707         | 0.303         |
 
-The default [`LinearDecay`](@ref) grades the path over the same budget, so its distances are `0.436` for `1`-`3` and `0.239` for `1`-`2`. The order of the two pairs is the order of the right-hand column.
+The default [`LinearDecay`](@ref) grades the path over the same budget, so its distances are `0.632` for `1`-`3` and `0.367` for `1`-`2`. The order of the two pairs is the order of the right-hand column.
 
 With a zero diagonal, the two endpoints, which are not adjacent, have a distance of zero, and each adjacent pair has the largest distance. The metric then compares two rows by their shared neighbours, and ignores whether the two assets are neighbours of each other. That is structural equivalence, a similarity of role, and it is the opposite of proximity.
 
-The diagonal also keeps a subproblem well defined. A view of a spanning tree on a subset of the assets can isolate a vertex. With a zero diagonal, the row of an isolated asset is a zero row, and the zero-vector convention of [`AngularDist`](@ref) puts every isolated asset at distance `0` from every other isolated asset. With self included, each isolated asset is at distance `0.5` from every other asset, the largest distance between two non-negative rows.
+The diagonal also keeps a subproblem well defined. A view of a spanning tree on a subset of the assets can isolate a vertex. With a zero diagonal, the row of an isolated asset is a zero row, and the zero-vector convention of [`ChordDist`](@ref) puts every isolated asset at distance `0` from every other isolated asset. With self included, each isolated asset is at distance ``1 / \\sqrt{2} \\approx 0.707`` from every other asset, the largest distance between two non-negative rows.
 
 # A clustering source
 
 [`NwE_ClE`](@ref) bounds `pl`, so it is a graph ([`NetworkEstimator`](@ref)) or a partition ([`ClustersEstimator`](@ref)). Both are estimators, so both refit.
 
-A partition holds less information than a graph. Its matrix is the co-membership indicator `P * transpose(P)`, where `P` is the `assets × clusters` membership matrix. Row `i` marks the assets in the cluster of asset `i`, so two rows are equal or disjoint. On seven assets in the clusters `[1, 1, 1, 2, 2, 3, 3]`, the distance matrix under the default [`AngularDist`](@ref) takes two values, `0.0` inside a cluster and `0.5` across clusters, whatever the sizes of the clusters. The raw output of [`phylogeny_matrix`](@ref) is `P * transpose(P) - I`, and it takes three values, `0.0`, `0.333` and `0.5`. In a cluster of two assets, the `- I` leaves each row with a single `1` at the other member, so the two rows are orthogonal, and the distance inside that cluster equals the distance across clusters. This producer adds `I` back, which repairs that case, but the matrix stays coarse.
+A partition holds less information than a graph. Its matrix is the co-membership indicator `P * transpose(P)`, where `P` is the `assets × clusters` membership matrix. Row `i` marks the assets in the cluster of asset `i`, so two rows are equal or disjoint. On seven assets in the clusters `[1, 1, 1, 2, 2, 3, 3]`, the distance matrix under the default [`ChordDist`](@ref) takes two values, `0.0` inside a cluster and `0.707` across clusters, whatever the sizes of the clusters. The raw output of [`phylogeny_matrix`](@ref) is `P * transpose(P) - I`, and it takes three values, `0.0`, `0.5` and `0.707`. In a cluster of two assets, the `- I` leaves each row with a single `1` at the other member, so the two rows are orthogonal, and the distance inside that cluster equals the distance across clusters. This producer adds `I` back, which repairs that case, but the matrix stays coarse.
 
 A clustering of a feature matrix built from a clustering gives back much the same clustering. Use a graph source unless the partition is the thing to measure.
 
