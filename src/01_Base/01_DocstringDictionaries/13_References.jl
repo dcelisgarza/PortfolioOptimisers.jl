@@ -307,4 +307,10 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :tibshirani2012 => "[tibshirani2012](@cite) R. J. Tibshirani and J. Taylor. *Degrees of freedom in lasso problems*. The Annals of Statistics 40, 1198–1232 (2012).",#
                  :hurvich1998 => "[hurvich1998](@cite) C. M. Hurvich, J. S. Simonoff and C.-L. Tsai. *Smoothing parameter selection in nonparametric regression using an improved Akaike information criterion*. Journal of the Royal Statistical Society: Series B (Statistical Methodology) 60, 271–293 (1998).",#
                  :zou2007 => "[zou2007](@cite) H. Zou, T. Hastie and R. Tibshirani. *On the \"degrees of freedom\" of the lasso*. The Annals of Statistics 35, 2173–2192 (2007).",#
-                 :hastie2009 => "[hastie2009](@cite) T. Hastie, R. Tibshirani and J. Friedman. *The Elements of Statistical Learning: Data Mining, Inference, and Prediction*. 2nd edition (Springer, 2009).")
+                 :hastie2009 => "[hastie2009](@cite) T. Hastie, R. Tibshirani and J. Friedman. *The Elements of Statistical Learning: Data Mining, Inference, and Prediction*. 2nd edition (Springer, 2009).",#
+                 :rousseeuw1999 => "[rousseeuw1999](@cite) P. J. Rousseeuw and K. Van Driessen. *A fast algorithm for the minimum covariance determinant estimator*. Technometrics 41, 212–223 (1999).",#
+                 :hubert2012 => "[hubert2012](@cite) M. Hubert, P. J. Rousseeuw and T. Verdonck. *A deterministic algorithm for robust location and scatter*. Journal of Computational and Graphical Statistics 21, 618–637 (2012).",#
+                 :croux1999 => "[croux1999](@cite) C. Croux and G. Haesbroeck. *Influence function and efficiency of the minimum covariance determinant scatter matrix estimator*. Journal of Multivariate Analysis 71, 161–190 (1999).",#
+                 :pison2002 => "[pison2002](@cite) G. Pison, S. Van Aelst and G. Willems. *Small sample corrections for LTS and MCD*. Metrika 55, 111–123 (2002).",#
+                 :tyler1987 => "[tyler1987](@cite) D. E. Tyler. *A distribution-free M-estimator of multivariate scatter*. The Annals of Statistics 15, 234–251 (1987).",#
+                 :hettmansperger2002 => "[hettmansperger2002](@cite) T. P. Hettmansperger and R. H. Randles. *A practical affine equivariant multivariate median*. Biometrika 89, 851–860 (2002).")

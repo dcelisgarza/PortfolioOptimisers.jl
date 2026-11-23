@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.4"
 julia_syntax = "1.0.2"
-commit = "4d83c186be"
+commit = "6f0391e693"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { code = 35, doc = 0, comment = 5, blank = 4, total = 44 }
@@ -195,6 +195,14 @@ commit = "4d83c186be"
 "src/05_Moments/37_GeodesicShrinkageCovariance.jl" = { code = 204, doc = 557, comment = 1, blank = 260, total = 1022 }
 "src/05_Moments/38_ElasticNet.jl" = { code = 266, doc = 745, comment = 2, blank = 311, total = 1324 }
 "src/05_Moments/39_WeightedAvailableCase.jl" = { code = 195, doc = 258, comment = 2, blank = 118, total = 573 }
+"src/05_Moments/40_RobustCovariance/01_Base_RobustCovariance.jl" = { code = 54, doc = 143, comment = 0, blank = 63, total = 260 }
+"src/05_Moments/40_RobustCovariance/02_QnScale.jl" = { code = 82, doc = 124, comment = 0, blank = 73, total = 279 }
+"src/05_Moments/40_RobustCovariance/03_MCDSearch.jl" = { code = 116, doc = 271, comment = 0, blank = 137, total = 524 }
+"src/05_Moments/40_RobustCovariance/04_DetMCDStarts.jl" = { code = 35, doc = 56, comment = 0, blank = 33, total = 124 }
+"src/05_Moments/40_RobustCovariance/05_MCDFactors.jl" = { code = 53, doc = 106, comment = 0, blank = 60, total = 219 }
+"src/05_Moments/40_RobustCovariance/06_MCDCovariance.jl" = { code = 84, doc = 217, comment = 0, blank = 97, total = 398 }
+"src/05_Moments/40_RobustCovariance/07_TylerCovariance.jl" = { code = 104, doc = 231, comment = 0, blank = 108, total = 443 }
+"src/05_Moments/40_RobustCovariance/08_RobustExpectedReturns.jl" = { code = 16, doc = 58, comment = 0, blank = 29, total = 103 }
 "src/06_Distance/01_Base_Distance.jl" = { code = 24, doc = 228, comment = 0, blank = 93, total = 345 }
 "src/06_Distance/02_Distance.jl" = { code = 162, doc = 350, comment = 0, blank = 157, total = 669 }
 "src/06_Distance/03_DistanceDistance.jl" = { code = 39, doc = 132, comment = 0, blank = 58, total = 229 }

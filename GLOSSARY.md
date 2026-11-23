@@ -391,6 +391,11 @@ Computes an asset covariance matrix and its correlation matrix. The core wrapper
 - **GeodesicShrinkageCovariance**: wraps another covariance estimator and applies Geodesic Shrinkage (§3.5) to the matrix it computes.
 - **PortfolioOptimisersCovariance**: a composite estimator that bundles covariance estimation with post-processing. It is the one place where Matrix Processing runs on the output of a covariance estimator, and it takes any covariance estimator, also one that another package defines. A covariance estimator has no Matrix Processing of its own.
 - **WindowedCovariance** / **WindowedVariance**: the Windowed Estimators for covariance and variance.
+- **Robust Covariance Estimator** (`AbstractRobustCovarianceEstimator`): a covariance estimator that gives each observation a weight that falls with its distance from the centre of the data, so a few bad rows cannot control the estimate. `fit(ce, X)` returns a **Robust Covariance Result** (`RobustCovarianceResult`): the robust location `mu`, the covariance `sigma`, and the squared robust distance `d2`, the weight `w` and the outlier flag of each observation. `cov(ce, X)` returns its `sigma`, and `RobustExpectedReturns` reads its `mu`. A rank correlation is robust in another sense: it estimates a different matrix.
+  - **MCDCovariance**: the minimum covariance determinant. The fit of the subset of `h` observations whose covariance has the smallest determinant, with a consistency factor (`mcd_consistency`), a small-sample correction (`MCDSmallSampleCorrection`) and a reweighting step (`MCDReweighting`). `DetMCD` and `FastMCD` are the two searches of the subset.
+  - **Concentration step** (C-step): one step of an MCD search. It fits a subset and takes the `h` observations nearest to its centre as the new subset. The determinant never increases.
+  - **TylerCovariance**: the shape matrix of Tyler's M-estimator, in which each observation has the weight `p / d²`, with the joint Hettmansperger–Randles location and a robust scale.
+  *Avoid*: "robust covariance" for a shrunk or a denoised covariance. Those reduce the estimation error of a clean sample. A robust estimator resists bad observations.
 
 ### 3.3 Higher-Order Moments
 
