@@ -4981,3 +4981,25 @@ end
     @test clusterise(ClustersEstimator(; alg = DBHT(; branchorder = nothing)), X).res.order ==
           h0.order
 end
+@testset "ROrder and the tree order agree for HClustAlgorithm, not always for DBHT (#2245)" begin
+    using PortfolioOptimisers, Test, Clustering, StableRNGs
+    PO = PortfolioOptimisers
+    cle0 = ClustersEstimator()
+    X = randn(StableRNG(2245), 150, 13) * randn(StableRNG(2246), 13, 13)
+    _, D = cor_and_dist(cle0.de, cle0.ce, X)
+    # The four linkages of Clustering.jl and the three of the kernel.
+    for linkage in (SingleLinkage(), CompleteLinkage(), AverageLinkage(), WardLinkage(),
+                    WeightedLinkage(), CentroidLinkage(), MedianLinkage())
+        @test PO.branch_ordered_hclust(D, linkage, ROrder()).order ==
+              PO.branch_ordered_hclust(D, linkage, nothing).order
+    end
+    # A builder that makes a merge before a lower merge, as `HierarchyConstruct4s` can. The
+    # root joins merge 1, at the height 3, and merge 2, at the height 2.
+    hm() = PO.hclust_merges([-1, -3, 1], [-2, -4, 2], [3.0, 2.0, 5.0])
+    D4 = zeros(4, 4)
+    @test Clustering.Hclust(PO.order_branches!(hm(), D4, nothing), :DBHT).order ==
+          [1, 2, 3, 4]
+    @test Clustering.Hclust(PO.order_branches!(hm(), D4, ROrder()), :DBHT).order ==
+          [3, 4, 1, 2]
+    @test Clustering.Hclust(PO.tree_order!(hm()), :DBHT).order == [3, 4, 1, 2]
+end

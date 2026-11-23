@@ -539,7 +539,7 @@ Flip the merges of `hmer` under a branch order, the interface of [`AbstractBranc
   - [`OptimalLeafOrder`](@ref) flips the merges with [`optimal_leaf_order!`](@ref), so that the leaf order has the least sum of the distances between adjacent leaves that the tree permits.
   - [`BarJosephOrder`](@ref) flips the merges with the heuristic `Clustering.orderbranches_barjoseph!`, which decides each merge once from its four outermost leaves.
   - [`ROrder`](@ref) sorts the merges by their [`cophenetic_heights`](@ref), with the earlier merge first in a tie, and flips each so that its older child comes first, with [`older_first`](@ref). This is the order of the R function `hclust`. `Clustering.orderbranches_r!` sorts by the raw heights, so on a tree with an inversion it puts a parent before its child. On a tree with no inversion, the two give the same result.
-  - `nothing` skips the flip step. The merges keep the orientation that the tree builder gave them. This is the tree order.
+  - `nothing` skips the flip step. The merges keep the orientation that the tree builder gave them. This is the tree order. For [`HClustAlgorithm`](@ref) it gives the leaf order of [`ROrder`](@ref), and for [`DBHT`](@ref) the two can differ, see [`ROrder`](@ref).
 
 # Arguments
 
@@ -587,7 +587,7 @@ end
 
 Flip each merge of `hmer` to the orientation of a linkage that builds its tree with no flip step.
 
-`Clustering.hclust` always flips its merges, so the orientation that its linkage builds is not available. This function gives the orientation of a linkage matrix of SciPy, whose rows hold the lower child first. A leaf comes before a merge. Of two leaves, the lower index comes first. Of two merges, the lower one comes first, where the rank of a merge is its position in [`cophenetic_order`](@ref), and a tie keeps the order of the merges. The cophenetic height is the raw height on a tree with no inversion, and on a tree with an inversion it keeps each child below its parent. The function moves no merge. [`ROrder`](@ref) flips by the same rule, so the two give the same leaf order.
+`Clustering.hclust` always flips its merges, so the orientation that its linkage builds is not available. This function gives the orientation of a linkage matrix of SciPy, whose rows hold the lower child first. A leaf comes before a merge. Of two leaves, the lower index comes first. Of two merges, the lower one comes first, where the rank of a merge is its position in [`cophenetic_order`](@ref), and a tie keeps the order of the merges. The cophenetic height is the raw height on a tree with no inversion, and on a tree with an inversion it keeps each child below its parent. The function moves no merge. [`ROrder`](@ref) flips by the same rule, so the two give the same leaf order on any merges, and the tree order of [`HClustAlgorithm`](@ref) is the leaf order of [`ROrder`](@ref). [`DBHT`](@ref) does not call this function, so its tree order can differ from the order of [`ROrder`](@ref).
 
 The kernel of [`AbstractLinkage`](@ref) writes this orientation itself, so its trees do not need this function.
 

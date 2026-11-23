@@ -652,7 +652,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Orders the merges of a dendrogram by their cophenetic height, and flips each merge to the order of the R function `hclust`.
 
-The flip rule puts a leaf before a merge. Of two leaves, the lower index comes first, and of two merges, the lower one comes first. This is the rule of the tree order, `nothing`, so for [`HClustAlgorithm`](@ref) the two give the same leaf order. This type also sorts the merges by their [`cophenetic_heights`](@ref), with the earlier merge first in a tie, and the tree order keeps the merges in the order that the tree builder made them. On a tree with no inversion, the cophenetic height is the raw height, and the result is the result of `Clustering.orderbranches_r!`. That function sorts by the raw heights, so on an inversion of [`CentroidLinkage`](@ref) or [`MedianLinkage`](@ref) it would put a parent before its child.
+The flip rule puts a leaf before a merge. Of two leaves, the lower index comes first, and of two merges, the lower one comes first. This is the rule of the tree order, `nothing`, of [`HClustAlgorithm`](@ref), so for that algorithm the two give the same leaf order. [`tree_order!`](@ref) flips the merges of `Clustering.hclust` by this rule. The kernel of [`AbstractLinkage`](@ref) makes its merges in the order of their cophenetic heights, so its older child is the lower child.
+
+For [`DBHT`](@ref), the two can give different leaf orders. The tree order keeps the order and the orientation of the merges that [`HierarchyConstruct4s`](@ref) built. That function can build a merge before a lower merge. When the two are the children of one merge, this type puts the lower one first, and the tree order can put it second.
+
+This type also sorts the merges by their [`cophenetic_heights`](@ref), with the earlier merge first in a tie, and the tree order keeps the merges in the order that the tree builder made them. On a tree with no inversion, the cophenetic height is the raw height, and the result is the result of `Clustering.orderbranches_r!`. That function sorts by the raw heights, so on an inversion of [`CentroidLinkage`](@ref) or [`MedianLinkage`](@ref) it would put a parent before its child.
 
 # Related
 
