@@ -31,6 +31,8 @@ Each session wrote its own driver for one test file, and one of those drivers le
     declaration that the two package-level censuses read. The test checks which diff lines name one.
   - `code_health/sweep_check.jl` and `code_health/sweep_triage.jl` refuse an open sweep issue whose
     title names a `.jl` file that has no row. The test checks the match, the report and the refusal.
+    A row of another branch or worktree is a note (#2261), which a clone with a second worktree
+    checks.
   - `docs/doctest_files.jl` runs the doctests of the docstrings that named source files hold. The
     test checks its selection on a fixture module. The doctest run itself needs Documenter, which
     the test environment does not hold.
@@ -1391,6 +1393,92 @@ end
         end
         @test err isa ErrorException
         @test occursin("issue #2 names `src/old/c.jl`, `02_D.jl`", err.msg)
+    end
+    @testset "a title that names a row of unlanded work is a note (#2261)" begin
+        #=
+        A branch from `main` is older than `dev`, so twelve correct issues for files of `dev`
+        stopped the triage in each worktree from `main`, and the issues of three unpushed worktrees
+        stopped it everywhere else. The fixture is a clone with the pushed branch `dev` and a
+        second worktree that committed nothing. `src/old.jl` left `HEAD`, and `origin/stale` still
+        holds its row.
+        =#
+        CH = GateScopeSeam.CodeHealth
+        function row(paths)
+            return "[file]\n" *
+                   join("\"$p\" = { map = 9, units = 0, swept = false }\n" for p in paths)
+        end
+        manifest = "code_health/sweep_manifest.toml"
+        up = mktempdir()
+        git(up, "init", "-q", "-b", "main")
+        put(up, "src/old.jl", "old = 1\n")
+        put(up, manifest, row(["src/old.jl"]))
+        commit(up, "c0")
+        git(up, "branch", "stale")
+        git(up, "mv", "src/old.jl", "src/a.jl")
+        put(up, manifest, row(["src/a.jl"]))
+        commit(up, "c1")
+        git(up, "checkout", "-q", "-b", "dev")
+        put(up, "src/on_dev.jl", "x = 1\n")
+        put(up, manifest, row(["src/a.jl", "src/on_dev.jl"]))
+        commit(up, "c2")
+        git(up, "checkout", "-q", "-b", "broken", "main")
+        put(up, manifest, "[file\n")
+        commit(up, "c3")
+        git(up, "checkout", "-q", "--orphan", "bare")
+        git(up, "rm", "-q", "-rf", ".")
+        put(up, "page.html", "no manifest\n")
+        commit(up, "c4")
+        git(up, "checkout", "-q", "main")
+        root = joinpath(mktempdir(), "clone")
+        git(up, "clone", "-q", up, root)
+        tree = joinpath(mktempdir(), "sibling")
+        git(root, "worktree", "add", "-q", tree)
+        put(tree, manifest, row(["src/a.jl", "src/unpushed.jl"]))
+        gone = joinpath(mktempdir(), "gone")
+        git(root, "worktree", "add", "-q", gone)
+        rm(gone; recursive = true)
+
+        paths = Set(["src/a.jl"])
+        issues = [(1, true, "Sweep `src/a.jl` into child map 9: Risk measures"),
+                  (2, true, "Sweep `src/on_dev.jl` into child map 9: Risk measures"),
+                  (3, true, "Sweep `src/unpushed.jl` into child map 9: Risk measures"),
+                  (4, true, "Sweep `src/old.jl` into child map 9: Risk measures"),
+                  (5, true, "Sweep `src/nowhere.jl` and unpushed.jl"),
+                  (6, false, "Sweep `src/closed.jl`")]
+        elsewhere = CH.rows_elsewhere(issues, paths; root)
+        @test elsewhere == Dict("src/on_dev.jl" => "branch `origin/dev`",
+                                "src/unpushed.jl" => "worktree `sibling`")
+        @test isempty(CH.rows_elsewhere(issues[1:1], paths; root))
+        # `origin/HEAD`, the branch with no manifest and the deleted worktree are not listed.
+        @test Set(first.(CH.other_manifests(; root))) ==
+              Set(["branch `origin/broken`", "branch `origin/dev`", "branch `origin/main`",
+                   "branch `origin/stale`", "worktree `sibling`"])
+        @test last(CH.other_manifests(; root = tree)) ==
+              ("worktree `clone`" => Set(["src/a.jl"]))
+        # A shallow clone cannot find a file that moved, and a directory is no repository.
+        shallow = joinpath(mktempdir(), "shallow")
+        git(up, "clone", "-q", "--depth", "1", "--no-single-branch", "file://$up", shallow)
+        @test isempty(CH.rows_elsewhere(issues, paths; root = shallow))
+        @test isempty(CH.rows_elsewhere(issues, paths; root = mktempdir()))
+
+        SC = SweepCheckSeam
+        tracker = SC.Tracker(Dict{Int, Tuple{Int, Bool, String}}(), true, issues)
+        fs = SC.check_titles(tracker, paths, elsewhere)
+        @test [f.level for f in fs] == [:fail, :fail, :note, :note]
+        @test occursin("issue #4 names `src/old.jl`", fs[1].text)
+        @test occursin("issue #5 names `src/nowhere.jl`, `unpushed.jl`", fs[2].text)
+        @test occursin("1 row(s) of the branch `origin/dev`", fs[3].text)
+        @test last(fs[3].detail) == "src/on_dev.jl"
+        @test CH.by_place(Dict("b.jl" => "y", "c.jl" => "x", "a.jl" => "y")) ==
+              ["x" => ["c.jl"], "y" => ["a.jl", "b.jl"]]
+
+        ST = SweepTriageSeam
+        rows = Dict("src/a.jl" => Dict{String, Any}("map" => 9, "swept" => false))
+        map_names = Dict("9" => "Risk measures")
+        maps = Dict("9" => ST.ChildMap(9, 423, true, "Risk measures"))
+        @test ST.reconcile(rows, map_names, maps, issues[1:3], elsewhere) === nothing
+        @test_throws r"issue #4 names `src/old.jl`" ST.reconcile(rows, map_names, maps,
+                                                                 issues, elsewhere)
     end
     @testset "the routes of a tripped gate let the design pick the route (#2060)" begin
         #=
