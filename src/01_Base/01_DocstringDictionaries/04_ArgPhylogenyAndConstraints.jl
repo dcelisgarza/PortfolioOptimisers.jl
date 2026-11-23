@@ -41,6 +41,15 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :sdecay => "`decay`: Separation decay algorithm, the rule by which the score falls off as two assets get further apart, or `nothing` for a flat score of one. Distinct from the exponentially weighted moment estimators' `decay`, which is a smoothing constant over observations.",#
                  :sdrate => "`rate`: Rate of the exponential fall-off, `exp(-rate * d)`. A larger rate makes the score fall faster. The retention form `ratio^d` is the same function at `rate = -log(ratio)`.",#
                  :sdpower => "`power`: Exponent of the reciprocal fall-off, `inv((1 + d)^power)`. A larger power makes the score fall faster.",#
+                 ## Walk Profile
+                 :walk_ng => "`ng`: The names of the Exogenous Graphs that the walk reads: `nothing` for the only graph of the returns data, one name, or a vector of names. Each graph gives its own Panel Fields.",#
+                 :walk_sep => "`sep`: The hop budget of the walk, a [`HopCount`](@ref). A walk of `h` hops counts for `h` in `1:n`. A [`FractionOf`](@ref) or a rule resolves over the graph in force, through [`resolve_separation`](@ref). A [`PathLength`](@ref) has no meaning for a walk, so the field refuses it at dispatch.",#
+                 :walk_decay => "`decay`: The weight `w(h)` of a walk of `h` hops, a separation decay algorithm of [`separation_decay`](@ref) at the separation `h` and the budget `n`, or `nothing` for a weight of one at each hop.",#
+                 :walk_dir => "`dir`: The direction of the walk, a member of [`AbstractEdgeDirection`](@ref): along the out-edges, along the in-edges, or both as two Panel Fields.",#
+                 :walk_nrm => "`nrm`: The normalisation of the edge weights before the walk, a member of [`AbstractEdgeNormalisation`](@ref), or `nothing` to walk the stored weights.",#
+                 :walk_wgt => "`wgt`: The rule that reads the edge weights, a member of [`AbstractEdgeWeightRule`](@ref), or `nothing` to read the stored weights.",#
+                 :walk_self => "`self`: Whether the profile of an asset holds the asset itself at the weight `w(0)`.",#
+                 :walk_prefix => "`prefix`: The first part of the name of each Panel Field, or `nothing` for `\"walk\"`. Each field is `\"<prefix>_<dir>_<graph>\"`.",#
                  ## DBHT
                  :dbhtpower => "`power`: The exponent of each distance in the similarity transformation.",#
                  :dbhtcoef => "`coef`: The scale factor of the distance term in the similarity transformation.",#

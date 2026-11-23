@@ -51,7 +51,7 @@ end
 
     # The two kinds this file holds. A new alias must land in one of them.
     ACRONYM_TOTAL = 111
-    FACTORY_TOTAL = 21
+    FACTORY_TOTAL = 22
 
     # ------------------------------------------------------------------ the parse
 

@@ -2605,6 +2605,8 @@ struct UndeclaredCentrality <: PortfolioOptimisers.AbstractCentralityAlgorithm e
             @test isa(T(), T)
             @test isa(T(; args = (), kwargs = (;)), T)
         end
+        # `Graphs.prim_mst` takes no keyword, so a keyword of a PrimTree fails at every call.
+        @test_throws ArgumentError PrimTree(; kwargs = (; foo = 1))
     end
 
     @testset "kwargs needs no guard on the centrality family" begin

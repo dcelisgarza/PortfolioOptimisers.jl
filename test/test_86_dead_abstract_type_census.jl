@@ -73,6 +73,7 @@ end
     kept = Dict{Symbol, String}(
         # Public extension points. A caller subtypes each one through its `# Interfaces` section
         # (ADR 0154), and a caller's method is a use that the census cannot see.
+        :AbstractGraphRequirement => "public, the family of the requirements that a consumer of an Exogenous Graph states (ADR 0242)",
         :AbstractHighOrderPriorEstimator => "public, the fifth prior family that `AbstractPriorEstimator` tells an author to subtype (#531)",
         :AbstractPenalisedRegressionTarget => "public, the family of the penalised regression targets (ADR 0223)",
         :AbstractRiskMeasureSettings => "public, the family of the settings of a risk measure",

@@ -72,7 +72,7 @@ commit = "b6d553a455"
 "src/03_InputData/05_ExogenousGraph/02_ExogenousGraphSeries.jl" = { cyc = 6, cog = 7, arg = 2, cyc_sum = 14, cog_sum = 10, arg_sum = 8, macros = [] }
 "src/03_InputData/05_ExogenousGraph/03_GraphObservations.jl" = { cyc = 7, cog = 8, arg = 7, cyc_sum = 55, cog_sum = 27, arg_sum = 97, macros = [] }
 "src/03_InputData/05_ExogenousGraph/04_GraphTables.jl" = { cyc = 6, cog = 13, arg = 5, cyc_sum = 55, cog_sum = 36, arg_sum = 49, macros = [] }
-"src/03_InputData/05_ExogenousGraph/05_GraphRequirements.jl" = { cyc = 4, cog = 7, arg = 6, cyc_sum = 31, cog_sum = 19, arg_sum = 18, macros = [] }
+"src/03_InputData/05_ExogenousGraph/05_GraphRequirements.jl" = { cyc = 5, cog = 9, arg = 6, cyc_sum = 32, cog_sum = 21, arg_sum = 18, macros = [] }
 "src/03_InputData/06_PricesResult.jl" = { cyc = 8, cog = 10, arg = 10, cyc_sum = 35, cog_sum = 39, arg_sum = 29, macros = [] }
 "src/03_InputData/07_PriceIngestion.jl" = { cyc = 9, cog = 13, arg = 4, cyc_sum = 65, cog_sum = 43, arg_sum = 55, macros = [] }
 "src/03_InputData/08_PriceGapFill.jl" = { cyc = 5, cog = 6, arg = 6, cyc_sum = 26, cog_sum = 19, arg_sum = 34, macros = [] }
@@ -266,7 +266,7 @@ commit = "b6d553a455"
 "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_c.jl" = { cyc = 19, cog = 23, arg = 18, cyc_sum = 92, cog_sum = 70, arg_sum = 185, macros = ["@forward_properties", "@propagatable"] }
 "src/10_Prior/07_OpinionPoolingPrior.jl" = { cyc = 4, cog = 5, arg = 9, cyc_sum = 34, cog_sum = 21, arg_sum = 91, macros = ["@propagatable"] }
 "src/10_Prior/08_HighOrderFactorPriorEstimator.jl" = { cyc = 23, cog = 40, arg = 7, cyc_sum = 64, cog_sum = 74, arg_sum = 34, macros = ["@forward_properties", "@propagatable"] }
-"src/10_Prior/09_AssetPanelEstimators.jl" = { cyc = 3, cog = 4, arg = 4, cyc_sum = 27, cog_sum = 13, arg_sum = 27, macros = ["@propagatable"] }
+"src/10_Prior/09_AssetPanelEstimators.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 96, cog_sum = 59, arg_sum = 112, macros = ["@propagatable"] }
 "src/10_Prior/10_Base_CrossSectionalFactorPrior.jl" = { cyc = 10, cog = 16, arg = 11, cyc_sum = 106, cog_sum = 78, arg_sum = 120, macros = [] }
 "src/10_Prior/11_CrossSectionalFactorPrior_a.jl" = { cyc = 6, cog = 7, arg = 31, cyc_sum = 66, cog_sum = 43, arg_sum = 141, macros = ["@propagatable"] }
 "src/10_Prior/11_CrossSectionalFactorPrior_b.jl" = { cyc = 4, cog = 5, arg = 0, cyc_sum = 8, cog_sum = 6, arg_sum = 0, macros = [] }

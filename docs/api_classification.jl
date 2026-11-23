@@ -19,7 +19,8 @@
 # the bare form.
 const FOREIGN_PUBLIC_BINDINGS = Set([:iterate, :getproperty, :hasproperty, :getindex,
                                      :propertynames, :showerror, :split, :fit, :predict,
-                                     :vcat, :describe, :show, :DataFrame])
+                                     :vcat, :describe, :show, :DataFrame, :isequal,
+                                     :SimpleDiGraph])
 
 """
     classify_binding(name) -> Symbol

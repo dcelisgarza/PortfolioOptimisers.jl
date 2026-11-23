@@ -206,6 +206,10 @@ function HierarchicalSeriationResult(;
                                      clr::Clusters{<:Clustering.Hclust})::HierarchicalSeriationResult
     return HierarchicalSeriationResult(clr)
 end
+# The inner constructor reads `order` from the tree of `clr`, so a lens write leaves it out.
+@forward_properties HierarchicalSeriationResult begin
+    derived(order)
+end
 """
 $(DocStringExtensions.TYPEDEF)
 

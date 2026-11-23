@@ -53,6 +53,7 @@ The type selects the algorithm. It cannot select the data. A member whose guaran
 | [`GeneralExponentialSimilarity`](@ref) | always         |
 | [`MaximumDistanceSimilarity`](@ref)    | `D` is finite  |
 | [`ComplementSimilarity`](@ref)         | `all(D .<= 1)` |
+| [`OrthantChordSimilarity`](@ref)       | `all(D .<= 1)` |
 
 The family never admits [`AngularSimilarity`](@ref) or [`ChordSimilarity`](@ref), and no precondition can change that. Each is negative at each negative correlation, and a negative correlation is ordinary data.
 
@@ -67,6 +68,7 @@ The family is open. A subtype claims its membership, and the library does not ch
   - [`ExponentialSimilarity`](@ref)
   - [`GeneralExponentialSimilarity`](@ref)
   - [`ComplementSimilarity`](@ref)
+  - [`OrthantChordSimilarity`](@ref)
   - [`AngularSimilarity`](@ref)
   - [`assert_similarity_domain`](@ref)
   - [`distance_to_similarity`](@ref)
@@ -431,6 +433,59 @@ The branch of [`distance_to_similarity`](@ref) that this tag selects runs these 
 """
 struct ChordSimilarity <: AbstractSimilarityMatrixAlgorithm end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Recovers a cosine from an orthant chord distance by ``1 - D^{2}``.
+
+It returns the cosine itself, not a monotone function of it. It is the exact algebraic inverse of [`OrthantChordDist`](@ref), the chord on the non-negative orthant, where a cosine is in ``[0,\\,1]``.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+S_{i,\\,j} &= 1 - D_{i,\\,j}^{2}\\,,
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:S_ij_sim])
+  - $(math_dict[:D_mat_dist])
+  - $(math_dict[:D_ij_dist])
+
+For an orthant chord distance ``D_{i,\\,j} = \\sqrt{1 - \\rho_{i,\\,j}}`` this member recovers ``\\rho_{i,\\,j}`` exactly. Equation 4 of Section 3 of [gower1966](@cite) states the relation ``\\Delta_{i,\\,j}^{2} = 2(1 - S_{i,\\,j})``, and ``D_{i,\\,j} = \\Delta_{i,\\,j} / \\sqrt{2}``. The member maps ``[0,\\,1] \\to [1,\\,0]``, and its diagonal is `1` when the diagonal of the distance matrix is zero.
+
+# Where this member is correct
+
+It is correct on the [`FeatureDistance`](@ref) path, where [`default_similarity`](@ref) selects it for [`OrthantChordDist`](@ref). It is a member of [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref), because it is non-negative at each distance that is not more than `1`, and [`OrthantChordDist`](@ref) gives no distance above `1`. [`assert_similarity_domain`](@ref) checks that bound on the PMFG path.
+
+!!! warning "The library does not check the pair"
+
+    With a distance that is not an orthant chord, this member returns a number that is not a cosine. [`ChordDist`](@ref) puts two orthogonal vectors at ``D = 1 / \\sqrt{2}``, and this member reports `0.5` for them, not `0`.
+
+# Algorithm
+
+The branch of [`distance_to_similarity`](@ref) that this tag selects runs these steps.
+
+ 1. Square every entry of `D`.
+ 2. Subtract the result from `one(eltype(D))`. The result is the similarity matrix. It keeps the element type of `D`.
+
+# Related
+
+  - [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref)
+  - [`OrthantChordDist`](@ref)
+  - [`ChordSimilarity`](@ref)
+  - [`ComplementSimilarity`](@ref)
+  - [`distance_to_similarity`](@ref)
+  - [`default_similarity`](@ref)
+  - [`assert_similarity_domain`](@ref)
+
+# References
+
+  - $(ref_dict[:gower1966]) Section 3, Equation 4.
+"""
+struct OrthantChordSimilarity <: AbstractNonNegativeSimilarityMatrixAlgorithm end
+"""
     distance_to_similarity(se::AbstractSimilarityMatrixAlgorithm; D::MatNum, kwargs...)
 
 Compute a similarity matrix from a distance matrix with a similarity matrix algorithm.
@@ -512,21 +567,27 @@ end
 function distance_to_similarity(::ChordSimilarity; D::MatNum, kwargs...)
     return one(eltype(D)) .- 2 .* D .^ 2
 end
+function distance_to_similarity(::OrthantChordSimilarity; D::MatNum, kwargs...)
+    return one(eltype(D)) .- D .^ 2
+end
 """
     assert_similarity_domain(sim::AbstractSimilarityMatrixAlgorithm,
                              de::AbstractDistanceEstimator, D::MatNum)
     assert_similarity_domain(sim::ComplementSimilarity, de::AbstractDistanceEstimator,
+                             D::MatNum)
+    assert_similarity_domain(sim::OrthantChordSimilarity, de::AbstractDistanceEstimator,
                              D::MatNum)
     assert_similarity_domain(sim::MaximumDistanceSimilarity,
                              de::AbstractDistanceEstimator, D::MatNum)
 
 Assert that `D` is in the domain of `sim`, so that the non-negativity guarantee of `sim` holds on it.
 
-It is the second half of the enforcement of [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref). The type bound selects the algorithms that can reach the PMFG path, but it cannot select the data. Two of the four admitted members are non-negative only over a part of the distances that a caller can give.
+It is the second half of the enforcement of [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref). The type bound selects the algorithms that can reach the PMFG path, but it cannot select the data. Three of the five admitted members are non-negative only over a part of the distances that a caller can give.
 
 | Member                              | Precondition                                |
 |:----------------------------------- |:------------------------------------------- |
 | [`ComplementSimilarity`](@ref)      | `all(D .<= 1)`                              |
+| [`OrthantChordSimilarity`](@ref)    | `all(D .<= 1)`                              |
 | [`MaximumDistanceSimilarity`](@ref) | `all(isfinite, D)`                          |
 | every other member                  | none, the fallback method does no operation |
 
@@ -542,7 +603,7 @@ It costs nothing that works today. Each pair that this function refuses already 
 
 # Algorithm
 
- 1. Select the method by the type of `sim`. Each of the two members of the table above has a method. Each other member reaches the method of [`AbstractSimilarityMatrixAlgorithm`](@ref), which does no operation and returns at once.
+ 1. Select the method by the type of `sim`. Each of the three members of the table above has a method. Each other member reaches the method of [`AbstractSimilarityMatrixAlgorithm`](@ref), which does no operation and returns at once.
  2. Test the precondition of that member over all of `D`.
  3. Raise a `DomainError` when the test fails. The message holds `maximum(D)`, the name of the similarity that refused it, the closed form of that similarity, and the concrete type of `de`. Return `nothing` when the precondition holds.
 
@@ -555,6 +616,7 @@ It costs nothing that works today. Each pair that this function refuses already 
 # Validation
 
   - Under [`ComplementSimilarity`](@ref): `all(x -> x <= 1, D)`.
+  - Under [`OrthantChordSimilarity`](@ref): `all(x -> x <= 1, D)`.
   - Under [`MaximumDistanceSimilarity`](@ref): `all(isfinite, D)`.
 
 # Returns
@@ -565,6 +627,7 @@ It costs nothing that works today. Each pair that this function refuses already 
 
   - [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref)
   - [`ComplementSimilarity`](@ref)
+  - [`OrthantChordSimilarity`](@ref)
   - [`MaximumDistanceSimilarity`](@ref)
   - [`distance_to_similarity`](@ref)
   - [`PMFG_T2s`](@ref)
@@ -581,6 +644,13 @@ function assert_similarity_domain(sim::ComplementSimilarity, de::AbstractDistanc
                           "all(x -> x <= 1, D) must hold for $(nameof(typeof(sim))), whose similarity is 1 - D. Got\nmaximum(D) => $(maximum(D)), from $(typeof(de))."))
     return nothing
 end
+function assert_similarity_domain(sim::OrthantChordSimilarity,
+                                  de::AbstractDistanceEstimator, D::MatNum)::Nothing
+    @argcheck(all(<=(one(eltype(D))), D),
+              DomainError(maximum(D),
+                          "all(x -> x <= 1, D) must hold for $(nameof(typeof(sim))), whose similarity is 1 - D^2. Got\nmaximum(D) => $(maximum(D)), from $(typeof(de))."))
+    return nothing
+end
 function assert_similarity_domain(sim::MaximumDistanceSimilarity,
                                   de::AbstractDistanceEstimator, D::MatNum)::Nothing
     @argcheck(all(isfinite, D),
@@ -592,6 +662,7 @@ end
     default_similarity(metric::Distances.SemiMetric)
     default_similarity(metric::AngularDist)
     default_similarity(metric::ChordDist)
+    default_similarity(metric::OrthantChordDist)
     default_similarity(alg::AbstractDistanceBlendAlgorithm)
     default_similarity(alg::QuadraticBlend)
 
@@ -603,13 +674,14 @@ A distance algorithm calls it to get the default of its similarity field from it
 
  1. Select the method by the type of `metric`. Dispatch does the selection, so a metric whose inverse is not linear adds a method of its own, and this function needs no branch for it.
 
- 2. Return the similarity that the method names. There are three methods for a metric.
+ 2. Return the similarity that the method names. There are four methods for a metric.
 
       + `metric::Distances.SemiMetric` is the fallback, and returns [`ComplementSimilarity`](@ref). Each metric that is one minus a similarity reaches this method, and the complement recovers that named similarity.
       + `metric::AngularDist` returns [`AngularSimilarity`](@ref), the exact algebraic inverse of the angular distance.
       + `metric::ChordDist` returns [`ChordSimilarity`](@ref), the exact algebraic inverse of the chord distance.
+      + `metric::OrthantChordDist` returns [`OrthantChordSimilarity`](@ref), the exact algebraic inverse of the orthant chord distance.
 
-    `src/06_Distance/05_FeatureDistance.jl` declares the last two methods, next to their metrics, and this docstring documents them.
+    `src/06_Distance/05_FeatureDistance.jl` declares the last three methods, next to their metrics, and this docstring documents them.
 
  3. A [`BlendDistance`](@ref) calls it on its blend rule. `src/06_Distance/07_BlendDistance.jl` declares these two methods, and this docstring documents them.
 
@@ -638,6 +710,9 @@ AngularSimilarity()
 
 julia> PortfolioOptimisers.default_similarity(ChordDist())
 ChordSimilarity()
+
+julia> PortfolioOptimisers.default_similarity(OrthantChordDist())
+OrthantChordSimilarity()
 ```
 
 # Related
@@ -646,8 +721,10 @@ ChordSimilarity()
   - [`ComplementSimilarity`](@ref)
   - [`AngularSimilarity`](@ref)
   - [`ChordSimilarity`](@ref)
+  - [`OrthantChordSimilarity`](@ref)
   - [`AngularDist`](@ref)
   - [`ChordDist`](@ref)
+  - [`OrthantChordDist`](@ref)
   - [`FeatureDistance`](@ref)
   - [`BlendDistance`](@ref)
   - [`QuadraticBlend`](@ref)
@@ -658,5 +735,5 @@ function default_similarity(::Distances.SemiMetric)::ComplementSimilarity
 end
 
 export MaximumDistanceSimilarity, ExponentialSimilarity, GeneralExponentialSimilarity,
-       ComplementSimilarity, AngularSimilarity, ChordSimilarity
+       ComplementSimilarity, AngularSimilarity, ChordSimilarity, OrthantChordSimilarity
 public default_similarity

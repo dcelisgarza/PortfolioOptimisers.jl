@@ -223,7 +223,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/08_Phylogeny/06_DBHT/02_PMFG.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/06_DBHT/03_GraphTraversal.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/06_DBHT/04_CliqueHierarchy.jl" = { raw = 0, reviewed = 0 }
-"src/08_Phylogeny/06_DBHT/05_BubbleTree.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/06_DBHT/05_BubbleTree.jl" = { raw = 1, reviewed = 1 }
 "src/08_Phylogeny/06_DBHT/06_DBHTDendrogram.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/06_DBHT/07_DBHTClustering.jl" = { raw = 1, reviewed = 1 }
 "src/08_Phylogeny/07_LoGo.jl" = { raw = 4, reviewed = 4 }

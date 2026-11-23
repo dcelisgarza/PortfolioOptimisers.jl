@@ -618,10 +618,11 @@ end
 """
     asset_panel(ape::RegressionPanel, pr, rd, X) -> AssetPanel
     asset_panel(ape::PhylogenyPanel, pr, rd, X) -> AssetPanel
+    asset_panel(ape::WalkProfilePanel, pr, rd, X) -> AssetPanel
 
 Build the static [`AssetPanel`](@ref) of a producer, at the point of use.
 
-Each method returns a panel that holds one [`TensorPanelField`](@ref), because a loadings matrix and a proximity matrix are each one quantity with a labelled second axis. The field takes the resolved name of the producer, see [`resolve_panel_field_name`](@ref). The labels of the label axis come from the returns data or from the regression block where a name exists, and are positions otherwise. [`panel_axis_labels`](@ref) and [`regression_factor_names`](@ref) state the rule.
+The methods of [`RegressionPanel`](@ref) and [`PhylogenyPanel`](@ref) return a panel that holds one [`TensorPanelField`](@ref), because a loadings matrix and a proximity matrix are each one quantity with a labelled second axis. The field takes the resolved name of the producer, see [`resolve_panel_field_name`](@ref). The method of [`WalkProfilePanel`](@ref) returns one [`TensorPanelField`](@ref) for each graph and each single direction, labelled by the nodes of the graph. The labels of the label axis come from the returns data or from the regression block where a name exists, and are positions otherwise. [`panel_axis_labels`](@ref) and [`regression_factor_names`](@ref) state the rule.
 
 A producer runs on the prior and the returns of its own subproblem, so no view reads the panel that it builds, and a fold refits it. Called on its own, on a prior fitted on a point-in-time Asset Panel, a [`RegressionPanel`](@ref) reads the loadings on the Investable Mask of the prior and answers for the full universe. Outside the mask each asset gets a zero row and a false observed mask, so an optimiser can take the panel back. [`expand_investable_loadings`](@ref) states the rule.
 
@@ -643,27 +644,36 @@ A [`PhylogenyPanel`](@ref) takes three steps:
  2. Label the label axis with [`panel_axis_labels`](@ref), from [`returns_asset_names`](@ref).
  3. Return the panel that holds `Zp` as one field on the axis `"asset"`, named `"proximity"` or `ape.name`.
 
+A [`WalkProfilePanel`](@ref) takes four steps:
+
+ 1. Read the returns data with [`walk_returns`](@ref), from `rd`, or from `pr` when `rd` is `nothing`.
+ 2. Read the parts of the walk with [`walk_parts_of`](@ref), one for each graph and each single direction, and check that `X` has one column for each asset.
+ 3. Mark the assets with a zero profile in every field with [`walk_unwalked`](@ref), giving `zall`.
+ 4. Build the field of each part with [`walk_field`](@ref), and return the panel that holds them.
+
 # Arguments
 
   - `ape`: The producer.
   - $(arg_dict[:pr_rr])
-  - $(arg_dict[:rd]) Read for the axis names alone.
+  - $(arg_dict[:rd]) [`RegressionPanel`](@ref) and [`PhylogenyPanel`](@ref) read it for the axis names alone. [`WalkProfilePanel`](@ref) reads its Exogenous Graphs and its asset names.
   - `X`: Returns matrix of the subproblem, observations × assets.
 
 # Validation
 
   - A [`RegressionPanel`](@ref) needs a prior result that holds a regression. Raises an [`IsNothingError`](@ref).
   - A [`RegressionPanel`](@ref) needs every loading inside the Investable Mask of the prior to be finite. Raises an [`IsNonFiniteError`](@ref) that counts the assets whose loadings are not finite.
+  - A [`WalkProfilePanel`](@ref) needs the returns data, with asset names, a graph in force at the last row of each name of `ng`, and one column of `X` for each asset. Raises an [`IsNothingError`](@ref), an `ArgumentError` or a `DimensionMismatch`. See [`walk_parts_of`](@ref).
 
 # Returns
 
-  - `pnl::AssetPanel`: A static Asset Panel that holds one tensor Panel Field.
+  - `pnl::AssetPanel`: A static Asset Panel that holds one tensor Panel Field, or one for each part of a walk.
 
 # Related
 
   - [`AbstractAssetPanelEstimator`](@ref)
   - [`RegressionPanel`](@ref)
   - [`PhylogenyPanel`](@ref)
+  - [`WalkProfilePanel`](@ref)
   - [`TensorPanelField`](@ref)
   - [`panel_axis_labels`](@ref)
   - [`FeatureDistance`](@ref)
@@ -769,6 +779,1058 @@ function asset_panel(ape::PhylogenyPanel, ::Any, rd, X::MatNum)
                                              vals = Zp)])
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the direction along which a walk reads the edges of an Exogenous Graph.
+
+An edge of an [`ExogenousGraph`](@ref) goes from a source to a target. A walk along the out-edges of an asset reaches what the asset depends on, and a walk along its in-edges reaches what depends on the asset. [`WalkProfilePanel`](@ref) holds a member in its `dir` field.
+
+# Interfaces
+
+To add a direction, subtype `AbstractEdgeDirection` and implement the following methods.
+
+## `walk_parts`
+
+  - `walk_parts(dir::MyEdgeDirection) -> Tuple`: Return the single directions that the member walks, one Panel Field each, as a tuple of [`OutEdges`](@ref) and [`InEdges`](@ref).
+
+### Arguments
+
+  - `dir`: The direction.
+
+### Returns
+
+  - `parts::Tuple`: The single directions.
+
+# Related
+
+  - [`OutEdges`](@ref)
+  - [`InEdges`](@ref)
+  - [`BothEdges`](@ref)
+  - [`WalkProfilePanel`](@ref)
+"""
+abstract type AbstractEdgeDirection <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Walks each edge from its source to its target, so an asset reaches what it depends on.
+
+The walk reads the stored layout of the adjacency, the column of the asset in `At`. Two assets are close when they depend on the same nodes.
+
+# Related
+
+  - [`AbstractEdgeDirection`](@ref)
+  - [`InEdges`](@ref)
+  - [`BothEdges`](@ref)
+"""
+struct OutEdges <: AbstractEdgeDirection end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Walks each edge from its target to its source, so an asset reaches what depends on it.
+
+The walk reads the transpose of the stored adjacency, the row of the asset in `At`. Two assets are close when the same nodes depend on them, such as two suppliers of one customer.
+
+# Related
+
+  - [`AbstractEdgeDirection`](@ref)
+  - [`OutEdges`](@ref)
+  - [`BothEdges`](@ref)
+"""
+struct InEdges <: AbstractEdgeDirection end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Walks the out-edges and the in-edges apart, and gives one Panel Field for each.
+
+The two profiles are each scaled to unit length, so a cosine of the stack of the two fields is the mean of the two cosines when neither part is zero. The walk does not add the two directions into one adjacency. A walk of two hops over the sum mixes "shares a supplier" with "is a supplier".
+
+# Related
+
+  - [`AbstractEdgeDirection`](@ref)
+  - [`OutEdges`](@ref)
+  - [`InEdges`](@ref)
+"""
+struct BothEdges <: AbstractEdgeDirection end
+"""
+    walk_parts(dir::OutEdges) -> Tuple{OutEdges}
+    walk_parts(dir::InEdges) -> Tuple{InEdges}
+    walk_parts(dir::BothEdges) -> Tuple{OutEdges, InEdges}
+
+Return the single directions of a walk, one Panel Field for each.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+# Arguments
+
+  - $(arg_dict[:walk_dir])
+
+# Returns
+
+  - `parts::Tuple`: The single directions.
+
+# Related
+
+  - [`AbstractEdgeDirection`](@ref)
+  - [`WalkProfilePanel`](@ref)
+"""
+function walk_parts(::OutEdges)
+    return (OutEdges(),)
+end
+function walk_parts(::InEdges)
+    return (InEdges(),)
+end
+function walk_parts(::BothEdges)
+    return (OutEdges(), InEdges())
+end
+"""
+    edge_direction_label(dir::OutEdges) -> String
+    edge_direction_label(dir::InEdges) -> String
+
+Return the part of the name of a Panel Field that names a single direction: `"out"` or `"in"`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+# Related
+
+  - [`walk_parts`](@ref)
+  - [`WalkProfilePanel`](@ref)
+"""
+function edge_direction_label(::OutEdges)
+    return "out"
+end
+function edge_direction_label(::InEdges)
+    return "in"
+end
+"""
+    directed_weights(dir::OutEdges, At::MatNum) -> MatNum
+    directed_weights(dir::InEdges, At::MatNum) -> MatNum
+
+Return the adjacency of a single direction, with the start of each step in its columns.
+
+`At` holds the sources in its columns, so a walk along the out-edges reads it as it is, with no copy. A walk along the in-edges reads its transpose, one copy of the stored entries, dense or sparse as `At` is.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+# Arguments
+
+  - `dir`: The single direction.
+  - `At`: The adjacency of the graph, with the sources in its columns.
+
+# Returns
+
+  - `M::MatNum`: The adjacency of the walk. `M[j, i]` is the weight of the step from node `i` to node `j`.
+
+# Related
+
+  - [`ExogenousGraph`](@ref)
+  - [`walk_operator`](@ref)
+"""
+function directed_weights(::OutEdges, At::MatNum)
+    return At
+end
+function directed_weights(::InEdges, At::MatNum)
+    return permutedims(At)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the rules that normalise the edge weights of a walk before it starts.
+
+[`WalkProfilePanel`](@ref) holds a member, or `nothing` for the stored weights, in its `nrm` field.
+
+# Interfaces
+
+To add a rule, subtype `AbstractEdgeNormalisation` and implement the following method.
+
+## `normalise_edge_weights`
+
+  - `normalise_edge_weights(nrm::MyEdgeNormalisation, M::MatNum) -> MatNum`: Return the adjacency of the walk after the rule, with the start of each step in its columns. It keeps the kind of storage of `M`, dense or sparse.
+
+### Arguments
+
+  - `nrm`: The rule.
+  - `M`: The adjacency of the walk, with non-negative weights.
+
+### Returns
+
+  - `M::MatNum`: The normalised adjacency.
+
+A walk under a new member takes the scaled walk that [`WalkProfilePanel`](@ref) states, which is exact for any scale of the weights.
+
+# Related
+
+  - [`WeightShare`](@ref)
+  - [`WalkProfilePanel`](@ref)
+  - [`normalise_edge_weights`](@ref)
+"""
+abstract type AbstractEdgeNormalisation <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Divides each edge weight by the total weight of its node along the walk direction.
+
+Each step of the walk is then a share of its node, and a walk of `h` hops is the distribution of a random walk after `h` steps. A node with no edge along the direction keeps a zero column, so the adjacency of the walk is substochastic, and the total of each distribution is at most one.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\tilde{M}_{j,\\,i} &= \\begin{cases}
+\\dfrac{M_{j,\\,i}}{\\sum_{k} M_{k,\\,i}} & \\sum_{k} M_{k,\\,i} > 0\\,, \\\\
+0 & \\text{otherwise}\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{M}``: Adjacency of the walk before the rule, nodes × nodes, with the start of each step in its columns. Entry ``M_{j,\\,i}`` is the non-negative weight of the step from node ``i`` to node ``j``.
+  - $(math_dict[:Mt_walk])
+
+# Related
+
+  - [`AbstractEdgeNormalisation`](@ref)
+  - [`WalkProfilePanel`](@ref)
+  - [`normalise_edge_weights`](@ref)
+"""
+struct WeightShare <: AbstractEdgeNormalisation end
+"""
+    normalise_edge_weights(nrm::Nothing, M::MatNum) -> MatNum
+    normalise_edge_weights(nrm::WeightShare, M::MatNum) -> MatNum
+
+Normalise the adjacency of a walk under a rule, or keep it under `nothing`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `nothing`: return `M`.
+ 2. [`WeightShare`](@ref): take the column sums `s` of `M`, and multiply `M` from the right by the diagonal of the inverse of each sum that is not zero, and of zero for a sum of zero. The product keeps the storage of `M`.
+
+# Arguments
+
+  - `nrm`: The rule, or `nothing`.
+  - `M`: The adjacency of the walk, with the start of each step in its columns.
+
+# Returns
+
+  - `M::MatNum`: The normalised adjacency.
+
+# Related
+
+  - [`AbstractEdgeNormalisation`](@ref)
+  - [`WeightShare`](@ref)
+  - [`walk_operator`](@ref)
+"""
+function normalise_edge_weights(::Nothing, M::MatNum)
+    return M
+end
+function normalise_edge_weights(::WeightShare, M::MatNum)
+    s = vec(sum(M; dims = 1))
+    return M * LinearAlgebra.Diagonal([iszero(x) ? zero(inv(x)) : inv(x) for x in s])
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the rules that read the edge weights of a walk.
+
+[`WalkProfilePanel`](@ref) holds a member, or `nothing` for the stored weights, in its `wgt` field. The rule runs at the point of use, on the one snapshot that a fit reads, so a user with a graph series builds no second copy of each snapshot.
+
+# Interfaces
+
+To add a rule, subtype `AbstractEdgeWeightRule` and implement the following method.
+
+## `read_edge_weights`
+
+  - `read_edge_weights(wgt::MyEdgeWeightRule, M::MatNum) -> MatNum`: Return the adjacency of the walk with the weights that the rule reads. It keeps the zero of each pair with no edge, and the kind of storage of `M`.
+
+### Arguments
+
+  - `wgt`: The rule.
+  - `M`: The adjacency of the walk.
+
+### Returns
+
+  - `M::MatNum`: The adjacency with the weights that the rule reads.
+
+# Related
+
+  - [`UnitEdgeWeights`](@ref)
+  - [`WalkProfilePanel`](@ref)
+  - [`read_edge_weights`](@ref)
+"""
+abstract type AbstractEdgeWeightRule <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Reads each edge as a weight of one, so the walk counts the paths and ignores their weights.
+
+Under [`WeightShare`](@ref), each step goes to each neighbour at the share one over the number of edges of the node, the simple random walk. It costs one pass over the stored entries of the snapshot that the fit reads.
+
+# Related
+
+  - [`AbstractEdgeWeightRule`](@ref)
+  - [`WalkProfilePanel`](@ref)
+  - [`read_edge_weights`](@ref)
+"""
+struct UnitEdgeWeights <: AbstractEdgeWeightRule end
+"""
+    read_edge_weights(wgt::Nothing, M::MatNum) -> MatNum
+    read_edge_weights(wgt::UnitEdgeWeights, M::MatNum) -> MatNum
+
+Read the edge weights of the adjacency of a walk under a rule, or keep them under `nothing`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `nothing`: return `M`.
+ 2. [`UnitEdgeWeights`](@ref): map each entry that is not zero to `one` of its type, and keep each zero. A sparse `M` stays sparse, because the map keeps zero at zero.
+
+# Arguments
+
+  - `wgt`: The rule, or `nothing`.
+  - `M`: The adjacency of the walk.
+
+# Returns
+
+  - `M::MatNum`: The adjacency with the weights that the rule reads.
+
+# Related
+
+  - [`AbstractEdgeWeightRule`](@ref)
+  - [`UnitEdgeWeights`](@ref)
+  - [`walk_operator`](@ref)
+"""
+function read_edge_weights(::Nothing, M::MatNum)
+    return M
+end
+function read_edge_weights(::UnitEdgeWeights, M::MatNum)
+    return map(x -> iszero(x) ? zero(x) : one(x), M)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Builds an Asset Panel that holds the Walk Profile of each asset over an Exogenous Graph.
+
+The Walk Profile of an asset is the weighted sum of the nodes that the walks of `1` to `n` hops from the asset reach in an [`ExogenousGraph`](@ref), each walk weighted by the decay of its number of hops. A metric over the profiles measures how much two assets share their direct and their indirect dependencies, such as a supplier of a supplier. The producer reads the graph in force at the last row of its window in `rd.G`, so a fold reads the graph in force at its own last row. It returns one tensor Panel Field for each graph and each single direction, `"walk_<dir>_<graph>"` on the axis `"node"`, with each profile scaled to unit length.
+
+The nodes are the label axis, and they can be entities that are not assets. The walk finds each asset among the nodes by its name in `rd.nx`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{p}_{i} &= \\mathbb{1}_{\\mathrm{self}}\\, w(0)\\, \\boldsymbol{e}_{i} + \\sum_{h=1}^{n} w(h)\\, \\tilde{\\mathbf{M}}^{h} \\boldsymbol{e}_{i}\\,, \\\\
+\\hat{\\boldsymbol{p}}_{i} &= \\dfrac{\\boldsymbol{p}_{i}}{\\lVert \\boldsymbol{p}_{i} \\rVert}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{p}_{i}``: Walk Profile of asset ``i`` over the nodes of the graph.
+  - ``\\hat{\\boldsymbol{p}}_{i}``: The profile scaled to unit length, which the Panel Field holds. A zero profile stays zero.
+  - $(math_dict[:Mt_walk])
+  - ``\\boldsymbol{e}_{i}``: Unit vector of the node of asset ``i``.
+  - ``w(h)``: Weight of a walk of ``h`` hops, [`separation_decay`](@ref) of `decay` at the separation ``h`` and the budget ``n``.
+  - ``n``: Hop budget, the resolved `sep`.
+  - ``\\mathbb{1}_{\\mathrm{self}}``: `1` when `self` is `true`, and `0` otherwise.
+
+The weights are non-negative, so each profile is in the non-negative orthant and each cosine of two profiles is in ``[0,\\,1]``. [`OrthantChordDist`](@ref) is the metric for that domain, and [`WalkDistance`](@ref) pairs it with this producer. Under [`ExponentialDecay`](@ref) at the rate ``\\log(1 / \\alpha)``, ``w(h) = \\alpha^{h}``. That is ``\\alpha^{h - 1}`` times one factor, so the unit profile equals the profile of the sum ``\\sum_{h} \\alpha^{h - 1} \\tilde{\\mathbf{M}}^{h}``.
+
+# The budget
+
+`sep` is a [`HopCount`](@ref), because a matrix power counts edges and a walk has no radius. A [`PathLength`](@ref) fails at dispatch. A [`CountOf`](@ref) is the budget. A [`FractionOf`](@ref) takes its quantile over the hop separations of the pairs of an asset and a node that the walk direction reaches, and rounds it to the nearest `Int`. A rule is called as `n(ape, X, g; dims = 1)`, with this producer in place of a network estimator and the directed graph of the walk as `g`. [`resolve_separation`](@ref) resolves each graph and each single direction on its own.
+
+# The scale of the weights
+
+Under [`WeightShare`](@ref), each `h`-step distribution has a total of at most one, so the walk needs no scaling. Under `nrm = nothing`, the walk reads the stored weights, and a power of a large weight can overflow. So that path keeps each hop vector divided by its largest entry, with the log of the scale apart, and joins the terms relative to the largest scale. It is exact to rounding, it cannot overflow, and an underflow drops only the terms that are smaller than the smallest float relative to the largest term. With `nrm = nothing`, the self term is in the units of the raw weights.
+
+# Assets that the walk cannot read
+
+  - An asset that is not a node of a graph has a placeholder in each field of that graph, and it is unreadable.
+  - An asset with a zero profile in one field and a profile that is not zero in another field keeps a zero row in the first field, and it is readable.
+  - An asset with a zero profile in every field has a placeholder in every field, and it is unreadable. Under the decays of the library, this is an asset with no edge along the walk directions. `self = true` gives every node a profile.
+
+[`readable_assets`](@ref) finds the unreadable assets from `rd` alone, so a fit drops them at its entry, and a direct call refuses them. The rule reads every field of the producer, and not only the fields that `sel` of a [`FeatureDistance`](@ref) picks.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    WalkProfilePanel(;
+        ng::Option{<:Union{AbstractString, VecStr}} = nothing,
+        sep::HopCount = HopCount(; n = CountOf(2)),
+        decay::Option{<:AbstractSeparationDecayAlgorithm} = ExponentialDecay(; rate = log(2)),
+        dir::AbstractEdgeDirection = OutEdges(),
+        nrm::Option{<:AbstractEdgeNormalisation} = WeightShare(),
+        wgt::Option{<:AbstractEdgeWeightRule} = nothing,
+        self::Bool = false,
+        prefix::Option{<:AbstractString} = nothing
+    ) -> WalkProfilePanel
+
+Keywords correspond to the struct's fields. The defaults walk two hops along the out-edges with the weight ``2^{-h}``, on the shares of the weights.
+
+## Validation
+
+  - A `String` in `ng` is not empty, and a vector in `ng` is not empty and holds no empty name and no name twice. Raises an [`IsEmptyError`](@ref) or an `ArgumentError`. See [`assert_graph_names`](@ref).
+  - A `String` in `prefix` is not empty. Raises an [`IsEmptyError`](@ref). See [`assert_panel_field_name`](@ref).
+
+# Examples
+
+```jldoctest
+julia> WalkProfilePanel(; ng = \"supply\", dir = BothEdges())
+WalkProfilePanel
+      ng ┼ String: "supply"
+     sep ┼ HopCount
+         │   n ┼ CountOf
+         │     │   val ┴ Int64: 2
+   decay ┼ ExponentialDecay
+         │   rate ┴ Float64: 0.6931471805599453
+     dir ┼ BothEdges()
+     nrm ┼ WeightShare()
+     wgt ┼ nothing
+    self ┼ Bool: false
+  prefix ┴ nothing
+```
+
+# Related
+
+  - [`AbstractAssetPanelEstimator`](@ref)
+  - [`asset_panel`](@ref)
+  - [`readable_assets`](@ref)
+  - [`WalkDistance`](@ref)
+  - [`OrthantChordDist`](@ref)
+  - [`ExogenousGraph`](@ref)
+  - [`graph_in_force`](@ref)
+  - [`HopCount`](@ref)
+  - [`separation_decay`](@ref)
+  - [`AbstractEdgeDirection`](@ref)
+  - [`AbstractEdgeNormalisation`](@ref)
+  - [`AbstractEdgeWeightRule`](@ref)
+"""
+@concrete struct WalkProfilePanel <: AbstractAssetPanelEstimator
+    """
+    $(field_dict[:walk_ng])
+    """
+    ng
+    """
+    $(field_dict[:walk_sep])
+    """
+    sep
+    """
+    $(field_dict[:walk_decay])
+    """
+    decay
+    """
+    $(field_dict[:walk_dir])
+    """
+    dir
+    """
+    $(field_dict[:walk_nrm])
+    """
+    nrm
+    """
+    $(field_dict[:walk_wgt])
+    """
+    wgt
+    """
+    $(field_dict[:walk_self])
+    """
+    self
+    """
+    $(field_dict[:walk_prefix])
+    """
+    prefix
+    function WalkProfilePanel(ng::Option{<:Union{AbstractString, VecStr}}, sep::HopCount,
+                              decay::Option{<:AbstractSeparationDecayAlgorithm},
+                              dir::AbstractEdgeDirection,
+                              nrm::Option{<:AbstractEdgeNormalisation},
+                              wgt::Option{<:AbstractEdgeWeightRule}, self::Bool,
+                              prefix::Option{<:AbstractString})
+        assert_graph_names(ng, :ng)
+        assert_panel_field_name(prefix)
+        return new{typeof(ng), typeof(sep), typeof(decay), typeof(dir), typeof(nrm),
+                   typeof(wgt), typeof(self), typeof(prefix)}(ng, sep, decay, dir, nrm, wgt,
+                                                              self, prefix)
+    end
+end
+function WalkProfilePanel(; ng::Option{<:Union{AbstractString, VecStr}} = nothing,
+                          sep::HopCount = HopCount(; n = CountOf(2)),
+                          decay::Option{<:AbstractSeparationDecayAlgorithm} = ExponentialDecay(;
+                                                                                               rate = log(2)),
+                          dir::AbstractEdgeDirection = OutEdges(),
+                          nrm::Option{<:AbstractEdgeNormalisation} = WeightShare(),
+                          wgt::Option{<:AbstractEdgeWeightRule} = nothing,
+                          self::Bool = false,
+                          prefix::Option{<:AbstractString} = nothing)::WalkProfilePanel
+    return WalkProfilePanel(ng, sep, decay, dir, nrm, wgt, self, prefix)
+end
+function graph_requirements(::WalkProfilePanel)
+    return (NonNegativeWeights(),)
+end
+function graph_names(ape::WalkProfilePanel)
+    return ape.ng
+end
+"""
+    walk_returns(pr, rd::ReturnsResult) -> ReturnsResult
+    walk_returns(pr::ReturnsResult, rd::Nothing) -> ReturnsResult
+    walk_returns(pr, rd::Nothing) -> Union{}
+
+Return the returns data that a [`WalkProfilePanel`](@ref) reads, for the graphs and the asset names.
+
+`clusterise(cle, rd)` puts the returns data in the prior slot, so the function reads `pr` when `rd` is `nothing`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+# Arguments
+
+  - $(arg_dict[:pr_rr])
+  - $(arg_dict[:rd])
+
+# Validation
+
+  - `rd` or `pr` is a [`ReturnsResult`](@ref). Raises an [`IsNothingError`](@ref).
+
+# Returns
+
+  - `rd::ReturnsResult`: The returns data.
+
+# Related
+
+  - [`WalkProfilePanel`](@ref)
+  - [`feature_asset_names`](@ref)
+"""
+function walk_returns(::Any, rd::ReturnsResult)
+    return rd
+end
+function walk_returns(pr::ReturnsResult, ::Nothing)
+    return pr
+end
+function walk_returns(::Any, ::Nothing)
+    return throw(IsNothingError("WalkProfilePanel reads the Exogenous Graphs and the asset names of the returns data, and this call supplied no ReturnsResult. Pass the returns data as `rd`."))
+end
+"""
+    walk_asset_names(rd::ReturnsResult) -> VecStr
+
+Return the asset names that a [`WalkProfilePanel`](@ref) finds among the nodes of a graph.
+
+# Arguments
+
+  - $(arg_dict[:rd])
+
+# Validation
+
+  - `rd.nx` is not `nothing`. Raises an [`IsNothingError`](@ref).
+
+# Returns
+
+  - `nx::VecStr`: The asset names.
+
+# Related
+
+  - [`WalkProfilePanel`](@ref)
+"""
+function walk_asset_names(rd::ReturnsResult)
+    @argcheck(!isnothing(rd.nx),
+              IsNothingError("WalkProfilePanel finds each asset among the nodes of an Exogenous Graph by its name, and the returns data names no asset. Give the ReturnsResult the names `nx`."))
+    return rd.nx
+end
+"""
+    walk_positions(nodes::VecStr, nx::VecStr) -> Vector{Int}
+
+Return the position of the node of each asset in a graph, or `0` for an asset that is not a node.
+
+# Arguments
+
+  - `nodes`: The names of the nodes of the graph.
+  - `nx`: The asset names.
+
+# Returns
+
+  - `ia::Vector{Int}`: One position for each asset.
+
+# Related
+
+  - [`WalkProfilePanel`](@ref)
+"""
+function walk_positions(nodes::VecStr, nx::VecStr)
+    pos = Dict(n => k for (k, n) in enumerate(nodes))
+    return [get(pos, s, 0) for s in nx]
+end
+"""
+    walk_operator(ape::WalkProfilePanel, d::AbstractEdgeDirection, At::MatNum) -> MatNum
+
+Return the adjacency that one single direction of a walk multiplies, with the start of each step in its columns.
+
+# Algorithm
+
+ 1. Orient `At` along `d` with [`directed_weights`](@ref).
+ 2. Read its weights under `ape.wgt` with [`read_edge_weights`](@ref).
+ 3. Normalise them under `ape.nrm` with [`normalise_edge_weights`](@ref), giving `M`.
+
+# Arguments
+
+  - `ape`: The producer.
+  - `d`: The single direction.
+  - `At`: The adjacency of the graph, with the sources in its columns.
+
+# Returns
+
+  - `M::MatNum`: The adjacency of the walk, ``\\tilde{\\mathbf{M}}``.
+
+# Related
+
+  - [`WalkProfilePanel`](@ref)
+  - [`walk_profiles`](@ref)
+"""
+function walk_operator(ape::WalkProfilePanel, d::AbstractEdgeDirection, At::MatNum)
+    return normalise_edge_weights(ape.nrm,
+                                  read_edge_weights(ape.wgt, directed_weights(d, At)))
+end
+"""
+    walk_parts_of(ape::WalkProfilePanel, rd::ReturnsResult) -> Vector{Tuple}
+
+Return one tuple for each graph and each single direction that a [`WalkProfilePanel`](@ref) walks.
+
+Each tuple holds the name of the graph, the single direction, the names of the nodes, the adjacency of the walk from [`walk_operator`](@ref), and the node positions of the assets from [`walk_positions`](@ref). [`asset_panel`](@ref) and [`readable_assets`](@ref) read the same tuples, so the two always agree.
+
+# Algorithm
+
+ 1. Read the asset names with [`walk_asset_names`](@ref).
+ 2. For each name of [`graph_name_list`](@ref) of `ape.ng`, read the graph in force at the last row with [`consumer_graph`](@ref), which checks it against [`graph_requirements`](@ref). Read the name of the graph in `rd.ng`, through [`graph_position`](@ref).
+ 3. For each single direction of [`walk_parts`](@ref), build the tuple.
+
+# Arguments
+
+  - `ape`: The producer.
+  - $(arg_dict[:rd])
+
+# Validation
+
+  - The rules of [`walk_asset_names`](@ref), [`graph_position`](@ref) and [`consumer_graph`](@ref).
+
+# Returns
+
+  - `parts::Vector{Tuple}`: The parts of the walk.
+
+# Related
+
+  - [`WalkProfilePanel`](@ref)
+  - [`walk_field`](@ref)
+"""
+function walk_parts_of(ape::WalkProfilePanel, rd::ReturnsResult)
+    nx = walk_asset_names(rd)
+    parts = Tuple{String, AbstractEdgeDirection, Vector{String}, MatNum, Vector{Int}}[]
+    for name in graph_name_list(ape.ng)
+        g = consumer_graph(ape, rd, name)
+        gname = rd.ng[graph_position(rd.ng, name)]
+        ia = walk_positions(g.nodes, nx)
+        for d in walk_parts(ape.dir)
+            push!(parts, (gname, d, g.nodes, walk_operator(ape, d, g.At), ia))
+        end
+    end
+    return parts
+end
+"""
+    walk_unwalked(ape::WalkProfilePanel, parts::AbstractVector, N::Integer) -> BitVector
+
+Mark the assets whose Walk Profile is zero in every field of a [`WalkProfilePanel`](@ref).
+
+An asset has a profile that is not zero in a field when it is a node of the graph and its column of the adjacency of the walk holds an edge, because the decays of the library weigh a walk of one hop above zero. `self = true` gives every node a profile, so the function then marks no asset. The rule costs one column sum of each adjacency, and it runs no walk.
+
+# Arguments
+
+  - `ape`: The producer.
+  - `parts`: The parts of the walk, from [`walk_parts_of`](@ref).
+  - `N`: The number of assets.
+
+# Returns
+
+  - `zall::BitVector`: `true` for each asset with a zero profile in every field.
+
+# Related
+
+  - [`WalkProfilePanel`](@ref)
+  - [`readable_assets`](@ref)
+"""
+function walk_unwalked(ape::WalkProfilePanel, parts::AbstractVector, N::Integer)
+    walks = falses(N)
+    for (_, _, _, M, ia) in parts
+        deg = vec(sum(M; dims = 1))
+        for i in eachindex(ia)
+            walks[i] |= ia[i] > 0 && !iszero(deg[ia[i]])
+        end
+    end
+    return ape.self ? falses(N) : .!walks
+end
+"""
+    walk_graph(M::MatNum) -> Graphs.SimpleDiGraph
+
+Build the directed graph of the steps of a walk, with an edge from node `i` to node `j` at each entry `M[j, i]` that is not zero.
+
+A [`FractionOf`](@ref) budget and a rule read this graph.
+
+# Arguments
+
+  - `M`: The adjacency of the walk, with the start of each step in its columns.
+
+# Returns
+
+  - `g::Graphs.SimpleDiGraph`: The graph of the steps.
+
+# Related
+
+  - [`resolve_separation`](@ref)
+  - [`stored_entries`](@ref)
+"""
+function walk_graph(M::MatNum)
+    I, J, _ = stored_entries(M)
+    g = Graphs.SimpleDiGraph(size(M, 1))
+    for k in eachindex(I, J)
+        Graphs.add_edge!(g, J[k], I[k])
+    end
+    return g
+end
+function resolve_separation(sep::HopCount{<:CountOf}, ::WalkProfilePanel, ::MatNum,
+                            ::MatNum, ::VecInt)::HopCount
+    return sep
+end
+function resolve_separation(sep::HopCount, ape::WalkProfilePanel, X::MatNum, M::MatNum,
+                            ia::VecInt)::HopCount
+    return resolve_separation(sep, ape, X, walk_graph(M), ia)
+end
+function resolve_separation(sep::HopCount{<:FractionOf}, ::WalkProfilePanel, ::MatNum,
+                            g::Graphs.AbstractGraph, ia::VecInt)::HopCount
+    v = Int[]
+    for s in ia
+        for (t, d) in enumerate(Graphs.gdistances(g, s))
+            if t != s && d < typemax(d)
+                push!(v, d)
+            end
+        end
+    end
+    @argcheck(!isempty(v),
+              ArgumentError("a FractionOf hop budget of a WalkProfilePanel takes a quantile of the hops from each asset to each node that the walk reaches, and the walk from the $(length(ia)) assets of this graph reaches no other node."))
+    return HopCount(round(Int, Statistics.quantile(v, sep.n.val)))
+end
+function resolve_separation(sep::HopCount{<:HopCountRule}, ape::WalkProfilePanel, X::MatNum,
+                            g::Graphs.AbstractGraph, ::VecInt)::HopCount
+    n = sep.n(ape, X, g; dims = 1)
+    @argcheck(isa(n, Integer),
+              ArgumentError("a hop count rule must return an Integer, because the walk sums the matrix powers 1:n.\nGot $(n)::$(typeof(n)) from $(typeof(sep.n))."))
+    return HopCount(n)
+end
+"""
+    walk_profiles(nrm::WeightShare, M::MatNum, ia::VecInt, ws::AbstractVector, self::Bool, T::Type) -> Matrix
+    walk_profiles(nrm, M::MatNum, ia::VecInt, ws::AbstractVector, self::Bool, T::Type) -> Matrix
+
+Sum the walks of `1` to `n` hops from the node of each asset, each weighted by its decay, before the scale to unit length.
+
+The column `j` of the result is the profile of the asset at the node `ia[j]`, over every node. The first method is the walk on the shares of [`WeightShare`](@ref). The total of each `h`-step distribution is at most one, so it needs no scaling. The second method serves every other rule and `nothing`, and its weights can have any scale. It keeps each hop vector divided by its largest entry, with the log of its scale apart, and it joins the terms in the frame of the largest scale. The frame drops out at the scale to unit length, so the result is a positive multiple of the profile, exact to rounding, with no overflow.
+
+# Algorithm
+
+Both methods start from the unit vectors `E` of the nodes of the assets, from [`walk_starts`](@ref). The self term is the term of zero hops, with the weight `self * ws[1]`, so it is zero when `self` is `false`.
+
+The plain walk, under [`WeightShare`](@ref):
+
+ 1. Weigh `E` by `self * ws[1]`, giving the sum `P`, and set the hop vectors `V` to `E`.
+ 2. For each hop `h` in `1:n`, multiply `V` by `M` from the left, and add `ws[h + 1] * V` to `P`.
+
+The scaled walk, under any other rule:
+
+ 1. Take the largest entry `mM` of `M`, or `1` when `M` holds no edge, and divide `M` by it, giving `Ms`. Keep `log(mM)` as `lM`.
+ 2. Join `E` to the empty sum `A` and its log scale `La`, at the scale `0` and with the weight `self * ws[1]`, through [`walk_join!`](@ref). Set `V` to `E`, with the log scale `L` of zero for each column.
+ 3. For each hop `h` in `1:n`, multiply `V` by `Ms` from the left, add `lM` to `L`, rescale each column with [`walk_rescale!`](@ref), and join with the weight `ws[h + 1]`.
+
+# Arguments
+
+  - `nrm`: The normalisation of the walk, which selects the method.
+  - `M`: The adjacency of the walk, with the start of each step in its columns and non-negative weights.
+  - `ia`: The node positions of the assets that are nodes of the graph.
+  - `ws`: The weights `w(0)` to `w(n)`.
+  - $(arg_dict[:walk_self])
+  - `T`: The element type of the walk.
+
+# Returns
+
+  - `P::Matrix`: The profiles, `nodes × assets`, of element type `T`.
+
+# Related
+
+  - [`WalkProfilePanel`](@ref)
+  - [`walk_field`](@ref)
+"""
+function walk_profiles(::WeightShare, M::MatNum, ia::VecInt, ws::AbstractVector, self::Bool,
+                       T::Type)
+    V = walk_starts(ia, size(M, 1), T)
+    P = (self * ws[1]) * V
+    for h in 1:(length(ws) - 1)
+        V = M * V
+        P .+= ws[h + 1] * V
+    end
+    return P
+end
+function walk_profiles(::Any, M::MatNum, ia::VecInt, ws::AbstractVector, self::Bool,
+                       T::Type)
+    mM = mapreduce(identity, max, M; init = zero(eltype(M)))
+    sM = iszero(mM) ? one(mM) : mM
+    Ms = M / sM
+    lM = log(T(sM))
+    V = walk_starts(ia, size(M, 1), T)
+    L = zeros(typeof(lM), length(ia))
+    A = zeros(T, size(V))
+    La = fill(typemin(typeof(lM)), length(ia))
+    walk_join!(A, La, V, L, self * ws[1])
+    for h in 1:(length(ws) - 1)
+        V = Ms * V
+        L .+= lM
+        walk_rescale!(V, L)
+        walk_join!(A, La, V, L, ws[h + 1])
+    end
+    return A
+end
+"""
+    walk_starts(ia::VecInt, n::Integer, T::Type) -> Matrix
+
+Return the unit vectors of the nodes `ia` among `n` nodes, one column for each asset, of element type `T`.
+
+# Arguments
+
+  - `ia`: The node positions of the assets.
+  - `n`: The number of nodes.
+  - `T`: The element type.
+
+# Returns
+
+  - `E::Matrix`: `nodes × assets`, with a one at `E[ia[j], j]` and zeros elsewhere.
+
+# Related
+
+  - [`walk_profiles`](@ref)
+"""
+function walk_starts(ia::VecInt, n::Integer, T::Type)
+    E = zeros(T, n, length(ia))
+    for (j, k) in enumerate(ia)
+        E[k, j] = one(T)
+    end
+    return E
+end
+"""
+    walk_rescale!(V::AbstractMatrix, L::AbstractVector) -> V
+
+Divide each hop vector, a column of `V`, by its largest entry, and add the log of that entry to its log scale in `L`.
+
+A column of zeros is a walk that reached no node. Its log scale becomes `typemin`, the log of zero, and it stays zero at each later hop.
+
+# Arguments
+
+  - `V`: The hop vectors, `nodes × assets`, with non-negative entries.
+  - `L`: The log scale of each column.
+
+# Returns
+
+  - `V::AbstractMatrix`: The rescaled hop vectors, with the largest entry of each column `1` or `0`.
+
+# Related
+
+  - [`walk_profiles`](@ref)
+  - [`walk_join!`](@ref)
+"""
+function walk_rescale!(V::AbstractMatrix, L::AbstractVector)
+    for j in axes(V, 2)
+        m = maximum(view(V, :, j))
+        if iszero(m)
+            L[j] = typemin(eltype(L))
+        else
+            view(V, :, j) ./= m
+            L[j] += log(m)
+        end
+    end
+    return V
+end
+"""
+    walk_join!(A::AbstractMatrix, La::AbstractVector, V::AbstractMatrix, L::AbstractVector, w::Number) -> A
+
+Add the term ``w \\exp(L_{j}) \\boldsymbol{v}_{j}`` to each column of the sum ``\\exp(La_{j}) \\boldsymbol{a}_{j}``, and keep the larger of the two scales.
+
+The sum keeps the frame of its largest term, so the smaller term enters with a factor ``\\exp(\\cdot) \\leq 1``, and no factor overflows. A term below the smallest float relative to the frame underflows to zero.
+
+# Algorithm
+
+For each column `j`:
+
+ 1. Take the log scale of the term, `lt = L[j] + log(w)`. Skip the term when it is `typemin`, a zero term.
+ 2. Take the new frame `m = max(La[j], lt)`.
+ 3. Multiply the sum by `exp(La[j] - m)` and the term by `exp(lt - m)`, add them, and set `La[j]` to `m`. An empty sum has `La[j] == typemin`, so its factor is zero.
+
+# Arguments
+
+  - `A`: The sum, `nodes × assets`.
+  - `La`: The log scale of each column of the sum.
+  - `V`: The term, `nodes × assets`.
+  - `L`: The log scale of each column of the term.
+  - `w`: The weight of the term.
+
+# Returns
+
+  - `A::AbstractMatrix`: The sum.
+
+# Related
+
+  - [`walk_profiles`](@ref)
+  - [`walk_rescale!`](@ref)
+"""
+function walk_join!(A::AbstractMatrix, La::AbstractVector, V::AbstractMatrix,
+                    L::AbstractVector, w::Number)
+    lw = iszero(w) ? typemin(eltype(L)) : log(convert(eltype(A), w))
+    for j in axes(A, 2)
+        lt = L[j] + lw
+        if lt == typemin(lt)
+            continue
+        end
+        m = max(La[j], lt)
+        view(A, :, j) .= view(A, :, j) .* exp(La[j] - m) .+ view(V, :, j) .* exp(lt - m)
+        La[j] = m
+    end
+    return A
+end
+"""
+    walk_field(ape::WalkProfilePanel, X::MatNum, gname::AbstractString, d::AbstractEdgeDirection,
+               nodes::VecStr, M::MatNum, ia::VecInt, zall::AbstractVector{Bool}) -> TensorPanelField
+
+Build the Panel Field of one graph and one single direction of a [`WalkProfilePanel`](@ref).
+
+# Algorithm
+
+ 1. Find the assets that are nodes of the graph, `j`, and their node positions, `ka`.
+ 2. Resolve the budget with [`resolve_separation`](@ref), giving the count of hops `n`.
+ 3. Check the decay over `0:n` with [`assert_separation_decay`](@ref), and score the weights `ws`, `w(0)` to `w(n)`, with [`separation_decay`](@ref).
+ 4. Derive the element type `T` from `eltype(M)` and `eltype(ws)`, with `promote_type`.
+ 5. Walk with [`walk_profiles`](@ref), giving `P`, and scale each column of `P` to unit length. A zero column stays zero.
+ 6. Write the profiles into the rows of `vals`, `assets × nodes`, at the rows `j`, with a zero row for every other asset.
+ 7. Mark a placeholder at each row of an asset that is not a node of the graph, or that `zall` marks, giving `pm`. When `pm` marks a row, the field holds the placeholder mask of the rows and its negation as the observed mask.
+
+# Arguments
+
+  - `ape`: The producer.
+  - `X`: Returns matrix of the subproblem, observations × assets, for a rule of the budget.
+  - `gname`: The name of the graph.
+  - `d`: The single direction.
+  - `nodes`: The names of the nodes, the labels of the field.
+  - `M`: The adjacency of the walk.
+  - `ia`: The node position of each asset, `0` for an asset that is not a node.
+  - `zall`: The assets with a zero profile in every field, from [`walk_unwalked`](@ref).
+
+# Validation
+
+  - The rules of [`resolve_separation`](@ref) and [`assert_separation_decay`](@ref).
+
+# Returns
+
+  - `pf::TensorPanelField`: The field `"<prefix>_<dir>_<graph>"` on the axis `"node"`.
+
+# Related
+
+  - [`WalkProfilePanel`](@ref)
+  - [`walk_profiles`](@ref)
+  - [`resolve_panel_field_name`](@ref)
+"""
+function walk_field(ape::WalkProfilePanel, X::MatNum, gname::AbstractString,
+                    d::AbstractEdgeDirection, nodes::VecStr, M::MatNum, ia::VecInt,
+                    zall::AbstractVector{Bool})
+    j = findall(>(0), ia)
+    ka = ia[j]
+    n = resolve_separation(ape.sep, ape, X, M, ka).n.val
+    assert_separation_decay(ape.decay, 0:n, n)
+    ws = [separation_decay(ape.decay, h, n) for h in 0:n]
+    T = promote_type(eltype(M), eltype(ws))
+    P = walk_profiles(ape.nrm, M, ka, ws, ape.self, T)
+    for c in axes(P, 2)
+        s = LinearAlgebra.norm(view(P, :, c))
+        if !iszero(s)
+            view(P, :, c) ./= s
+        end
+    end
+    vals = zeros(T, length(ia), length(nodes))
+    vals[j, :] = transpose(P)
+    pm = (ia .== 0) .| zall
+    pmsk = any(pm) ? repeat(pm, 1, length(nodes)) : nothing
+    return TensorPanelField(;
+                            name = string(resolve_panel_field_name(ape.prefix, "walk"), "_",
+                                          edge_direction_label(d), "_", gname),
+                            axis = "node", labels = nodes, vals = vals,
+                            omsk = isnothing(pmsk) ? nothing : .!pmsk, pmsk = pmsk)
+end
+"""
+    readable_assets(ape::AbstractAssetPanelEstimator, rd) -> nothing
+    readable_assets(ape::WalkProfilePanel, rd::ReturnsResult) -> BitVector
+
+Mark the assets that the panel of a producer can read, from the returns data alone, or return `nothing` when the producer cannot tell before it fits.
+
+A fit composes this mask with its Investable Mask before [`investable_reduction`](@ref), through [`feature_readable_mask`](@ref). So an unreadable asset departs as a non-investable asset, the reduction announces it, and the fit gives it a zero weight. A direct call of the distance has no entry of a fit, so it refuses the asset through [`assert_feature_readable`](@ref).
+
+The fallback returns `nothing`, for a producer whose unreadable assets the data does not show before the fit, such as [`RegressionPanel`](@ref) and [`PhylogenyPanel`](@ref). A [`WalkProfilePanel`](@ref) knows its unreadable assets from the graphs in force and the asset names, in one column sum of each adjacency.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. The fallback: return `nothing`.
+ 2. A [`WalkProfilePanel`](@ref): read the parts of the walk with [`walk_parts_of`](@ref), and mark the assets with a zero profile in every field with [`walk_unwalked`](@ref), giving `zall`. An asset is readable when `zall` does not mark it and it is a node of every graph.
+
+# Arguments
+
+  - `ape`: The producer.
+  - $(arg_dict[:rd])
+
+# Validation
+
+  - The rules of [`walk_parts_of`](@ref) for a [`WalkProfilePanel`](@ref).
+
+# Returns
+
+  - `keep::Option{BitVector}`: `true` for each readable asset, or `nothing`.
+
+# Related
+
+  - [`AbstractAssetPanelEstimator`](@ref)
+  - [`WalkProfilePanel`](@ref)
+  - [`feature_readable_mask`](@ref)
+  - [`assert_feature_readable`](@ref)
+"""
+function readable_assets(::AbstractAssetPanelEstimator, ::Any)
+    return nothing
+end
+function readable_assets(ape::WalkProfilePanel, rd::ReturnsResult)
+    parts = walk_parts_of(ape, rd)
+    keep = .!walk_unwalked(ape, parts, length(rd.nx))
+    for (_, _, _, _, ia) in parts
+        keep .&= ia .> 0
+    end
+    return keep
+end
+function asset_panel(ape::WalkProfilePanel, pr, rd, X::MatNum)
+    r = walk_returns(pr, rd)
+    parts = walk_parts_of(ape, r)
+    N = length(r.nx)
+    @argcheck(size(X, 2) == N,
+              DimensionMismatch("WalkProfilePanel reads one column of X for each asset of the returns data, got size(X, 2) = $(size(X, 2)) and $(N) asset names"))
+    zall = walk_unwalked(ape, parts, N)
+    return AssetPanel(; pf = [walk_field(ape, X, p..., zall) for p in parts])
+end
+"""
     assert_producer_prior(ape::AbstractAssetPanelEstimator, pr::AbstractPriorResult) -> nothing
     assert_producer_prior(ape::AbstractAssetPanelEstimator, pr) -> Union{}
 
@@ -808,5 +1870,8 @@ function assert_producer_prior(ape::AbstractAssetPanelEstimator, ::Any)::Nothing
     return throw(IsNothingError("$(nameof(typeof(ape))) reads the prior result it is handed, and this call supplied none. A pre-prior site supplies none by construction: preselection is fitted from the returns data alone, and `clusterise(cle, rd)` puts the returns data in the prior slot. Two ways forward:\n  1. Build the Asset Panel from data and put it on the `ReturnsResult`, then leave `FeatureDistance.ape` at `nothing`.\n  2. Use a producer that reads no prior, such as `PhylogenyPanel`."))
 end
 
-export Proximity, phylogeny_features, RegressionPanel, PhylogenyPanel
-public AbstractPhylogenyFeatureAlgorithm
+export Proximity, phylogeny_features, RegressionPanel, PhylogenyPanel, WalkProfilePanel,
+       OutEdges, InEdges, BothEdges, WeightShare, UnitEdgeWeights
+public AbstractPhylogenyFeatureAlgorithm, AbstractEdgeDirection, AbstractEdgeNormalisation,
+       AbstractEdgeWeightRule, readable_assets, walk_parts, normalise_edge_weights,
+       read_edge_weights

@@ -1,11 +1,23 @@
 """
     assert_graph_names(names::VecStr, sym::Sym_Str) -> nothing
+    assert_graph_names(names::AbstractString, sym::Sym_Str) -> nothing
+    assert_graph_names(names::Nothing, sym::Sym_Str) -> nothing
 
 Refuse a list of names of graph nodes, or of graphs, that is empty, that holds an empty name, or that holds a name twice.
 
+A consumer that names the graphs it reads, such as [`WalkProfilePanel`](@ref), takes one name or `nothing` for the only graph too, so the function has a method for each form.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A vector: refuse an empty vector, an empty name and a repeated name.
+ 2. One name: refuse the empty string.
+ 3. `nothing`: return `nothing`. It names the only graph.
+
 # Arguments
 
-  - `names`: The names to check.
+  - `names`: The names to check, one name, or `nothing`.
   - $(arg_dict[:sym_msg])
 
 # Validation
@@ -30,6 +42,14 @@ function assert_graph_names(names::VecStr, sym::Sym_Str)::Nothing
     k = findfirst(i -> names[i] in view(names, 1:(i - 1)), eachindex(names))
     @argcheck(isnothing(k),
               ArgumentError("$sym holds the name \"$(isnothing(k) ? "" : names[k])\" more than one time, and each name must be unique"))
+    return nothing
+end
+function assert_graph_names(name::AbstractString, sym::Sym_Str)::Nothing
+    @argcheck(!isempty(name),
+              IsEmptyError("$sym names a graph, so it cannot be an empty String. Pass `nothing` for the only graph."))
+    return nothing
+end
+function assert_graph_names(::Nothing, ::Sym_Str)::Nothing
     return nothing
 end
 """

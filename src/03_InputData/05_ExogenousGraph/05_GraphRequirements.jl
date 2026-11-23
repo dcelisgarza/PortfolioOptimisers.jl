@@ -222,8 +222,10 @@ function assert_graph_requirements(consumer, g::ExogenousGraph, name::AbstractSt
                                    path::AbstractString)::Nothing
     for req in graph_requirements(consumer)
         e = graph_requirement_breach(req, g)
-        @argcheck(isnothing(e),
-                  ArgumentError("the $(nameof(typeof(consumer)))$(isempty(path) ? "" : " at `$path`") cannot read the Exogenous Graph \"$name\"$(isnothing(key) ? "" : " at the key $key"): $(graph_requirement_rule(req)), and the edge \"$(g.nodes[e[1]])\" => \"$(g.nodes[e[2]])\" has the weight $(g.At[e[2], e[1]])"))
+        if isnothing(e)
+            continue
+        end
+        throw(ArgumentError("the $(nameof(typeof(consumer)))$(isempty(path) ? "" : " at `$path`") cannot read the Exogenous Graph \"$name\"$(isnothing(key) ? "" : " at the key $key"): $(graph_requirement_rule(req)), and the edge \"$(g.nodes[e[1]])\" => \"$(g.nodes[e[2]])\" has the weight $(g.At[e[2], e[1]])"))
     end
     return nothing
 end

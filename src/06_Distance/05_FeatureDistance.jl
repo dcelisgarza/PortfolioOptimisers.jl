@@ -196,6 +196,98 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Measures the chord between the directions of two non-negative feature vectors, scaled to `[0, 1]`.
+
+The chord is the distance between the unit vectors ``\\hat{\\boldsymbol{z}}_{i}`` and ``\\hat{\\boldsymbol{z}}_{j}``, so ``\\lVert\\hat{\\boldsymbol{z}}_{i} - \\hat{\\boldsymbol{z}}_{j}\\rVert^{2} = 2(1 - \\cos)``. On the non-negative orthant of the unit sphere the cosine is in ``[0,\\,1]``, and the longest chord is ``\\sqrt{2}``, between two orthogonal vectors. This metric divides the chord by ``\\sqrt{2}``, so it uses the full range ``[0,\\,1]``. [`ChordDist`](@ref) divides it by `2`, the longest chord on the whole sphere, and on the orthant it uses ``[0,\\,1 / \\sqrt{2}]``. The two metrics order the pairs alike, and they differ by the constant factor ``\\sqrt{2}``. So a tree, a leaf order and a cut do not change between them. A consumer that reads the absolute scale of a distance does change, such as [`ComplementSimilarity`](@ref), the exponential similarities and the `dmax` of [`PathLength`](@ref). Its exact similarity counterpart is [`OrthantChordSimilarity`](@ref).
+
+The metric is Euclidean, because the points ``\\hat{\\boldsymbol{z}}_{i} / \\sqrt{2}`` realise it, so the Ward update of [`HClustAlgorithm`](@ref) is correct on it.
+
+The domain is the non-negative orthant. A signed feature vector can give a negative cosine. The metric clamps ``1 - \\cos`` to ``[0,\\,1]``, so a negative cosine gives the distance `1`, the distance of two orthogonal vectors. A signed feature takes [`ChordDist`](@ref). A zero feature vector has no direction. The metric puts two zero vectors at distance `0`, and a zero vector at distance `1` from every non-zero vector, the distance of two orthogonal vectors. This convention keeps ``S = 1 - D^{2}`` true at every entry of the matching similarity matrix.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+d_{i,\\,j} &= \\sqrt{1 - \\dfrac{\\boldsymbol{z}_{i} \\cdot \\boldsymbol{z}_{j}}{\\lVert\\boldsymbol{z}_{i}\\rVert \\lVert\\boldsymbol{z}_{j}\\rVert}} = \\dfrac{1}{\\sqrt{2}}\\left\\lVert \\dfrac{\\boldsymbol{z}_{i}}{\\lVert\\boldsymbol{z}_{i}\\rVert} - \\dfrac{\\boldsymbol{z}_{j}}{\\lVert\\boldsymbol{z}_{j}\\rVert} \\right\\rVert\\,,
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:d_ij_dist])
+  - $(math_dict[:z_i_feature])
+
+# Algorithm
+
+The metric has the two paths of [`ChordDist`](@ref), and both are part of its contract.
+
+The elementwise method, `OrthantChordDist()(a, b)`:
+
+ 1. Promote the element types of `a` and `b`, and take `T` as the type of the square root of `one` of that type. `Distances.result_type` gives the same `T`.
+ 2. Take the norm `na` of `a` and the norm `nb` of `b`.
+ 3. Return `zero(T)` when both norms are zero, and `one(T)` when exactly one of them is zero.
+ 4. Divide the dot product of `a` and `b` by `na * nb` to get the cosine `c`.
+ 5. Clamp `1 - c` to ``[0,\\,1]``, and take its square root.
+
+The matrix method, `Distances._pairwise!(::OrthantChordDist, r, a)`, receives `a` with one column per asset:
+
+ 1. Pass the whole matrix to the `Distances.CosineDist` kernel. The kernel writes ``1 - \\cos`` into `r` with one BLAS `gemm` call, and leaves `NaN` at each entry of a zero column.
+ 2. Mark the zero columns of `a` in the mask `z`.
+ 3. Rewrite every entry of `r` in place. A diagonal entry and an entry of two zero columns become `zero(T)`. An entry of a zero column and a non-zero column becomes `one(T)`. Every other entry becomes the square root of ``r_{i,\\,j}`` after a clamp to ``[0,\\,1]``.
+
+The diagonal of the matrix path is exact zero, for the reason that [`ChordDist`](@ref) states.
+
+# Related
+
+  - [`OrthantChordSimilarity`](@ref)
+  - [`ChordDist`](@ref)
+  - [`CorrelationDistance`](@ref): the same form on a correlation, with the same clamp.
+  - [`FeatureDistance`](@ref)
+  - [`WalkProfilePanel`](@ref): the producer whose profiles are non-negative.
+  - [`WalkDistance`](@ref)
+  - [`default_similarity`](@ref)
+  - [`Distances.jl`](https://docs.juliahub.com/General/Distances/stable/)
+
+# References
+
+  - $(ref_dict[:gower1966]) Section 3, Equation 4.
+"""
+struct OrthantChordDist <: Distances.Metric end
+function (::OrthantChordDist)(a, b)
+    T = Distances.result_type(OrthantChordDist(), eltype(a), eltype(b))
+    na = LinearAlgebra.norm(a)
+    nb = LinearAlgebra.norm(b)
+    if iszero(na) && iszero(nb)
+        return zero(T)
+    elseif iszero(na) || iszero(nb)
+        return one(T)
+    end
+    return sqrt(clamp(one(T) - T(LinearAlgebra.dot(a, b) / (na * nb)), zero(T), one(T)))
+end
+function Distances.result_type(::OrthantChordDist, a::Type, b::Type)
+    return typeof(sqrt(one(promote_type(a, b))))
+end
+function Distances._pairwise!(::OrthantChordDist, r::AbstractMatrix, a::AbstractMatrix)
+    Distances._pairwise!(Distances.CosineDist(), r, a)
+    T = eltype(r)
+    z = [iszero(LinearAlgebra.norm(view(a, :, j))) for j in axes(a, 2)]
+    @inbounds for j in axes(r, 2), i in axes(r, 1)
+        r[i, j] = if i == j || (z[i] && z[j])
+            zero(T)
+        elseif z[i] || z[j]
+            one(T)
+        else
+            sqrt(clamp(r[i, j], zero(T), one(T)))
+        end
+    end
+    return r
+end
+function default_similarity(::OrthantChordDist)::OrthantChordSimilarity
+    return OrthantChordSimilarity()
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Abstract supertype for all collapse algorithms.
 
 A collapse algorithm states how to aggregate along the observation axis of a window of time-varying features. [`AggregateFeatures`](@ref) and [`AggregateDistances`](@ref) read it. These two state what to aggregate, the features or the distances, so the two families are independent.
@@ -1824,7 +1916,7 @@ function cor_and_dist(de::FeatureDistance, ::Any, X; pr = nothing, rd = nothing,
     return cor_and_dist(de, Z; dims = 1, amsk = A, nx = feature_asset_names(pr, rd))
 end
 
-export AngularDist, ChordDist, MeanCollapse, MedianCollapse, AggregateFeatures,
-       AggregateDistances, StackObservations, FeatureDistance, LastRow, LastActiveRow,
-       RefusePair, DropFewerRows, FeatureFallback
+export AngularDist, ChordDist, OrthantChordDist, MeanCollapse, MedianCollapse,
+       AggregateFeatures, AggregateDistances, StackObservations, FeatureDistance, LastRow,
+       LastActiveRow, RefusePair, DropFewerRows, FeatureFallback
 public LastObservation, AbstractEmptyPairAlgorithm, collapse_rows

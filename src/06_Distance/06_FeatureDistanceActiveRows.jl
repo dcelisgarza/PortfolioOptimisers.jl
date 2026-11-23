@@ -823,7 +823,8 @@ The method that Julia selects is the algorithm.
  1. For a `Tuple` or a vector, compose the mask of each entry in turn.
  2. For an estimator that holds a distance estimator, such as a [`ClustersEstimator`](@ref), forward to the estimator it holds. A [`BlendDistance`](@ref) composes the mask of each of its parts with a positive weight in turn, so an asset that one part cannot read leaves the fit. A part with weight zero drops no asset. `07_BlendDistance.jl` declares that method.
  3. For a [`FeatureDistance`](@ref) with no producer, on returns data that holds a panel, take the mask of readable cells in the rows that the collapse reads, with [`entry_activity`](@ref). Compose it with `imsk` through [`compose_readable_mask`](@ref).
- 4. In every other case, a producer and returns data with no panel included, return `imsk` unchanged.
+ 4. For a [`FeatureDistance`](@ref) with a producer, ask the producer for its readable assets with [`readable_assets`](@ref). A producer that answers `nothing` keeps `imsk`. Otherwise take the answer as the one-row window of a static panel with [`window_activity`](@ref), and compose it with `imsk` through [`compose_readable_mask`](@ref).
+ 5. In every other case, returns data with no panel included, return `imsk` unchanged.
 
 A panel whose every cell is readable takes step 3, and it gives a mask equal to `imsk`.
 
@@ -847,6 +848,7 @@ A panel whose every cell is readable takes step 3, and it gives a mask equal to 
   - [`investable_mask`](@ref)
   - [`feature_readable`](@ref)
   - [`drop_empty_pairs!`](@ref)
+  - [`readable_assets`](@ref)
   - [`FeatureDistance`](@ref)
 """
 function feature_readable_mask(::Any, imsk::Option{<:BitVector}, ::Any)
@@ -862,6 +864,12 @@ end
 function feature_readable_mask(de::FeatureDistance{<:Any, <:Any, <:Any, Nothing},
                                imsk::Option{<:BitVector}, rd::ReturnsResult)
     return compose_readable_mask(de.alg, entry_activity(de, rd.pnl), imsk)
+end
+function feature_readable_mask(de::FeatureDistance{<:Any, <:Any, <:Any,
+                                                   <:AbstractAssetPanelEstimator},
+                               imsk::Option{<:BitVector}, rd::ReturnsResult)
+    return compose_readable_mask(de.alg, window_activity(readable_assets(de.ape, rd), :),
+                                 imsk)
 end
 """
     compose_readable_mask(alg::AbstractFeatureCollapseAlgorithm, A, imsk::Option{<:BitVector})

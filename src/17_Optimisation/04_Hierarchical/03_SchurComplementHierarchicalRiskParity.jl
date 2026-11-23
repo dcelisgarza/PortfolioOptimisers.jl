@@ -549,6 +549,7 @@ $(DocStringExtensions.FIELDS)
 
     SchurComplementHierarchicalRiskParity(;
         opt::HierarchicalOptimiser = HierarchicalOptimiser(),
+        ser::TD{<:SerE_SerR} = HierarchicalSeriation(),
         params::TD{<:ScP_VecScP} = SchurComplementParams(),
         fb::TDO_Option{<:OptE_Opt} = nothing
     ) -> SchurComplementHierarchicalRiskParity

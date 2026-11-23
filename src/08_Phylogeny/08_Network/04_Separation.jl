@@ -283,6 +283,14 @@ end
     resolve_separation(sep::Union{HopCount{<:Union{HopCountRule, FractionOf}},
                                   PathLength{<:Union{PathLengthRule, FractionOf}}},
                        nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
+    resolve_separation(sep::HopCount{<:CountOf}, ape::WalkProfilePanel, X::MatNum,
+                       M::MatNum, ia::VecInt)
+    resolve_separation(sep::HopCount, ape::WalkProfilePanel, X::MatNum, M::MatNum,
+                       ia::VecInt)
+    resolve_separation(sep::HopCount{<:FractionOf}, ape::WalkProfilePanel, X::MatNum,
+                       g::Graphs.AbstractGraph, ia::VecInt)
+    resolve_separation(sep::HopCount{<:HopCountRule}, ape::WalkProfilePanel, X::MatNum,
+                       g::Graphs.AbstractGraph, ia::VecInt)
 
 Replace a separation whose budget is a fraction or a rule by one whose budget is a value.
 
@@ -306,6 +314,10 @@ Every shipped consumer of a network first resolves `nte.sep`. It then passes the
 
 The methods that take only `nte` and `X` are wrappers. The resolved case has a wrapper of its own, so that a stated budget builds no structure. The wrapper for a rule dispatches on the type parameter that holds the rule. One generic wrapper builds a structure before it finds that the method on the abstract type does not read it.
 
+# The budget of a walk over an Exogenous Graph
+
+A [`WalkProfilePanel`](@ref) reads a [`HopCount`](@ref) budget over the Exogenous Graph in force, and the methods that take it resolve it there. A walk starts at the nodes of the assets and walks one direction, so the pairs that its budget relates are the pairs of an asset and a node that the direction reaches. A [`FractionOf`](@ref) measures the hops from each asset node `s` of `ia` to each node with `Graphs.gdistances`, keeps each node that the walk reaches and that is not `s`, takes the quantile at `val`, and rounds it to the nearest `Int`. A rule is called as `n(ape, X, g; dims = 1)`, with the producer in place of a network estimator, and `g` the graph of the steps of the walk from [`walk_graph`](@ref). A [`CountOf`](@ref) builds no graph. `M` is the adjacency of the walk, with the start of each step in its columns, and `ia` holds the node positions of the assets that are nodes of the graph. A fraction over a walk that reaches no other node raises an `ArgumentError`.
+
 # The check of the return value runs at run time, and it must
 
 The return type of a functor is not part of its signature, so the type system cannot make a [`HopCountAlgorithm`](@ref) return an `Integer`. This kernel checks the value, and throws if it is not an `Integer`. The check is necessary. Three readers use `0:n.val` as a count of matrix powers, and `0:1.5` removes a power with no error.
@@ -326,7 +338,10 @@ The kernel builds the resolved member through its usual constructor, which wraps
   - `sep`: Separation algorithm, resolved or not.
   - `nte`: Network estimator that owns `sep`. A rule receives it, and can read from it what the graph does not hold. A fraction does not read it.
   - $(arg_dict[:X])
-  - `g`: Structure that the fraction or the rule measures over, from [`separation_graph`](@ref). The wrappers build it from `X`.
+  - `g`: Structure that the fraction or the rule measures over, from [`separation_graph`](@ref). The wrappers build it from `X`. On a walk, the graph of the steps from [`walk_graph`](@ref).
+  - `ape`: The [`WalkProfilePanel`](@ref) that owns `sep`, which a rule receives in place of `nte`.
+  - `M`: The adjacency of a walk, with the start of each step in its columns.
+  - `ia`: The node positions of the assets that are nodes of the graph of a walk.
   - $(arg_dict[:dims])
   - `kwargs...`: Keyword arguments that the function passes to the rule.
 
@@ -334,7 +349,7 @@ The kernel builds the resolved member through its usual constructor, which wraps
 
   - A [`HopCountAlgorithm`](@ref) or `Function` in `HopCount`'s `n` must return an `Integer`.
   - A [`PathLengthAlgorithm`](@ref) or `Function` in `PathLength`'s `dmax` must return a `Number`. `nothing` is a stated budget, not a computed one.
-  - A fraction needs at least one reachable pair of distinct assets. [`separation_quantile`](@ref) throws an `ArgumentError` otherwise.
+  - A fraction needs at least one reachable pair of distinct assets. [`separation_quantile`](@ref) throws an `ArgumentError` otherwise. On a walk, it needs one pair of an asset and another node that the walk reaches.
 
 # Returns
 
