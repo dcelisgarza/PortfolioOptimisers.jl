@@ -3,11 +3,12 @@ The robust covariance estimators of #2025: the minimum covariance determinant
 (`MCDCovariance`, with the searches `DetMCD` and `FastMCD`) and Tyler's M-estimator
 (`TylerCovariance`), with the location adapter `RobustExpectedReturns`.
 
-The R oracles of the issue (`robustbase::covMcd` and `ICSNP::tyler.shape` / `HR.Mest`) are
-not on the test machine, so these tests check the properties that define each estimator:
-the resistance to outliers, the agreement with the sample covariance on clean data, the
-fixed points of the C-step and of the Tyler equations, the closed forms of the factors, the
-determinism of the searches and the refusals.
+The reference values come from R 4.5.3 with `robustbase` 0.99-7 (`covMcd` with
+`nsamp = "deterministic"`, `Qn`) and `ICSNP` 1.1-3 (`tyler.shape` and `HR.Mest`, with a tight
+tolerance). The other tests check the properties that define each estimator: the resistance
+to outliers, the agreement with the sample covariance on clean data, the fixed points of the
+C-step and of the Tyler equations, the closed forms of the factors, the determinism of the
+searches and the refusals.
 =#
 using Test, PortfolioOptimisers, Statistics, StatsBase, LinearAlgebra, StableRNGs, Random
 
@@ -24,8 +25,80 @@ function robust_test_sample(rng, n, p; nbad = 0, shift = 8)
     return X, clean, bad
 end
 relerr(A, B) = norm(A - B) / norm(B)
+# The samples that R read. The outliers are the first rows.
+function r_parity_sample(seed, n, p, nbad)
+    rng = StableRNG(seed)
+    A = randn(rng, p, p)
+    X = Matrix((cholesky(A * A' + I).L * randn(rng, p, n))')
+    X[1:nbad, :] .= 8 .+ 0.5 .* randn(rng, nbad, p)
+    return X
+end
 
 @testset "Robust covariance estimators (#2025)" begin
+    @testset "Parity with R" begin
+        X = r_parity_sample(11, 120, 3, 12)
+        raw = StatsAPI.fit(MCDCovariance(; rw = nothing), X)
+        @test raw.mu ≈ [0.352054507387890514, -0.075191857287023711, 0.329141313421352999]
+        @test raw.sigma ≈ [5.4742125785071618 2.2349347443650411 4.7046195841581495
+                           2.2349347443650411 3.6824108285441408 3.3253952751535536
+                           4.7046195841581504 3.3253952751535540 6.8925701452664683]
+        @test cov(MCDCovariance(; rw = nothing, ssc = nothing), X) ≈
+              [5.0484860790926884 2.0611250993260497 4.3387439083570065
+               2.0611250993260497 3.3960317650789866 3.0667811147866533
+               4.3387439083570074 3.0667811147866542 6.3565387584997506]
+        r = StatsAPI.fit(MCDCovariance(), X)
+        @test r.mu ≈ [0.1802475948173479781, -0.0044548433328605924, 0.1743586070336486660]
+        @test r.sigma ≈ [5.1717619062118718 2.0737125297779788 5.0771151244300698
+                         2.0737125297779788 3.0438061177501177 3.2061450946704912
+                         5.0771151244300698 3.2061450946704912 7.6587564976802840]
+        @test cov(MCDCovariance(; ssc = nothing), X) ≈
+              [5.1596263219182488 2.0717872727430215 4.9784124396987455
+               2.0717872727430215 3.0618886024095451 3.1836323356261209
+               4.9784124396987455 3.1836323356261209 7.3582957839725003]
+        # A subset fraction between the two that the small-sample factors were simulated at.
+        Y = r_parity_sample(16, 60, 4, 6)
+        raw = StatsAPI.fit(MCDCovariance(; alpha = 0.75, rw = nothing), Y)
+        @test raw.sigma ≈
+              [3.16671953242966975 -2.70165077070260606 -1.38588523212224768 -1.11958771161179449
+               -2.70165077070260606 8.14000619909545087 4.66531443347527386 0.88349719114699732
+               -1.38588523212224835 4.66531443347527564 12.25661501136657705 -0.91103865362331127
+               -1.11958771161179449 0.88349719114699732 -0.91103865362331127 2.35829958805300066]
+        r = StatsAPI.fit(MCDCovariance(; alpha = 0.75), Y)
+        @test r.mu ≈ [-0.121367381516236980, -0.177936158979843495, 0.069576080185424369,
+                      -0.016113701108301088]
+        @test r.sigma ≈
+              [2.79514864506473648 -2.22131959020888514 -0.37693572791331581 -1.04759875659915047
+               -2.22131959020888514 5.98272024931919066 2.47381824547427254 0.85774833668370942
+               -0.37693572791331581 2.47381824547427254 10.63364148587304570 -1.10694445130068897
+               -1.04759875659915047 0.85774833668370942 -1.10694445130068897 2.33570923377717943]
+        # The shape of `ICSNP` has the determinant one. The stop rule of the library is
+        # `sqrt(eps)` on a step, so the fit is near to the limit of the iteration by 1e-7.
+        shape(V) = V / det(V)^(1 / size(V, 1))
+        V = last(POR.tyler_fixed_point(X, nothing, vec(median(X; dims = 1))))
+        @test isapprox(shape(V),
+                       [1.88859915647789878 0.94601098862414912 1.74109641251885061
+                        0.94601098862414912 1.24327631827079554 1.26499011224387026
+                        1.74109641251885106 1.26499011224387026 2.49388847143658277];
+                       rtol = 1e-6)
+        mu, V = POR.tyler_fixed_point(X, nothing, nothing)
+        @test isapprox(mu, [0.64721712353539251, 0.33552574391256379, 0.60611848121963507];
+                       rtol = 1e-6)
+        @test isapprox(shape(V),
+                       [2.1813803005688044 1.1462099349900512 2.0445149617704170
+                        1.1462099349900507 1.4050267122619411 1.4201641036756165
+                        2.0445149617704166 1.4201641036756167 2.6363271826510792];
+                       rtol = 1e-6)
+        x7 = [0.918977371608218241, 0.782136300731067102, 0.074564983365190601,
+              -1.989351695863372793, 0.619825747894710233, -0.056128739529000785,
+              -0.155795506705329295]
+        @test POR.qn_scale(x7) ≈ 0.570102480471806450
+        x14 = [-0.54252003099165036, 1.20786780598317223, 1.16040261569495162,
+               0.70021364951499820, 1.58683345454084557, 0.55848642556530392,
+               -1.27659220845803656, -0.57326541423688626, -1.22461261489835582,
+               -0.47340063643931157, -0.62036667722412420, 0.04211587314423524,
+               -0.91092164855244551, 0.15802877240407498]
+        @test POR.qn_scale(x14) ≈ 1.07265984690971816
+    end
     @testset "Qn scale" begin
         rng = StableRNG(2025)
         function brute_qn(x)
