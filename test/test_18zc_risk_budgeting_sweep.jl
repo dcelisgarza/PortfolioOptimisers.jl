@@ -136,6 +136,55 @@ end
     @test Int.(sign.(res.w)) == zs[argmin(risk)]
 end
 
+@testset "RiskBudgeting sweep: a gate of a long-short bundle scales with the budget (#2275)" begin
+    # The model solves for the weights times `k`, so the bound, the threshold and the gate of
+    # a bit scale with `k`. An equal budget on this book holds a smallest weight of about
+    # 0.15, so a threshold of 0.18 binds.
+    b = fill(0.2, 5)
+    kw = (; b = b, r = StandardDeviation(), slv = RBS_MIP, so = 10_000,
+          wb = WeightBounds(; lb = 0.0, ub = 1.0))
+    th = Threshold(; val = 0.18)
+    free = rbs_solve(MixedIntegerRiskBudgeting(); kw...)
+    held = rbs_solve(MixedIntegerRiskBudgeting(); kw..., lt = th)
+    both = rbs_solve(MixedIntegerRiskBudgeting(); kw..., lt = th, st = th)
+    @test minimum(free.w) < 0.18 - 1e-3
+    for res in (held, both)
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(minimum(res.w), 0.18; rtol = 1e-5)
+        @test maximum(res.w) > 0.2 + 1e-3
+    end
+    @test PO.mip_indicators(held.model) isa PO.HeldIndicators
+    @test PO.mip_indicators(both.model) isa PO.LongShortIndicators
+    @test isapprox(both.w, held.w; rtol = 1e-3)
+    k = value(both.model[:k])
+    @test k > 2
+    @test isapprox(value.(both.model[:il]), k .* value.(both.model[:ilb]); rtol = 1e-5)
+
+    # A book with a short side: each held weight meets its threshold and its bound.
+    res = rbs_solve(MixedIntegerRiskBudgeting(); b = b, r = StandardDeviation(),
+                    slv = RBS_MIP, so = 10_000, wb = WeightBounds(; lb = -0.6, ub = 0.8),
+                    sbgt = BudgetRange(; lb = 0.0, ub = 1.0), lt = th, st = th)
+    @test isa(res.retcode, OptimisationSuccess)
+    @test isapprox(sum(res.w), 1; atol = 1e-6)
+    @test all(x -> 0.18 - 1e-5 <= x <= 0.8 + 1e-5 || -0.6 - 1e-5 <= x <= -0.18 + 1e-5,
+              res.w)
+end
+
+@testset "RiskBudgeting sweep: a number target of an even moment scales with the budget (#2275)" begin
+    # `k` is the sum of the unscaled weights, so a target `mu` is the target zero on the
+    # returns less `mu`.
+    mu = 0.002
+    prs = prior(EmpiricalPrior(), RBS_X .- mu)
+    solve(pr, t, alg) = optimise(RiskBudgeting(; r = LowOrderMoment(; mu = t, alg = alg),
+                                               opt = JuMPOptimiser(; pe = pr,
+                                                                   slv = RBS_SLV)))
+    for alg in (EvenMoment(), EvenMoment(; alg = SemiMoment()))
+        w = solve(RBS_PR, mu, alg).w
+        @test isapprox(w, solve(prs, 0.0, alg).w; rtol = 1e-3)
+        @test !isapprox(w, solve(RBS_PR, 0.0, alg).w; rtol = 1e-2)
+    end
+end
+
 @testset "RiskBudgeting sweep: the factor form gives the budgeted factor contributions" begin
     S = RBS_PR.sigma
     bf = [0.3, 0.7]

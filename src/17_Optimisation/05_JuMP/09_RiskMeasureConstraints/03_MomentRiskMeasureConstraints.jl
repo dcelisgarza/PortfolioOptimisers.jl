@@ -429,7 +429,7 @@ Where:
   - $(math_dict[:I_pos_obs])
   - ``T_d = T - \\mathrm{ddof}``: Effective sample size.
   - $(math_dict[:T])
-  - ``k``: Budget-scaling / homogenisation variable.
+  - ``k``: Budget-scaling / homogenisation variable. The cone reads ``1`` in its place under a unit budget, [`effective_k`](@ref). The target ``\\mu`` always scales with the variable.
   - ``p``: Order parameter; the moment order is ``2p``.
   - ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal\\boldsymbol{w}``: Portfolio return at time ``t``.
   - ``\\mu``: Target return.
@@ -460,9 +460,11 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
     w = get_w(model, prefix)
+    # The cone reads the unit budget, so the model minimises the moment of the unscaled
+    # weights. The target is subtracted from their returns, so it scales with the variable.
     k = effective_k(model)
     sc = get_constraint_scale(model)
-    tgt = calc_risk_constraint_target(model, r, w, pr.mu, k)
+    tgt = calc_risk_constraint_target(model, r, w, pr.mu, get_k(model))
     net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
     T = length(net_X)
     p = r.alg.p

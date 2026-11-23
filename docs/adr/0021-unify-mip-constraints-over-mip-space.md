@@ -73,6 +73,12 @@ constraint builders once against it.**
 
 ## Amendment (2026-11-23)
 
+The shortcut `use_direct_mip_indicators` is gone (#2275). It let the asset space use the binaries
+as the gates under the unit budget of `RiskBudgeting`. That head solves for the scaled weights
+`k w`, so a bound or a threshold on an unscaled gate did not hold on the weights. In every space,
+the binary is the gate only when `k` is a number. The interface is `mip_wx!`, `mip_bounds` and
+`mip_key`.
+
 The concentration limit (#2018, ADR 0245) gates a binary of its own, and it would have been the
 fifth copy of the rows that link a binary to a free budget `k`. The held bit, the long bit, the
 short bit and the exact cost budget held the other four.
@@ -81,8 +87,6 @@ short bit and the exact cost budget held the other four.
   Under a numeric `k` the gate is the binary. Under a variable `k` the gate is a continuous
   variable with its three big-M rows. The five sites call it, and it registers each key through
   `state_set!`, so a second declaration under one key raises.
-- **`use_direct_mip_indicators` is gone.** The function tests `isa(k, Number)` in every space. The
-  shortcut of the asset space bound the unscaled weights of a `RiskBudgeting` head (#2275).
 - **`ConcentrationMIPSpace` is a member of the family.** It implements `mip_wx!` and `mip_key`. A
   space that gates no weight bound has no `mip_bounds`.
 - The rows of the exact cost budget take the keys `cost_bgt_gd_ub` and `cost_bgt_gd_lb`, after

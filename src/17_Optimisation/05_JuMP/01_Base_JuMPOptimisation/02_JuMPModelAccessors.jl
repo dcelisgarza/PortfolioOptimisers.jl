@@ -165,7 +165,7 @@ Return the homogenisation variable `model[:k]`.
 A ratio objective such as [`MaximumRatio`](@ref) solves for the scaled weights ``k \\boldsymbol{w}``, and [`process_model`](@ref) divides the solved weights by `k`. Two builders register `k`, and a head reaches one of them. The error message names both.
 
   - [`set_maximum_ratio_factor_variables!`](@ref) registers a variable ``k \\geq 0`` under [`MaximumRatio`](@ref), and the number `1` under any other objective. Every head that builds an objective calls it.
-  - [`_set_risk_budgeting_constraints!`](@ref) declares a variable ``k \\geq k_{\\min} \\geq 0``, because its log barrier fixes the scale of the unscaled weights. [`risk_budgeting_scale_floor`](@ref) sizes the floor. The same head calls [`set_unit_budget!`](@ref), so a builder that reads [`effective_k`](@ref) gets `1` and not the variable.
+  - [`_set_risk_budgeting_constraints!`](@ref) declares a variable ``k \\geq k_{\\min} \\geq 0``, because its log barrier fixes the scale of the unscaled weights. [`risk_budgeting_scale_floor`](@ref) sizes the floor. The same head calls [`set_unit_budget!`](@ref), so a builder of a risk or of a penalty that reads [`effective_k`](@ref) gets `1` and not the variable.
 
 Both builders bound `k` below by zero. A row ``\\boldsymbol{a}^\\intercal \\boldsymbol{y} \\leq c\\, k`` of the scaled weights ``\\boldsymbol{y} = k \\boldsymbol{w}`` states ``\\boldsymbol{a}^\\intercal \\boldsymbol{w} \\leq c`` only when ``k > 0``.
 
@@ -190,7 +190,7 @@ end
 
 Record that the head fixed the budget scale of the model to one.
 
-A head calls it when its own constraints make the formulation invariant to scale, so a builder can use the number `1` in place of the homogenisation variable `k`. [`RiskBudgeting`](@ref) is the only such head. Its log barrier fixes the scale, and it normalises the weights after the solve. `k` stays a variable ``k \\geq k_{\\min} \\geq 0`` under this record. The budget scale is one, and `k` is not a constant.
+A head calls it when its own constraints fix the scale of the unscaled weights ``k \\boldsymbol{w}``. The builder of a risk or of a penalty can then use the number `1` in place of the homogenisation variable `k`, so the objective measures the unscaled weights. A bound, a threshold, a target or the gate of a binary still reads [`get_k`](@ref), because the head divides the weights by `k` after the solve. [`RiskBudgeting`](@ref) is the only such head. Its log barrier fixes the scale, and it normalises the weights after the solve. `k` stays a variable ``k \\geq k_{\\min} \\geq 0`` under this record. The budget scale is one, and `k` is not a constant.
 
 # Returns
 
@@ -198,7 +198,6 @@ A head calls it when its own constraints make the formulation invariant to scale
 
 # Related
 
-  - [`is_unit_budget`](@ref)
   - [`effective_k`](@ref)
 """
 function set_unit_budget!(model::JuMP.Model)
@@ -206,24 +205,11 @@ function set_unit_budget!(model::JuMP.Model)
     return nothing
 end
 """
-    is_unit_budget(model::JuMP.Model)
-
-Return `true` when the head fixed the budget scale to one through [`set_unit_budget!`](@ref).
-
-# Related
-
-  - [`set_unit_budget!`](@ref)
-  - [`effective_k`](@ref)
-"""
-function is_unit_budget(model::JuMP.Model)
-    return haskey(model, :unit_budget)
-end
-"""
     effective_k(model::JuMP.Model)
 
-Return the budget scale that a builder multiplies a bound by: `1` under a unit budget, and `model[:k]` otherwise.
+Return the scale that the builder of a risk or of a penalty divides a power of the weights by: `1` under a unit budget, and `model[:k]` otherwise.
 
-A builder that multiplies a bound by the budget reads this and not [`get_k`](@ref). A head that is invariant to scale then needs no check in each builder.
+A risk such as ``\\lVert \\boldsymbol{y} \\rVert_2^2 / k`` has degree one in the scaled weights ``\\boldsymbol{y} = k \\boldsymbol{w}``. A ratio objective needs that degree. [`RiskBudgeting`](@ref) needs a risk of ``\\boldsymbol{y}`` alone, because a division by the variable `k` adds a term to the risk contributions. A builder that multiplies a bound by the budget reads [`get_k`](@ref), under every head.
 
 # Validation
 
@@ -231,11 +217,11 @@ A builder that multiplies a bound by the budget reads this and not [`get_k`](@re
 
 # Related
 
-  - [`is_unit_budget`](@ref)
+  - [`set_unit_budget!`](@ref)
   - [`get_k`](@ref)
 """
 function effective_k(model::JuMP.Model)
-    return ifelse(is_unit_budget(model), 1, get_k(model))
+    return ifelse(haskey(model, :unit_budget), 1, get_k(model))
 end
 """
 $(DocStringExtensions.TYPEDEF)

@@ -1049,6 +1049,13 @@ A static `TensorPanelField` and a static feature matrix keep `assets × labels` 
 | `descriptor` of `SalesToPrice()`, `GrossProfitability()`, `AssetTurnover()` or `SalesToEnterpriseValue()` over a panel with a negative sales figure on an active, observed cell | Divided the negative sales figure, as for any other number. `GrossMargin()` already refused it. | Raises a `DomainError` that names the field and the cell, as `GrossMargin()` does. Each of the four constructors sets `nonneg = [num]`, or `nonneg = [sales]` for `GrossProfitability`, because a sales figure below zero is a data error. A zero sales figure stays valid. To read the sales figure without the guard, build `PanelFieldRatio` with the same `num`, `den` and `gt0`, and no `nonneg`. |
 | `descriptor` of `DebtToAssets()` over a panel with a negative debt on an active, observed cell | Divided the negative debt. `BookLeverage()` and `MarketLeverage()` already refused it. | Raises a `DomainError`, as `BookLeverage()` and `MarketLeverage()` do. `DebtToAssets` sets `nonneg = [num]`. To read the debt without the guard, build `PanelFieldRatio(; num = "total_debt", den = "total_assets", gt0 = ["total_assets"])`. |
 
+## From v0.34.2 to v0.34.3
+
+### [Results that move](@id migration-0-34-3-numbers)
+
+- **A `RiskBudgeting` whose mixed-integer rows use a long and a short bit for each asset.** A short threshold `st`, a fixed fee, or `xbgt` beside another mixed-integer row builds these bits, on a model that splits the weights into a long and a short part. v0.34.2 applied the weight bounds, the thresholds and the fixed fees to the unscaled weights, which sum to `k` and not to the budget. A bound of one then held each weight under `1 / k`, so a book could come out equal-weighted, and a threshold did not hold on the weights that the optimiser returned. v0.34.3 scales each of them with `k`, as the long-only bits always did. A model whose thresholds v0.34.2 could meet only in the unscaled weights can now be infeasible.
+- **A `RiskBudgeting` with `LowOrderMoment(; mu, alg = EvenMoment())` and a number or a `VecScalar` as `mu`.** v0.34.2 subtracted the target from the returns of the unscaled weights, so it read a target of `mu / k`. v0.34.3 scales the target with `k`, as the other algorithms of `LowOrderMoment` do.
+
 ## From v0.34 to v0.35
 
 ### [Concentration limits](@id migration-0-35-concentration)

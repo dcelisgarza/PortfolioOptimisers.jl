@@ -887,7 +887,7 @@ end
 
 Add the row of the logarithm, ``\\boldsymbol{b}^\\intercal \\ln(\\boldsymbol{x}) \\geq 0``, and the variable ``k``, to the model of a [`RiskBudgeting`](@ref).
 
-Every method of [`set_risk_budgeting_constraints!`](@ref) calls it, with the vector ``\\boldsymbol{x}`` that its formulation reads. The row fixes the scale of the weights, so the function also records a unit budget with [`set_unit_budget!`](@ref). A builder that reads [`effective_k`](@ref) then uses `1` in place of ``k``, so it bounds the unscaled weights whose risk the model minimises.
+Every method of [`set_risk_budgeting_constraints!`](@ref) calls it, with the vector ``\\boldsymbol{x}`` that its formulation reads. The row fixes the scale of the weights, so the function also records a unit budget with [`set_unit_budget!`](@ref). A builder that reads [`effective_k`](@ref) then uses `1` in place of ``k``, so it measures the unscaled weights whose risk the model minimises.
 
 # JuMP formulation
 
@@ -953,8 +953,8 @@ function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
     JuMP.@constraint(model, clog_w[i = 1:N],
                      [sc * log_w[i], sc, sc * w[i]] in JuMP.MOI.ExponentialCone())
     JuMP.@constraint(model, crkb, sc * LinearAlgebra.dot(b, log_w) >= 0)
-    # The log-barrier normalisation above pins the scale, so downstream builders may use 1
-    # in place of the variable `k`.
+    # The log-barrier normalisation above pins the scale, so the builder of a risk or of a
+    # penalty may use 1 in place of the variable `k`. A bound still scales with `k`.
     set_unit_budget!(model)
     return rkb
 end
