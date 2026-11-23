@@ -42,7 +42,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :sdrate => "`rate`: Rate of the exponential fall-off, `exp(-rate * d)`. A larger rate makes the score fall faster. The retention form `ratio^d` is the same function at `rate = -log(ratio)`.",#
                  :sdpower => "`power`: Exponent of the reciprocal fall-off, `inv((1 + d)^power)`. A larger power makes the score fall faster.",#
                  ## Walk Profile
-                 :walk_ng => "`ng`: The names of the Exogenous Graphs that the walk reads: `nothing` for the only graph of the returns data, one name, or a vector of names. Each graph gives its own Panel Fields.",#
+                 :walk_ng => "`ng`: The Exogenous Graphs that the walk reads: `nothing` for the only graph of the returns data, one name, a [`GraphUnion`](@ref), or a vector whose entries are a name or a [`GraphUnion`](@ref). Each entry gives its own Panel Fields, and a union names them by its `name`.",#
                  :walk_sep => "`sep`: The hop budget of the walk, a [`HopCount`](@ref). A walk of `h` hops counts for `h` in `1:n`. A [`FractionOf`](@ref) or a rule resolves over the graph in force, through [`resolve_separation`](@ref). A [`PathLength`](@ref) has no meaning for a walk, so the field refuses it at dispatch.",#
                  :walk_decay => "`decay`: The weight `w(h)` of a walk of `h` hops, a separation decay algorithm of [`separation_decay`](@ref) at the separation `h` and the budget `n`, or `nothing` for a weight of one at each hop.",#
                  :walk_dir => "`dir`: The direction of the walk, a member of [`AbstractEdgeDirection`](@ref): along the out-edges, along the in-edges, or both as two Panel Fields.",#
@@ -50,6 +50,14 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :walk_wgt => "`wgt`: The rule that reads the edge weights, a member of [`AbstractEdgeWeightRule`](@ref), or `nothing` to read the stored weights.",#
                  :walk_self => "`self`: Whether the profile of an asset holds the asset itself at the weight `w(0)`.",#
                  :walk_prefix => "`prefix`: The first part of the name of each Panel Field, or `nothing` for `\"walk\"`. Each field is `\"<prefix>_<dir>_<graph>\"`.",#
+                 ## Graph Union
+                 :gu_gs => "`gs`: The parts of the union, each an [`ExogenousGraph`](@ref) or an [`ExogenousGraphSeries`](@ref).",#
+                 :gu_ng => "`ng`: The names of the Exogenous Graphs of the returns data that the union sums, one part for each name.",#
+                 :gu_w => "`w`: The weight of each part, or `nothing` for a weight of one each, a plain sum. A part with the weight `0` is skipped. The union does not normalise the weights, because a raw edge weight is data.",#
+                 :gu_nrm => "`nrm`: The normalisation of each part before the sum, a member of [`AbstractEdgeNormalisation`](@ref) along the direction of the consumer, or `nothing` to sum the stored weights.",#
+                 :gu_dir => "`dir`: The single direction along which `nrm` normalises each part: [`OutEdges`](@ref) for a column sum of `At`, or [`InEdges`](@ref) for a row sum.",#
+                 :gu_unknown => "`unknown`: The rule for a part with no graph in force, a member of [`AbstractUnknownEntryRule`](@ref). [`EntrywiseUnknown`](@ref) makes the union unknown, and [`ZeroUnknown`](@ref) reads the part as an empty graph.",#
+                 :gu_name => "`name`: The name of the union in the Panel Fields and the messages of a consumer, or `nothing` for `join(ng, \"+\")`.",#
                  ## DBHT
                  :dbhtpower => "`power`: The exponent of each distance in the similarity transformation.",#
                  :dbhtcoef => "`coef`: The scale factor of the distance term in the similarity transformation.",#

@@ -2,29 +2,34 @@
     assert_graph_names(names::VecStr, sym::Sym_Str) -> nothing
     assert_graph_names(names::AbstractString, sym::Sym_Str) -> nothing
     assert_graph_names(names::Nothing, sym::Sym_Str) -> nothing
+    assert_graph_names(gu::GraphUnion, sym::Sym_Str) -> nothing
+    assert_graph_names(names::AbstractVector, sym::Sym_Str) -> nothing
 
 Refuse a list of names of graph nodes, or of graphs, that is empty, that holds an empty name, or that holds a name twice.
 
-A consumer that names the graphs it reads, such as [`WalkProfilePanel`](@ref), takes one name or `nothing` for the only graph too, so the function has a method for each form.
+A consumer that names the graphs it reads, such as [`WalkProfilePanel`](@ref), takes one name or `nothing` for the only graph too, and a [`GraphUnion`](@ref) or a vector of names and unions, so the function has a method for each form.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. A vector: refuse an empty vector, an empty name and a repeated name.
+ 1. A vector of names: refuse an empty vector, an empty name and a repeated name.
  2. One name: refuse the empty string.
  3. `nothing`: return `nothing`. It names the only graph.
+ 4. A [`GraphUnion`](@ref): return `nothing`. Its constructor checked it.
+ 5. Any other vector: refuse an empty vector, take the name of each entry with [`graph_entry_label`](@ref), and check the names by step 1.
 
 # Arguments
 
-  - `names`: The names to check, one name, or `nothing`.
+  - `names`: The names to check, one name, `nothing`, or a union.
   - $(arg_dict[:sym_msg])
 
 # Validation
 
   - `!isempty(names)`. Raises an [`IsEmptyError`](@ref).
   - No name is the empty string. Raises an `ArgumentError`.
-  - `allunique(names)`. Raises an `ArgumentError` that names the first repeated name.
+  - `allunique(names)`. Raises an `ArgumentError` that names the first repeated name. A union counts by its `name`, so a graph named `"a+b"` beside `GraphUnion(; ng = ["a", "b"])` is a repeated name.
+  - Each entry of a vector is a name or a union. Raises an `ArgumentError`. See [`graph_entry_label`](@ref).
 
 # Returns
 

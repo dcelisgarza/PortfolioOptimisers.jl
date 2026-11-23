@@ -9,6 +9,7 @@ PortfolioOptimisers.graph_name_list
 PortfolioOptimisers.graph_snapshot_list
 PortfolioOptimisers.assert_graph_requirements
 PortfolioOptimisers.assert_consumer_graphs
+PortfolioOptimisers.assert_consumer_entry
 PortfolioOptimisers.graph_walk_path
 PortfolioOptimisers.assert_graph_walk
 ```

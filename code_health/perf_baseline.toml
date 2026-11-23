@@ -5,7 +5,7 @@
 [provenance]
 julia = "1.13.4"
 rules = 2
-commit = "b6d553a455"
+commit = "ec67fbde74"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
@@ -55,6 +55,7 @@ commit = "b6d553a455"
 "src/01_Base/16_CoveragePolicy.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/01_Base/17_ReturnsSource.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/01_Base/18_CountFraction.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
+"src/01_Base/19_UnknownEntryRules.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/02_Tools/01_Operators.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/02_Tools/02_ArrayViews.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/02_Tools/03_TypeUtilities.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
@@ -73,6 +74,8 @@ commit = "b6d553a455"
 "src/03_InputData/05_ExogenousGraph/03_GraphObservations.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/03_InputData/05_ExogenousGraph/04_GraphTables.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/03_InputData/05_ExogenousGraph/05_GraphRequirements.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
+"src/03_InputData/05_ExogenousGraph/06_EdgeRules.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
+"src/03_InputData/05_ExogenousGraph/07_GraphUnion.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/03_InputData/06_PricesResult.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/03_InputData/07_PriceIngestion.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/03_InputData/08_PriceGapFill.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }

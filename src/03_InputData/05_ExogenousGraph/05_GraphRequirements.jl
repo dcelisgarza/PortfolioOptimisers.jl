@@ -157,9 +157,12 @@ end
 """
     graph_name_list(names::Nothing) -> Tuple{Nothing}
     graph_name_list(names::AbstractString) -> Tuple{AbstractString}
-    graph_name_list(names::VecStr) -> VecStr
+    graph_name_list(names::GraphUnion) -> Tuple{GraphUnion}
+    graph_name_list(names::AbstractVector) -> AbstractVector
 
-Return the names of [`graph_names`](@ref) as a collection to walk.
+Return the entries of [`graph_names`](@ref) as a collection to walk.
+
+An entry is `nothing` for the only graph, a name, or a [`GraphUnion`](@ref). A vector holds names and unions.
 
 # Related
 
@@ -171,7 +174,7 @@ end
 function graph_name_list(name::AbstractString)
     return (name,)
 end
-function graph_name_list(names::VecStr)
+function graph_name_list(names::AbstractVector)
     return names
 end
 """
@@ -240,11 +243,11 @@ Check each snapshot of each graph that one consumer names.
 The method that Julia selects is the algorithm.
 
  1. No requirement: return `nothing`. The value reads no graph.
- 2. Otherwise: for each name of [`graph_names`](@ref), find the graph with [`graph_position`](@ref), and check each of its snapshots with [`assert_graph_requirements`](@ref).
+ 2. Otherwise: check each entry of [`graph_names`](@ref) with [`assert_consumer_entry`](@ref).
 
 # Validation
 
-  - The rules of [`graph_position`](@ref) and [`assert_graph_requirements`](@ref).
+  - The rules of [`assert_consumer_entry`](@ref).
 
 # Related
 
@@ -254,11 +257,50 @@ function assert_consumer_graphs(::Any, ::Tuple{}, ::Any, ::Any, ::AbstractString
     return nothing
 end
 function assert_consumer_graphs(consumer, ::Tuple, ng, G, path::AbstractString)::Nothing
-    for name in graph_name_list(graph_names(consumer))
-        k = graph_position(ng, name)
-        for (key, g) in graph_snapshot_list(G[k])
-            assert_graph_requirements(consumer, g, ng[k], key, path)
-        end
+    for entry in graph_name_list(graph_names(consumer))
+        assert_consumer_entry(consumer, entry, ng, G, path)
+    end
+    return nothing
+end
+"""
+    assert_consumer_entry(consumer, name::Option{<:AbstractString}, ng, G, path::AbstractString) -> nothing
+    assert_consumer_entry(consumer, gu::GraphUnion, ng, G, path::AbstractString) -> nothing
+
+Check each snapshot of one graph that a consumer names, or of each part of a union of graphs.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A name, or `nothing` for the only graph: find the graph with [`graph_position`](@ref), and check each of its snapshots with [`assert_graph_requirements`](@ref).
+ 2. A [`GraphUnion`](@ref): check each part by step 1, and check that the keys of the parts are of one kind with [`assert_union_key_kinds`](@ref).
+
+# Arguments
+
+  - `consumer`: The consumer of the graph.
+  - `name`, `gu`: The entry of the consumer.
+  - `ng`: The names of the graphs of the returns data, or `nothing`.
+  - `G`: The graphs, or `nothing`.
+  - `path`: The path of the consumer in the estimator tree, which the message quotes.
+
+# Validation
+
+  - The rules of [`graph_position`](@ref), [`assert_graph_requirements`](@ref) and [`assert_union_key_kinds`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_consumer_graphs`](@ref)
+  - [`GraphUnion`](@ref)
+"""
+function assert_consumer_entry(consumer, name::Option{<:AbstractString}, ng, G,
+                               path::AbstractString)::Nothing
+    k = graph_position(ng, name)
+    for (key, g) in graph_snapshot_list(G[k])
+        assert_graph_requirements(consumer, g, ng[k], key, path)
     end
     return nothing
 end
@@ -395,16 +437,20 @@ function assert_graph_entry(::Any, ::Any...)::Nothing
 end
 """
     consumer_graph(consumer, ng, G, name, T, ts) -> ExogenousGraph
+    consumer_graph(consumer, ng, G, gu::GraphUnion, T, ts, dir::AbstractEdgeDirection) -> ExogenousGraph
     consumer_graph(consumer, rd::ReturnsResult, name = graph_names(consumer)) -> ExogenousGraph
+    consumer_graph(consumer, rd::ReturnsResult, gu::GraphUnion, dir::AbstractEdgeDirection) -> ExogenousGraph
 
 Return the Exogenous Graph `name` in force at the last row of the returns data, after a check against the requirements of `consumer`.
 
-A consumer calls this function in its fit. It reads one snapshot, so a direct call of the consumer, with no user verb around it, checks that snapshot, as the entry of the user verb checks each snapshot.
+A consumer calls this function in its fit. It reads one snapshot, so a direct call of the consumer, with no user verb around it, checks that snapshot, as the entry of the user verb checks each snapshot. A [`GraphUnion`](@ref) also takes the single direction `dir` of the consumer, along which it normalises its parts. A name takes no direction.
 
 # Algorithm
 
- 1. Find the graph with [`graph_position`](@ref), and the snapshot at the last row with [`graph_snapshot`](@ref).
- 2. Check it with [`assert_graph_requirements`](@ref).
+The method that Julia selects is the algorithm.
+
+ 1. A name, or `nothing`: find the graph with [`graph_position`](@ref), and the snapshot at the last row with [`graph_snapshot`](@ref). Check it with [`assert_graph_requirements`](@ref).
+ 2. A [`GraphUnion`](@ref): read the snapshot of each part in force at the last row, check each with [`assert_graph_requirements`](@ref), choose the parts under the rule `gu.unknown`, and build their union along `dir`, with [`union_in_force`](@ref).
 
 # Arguments
 
@@ -412,13 +458,16 @@ A consumer calls this function in its fit. It reads one snapshot, so a direct ca
   - `ng`: The names of the graphs, or `nothing`.
   - `G`: The graphs, or `nothing`.
   - `name`: The name of the graph, or `nothing` for the only graph.
+  - `gu`: The union of graphs.
   - `T`: The number of rows.
   - `ts`: The timestamps of the rows, or `nothing`.
+  - `dir`: The single direction of the consumer, [`OutEdges`](@ref) or [`InEdges`](@ref).
   - $(arg_dict[:rd])
 
 # Validation
 
   - The rules of [`graph_position`](@ref), [`graph_snapshot`](@ref) and [`assert_graph_requirements`](@ref).
+  - A union refuses a row at which its rule finds no graph in force. Raises an `ArgumentError` that names each part with no graph in force. See [`union_in_force`](@ref).
 
 # Returns
 

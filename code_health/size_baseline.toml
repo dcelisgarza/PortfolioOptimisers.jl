@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.4"
 julia_syntax = "1.0.2"
-commit = "b6d553a455"
+commit = "ec67fbde74"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { code = 35, doc = 0, comment = 5, blank = 4, total = 44 }
@@ -56,6 +56,7 @@ commit = "b6d553a455"
 "src/01_Base/16_CoveragePolicy.jl" = { code = 382, doc = 797, comment = 6, blank = 369, total = 1554 }
 "src/01_Base/17_ReturnsSource.jl" = { code = 95, doc = 320, comment = 0, blank = 165, total = 580 }
 "src/01_Base/18_CountFraction.jl" = { code = 40, doc = 105, comment = 5, blank = 52, total = 202 }
+"src/01_Base/19_UnknownEntryRules.jl" = { code = 20, doc = 137, comment = 0, blank = 81, total = 238 }
 "src/02_Tools/01_Operators.jl" = { code = 44, doc = 310, comment = 0, blank = 109, total = 463 }
 "src/02_Tools/02_ArrayViews.jl" = { code = 118, doc = 413, comment = 0, blank = 192, total = 723 }
 "src/02_Tools/03_TypeUtilities.jl" = { code = 45, doc = 162, comment = 2, blank = 80, total = 289 }
@@ -74,6 +75,8 @@ commit = "b6d553a455"
 "src/03_InputData/05_ExogenousGraph/03_GraphObservations.jl" = { code = 223, doc = 314, comment = 1, blank = 162, total = 700 }
 "src/03_InputData/05_ExogenousGraph/04_GraphTables.jl" = { code = 208, doc = 254, comment = 3, blank = 116, total = 581 }
 "src/03_InputData/05_ExogenousGraph/05_GraphRequirements.jl" = { code = 102, doc = 220, comment = 0, blank = 119, total = 441 }
+"src/03_InputData/05_ExogenousGraph/06_EdgeRules.jl" = { code = 36, doc = 145, comment = 0, blank = 81, total = 262 }
+"src/03_InputData/05_ExogenousGraph/07_GraphUnion.jl" = { code = 275, doc = 395, comment = 2, blank = 197, total = 869 }
 "src/03_InputData/06_PricesResult.jl" = { code = 122, doc = 169, comment = 5, blank = 72, total = 368 }
 "src/03_InputData/07_PriceIngestion.jl" = { code = 279, doc = 562, comment = 25, blank = 276, total = 1142 }
 "src/03_InputData/08_PriceGapFill.jl" = { code = 111, doc = 335, comment = 17, blank = 133, total = 596 }

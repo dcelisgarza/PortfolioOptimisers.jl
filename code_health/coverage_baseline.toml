@@ -54,6 +54,7 @@ commit = "391be5e"
 "src/01_Base/16_CoveragePolicy.jl" = { lines = 255, misses = 0 }
 "src/01_Base/17_ReturnsSource.jl" = { lines = 60, misses = 0 }
 "src/01_Base/18_CountFraction.jl" = { lines = 17, misses = 0 }
+"src/01_Base/19_UnknownEntryRules.jl" = { lines = 6, misses = 0 }
 "src/02_Tools/01_Operators.jl" = { lines = 37, misses = 0 }
 "src/02_Tools/02_ArrayViews.jl" = { lines = 69, misses = 0 }
 "src/02_Tools/03_TypeUtilities.jl" = { lines = 30, misses = 0 }
@@ -72,6 +73,8 @@ commit = "391be5e"
 "src/03_InputData/05_ExogenousGraph/03_GraphObservations.jl" = { lines = 140, misses = 0 }
 "src/03_InputData/05_ExogenousGraph/04_GraphTables.jl" = { lines = 125, misses = 0 }
 "src/03_InputData/05_ExogenousGraph/05_GraphRequirements.jl" = { lines = 56, misses = 0 }
+"src/03_InputData/05_ExogenousGraph/06_EdgeRules.jl" = { lines = 15, misses = 0 }
+"src/03_InputData/05_ExogenousGraph/07_GraphUnion.jl" = { lines = 156, misses = 0 }
 "src/03_InputData/06_PricesResult.jl" = { lines = 68, misses = 0 }
 "src/03_InputData/07_PriceIngestion.jl" = { lines = 166, misses = 0 }
 "src/03_InputData/08_PriceGapFill.jl" = { lines = 66, misses = 0 }

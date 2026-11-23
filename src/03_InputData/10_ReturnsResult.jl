@@ -1364,6 +1364,11 @@ end
 function consumer_graph(consumer, rd::ReturnsResult, name = graph_names(consumer))
     return consumer_graph(consumer, rd.ng, rd.G, name, observation_count(rd.X, rd.F), rd.ts)
 end
+function consumer_graph(consumer, rd::ReturnsResult, gu::GraphUnion,
+                        dir::AbstractEdgeDirection)
+    return consumer_graph(consumer, rd.ng, rd.G, gu, observation_count(rd.X, rd.F), rd.ts,
+                          dir)
+end
 function assert_graph_entry(est, rd::ReturnsResult, ::Any...)::Nothing
     return assert_graph_entry(est, rd.ng, rd.G)
 end

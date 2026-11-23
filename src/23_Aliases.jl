@@ -953,7 +953,7 @@ end
 # ── Distances ──────────────────────────────────────
 """
     WalkDistance(;
-        ng::Option{<:Union{AbstractString, VecStr}} = nothing,
+        ng::Option{<:Union{AbstractString, GraphUnion, AbstractVector}} = nothing,
         sep::HopCount = HopCount(; n = CountOf(2)),
         decay::Option{<:AbstractSeparationDecayAlgorithm} = ExponentialDecay(; rate = log(2)),
         dir::AbstractEdgeDirection = OutEdges(),
@@ -965,13 +965,14 @@ end
 
 Alias for the distance between the Walk Profiles of the assets over an Exogenous Graph, a [`FeatureDistance`](@ref) that holds a [`WalkProfilePanel`](@ref).
 
-It returns `FeatureDistance(; ape = WalkProfilePanel(; ng, sep, decay, dir, nrm, wgt, self), metric)`, and [`default_similarity`](@ref) gives the similarity of `metric`. The keywords of the walk are the fields of [`WalkProfilePanel`](@ref). The default [`OrthantChordDist`](@ref) is the chord on the non-negative orthant, where each cosine of two profiles lies. A user who needs `sel`, `strict` or the `prefix` of the fields writes the full form.
+It returns `FeatureDistance(; ape = WalkProfilePanel(; ng, sep, decay, dir, nrm, wgt, self), metric)`, and [`default_similarity`](@ref) gives the similarity of `metric`. The keywords of the walk are the fields of [`WalkProfilePanel`](@ref), so `ng` takes a [`GraphUnion`](@ref) too. The default [`OrthantChordDist`](@ref) is the chord on the non-negative orthant, where each cosine of two profiles lies. A user who needs `sel`, `strict` or the `prefix` of the fields writes the full form.
 
 # Validation
 
   - The rules of [`WalkProfilePanel`](@ref).
 """
-function WalkDistance(; ng::Option{<:Union{AbstractString, VecStr}} = nothing,
+function WalkDistance(;
+                      ng::Option{<:Union{AbstractString, GraphUnion, AbstractVector}} = nothing,
                       sep::HopCount = HopCount(; n = CountOf(2)),
                       decay::Option{<:AbstractSeparationDecayAlgorithm} = ExponentialDecay(;
                                                                                            rate = log(2)),

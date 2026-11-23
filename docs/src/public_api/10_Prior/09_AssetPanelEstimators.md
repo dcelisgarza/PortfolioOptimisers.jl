@@ -21,14 +21,6 @@ asset_panel(ape::RegressionPanel, pr, rd, ::Any)
 
 ```@docs
 WalkProfilePanel
-PortfolioOptimisers.AbstractEdgeDirection
-OutEdges
-InEdges
-BothEdges
-PortfolioOptimisers.walk_parts
-PortfolioOptimisers.AbstractEdgeNormalisation
-WeightShare
-PortfolioOptimisers.normalise_edge_weights
 PortfolioOptimisers.AbstractEdgeWeightRule
 UnitEdgeWeights
 PortfolioOptimisers.read_edge_weights
