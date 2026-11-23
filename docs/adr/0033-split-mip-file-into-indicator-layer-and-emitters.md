@@ -126,3 +126,11 @@ for the feature.**
 Item 5 calls `k` free. Since #1844 and #1845 the `k` of `RiskBudgeting` is a variable bounded by
 `k >= kmin >= 0` (ADR 0126), so "free" means only that `k` is not the number `1`. The log barrier still fixes the scale of the
 unscaled weights, and `effective_k` still answers `1` under a unit budget.
+
+## Amendment (2026-11-23)
+
+Item 5 gave one predicate to four sites. One of them, the choice of the gates of the asset space, read
+it wrongly (#2275). `effective_k` is `1` for the builder of a risk or of a penalty, because the
+objective of `RiskBudgeting` measures the scaled weights alone. A bound, a threshold, a target or
+the gate of a binary reads `get_k` under every head, because the head divides the weights by `k`
+after the solve. `is_unit_budget` then had one caller, so `effective_k` reads the record itself.

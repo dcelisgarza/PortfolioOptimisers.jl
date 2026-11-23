@@ -1276,7 +1276,6 @@ struct HookObjective03d <: PortfolioOptimisers.CustomJuMPObjective end
         end
         @test occursin("scalarise_return_expression!", msg)
         @test isnothing(PO.decomposition_contract(model))
-        @test !PO.is_unit_budget(model)
     end
 
     @testset "scales, observation count, unit budget and decomposition contract" begin
@@ -1290,7 +1289,6 @@ struct HookObjective03d <: PortfolioOptimisers.CustomJuMPObjective end
         JuMP.@variable(model, k)
         @test PO.effective_k(model) === k
         PO.set_unit_budget!(model)
-        @test PO.is_unit_budget(model)
         @test PO.effective_k(model) == 1
         @test PO.get_k(model) === k
         # The first record stays.
