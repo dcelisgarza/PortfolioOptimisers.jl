@@ -631,27 +631,40 @@ function check_tracker(path, row, map_names, tracker, survey)
 end
 
 """
-    check_titles(tracker, paths) -> Vector{Finding}
+    check_titles(tracker, paths, elsewhere) -> Vector{Finding}
 
-One failure for each open sweep issue whose title names a `.jl` file that `paths` does not hold,
-which `CodeHealth.stale_titles` finds. Such a title hides its file from `check_tracker` and from
+One failure for each open sweep issue whose title names a `.jl` file that neither `paths` nor
+`elsewhere` holds, which `CodeHealth.stale_titles` finds. Such a title hides its file from `check_tracker` and from
 `code_health/sweep_triage.jl`, so every answer about a missing sub-issue is in doubt until it is
 retitled (#1755).
 
 It is a failure in every scope, as a closed child map is. A stale title is a defect of the tracker,
 not the standing backlog of a map.
+
+One note for each branch or worktree of `elsewhere`, with the paths that `CodeHealth.rows_elsewhere`
+found there. Such a title names a row that did not land here yet, so it is correct (#2261).
 """
-function check_titles(tracker, paths)
+function check_titles(tracker, paths, elsewhere = Dict{String, String}())
     if tracker === nothing
         return Finding[]
     end
-    return [Finding(:fail,
-                    "issue #$n names $(join(("`$t`" for t in bad), ", ")), " *
-                    "which is not a path of the manifest.",
-                    ["Its title: $title",
-                     "Retitle it to name the current path of every file it sweeps. If a file",
-                     "moved, this is its ticket: do not file a second one."])
-            for (n, title, bad) in CodeHealth.stale_titles(tracker.issues, paths)]
+    known = union(paths, keys(elsewhere))
+    fs = [Finding(:fail,
+                  "issue #$n names $(join(("`$t`" for t in bad), ", ")), " *
+                  "which is not a path of the manifest.",
+                  ["Its title: $title",
+                   "Retitle it to name the current path of every file it sweeps. If a file",
+                   "moved, this is its ticket: do not file a second one. If another branch",
+                   "added the file, run `git fetch origin` and then this check again."])
+          for (n, title, bad) in CodeHealth.stale_titles(tracker.issues, known)]
+    for (place, held) in CodeHealth.by_place(elsewhere)
+        push!(fs,
+              Finding(:note,
+                      "the open `$LABEL` issues name $(length(held)) row(s) of the $place.",
+                      ["If one is the new path of a file of this checkout, file no second issue.";
+                       held]))
+    end
+    return fs
 end
 
 # --- the command line ------------------------------------------------------
@@ -786,11 +799,17 @@ function main(args)
     # Every `[fail]` with its path, repeated at the end: a reader who reads the tail of a long
     # report, as a session does, then still sees each one with its command.
     unmet = Pair{String, Finding}[]
-    stale = check_titles(tracker, keys(rows))
-    if !(isempty(stale))
+    elsewhere = if tracker === nothing
+        Dict{String, String}()
+    else
+        CodeHealth.rows_elsewhere(tracker.issues, keys(rows))
+    end
+    titles = check_titles(tracker, keys(rows), elsewhere)
+    if !(isempty(titles))
+        stale = filter(x -> x.level === :fail, titles)
         failures += length(stale)
         append!(unmet, ["the open `$LABEL` issues" => s for s in stale])
-        print_findings(stdout, "the open `$LABEL` issues", stale)
+        print_findings(stdout, "the open `$LABEL` issues", titles)
     end
     for f in scope
         fs = check_file(f, rows, map_names, coverage, entry, tracker, exempted, opts.all)
