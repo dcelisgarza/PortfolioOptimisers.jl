@@ -87,6 +87,10 @@ The consistency factor of [`mcd_consistency`](@ref) is exact as ``n`` grows. In 
 
 The coefficients are those of the R package `robustbase`, version 0.99-7, because [pison2002](@cite) prints the coefficients of the least trimmed squares regression alone. For ``n \\leq 20`` and ``p \\leq 9`` at the subset fraction 1/2, that package replaces the fitted factor with a table of simulated values. This type uses the fitted factor at every ``n``, so it differs from that package in such a small sample.
 
+!!! warning
+
+    [pison2002](@cite) simulates samples of 20 observations or more. Below that, the fitted factor is an extrapolation, and it is too large when ``n`` is near to ``2p``. At the subset fraction 1/2, ``n = 14`` and ``p = 5``, the factor of the reweighted MCD is 21. A smaller ``n`` gives a factor that is negative, and the fit raises a `DomainError`. Use `ssc = nothing` for such a sample.
+
 # Examples
 
 ```jldoctest
@@ -188,6 +192,10 @@ The factor is the reciprocal of the ratio of [`pison_fraction_factor`](@ref), in
   - `alpha`: The subset fraction.
   - `kind`: `:raw` for the raw MCD, or `:rew` for the reweighted MCD.
 
+# Validation
+
+  - The interpolated ratio is positive. Otherwise, the sample is too small for the fitted factor, and the method raises a `DomainError`.
+
 # Returns
 
   - `f::Number`: The factor.
@@ -213,6 +221,9 @@ function mcd_correction(::MCDSmallSampleCorrection, p::Integer, n::Integer, alph
     else
         f875 + (1 - f875) / 0.125 * (alpha - 0.875)
     end
+    @argcheck(f > zero(f),
+              DomainError((n, p),
+                          "the small-sample correction of the MCD has no positive factor for $n observations of $p assets. Use a longer window, or set `ssc = nothing`"))
     return inv(f)
 end
 

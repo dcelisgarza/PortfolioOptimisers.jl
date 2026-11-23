@@ -227,17 +227,17 @@ function assert_robust_rows(n::Integer, p::Integer, what::AbstractString)
     return nothing
 end
 """
-    robust_result(X::MatNum, mu::VecNum, sigma::MatNum, w::VecNum, q::Number) -> RobustCovarianceResult
+    robust_result(mu::VecNum, sigma::MatNum, d2::VecNum, w::VecNum, q::Number) -> RobustCovarianceResult
 
 Builds the [`RobustCovarianceResult`](@ref) of a robust fit.
 
-The function computes the squared distance of each observation from `mu` in the metric of `sigma` with [`squared_distances`](@ref), and flags each observation whose distance is above the quantile `q` of the ``\\chi^2_p`` distribution.
+The function flags each observation whose squared distance is above the quantile `q` of the ``\\chi^2_p`` distribution.
 
 # Arguments
 
-  - `X`: The data matrix, `observations × assets`.
   - `mu`: The robust location.
   - `sigma`: The robust scatter.
+  - `d2`: The squared distance of each observation, from [`squared_distances`](@ref).
   - `w`: The weight of each observation in the estimate of `sigma`.
   - `q`: The probability of the cut-off of the outlier flag.
 
@@ -250,9 +250,8 @@ The function computes the squared distance of each observation from `mu` in the 
   - [`RobustCovarianceResult`](@ref)
   - [`squared_distances`](@ref)
 """
-function robust_result(X::MatNum, mu::VecNum, sigma::MatNum, w::VecNum, q::Number)
-    d2 = squared_distances(X, mu, sigma)
-    cut = Distributions.quantile(Distributions.Chisq(size(X, 2)), q)
+function robust_result(mu::VecNum, sigma::MatNum, d2::VecNum, w::VecNum, q::Number)
+    cut = Distributions.quantile(Distributions.Chisq(length(mu)), q)
     return RobustCovarianceResult(mu, sigma, d2, w, d2 .> cut)
 end
 

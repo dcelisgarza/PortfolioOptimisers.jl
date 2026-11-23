@@ -5,7 +5,7 @@
 julia = "1.13.4"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "6f0391e693"
+commit = "43cd47031a"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 6, cog_sum = 4, arg_sum = 16, macros = [] }
@@ -96,9 +96,9 @@ commit = "6f0391e693"
 "src/05_Moments/03_Covariance.jl" = { cyc = 9, cog = 18, arg = 9, cyc_sum = 101, cog_sum = 77, arg_sum = 203, macros = ["@propagatable"] }
 "src/05_Moments/04_SimpleVariance.jl" = { cyc = 5, cog = 8, arg = 9, cyc_sum = 59, cog_sum = 42, arg_sum = 119, macros = ["@propagatable"] }
 "src/05_Moments/05_Gerber/01_GerberCovariance.jl" = { cyc = 1, cog = 1, arg = 6, cyc_sum = 10, cog_sum = 1, arg_sum = 29, macros = ["@propagatable"] }
-"src/05_Moments/05_Gerber/02_SmythBrobyCovariance.jl" = { cyc = 13, cog = 10, arg = 10, cyc_sum = 52, cog_sum = 25, arg_sum = 129, macros = ["@propagatable"] }
+"src/05_Moments/05_Gerber/02_SmythBrobyCovariance.jl" = { cyc = 13, cog = 10, arg = 10, cyc_sum = 53, cog_sum = 26, arg_sum = 137, macros = ["@propagatable"] }
 "src/05_Moments/05_Gerber/03_GerberIQCovariance_a.jl" = { cyc = 73, cog = 73, arg = 25, cyc_sum = 149, cog_sum = 126, arg_sum = 159, macros = ["@propagatable"] }
-"src/05_Moments/05_Gerber/03_GerberIQCovariance_b.jl" = { cyc = 9, cog = 7, arg = 11, cyc_sum = 30, cog_sum = 14, arg_sum = 84, macros = [] }
+"src/05_Moments/05_Gerber/03_GerberIQCovariance_b.jl" = { cyc = 9, cog = 7, arg = 11, cyc_sum = 28, cog_sum = 14, arg_sum = 76, macros = [] }
 "src/05_Moments/06_DistanceCovariance.jl" = { cyc = 3, cog = 4, arg = 6, cyc_sum = 19, cog_sum = 9, arg_sum = 45, macros = ["@propagatable"] }
 "src/05_Moments/07_LowerTailDependenceCovariance.jl" = { cyc = 6, cog = 10, arg = 4, cyc_sum = 10, cog_sum = 11, arg_sum = 12, macros = ["@propagatable"] }
 "src/05_Moments/08_RankCovariance.jl" = { cyc = 3, cog = 3, arg = 4, cyc_sum = 10, cog_sum = 5, arg_sum = 15, macros = ["@propagatable"] }
@@ -196,12 +196,12 @@ commit = "6f0391e693"
 "src/05_Moments/39_WeightedAvailableCase.jl" = { cyc = 3, cog = 4, arg = 9, cyc_sum = 33, cog_sum = 23, arg_sum = 94, macros = [] }
 "src/05_Moments/40_RobustCovariance/01_Base_RobustCovariance.jl" = { cyc = 3, cog = 3, arg = 5, cyc_sum = 9, cog_sum = 4, arg_sum = 27, macros = [] }
 "src/05_Moments/40_RobustCovariance/02_QnScale.jl" = { cyc = 4, cog = 5, arg = 4, cyc_sum = 19, cog_sum = 17, arg_sum = 14, macros = [] }
-"src/05_Moments/40_RobustCovariance/03_MCDSearch.jl" = { cyc = 3, cog = 3, arg = 5, cyc_sum = 26, cog_sum = 17, arg_sum = 43, macros = [] }
+"src/05_Moments/40_RobustCovariance/03_MCDSearch.jl" = { cyc = 4, cog = 5, arg = 5, cyc_sum = 30, cog_sum = 22, arg_sum = 44, macros = [] }
 "src/05_Moments/40_RobustCovariance/04_DetMCDStarts.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 5, cog_sum = 3, arg_sum = 6, macros = [] }
 "src/05_Moments/40_RobustCovariance/05_MCDFactors.jl" = { cyc = 3, cog = 3, arg = 5, cyc_sum = 8, cog_sum = 5, arg_sum = 19, macros = [] }
 "src/05_Moments/40_RobustCovariance/06_MCDCovariance.jl" = { cyc = 2, cog = 1, arg = 7, cyc_sum = 12, cog_sum = 4, arg_sum = 33, macros = ["@propagatable"] }
-"src/05_Moments/40_RobustCovariance/07_TylerCovariance.jl" = { cyc = 7, cog = 11, arg = 6, cyc_sum = 20, cog_sum = 15, arg_sum = 41, macros = ["@propagatable"] }
-"src/05_Moments/40_RobustCovariance/08_RobustExpectedReturns.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 4, cog_sum = 3, arg_sum = 5, macros = ["@propagatable"] }
+"src/05_Moments/40_RobustCovariance/07_TylerCovariance.jl" = { cyc = 7, cog = 11, arg = 6, cyc_sum = 23, cog_sum = 16, arg_sum = 45, macros = ["@propagatable"] }
+"src/05_Moments/40_RobustCovariance/08_RobustExpectedReturns.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 6, cog_sum = 5, arg_sum = 11, macros = ["@propagatable"] }
 "src/06_Distance/01_Base_Distance.jl" = { cyc = 2, cog = 1, arg = 2, cyc_sum = 3, cog_sum = 2, arg_sum = 2, macros = [] }
 "src/06_Distance/02_Distance.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 33, cog_sum = 18, arg_sum = 112, macros = [] }
 "src/06_Distance/03_DistanceDistance.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 6, cog_sum = 5, arg_sum = 19, macros = [] }

@@ -273,7 +273,7 @@ Fits the minimum covariance determinant of [`MCDCovariance`](@ref) to the data.
  4. Standardise the data with [`mcd_standardise`](@ref), and find the subset with [`mcd_search`](@ref).
  5. Fit the raw location and scatter of the subset in the units of the data with [`mcd_subset_fit`](@ref). Multiply the scatter by [`mcd_consistency`](@ref) at `h / n` and by the raw factor of [`mcd_correction`](@ref).
  6. Reweight with [`mcd_reweight`](@ref).
- 7. Build the result with [`robust_result`](@ref).
+ 7. Compute the squared distance of each observation with [`squared_distances`](@ref), and build the result with [`robust_result`](@ref).
 
 # Arguments
 
@@ -288,7 +288,9 @@ Fits the minimum covariance determinant of [`MCDCovariance`](@ref) to the data.
   - $(val_dict[:dims])
   - `all(isfinite, X)`.
   - `h > p`. Otherwise, the method raises a `DomainError` that names `h`, `p` and the limit.
-  - More than `h` of the observations do not lie on a hyperplane. Otherwise, the method raises the `DomainError` of [`squared_distances`](@ref).
+  - No column of `X` is constant, see [`mcd_standardise`](@ref).
+  - The factor of `ce.ssc` is positive, see [`mcd_correction`](@ref).
+  - No subset of `h` observations lies on a hyperplane. Otherwise, the method raises the `DomainError` of [`squared_distances`](@ref).
 
 # Returns
 
@@ -308,12 +310,12 @@ function StatsAPI.fit(ce::MCDCovariance, X::MatNum; dims::Int = 1, mean = nothin
     h = mcd_subset_size(ce.alpha, n, p)
     assert_robust_rows(h, p, "the size h of the MCD subset")
     centre = robust_centre(ce.me, X; mean = mean, kwargs...)
-    Z, = mcd_standardise(X, centre)
+    Z = mcd_standardise(X, centre)
     idx = mcd_search(ce.alg, Z, h, !isnothing(centre))
     mu, sigma = mcd_fit_rows(X, idx, centre)
     sigma .*= mcd_consistency(p, h / n) * mcd_correction(ce.ssc, p, n, ce.alpha, :raw)
     mu, sigma, w = mcd_reweight(ce.rw, ce, X, mu, sigma, idx, centre)
-    return robust_result(X, mu, sigma, w, ce.q)
+    return robust_result(mu, sigma, squared_distances(X, mu, sigma), w, ce.q)
 end
 """
     mcd_fit_rows(X::MatNum, idx::AbstractVector{<:Integer}, centre::Option{<:VecNum})
@@ -385,11 +387,14 @@ end
 function mcd_reweight(rw::MCDReweighting, ce::MCDCovariance, X::MatNum, mu::VecNum,
                       sigma::MatNum, ::AbstractVector{<:Integer}, centre::Option{<:VecNum})
     n, p = size(X)
+    # The factor depends on the shape of the sample alone, so a sample that is too small for it
+    # raises whether or not every observation is kept.
+    f = mcd_consistency(p, rw.q) * mcd_correction(ce.ssc, p, n, ce.alpha, :rew)
     cut = Distributions.quantile(Distributions.Chisq(p), rw.q)
     keep = squared_distances(X, mu, sigma) .< cut
     mu, sigma = mcd_fit_rows(X, findall(keep), centre)
     if !all(keep)
-        sigma .*= mcd_consistency(p, rw.q) * mcd_correction(ce.ssc, p, n, ce.alpha, :rew)
+        sigma .*= f
     end
     return mu, sigma, convert(Vector{eltype(sigma)}, keep)
 end

@@ -6,8 +6,8 @@ Returns the eigenvectors of the six robust estimates of the correlation of the s
 Section 3.2 of [hubert2012](@cite) gives the six estimates, and the code of the R package `robustbase`, version 0.99-7, computes them as this method does.
 
  1. The correlation of `tanh.(Z)`.
- 2. The Spearman correlation of `Z`.
- 3. The correlation of the normal scores of `Z`. The score of rank ``r`` of ``n`` is ``\\Phi^{-1}((r - 1/3)/(n + 1/3))``, and a tie takes the mean rank.
+ 2. The Spearman correlation of `Z`, the correlation of the ranks. A tie takes the mean rank.
+ 3. The correlation of the normal scores of `Z`. The score of rank ``r`` of ``n`` is ``\\Phi^{-1}((r - 1/3)/(n + 1/3))``.
  4. The spatial sign covariance: the product moment of the rows of `Z` divided by their norms. A row with a norm below `eps` keeps its values.
  5. The covariance of the ``\\lceil n/2 \\rceil`` rows of `Z` with the smallest norms, the first step of BACON.
  6. The raw orthogonalised Gnanadesikan–Kettenring scatter of [`ogk_scatter`](@ref).
@@ -32,13 +32,13 @@ Section 3.2 of [hubert2012](@cite) gives the six estimates, and the code of the 
 function detmcd_directions(Z::MatNum)
     n = size(Z, 1)
     ev(A) = LinearAlgebra.eigvecs(LinearAlgebra.Symmetric(A))
-    rk = mapreduce(StatsBase.tiedrank, hcat, eachcol(Z))
+    rk = stack(StatsBase.tiedrank, eachcol(Z))
     third = one(eltype(Z)) / 3
     scores = Distributions.quantile.(Distributions.Normal(), (rk .- third) ./ (n + third))
     nrm = vec(sqrt.(sum(abs2, Z; dims = 2)))
     sgn = Z ./ ifelse.(nrm .> eps(eltype(nrm)), nrm, one(eltype(nrm)))
     near = nearest_positions(nrm, cld(n, 2))
-    return (ev(Statistics.cor(tanh.(Z))), ev(StatsBase.corspearman(Z)),
+    return (ev(Statistics.cor(tanh.(Z))), ev(Statistics.cor(rk)),
             ev(Statistics.cor(scores)), ev(transpose(sgn) * sgn),
             ev(Statistics.cov(view(Z, near, :))), ev(ogk_scatter(Z)))
 end

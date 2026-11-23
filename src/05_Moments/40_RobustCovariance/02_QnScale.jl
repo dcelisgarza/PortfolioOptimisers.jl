@@ -255,7 +255,7 @@ Returns the robust scale of a column of the data, with a positive value for a co
 
 # Returns
 
-  - `s::Number`: The positive scale.
+  - `s::Number`: The positive scale, of the element type of `z`.
 
 # Related
 
@@ -271,8 +271,9 @@ function robust_column_scale(z::VecNum)
     for alpha in ((10:19) ./ 20..., 0.9875)
         qa = Statistics.quantile(a, alpha)
         if !iszero(qa)
-            return qa / convert(typeof(qa),
-                                Distributions.quantile(Distributions.Normal(), (alpha + 1) / 2))
+            return oftype(s,
+                          qa /
+                          Distributions.quantile(Distributions.Normal(), (alpha + 1) / 2))
         end
     end
     return one(s)

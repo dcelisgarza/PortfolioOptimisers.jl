@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.4"
 julia_syntax = "1.0.2"
-commit = "6f0391e693"
+commit = "43cd47031a"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { code = 35, doc = 0, comment = 5, blank = 4, total = 44 }
@@ -97,9 +97,9 @@ commit = "6f0391e693"
 "src/05_Moments/03_Covariance.jl" = { code = 494, doc = 1096, comment = 13, blank = 442, total = 2045 }
 "src/05_Moments/04_SimpleVariance.jl" = { code = 290, doc = 762, comment = 4, blank = 305, total = 1361 }
 "src/05_Moments/05_Gerber/01_GerberCovariance.jl" = { code = 100, doc = 531, comment = 6, blank = 212, total = 849 }
-"src/05_Moments/05_Gerber/02_SmythBrobyCovariance.jl" = { code = 235, doc = 1034, comment = 0, blank = 447, total = 1716 }
+"src/05_Moments/05_Gerber/02_SmythBrobyCovariance.jl" = { code = 267, doc = 1101, comment = 0, blank = 459, total = 1827 }
 "src/05_Moments/05_Gerber/03_GerberIQCovariance_a.jl" = { code = 458, doc = 1259, comment = 0, blank = 490, total = 2207 }
-"src/05_Moments/05_Gerber/03_GerberIQCovariance_b.jl" = { code = 130, doc = 304, comment = 0, blank = 129, total = 563 }
+"src/05_Moments/05_Gerber/03_GerberIQCovariance_b.jl" = { code = 141, doc = 302, comment = 6, blank = 125, total = 574 }
 "src/05_Moments/06_DistanceCovariance.jl" = { code = 102, doc = 354, comment = 0, blank = 158, total = 614 }
 "src/05_Moments/07_LowerTailDependenceCovariance.jl" = { code = 51, doc = 158, comment = 5, blank = 74, total = 288 }
 "src/05_Moments/08_RankCovariance.jl" = { code = 46, doc = 227, comment = 0, blank = 104, total = 377 }
@@ -195,14 +195,14 @@ commit = "6f0391e693"
 "src/05_Moments/37_GeodesicShrinkageCovariance.jl" = { code = 204, doc = 557, comment = 1, blank = 260, total = 1022 }
 "src/05_Moments/38_ElasticNet.jl" = { code = 266, doc = 745, comment = 2, blank = 311, total = 1324 }
 "src/05_Moments/39_WeightedAvailableCase.jl" = { code = 195, doc = 258, comment = 2, blank = 118, total = 573 }
-"src/05_Moments/40_RobustCovariance/01_Base_RobustCovariance.jl" = { code = 54, doc = 143, comment = 0, blank = 63, total = 260 }
-"src/05_Moments/40_RobustCovariance/02_QnScale.jl" = { code = 82, doc = 124, comment = 0, blank = 73, total = 279 }
-"src/05_Moments/40_RobustCovariance/03_MCDSearch.jl" = { code = 116, doc = 271, comment = 0, blank = 137, total = 524 }
+"src/05_Moments/40_RobustCovariance/01_Base_RobustCovariance.jl" = { code = 53, doc = 143, comment = 0, blank = 63, total = 259 }
+"src/05_Moments/40_RobustCovariance/02_QnScale.jl" = { code = 83, doc = 124, comment = 0, blank = 73, total = 280 }
+"src/05_Moments/40_RobustCovariance/03_MCDSearch.jl" = { code = 129, doc = 287, comment = 1, blank = 148, total = 565 }
 "src/05_Moments/40_RobustCovariance/04_DetMCDStarts.jl" = { code = 35, doc = 56, comment = 0, blank = 33, total = 124 }
-"src/05_Moments/40_RobustCovariance/05_MCDFactors.jl" = { code = 53, doc = 106, comment = 0, blank = 60, total = 219 }
-"src/05_Moments/40_RobustCovariance/06_MCDCovariance.jl" = { code = 84, doc = 217, comment = 0, blank = 97, total = 398 }
-"src/05_Moments/40_RobustCovariance/07_TylerCovariance.jl" = { code = 104, doc = 231, comment = 0, blank = 108, total = 443 }
-"src/05_Moments/40_RobustCovariance/08_RobustExpectedReturns.jl" = { code = 16, doc = 58, comment = 0, blank = 29, total = 103 }
+"src/05_Moments/40_RobustCovariance/05_MCDFactors.jl" = { code = 56, doc = 110, comment = 0, blank = 64, total = 230 }
+"src/05_Moments/40_RobustCovariance/06_MCDCovariance.jl" = { code = 85, doc = 219, comment = 2, blank = 97, total = 403 }
+"src/05_Moments/40_RobustCovariance/07_TylerCovariance.jl" = { code = 114, doc = 243, comment = 0, blank = 117, total = 474 }
+"src/05_Moments/40_RobustCovariance/08_RobustExpectedReturns.jl" = { code = 24, doc = 58, comment = 2, blank = 29, total = 113 }
 "src/06_Distance/01_Base_Distance.jl" = { code = 24, doc = 228, comment = 0, blank = 93, total = 345 }
 "src/06_Distance/02_Distance.jl" = { code = 162, doc = 350, comment = 0, blank = 157, total = 669 }
 "src/06_Distance/03_DistanceDistance.jl" = { code = 39, doc = 132, comment = 0, blank = 58, total = 229 }

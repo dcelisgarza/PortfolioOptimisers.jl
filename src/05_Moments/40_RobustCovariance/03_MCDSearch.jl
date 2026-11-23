@@ -153,26 +153,33 @@ The concentration steps of [`mcd_csteps`](@ref) stop when the subset does not ch
 """
 const MCD_MAX_CSTEPS = 200
 """
-    mcd_standardise(X::MatNum, centre::Option{<:VecNum}) -> Tuple{MatNum, VecNum, VecNum}
+    mcd_standardise(X::MatNum, centre::Option{<:VecNum}) -> MatNum
 
 Centres each column of the data and divides it by its robust scale.
 
 The search of the MCD subset is affine equivariant, so the standardisation does not change the subset that a concentration step selects. It keeps the numbers near one, and the six starts of [`DetMCD`](@ref) read the standardised data.
 
+A value that is further than `eps^(-1/4)` scales from the median of its column, 8192 scales in double precision, moves to that bound. Such a value is an outlier at either place. But the covariance matrix of a subset that holds an outlier larger than about `eps^(-1/2)` scales is singular in the arithmetic, and the search then stops although the rest of the data are regular. The search alone reads the standardised data, so the bound does not enter the estimate.
+
 # Algorithm
 
- 1. Take the centre `c` of each column: the median when `centre` is `nothing`, and `centre` otherwise.
- 2. Take the scale `s` of each centred column with [`robust_column_scale`](@ref).
- 3. Return `(X .- c') ./ s'`, `c` and `s`.
+ 1. Refuse a constant column.
+ 2. Take the centre `c` of each column: the median `m` when `centre` is `nothing`, and `centre` otherwise.
+ 3. Take the scale `s` of each centred column with [`robust_column_scale`](@ref).
+ 4. Clamp each column to `m ± s * eps^(-1/4)`. Subtract `c`, and divide by `s`.
 
 # Arguments
 
   - `X`: The data matrix, `observations × assets`.
   - `centre`: A fixed centre, or `nothing` for the median of each column.
 
+# Validation
+
+  - No column of `X` is constant. Otherwise, the function raises a `DomainError`, because the covariance matrix of each subset is singular.
+
 # Returns
 
-  - `(Z, c, s)`: The standardised data, the centre and the scale.
+  - `Z::MatNum`: The standardised data.
 
 # Related
 
@@ -180,10 +187,15 @@ The search of the MCD subset is affine equivariant, so the standardisation does 
   - [`mcd_search`](@ref)
 """
 function mcd_standardise(X::MatNum, centre::Option{<:VecNum})
-    c = isnothing(centre) ? vec(Statistics.median(X; dims = 1)) : centre
-    Xc = X .- transpose(c)
-    s = map(robust_column_scale, eachcol(Xc))
-    return Xc ./ transpose(s), c, s
+    flat = findfirst(allequal, eachcol(X))
+    @argcheck(isnothing(flat),
+              DomainError(flat,
+                          "column $flat of the data is constant, so its robust covariance is singular. A robust covariance needs data in general position"))
+    m = Statistics.median(X; dims = 1)
+    c = isnothing(centre) ? m : transpose(centre)
+    s = mapslices(robust_column_scale, X .- c; dims = 1)
+    b = s ./ sqrt(sqrt(eps(real(eltype(s)))))
+    return (clamp.(X, m .- b, m .+ b) .- c) ./ s
 end
 """
     mcd_subset_fit(Z::MatNum, idx::AbstractVector{<:Integer}, fixed::Bool) -> Tuple{VecNum, MatNum}
@@ -213,6 +225,33 @@ function mcd_subset_fit(Z::MatNum, idx::AbstractVector{<:Integer}, fixed::Bool)
     return m, (transpose(D) * D) / (length(idx) - !fixed)
 end
 """
+    scatter_cholesky(S::MatNum) -> Option{<:LinearAlgebra.Cholesky}
+
+Returns the Cholesky factorisation of a scatter matrix, or `nothing` when the matrix is singular.
+
+A matrix of rank `p - 1` can pass the factorisation in the arithmetic, with a pivot of the size of the rounding error. A pivot over its diagonal entry is the share of the variance of a variable that the variables before it do not explain. So the function reads a share of at most `p * eps` as zero. The rule does not depend on the units of the variables.
+
+# Arguments
+
+  - `S`: The scatter matrix.
+
+# Returns
+
+  - `C`: The factorisation, or `nothing`.
+
+# Related
+
+  - [`squared_distances`](@ref)
+  - [`mcd_csteps`](@ref)
+"""
+function scatter_cholesky(S::MatNum)
+    C = LinearAlgebra.cholesky(LinearAlgebra.Symmetric(S); check = false)
+    tol = size(S, 1) * eps(real(eltype(S)))
+    regular = LinearAlgebra.issuccess(C) &&
+              all(j -> abs2(C.factors[j, j]) > tol * S[j, j], axes(S, 1))
+    return regular ? C : nothing
+end
+"""
     squared_distances(Z::MatNum, m::VecNum, S::MatNum) -> VecNum
 
 Returns the squared Mahalanobis distance of each observation of `Z` from the centre `m` in the metric of `S`.
@@ -233,7 +272,7 @@ d_t^2 &= (\\boldsymbol{z}_t - \\boldsymbol{m})^\\intercal \\mathbf{S}^{-1} (\\bo
 
 # Validation
 
-  - `S` is positive definite. Otherwise, the function raises a `DomainError` that states that the observations lie on a hyperplane.
+  - `S` is positive definite, as [`scatter_cholesky`](@ref) reads it. Otherwise, the function raises a `DomainError` that states that the observations lie on a hyperplane.
 
 # Returns
 
@@ -245,8 +284,8 @@ d_t^2 &= (\\boldsymbol{z}_t - \\boldsymbol{m})^\\intercal \\mathbf{S}^{-1} (\\bo
   - [`RobustCovarianceResult`](@ref)
 """
 function squared_distances(Z::MatNum, m::VecNum, S::MatNum)
-    C = LinearAlgebra.cholesky(LinearAlgebra.Symmetric(S); check = false)
-    @argcheck(LinearAlgebra.issuccess(C),
+    C = scatter_cholesky(S)
+    @argcheck(!isnothing(C),
               DomainError(size(Z),
                           "the scatter matrix is singular, so the observations that it reads lie on a hyperplane. A robust covariance needs data in general position"))
     R = (Z .- transpose(m)) / C.U
@@ -288,7 +327,7 @@ A concentration step fits the mean and the covariance matrix of the subset, comp
 
  1. Fit the subset with [`mcd_subset_fit`](@ref).
  2. Repeat at most `maxsteps` times. Compute the distances with [`squared_distances`](@ref). Take the `h` nearest observations with a partial sort. Stop if this subset is the old subset. Otherwise, fit the new subset.
- 3. Return the subset and the logarithm of the determinant of its covariance matrix.
+ 3. Return the subset and the logarithm of the determinant of its covariance matrix. The logarithm is `-Inf` for a singular matrix, see [`scatter_cholesky`](@ref).
 
 # Arguments
 
@@ -325,14 +364,15 @@ function mcd_csteps(Z::MatNum, idx::AbstractVector{<:Integer}, h::Integer, fixed
         idx, nidx = nidx, idx
         m, S = mcd_subset_fit(Z, idx, fixed)
     end
-    return idx, LinearAlgebra.logdet(LinearAlgebra.Symmetric(S))
+    C = scatter_cholesky(S)
+    return idx, isnothing(C) ? typemin(real(eltype(S))) : LinearAlgebra.logdet(C)
 end
 """
     mcd_univariate_subset(z::VecNum, h::Integer, fixed::Bool) -> Vector{Int}
 
 Returns the exact MCD subset of one variable.
 
-The covariance matrix of one variable is its variance. The subset of `h` values with the smallest variance is a run of `h` consecutive values of the sorted data, so a pass over the `n - h + 1` runs finds it. When the centre is fixed at zero, the subset is the `h` values with the smallest absolute value.
+The covariance matrix of one variable is its variance. The subset of `h` values with the smallest variance is a run of `h` consecutive values of the sorted data, so a pass over the `n - h + 1` runs finds it. Each run holds the value of rank `h`, because `2h > n`. So the sums of a run are a sum to the left of that value plus a sum to its right, and an outlier outside the run does not enter them. When the centre is fixed at zero, the subset is the `h` values with the smallest absolute value.
 
 # Arguments
 
@@ -354,10 +394,11 @@ function mcd_univariate_subset(z::VecNum, h::Integer, fixed::Bool)
     end
     o = sortperm(z)
     y = z[o]
-    s1 = cumsum(vcat(zero(eltype(y)), y))
-    s2 = cumsum(vcat(zero(eltype(y)), abs2.(y)))
-    ss = [(s2[k + h] - s2[k]) - (s1[k + h] - s1[k])^2 / h for k in 1:(length(y) - h + 1)]
-    k = argmin(ss)
+    # Entry `k` is the sum over the run `k:(k + h - 1)`, which holds the position `h`.
+    left(v) = reverse!(cumsum(reverse(view(v, 1:h))))
+    right(v) = cumsum(vcat(zero(eltype(v)), view(v, (h + 1):length(v))))
+    run_sums(v) = (r = right(v); view(left(v), eachindex(r)) .+ r)
+    k = argmin(run_sums(abs2.(y)) .- abs2.(run_sums(y)) ./ h)
     return o[k:(k + h - 1)]
 end
 """
@@ -513,7 +554,7 @@ function fastmcd_random_start(rng::Random.AbstractRNG, Z::MatNum, h::Integer, fi
     n, p = size(Z)
     idx = StatsBase.sample(rng, 1:n, min(p + 1, n); replace = false)
     m, S = mcd_subset_fit(Z, idx, fixed)
-    while length(idx) < n && !LinearAlgebra.isposdef(LinearAlgebra.Symmetric(S))
+    while length(idx) < n && isnothing(scatter_cholesky(S))
         push!(idx, rand(rng, setdiff(1:n, idx)))
         m, S = mcd_subset_fit(Z, idx, fixed)
     end

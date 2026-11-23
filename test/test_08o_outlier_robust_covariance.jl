@@ -169,7 +169,7 @@ end
     end
     @testset "Searches" begin
         X, = robust_test_sample(StableRNG(7), 150, 3; nbad = 20, shift = 5)
-        Z, = POR.mcd_standardise(X, nothing)
+        Z = POR.mcd_standardise(X, nothing)
         h = POR.mcd_subset_size(0.5, 150, 3)
         idx = POR.mcd_search(DetMCD(), Z, h, false)
         # The best subset of the search is a fixed point of the C-step.
@@ -206,6 +206,49 @@ end
         H = randn(StableRNG(4), 60, 3)
         H[:, 3] .= H[:, 1] .+ H[:, 2]
         @test_throws DomainError cov(MCDCovariance(), H)
+        # A random start can end at a subset whose covariance is singular in the arithmetic. Its
+        # determinant is then zero, and the fit refuses it.
+        for s in 1:40
+            H = randn(StableRNG(s), 60, 4)
+            H[:, 4] .= H[:, 1] .+ 0.3 .* H[:, 2] .- 1.7 .* H[:, 3]
+            @test_throws "hyperplane" cov(MCDCovariance(;
+                                                        alg = FastMCD(; seed = 1,
+                                                                      n_starts = 10)), H)
+        end
+        @test isnothing(POR.scatter_cholesky([1.0 1.0; 1.0 1.0]))
+        C = randn(StableRNG(4), 60, 3)
+        C[:, 2] .= 0.7
+        for ce in (MCDCovariance(), MCDCovariance(; alg = FastMCD(; seed = 1)),
+                   MCDCovariance(; me = MedianExpectedReturns()))
+            @test_throws "column 2 of the data is constant" cov(ce, C)
+        end
+        # The scale of a column with more than half of its values equal keeps the element type.
+        F = Float32.(C)
+        F[1:40, 2] .= 0.0f0
+        F[41:60, 2] .= randn(StableRNG(6), Float32, 20)
+        @test eltype(POR.mcd_standardise(F, nothing)) == Float32
+    end
+    @testset "Outliers of any size" begin
+        # A bad tick can be many orders of magnitude larger than a return.
+        X = r_parity_sample(5, 300, 4, 0)
+        S = cov(X[16:end, :])
+        for m in (1e4, 1e8, 1e12)
+            Y = copy(X)
+            Y[1:15, :] .= m .+ randn(StableRNG(1), 15, 4)
+            Y[1, 1] = -3 * m
+            for ce in
+                (MCDCovariance(), MCDCovariance(; alg = FastMCD(; seed = 1, n_starts = 50)),
+                 TylerCovariance())
+                @test relerr(cov(ce, Y), S) < 0.2
+            end
+            # The subset of one variable does not depend on the size of an outlier.
+            y = Y[:, 1:1]
+            h = POR.mcd_subset_size(0.5, 300, 1)
+            sy = sort(vec(y))
+            best = minimum(var(sy[k:(k + h - 1)]) for k in 1:(300 - h + 1))
+            @test cov(MCDCovariance(; rw = nothing, ssc = nothing), y)[1] ≈
+                  best * POR.mcd_consistency(1, h / 300)
+        end
     end
     @testset "Tyler" begin
         X, = robust_test_sample(StableRNG(5), 300, 4)
@@ -229,11 +272,31 @@ end
         @test StatsAPI.fit(TylerCovariance(), X; mean = m0').mu == m0
         tv = cov(TylerCovariance(; ve = SimpleVariance()), X)
         @test sqrt.(diag(tv)) ≈ vec(std(X; dims = 1))
+        # An estimator of another package has no `std`, so the library reads its diagonal.
+        @test cov(TylerCovariance(; ve = StatsBase.SimpleCovariance(; corrected = true)),
+                  X) ≈ tv
         Xc = vcat(X, reshape(StatsAPI.fit(TylerCovariance(), X).mu, 1, :))
         @test all(isfinite, cov(TylerCovariance(), Xc))
         Xm = vcat(X, repeat(reshape(m0, 1, :), 3))
         rm = StatsAPI.fit(TylerCovariance(; me = MedianExpectedReturns()), Xm)
-        @test count(isinf, rm.w) == 3
+        # An observation at the centre leaves the fixed point, so its weight is zero.
+        @test findall(iszero, rm.w) == 301:303
+        @test all(isfinite, rm.w)
+        # The shape is exactly symmetric, as `cholesky` needs it.
+        @test issymmetric(cov(TylerCovariance(), X))
+        @test isposdef(cov(TylerCovariance(; ve = SimpleVariance()), X))
+        # A denoiser reads the count of the weights.
+        ew = eweights(1:300, 0.05)
+        count_of = POR.effective_observation_count
+        @test count_of(TylerCovariance(), X) == 300
+        @test count_of(TylerCovariance(; w = ew), X) ≈ sum(ew)^2 / sum(abs2, ew)
+        @test count_of(RobustExpectedReturns(; ce = TylerCovariance(; w = ew)), X) ≈
+              sum(ew)^2 / sum(abs2, ew)
+        for ce in (MCDCovariance(; me = MedianExpectedReturns(; w = ew)),
+                   TylerCovariance(; me = MedianExpectedReturns(; w = ew)))
+            @test count_of(RobustExpectedReturns(; ce = ce), X) ≈ sum(ew)^2 / sum(abs2, ew)
+            @test count_of(ce, X) == 300
+        end
         @test POR.observation_median([3.0, 1.0, 2.0], nothing) == 2.0
         # Half of the rows on a line through the centre: the shape does not exist, and the
         # iteration warns.
@@ -276,6 +339,11 @@ end
         @test_throws DomainError cov(TylerCovariance(), randn(rng, 8, 8))
         w = fweights(vcat(ones(8), zeros(20)))
         @test_throws DomainError cov(TylerCovariance(; w = w), randn(rng, 28, 8))
+        @test_throws DimensionMismatch cov(TylerCovariance(; w = w), randn(rng, 30, 8))
+        # The fitted small-sample factor has no positive value for a very small sample.
+        Xs = randn(rng, 10, 5)
+        @test_throws "ssc = nothing" cov(MCDCovariance(), Xs)
+        @test isposdef(cov(MCDCovariance(; ssc = nothing), Xs))
         @test_throws DomainError MCDCovariance(; alpha = 0.4)
         @test_throws DomainError MCDCovariance(; q = 1.0)
         @test_throws DomainError MCDReweighting(; q = 0.0)

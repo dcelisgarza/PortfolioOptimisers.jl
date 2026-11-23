@@ -1,5 +1,5 @@
 ```@meta
-Description = "MCD search, private API of PortfolioOptimisers.jl: MCD_MAX_CSTEPS, mcd_standardise, mcd_subset_fit, squared_distances, nearest_positions, mcd_csteps, …"
+Description = "MCD search, private API of PortfolioOptimisers.jl: MCD_MAX_CSTEPS, mcd_standardise, mcd_subset_fit, scatter_cholesky, squared_distances, nearest_positions, …"
 ```
 
 # MCD search: private API
@@ -8,6 +8,7 @@ Description = "MCD search, private API of PortfolioOptimisers.jl: MCD_MAX_CSTEPS
 PortfolioOptimisers.MCD_MAX_CSTEPS
 PortfolioOptimisers.mcd_standardise
 PortfolioOptimisers.mcd_subset_fit
+PortfolioOptimisers.scatter_cholesky
 PortfolioOptimisers.squared_distances
 PortfolioOptimisers.nearest_positions
 PortfolioOptimisers.mcd_csteps

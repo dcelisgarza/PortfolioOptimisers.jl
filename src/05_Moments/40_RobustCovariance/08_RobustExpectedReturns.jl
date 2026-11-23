@@ -99,5 +99,15 @@ function Statistics.mean(me::RobustExpectedReturns, X::MatNum; dims::Int = 1, kw
     mu = StatsAPI.fit(me.ce, X; dims = dims, kwargs...).mu
     return isone(dims) ? reshape(mu, 1, :) : reshape(mu, :, 1)
 end
+# The location of a robust fit is worth the count of the fit. A given `me` fixes the centre, so
+# the location is then the mean of `me`, and it is worth the count of that mean.
+function effective_observation_count(me::RobustExpectedReturns, X::MatNum; kwargs...)
+    return effective_observation_count(me.ce, X; kwargs...)
+end
+function effective_observation_count(me::RobustExpectedReturns{<:Union{MCDCovariance{<:AbstractExpectedReturnsEstimator},
+                                                                       TylerCovariance{<:AbstractExpectedReturnsEstimator}}},
+                                     X::MatNum; kwargs...)
+    return effective_observation_count(me.ce.me, X; kwargs...)
+end
 
 export RobustExpectedReturns

@@ -247,11 +247,11 @@
 "src/05_Moments/39_WeightedAvailableCase.jl" = { map = 3, units = 13, swept = false }
 "src/05_Moments/40_RobustCovariance/01_Base_RobustCovariance.jl" = { map = 3, units = 7, swept = false }
 "src/05_Moments/40_RobustCovariance/02_QnScale.jl" = { map = 3, units = 8, swept = false }
-"src/05_Moments/40_RobustCovariance/03_MCDSearch.jl" = { map = 3, units = 14, swept = false }
+"src/05_Moments/40_RobustCovariance/03_MCDSearch.jl" = { map = 3, units = 15, swept = false }
 "src/05_Moments/40_RobustCovariance/04_DetMCDStarts.jl" = { map = 3, units = 3, swept = false }
 "src/05_Moments/40_RobustCovariance/05_MCDFactors.jl" = { map = 3, units = 6, swept = false }
 "src/05_Moments/40_RobustCovariance/06_MCDCovariance.jl" = { map = 3, units = 8, swept = false }
-"src/05_Moments/40_RobustCovariance/07_TylerCovariance.jl" = { map = 3, units = 10, swept = false }
+"src/05_Moments/40_RobustCovariance/07_TylerCovariance.jl" = { map = 3, units = 11, swept = false }
 "src/05_Moments/40_RobustCovariance/08_RobustExpectedReturns.jl" = { map = 3, units = 2, swept = false }
 "src/06_Distance/01_Base_Distance.jl" = { map = 2, units = 9, algorithm = 2, swept = true, bindings = ["AbstractDistanceAlgorithm", "AbstractDistanceEstimator", "CanonicalDistance", "CorrelationDistance", "LogDistance", "SimpleAbsoluteDistance", "SimpleDistance", "VariationInfoDistance", "reads_sample_values"] }
 "src/06_Distance/02_Distance.jl" = { map = 2, units = 14, algorithm = 9, swept = true, bindings = ["AllInternalMutualInfoCov", "DistCov_AllInternalDistCov", "Distance", "LTDCov_AllInternalLTDCov", "RhoDistanceAlgorithm", "_absguard", "_as_correlation", "_dist_from_cor", "cor_and_dist", "distance", "distance", "distance", "distance", "reads_sample_values"] }

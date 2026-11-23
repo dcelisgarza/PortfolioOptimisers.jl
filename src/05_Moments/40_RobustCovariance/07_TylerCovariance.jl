@@ -3,15 +3,15 @@ $(DocStringExtensions.TYPEDEF)
 
 Estimates the covariance of the returns from the shape matrix of Tyler's M-estimator, which resists heavy tails.
 
-The shape ``\\mathbf{V}`` of [tyler1987](@cite) solves a fixed-point equation in which each observation has the weight ``p / d^2``, where ``d^2`` is its squared distance from the centre in the metric of ``\\mathbf{V}``. So an observation far from the centre has a small weight, and its direction alone enters the shape. The estimator is distribution-free over the elliptical distributions, and it exists when the data are in general position with ``n > p``. The equation fixes the shape and not the scale.
+The shape ``\\mathbf{V}`` of [tyler1987](@cite) solves a fixed-point equation in which each observation has the weight ``p / d^2``, where ``d^2`` is its squared distance from the centre in the metric of ``\\mathbf{V}``. So an observation far from the centre has a small weight, and its direction alone enters the shape. The estimator is distribution-free over the elliptical distributions, and it exists when the data are in general position with ``n > p``. It does not exist when a subspace of dimension ``r`` through the centre holds a share of the observations of ``r/p`` or more, for example when half of the returns of one of two assets are zero. The fixed point then does not converge, and the fit warns. The equation fixes the shape and not the scale.
 
 No copy of [tyler1987](@cite) or of [hettmansperger2002](@cite) was found, so the two equations below follow the code of the R package `ICSNP`, version 1.2-0.
 
   - `me = nothing` gives the joint location of [hettmansperger2002](@cite): the spatial median in the coordinates that the shape makes spherical, solved with the shape. A given `me`, or a `mean` keyword, fixes the centre. That is the classical estimator of [tyler1987](@cite).
   - `ve = nothing` gives the scale ``\\mathbf{\\Sigma} = \\mathbf{V} \\, \\mathrm{med}(d^2) / \\chi^2_{p, 1/2}``, which is robust and consistent at the normal model. A given `ve` keeps the correlation of ``\\mathbf{V}`` and takes the standard deviations from `std(ve, X)`, as [`GerberCovariance`](@ref) does.
-  - `w` gives the weighted fixed point ``\\sum_t w_t \\boldsymbol{x}_t \\boldsymbol{x}_t^\\intercal / d_t^2 \\, / \\sum_t w_t``, a weighted spatial median and a weighted median for the scale. A weight that is an integer gives the fit of the data with each observation repeated by its weight.
+  - `w` gives the weighted fixed point ``\\sum_t w_t \\boldsymbol{x}_t \\boldsymbol{x}_t^\\intercal / d_t^2 \\, / \\sum_t w_t``, a weighted spatial median and a weighted median for the scale. A `StatsBase.FrequencyWeights` gives the fit of the data with each observation repeated by its weight. Another weight type gives the weighted median of `StatsBase` for that type, which interpolates between the observations.
 
-`StatsAPI.fit` returns the location, the covariance, and the squared distance, the weight ``p / d^2`` and the outlier flag of each observation in a [`RobustCovarianceResult`](@ref). `cov` returns the covariance of that fit.
+`StatsAPI.fit` returns the location, the covariance, and the squared distance, the weight and the outlier flag of each observation in a [`RobustCovarianceResult`](@ref). The weight is ``p / d^2`` in the metric of the covariance, and it does not include the observation weight. An observation at the centre has no direction, so it leaves the fixed point and has the weight zero. With a given `ve`, the covariance has other distances than the shape, so the weight is not the weight of the fixed point. `cov` returns the covariance of that fit.
 
 !!! warning
 
@@ -43,7 +43,7 @@ $(DocStringExtensions.FIELDS)
 
     TylerCovariance(;
         me::Option{<:AbstractExpectedReturnsEstimator} = nothing,
-        ve::Option{<:AbstractCovarianceEstimator} = nothing,
+        ve::Option{<:StatsBase.CovarianceEstimator} = nothing,
         w::Option{<:ObsWeights} = nothing,
         q::Number = 0.975,
         cache::Option{<:AbstractPartialFitState} = nothing
@@ -55,7 +55,6 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:oow])
   - `0 < q < 1`.
-  - `ve` is not refused for a variance estimator: the estimator reads `std(ve, X)` alone.
 
 ## Propagated parameters
 
@@ -125,7 +124,7 @@ TylerCovariance
     """
     @fprop @vprop cache
     function TylerCovariance(me::Option{<:AbstractExpectedReturnsEstimator},
-                             ve::Option{<:AbstractCovarianceEstimator},
+                             ve::Option{<:StatsBase.CovarianceEstimator},
                              w::Option{<:ObsWeights}, q::Number,
                              cache::Option{<:AbstractPartialFitState})
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -135,7 +134,7 @@ TylerCovariance
     end
 end
 function TylerCovariance(; me::Option{<:AbstractExpectedReturnsEstimator} = nothing,
-                         ve::Option{<:AbstractCovarianceEstimator} = nothing,
+                         ve::Option{<:StatsBase.CovarianceEstimator} = nothing,
                          w::Option{<:ObsWeights} = nothing, q::Number = 0.975,
                          cache::Option{<:AbstractPartialFitState} = nothing)::TylerCovariance
     return TylerCovariance(me, ve, w, q, cache)
@@ -180,11 +179,11 @@ Fits the location and the covariance of [`TylerCovariance`](@ref) to the data.
 # Algorithm
 
  1. Orient `X` with [`dims_oriented`](@ref), and refuse a gapped sample with [`assert_finite_sample`](@ref).
- 2. Resolve the observation weights with [`get_observation_weights`](@ref). Refuse a sample whose number of observations of positive weight is not larger than `p`, with [`assert_robust_rows`](@ref).
+ 2. Resolve the observation weights with [`get_observation_weights`](@ref), and refuse a vector of another length. Refuse a sample whose number of observations of positive weight is not larger than `p`, with [`assert_robust_rows`](@ref).
  3. Take the fixed centre with [`robust_centre`](@ref), or `nothing` for the joint location.
  4. Solve the shape and the location with [`tyler_fixed_point`](@ref).
  5. Scale the shape with [`tyler_scale`](@ref).
- 6. Compute the squared distance of each observation in the metric of the covariance with [`squared_distances`](@ref). The weight of an observation is `p / d2`, `Inf` for an observation at the centre. The flag marks a squared distance above the quantile `ce.q` of the ``\\chi^2_p`` distribution.
+ 6. Compute the squared distance of each observation in the metric of the covariance with [`squared_distances`](@ref). The weight of an observation is `p / d2`, and zero for an observation that [`away_from_centre`](@ref) excludes. Build the result with [`robust_result`](@ref).
 
 # Arguments
 
@@ -198,6 +197,7 @@ Fits the location and the covariance of [`TylerCovariance`](@ref) to the data.
 
   - $(val_dict[:dims])
   - `all(isfinite, X)`.
+  - The observation weights have one entry for each observation.
   - More than `p` observations of positive weight. Otherwise, the method raises a `DomainError` that names `n`, `p` and the limit.
 
 # Returns
@@ -216,14 +216,41 @@ function StatsAPI.fit(ce::TylerCovariance, X::MatNum; dims::Int = 1, mean = noth
     assert_finite_sample(X)
     n, p = size(X)
     w = get_observation_weights(ce.w, X)
+    @argcheck(isnothing(w) || length(w) == n,
+              DimensionMismatch("the observation weights must have one entry for each of the $n observations. Got $(length(w))"))
     assert_robust_rows(isnothing(w) ? n : count(>(zero(eltype(w))), w), p,
                        "the number n of observations of positive weight")
     centre = robust_centre(ce.me, X; mean = mean, kwargs...)
     mu, V = tyler_fixed_point(X, w, centre)
     sigma = tyler_scale(ce.ve, X, mu, V, w; kwargs...)
     d2 = squared_distances(X, mu, sigma)
-    cut = Distributions.quantile(Distributions.Chisq(p), ce.q)
-    return RobustCovarianceResult(mu, sigma, d2, p ./ d2, d2 .> cut)
+    return robust_result(mu, sigma, d2,
+                         ifelse.(away_from_centre(d2), p ./ d2, zero(eltype(d2))), ce.q)
+end
+function effective_observation_count(ce::TylerCovariance, X::MatNum; kwargs...)
+    return observation_weight_count(get_observation_weights(ce.w, X), size(X, 1))
+end
+"""
+    away_from_centre(d2::VecNum) -> BitVector
+
+Marks the observations that have a direction from the centre in a fit of [`TylerCovariance`](@ref).
+
+An observation at the centre has the squared distance zero, so its term in the equations of the fixed point is not defined. The function reads a distance of at most `eps` times the median of the distances as zero.
+
+# Arguments
+
+  - `d2`: The squared distance of each observation.
+
+# Returns
+
+  - `pos::BitVector`: The observations away from the centre.
+
+# Related
+
+  - [`tyler_fixed_point`](@ref)
+"""
+function away_from_centre(d2::VecNum)
+    return d2 .> eps(eltype(d2)) * Statistics.median(d2)
 end
 """
     tyler_fixed_point(X::MatNum, w::Option{<:StatsBase.AbstractWeights}, centre::Option{<:VecNum}) -> Tuple{VecNum, MatNum}
@@ -232,9 +259,9 @@ Solves the fixed-point equations of [`TylerCovariance`](@ref) for the shape and,
 
 # Algorithm
 
- 1. Start the location at the coordinatewise weighted median, or at `centre`. Start the shape at the weighted covariance about it, scaled to the trace `p`.
+ 1. Start the location at the coordinatewise weighted median, or at `centre`. Start the shape at the diagonal matrix of the squares of the robust scales of the centred columns, from [`robust_column_scale`](@ref), scaled to the trace `p`. The start does not move the fixed point, and an outlier of any size does not make it singular.
  2. Repeat at most [`TYLER_MAX_ITER`](@ref) times:
-     1. Compute the squared distances `d2` in the metric of the shape with [`squared_distances`](@ref). An observation at the centre, with `d2` at most `eps` times its median, has no direction, so it leaves both sums.
+     1. Compute the squared distances `d2` in the metric of the shape with [`squared_distances`](@ref). An observation that [`away_from_centre`](@ref) does not mark leaves both sums.
      2. Update the shape with [`tyler_shape_step`](@ref), and scale it to the trace `p`.
      3. With no fixed centre, update the location with [`spatial_median_step`](@ref).
      4. Stop when the relative change of the shape and the change of the location in the metric of the shape are both below `sqrt(eps)`.
@@ -270,11 +297,12 @@ function tyler_fixed_point(X::MatNum, w::Option{<:StatsBase.AbstractWeights},
         centre
     end
     D = X .- transpose(mu)
-    V = trace_normalise!(transpose(D) * (wt .* D))
+    s = map(robust_column_scale, eachcol(D))
+    V = trace_normalise!(Matrix(LinearAlgebra.Diagonal(abs2.(s))))
     tol = sqrt(eps(real(eltype(V))))
     for _ in 1:TYLER_MAX_ITER
         d2 = squared_distances(X, mu, V)
-        pos = d2 .> eps(eltype(d2)) * Statistics.median(d2)
+        pos = away_from_centre(d2)
         Vn = trace_normalise!(tyler_shape_step(D, d2, wt, pos))
         mun = isnothing(centre) ? spatial_median_step(X, mu, V, d2, wt, pos) : mu
         dmu = squared_distances(transpose(mun), mu, V)[1]
@@ -285,7 +313,8 @@ function tyler_fixed_point(X::MatNum, w::Option{<:StatsBase.AbstractWeights},
             return mu, V
         end
     end
-    @warn("The fixed point of Tyler's M-estimator did not converge in $(TYLER_MAX_ITER) iterations. The last iterate is returned.")
+    @warn("The fixed point of Tyler's M-estimator did not converge in $(TYLER_MAX_ITER) iterations. The last iterate is returned.",
+          maxlog = log_limit(:warn), _id = @log_id())
     return mu, V
 end
 """
@@ -341,6 +370,8 @@ end
 
 Returns one step of the shape equation of [`TylerCovariance`](@ref): ``p \\sum_t w_t \\boldsymbol{x}_t \\boldsymbol{x}_t^\\intercal / d_t^2 \\, / \\sum_t w_t`` over the observations of `pos`.
 
+The step multiplies each row by the square root of its weight and takes one product of the result with itself, so the matrix is exactly symmetric.
+
 # Arguments
 
   - `D`: The data minus the location, `observations × assets`.
@@ -357,8 +388,8 @@ Returns one step of the shape equation of [`TylerCovariance`](@ref): ``p \\sum_t
   - [`tyler_fixed_point`](@ref)
 """
 function tyler_shape_step(D::MatNum, d2::VecNum, wt::VecNum, pos::AbstractVector{Bool})
-    a = ifelse.(pos, wt ./ d2, zero(eltype(d2)))
-    return size(D, 2) * (transpose(D) * (a .* D)) / sum(wt[pos])
+    A = ifelse.(pos, sqrt.(wt ./ d2), zero(eltype(d2))) .* D
+    return size(D, 2) * (transpose(A) * A) / sum(wt[pos])
 end
 """
     spatial_median_step(X::MatNum, mu::VecNum, V::MatNum, d2::VecNum, wt::VecNum,
@@ -404,12 +435,12 @@ end
 """
     tyler_scale(ve::Nothing, X::MatNum, mu::VecNum, V::MatNum, w::Option{<:StatsBase.AbstractWeights};
                 kwargs...) -> Matrix
-    tyler_scale(ve::AbstractCovarianceEstimator, X::MatNum, mu::VecNum, V::MatNum,
+    tyler_scale(ve::StatsBase.CovarianceEstimator, X::MatNum, mu::VecNum, V::MatNum,
                 w::Option{<:StatsBase.AbstractWeights}; kwargs...) -> Matrix
 
 Scales the shape of [`TylerCovariance`](@ref) to a covariance matrix.
 
-The `nothing` method multiplies the shape by the weighted median of the squared distances in its metric, divided by the median of the ``\\chi^2_p`` distribution. At the normal model, half of the squared distances in the metric of the covariance are below that median, so the scale is consistent. The estimator method keeps the correlation of the shape and takes the standard deviations from `std(ve, X)`.
+The `nothing` method multiplies the shape by the weighted median of the squared distances in its metric, divided by the median of the ``\\chi^2_p`` distribution. At the normal model, half of the squared distances in the metric of the covariance are below that median, so the scale is consistent. The estimator method keeps the correlation of the shape and takes the standard deviations from `std(ve, X)`, through [`library_covariance_estimator`](@ref) for an estimator of another package.
 
 # Arguments
 
@@ -434,9 +465,9 @@ function tyler_scale(::Nothing, X::MatNum, mu::VecNum, V::MatNum,
     med = Distributions.quantile(Distributions.Chisq(size(X, 2)), 0.5)
     return V .* (md / convert(typeof(md), med))
 end
-function tyler_scale(ve::AbstractCovarianceEstimator, X::MatNum, ::VecNum, V::MatNum,
+function tyler_scale(ve::StatsBase.CovarianceEstimator, X::MatNum, ::VecNum, V::MatNum,
                      ::Option{<:StatsBase.AbstractWeights}; kwargs...)
-    sd = vec(Statistics.std(ve, X; dims = 1, kwargs...))
+    sd = vec(Statistics.std(library_covariance_estimator(ve), X; dims = 1, kwargs...))
     return StatsBase.cor2cov!(StatsBase.cov2cor(V), sd)
 end
 
