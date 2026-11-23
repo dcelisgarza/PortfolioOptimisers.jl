@@ -315,7 +315,8 @@ metric = "arg"
 rationale = "keyword-constructor-arity"
 
 # The Constraint Block of ADR 0237 takes the 32 slots that `JuMPOptimiser` held before it, so its
-# constructor carries the arity that the constructor of `JuMPOptimiser` carried.
+# constructor carries the arity that the constructor of `JuMPOptimiser` carried. The slot `conc`
+# of ADR 0245 makes it 33 (#2018).
 [[exemption]]
 path = "src/17_Optimisation/05_JuMP/02_JuMPConstraints/14_ConstraintBlock.jl"
 definition = "ConstraintBlock"
@@ -323,7 +324,7 @@ metric = "arg"
 rationale = "keyword-constructor-arity"
 
 # The Resolved Constraint Block of ADR 0237 holds one field for each slot of the block, and its
-# prior and rows, so its constructor takes 32 arguments (#2042).
+# prior and rows, so its constructor takes 32 arguments (#2042), and 33 with the slot `conc` (#2018).
 [[exemption]]
 path = "src/17_Optimisation/05_JuMP/02_JuMPConstraints/14_ConstraintBlock.jl"
 definition = "ResolvedConstraintBlock"

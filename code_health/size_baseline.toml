@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.4"
 julia_syntax = "1.0.2"
-commit = "4d83c186be"
+commit = "6f0391e693"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { code = 35, doc = 0, comment = 5, blank = 4, total = 44 }
@@ -237,6 +237,7 @@ commit = "4d83c186be"
 "src/09_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { code = 132, doc = 368, comment = 1, blank = 181, total = 682 }
 "src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { code = 64, doc = 111, comment = 2, blank = 57, total = 234 }
 "src/09_ConstraintGeneration/10_LotUnitConstraintGeneration.jl" = { code = 44, doc = 190, comment = 0, blank = 86, total = 320 }
+"src/09_ConstraintGeneration/11_ConcentrationLimitGeneration.jl" = { code = 146, doc = 454, comment = 0, blank = 191, total = 791 }
 "src/10_Prior/01_Base_Prior.jl" = { code = 484, doc = 1162, comment = 69, blank = 503, total = 2218 }
 "src/10_Prior/02_EmpiricalPrior.jl" = { code = 108, doc = 318, comment = 14, blank = 131, total = 571 }
 "src/10_Prior/03_FactorPrior.jl" = { code = 145, doc = 406, comment = 32, blank = 143, total = 726 }
@@ -370,6 +371,7 @@ commit = "4d83c186be"
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl" = { code = 238, doc = 549, comment = 11, blank = 260, total = 1058 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl" = { code = 86, doc = 241, comment = 0, blank = 108, total = 435 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/14_ConstraintBlock.jl" = { code = 454, doc = 681, comment = 10, blank = 241, total = 1386 }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/15_ConcentrationConstraints.jl" = { code = 76, doc = 97, comment = 1, blank = 42, total = 216 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl" = { code = 198, doc = 305, comment = 26, blank = 122, total = 651 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl" = { code = 144, doc = 329, comment = 43, blank = 126, total = 642 }
 "src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { code = 272, doc = 571, comment = 5, blank = 193, total = 1041 }

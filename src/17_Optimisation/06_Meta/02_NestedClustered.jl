@@ -196,7 +196,7 @@ Each cluster solves its problem over its own assets, so each input of the inner 
 # Validation
 
   - A clustering optimiser: `opt.opt.cle` holds no `AbstractClusteringResult`.
-  - A JuMP optimiser: `opt` passes [`assert_rc_variance`](@ref) and [`assert_rc_pl`](@ref). `opt.opt.lcse`, `opt.opt.cte`, `opt.opt.gcarde` and `opt.opt.sgcarde` hold no `LinearConstraint`, and `opt.opt.ple` holds no `AbstractPhylogenyConstraintResult`.
+  - A JuMP optimiser: `opt` passes [`assert_rc_variance`](@ref) and [`assert_rc_pl`](@ref). `opt.opt.lcse`, `opt.opt.cte`, `opt.opt.gcarde` and `opt.opt.sgcarde` hold no `LinearConstraint`, `opt.opt.ple` holds no `AbstractPhylogenyConstraintResult`, and `opt.opt.conc` holds no concentration rule whose `set` is a matrix.
   - A vector of optimisers: each entry passes.
   - A [`NestedClustered`](@ref): `opt.cle` holds no `AbstractClusteringResult`, and `opt.opto` passes [`assert_external_optimiser`](@ref). When `opt.opti` is not `opt.opto`, it passes this function.
 
@@ -301,6 +301,13 @@ function assert_internal_optimiser(opt::JuMPOptimisationEstimator)::Nothing
               ArgumentError("opt.opt.sgcarde cannot be a LinearConstraint, or a TimeDependent schedule whose entries or default hold one, in NCO inner optimiser"))
     @argcheck(!holds_precomputed(opt.opt.ple, AbstractPhylogenyConstraintResult),
               ArgumentError("opt.opt.ple cannot be a precomputed AbstractPhylogenyConstraintResult, or a TimeDependent schedule whose entries or default hold one, in NCO inner optimiser; use an estimator instead"))
+    # The columns of a precomputed matrix belong to the full universe. The fourth parameter
+    # of both types is the type of `set`.
+    @argcheck(!holds_precomputed(opt.opt.conc,
+                                 Union{ConcentrationLimit{<:Any, <:Any, <:Any, <:MatNum},
+                                       ConcentrationLimitEstimator{<:Any, <:Any, <:Any,
+                                                                   <:MatNum}}),
+              ArgumentError("opt.opt.conc cannot hold a concentration rule whose `set` is a precomputed matrix, or a TimeDependent schedule whose entries or default hold one, in NCO inner optimiser; give `set` as an AssetSetsMatrixEstimator instead"))
     return nothing
 end
 function assert_internal_optimiser(opt::VecOptE_Opt_TD)::Nothing

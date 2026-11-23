@@ -1032,6 +1032,10 @@ The layer that adds numeric constraint data to a JuMP model: the budget constrai
 The number of assets of equal absolute weight that have the concentration of a book, `number_effective_assets`. It is the participation ratio `‖w‖₁² / ‖w‖₂²` of the absolute weights. So it does not change when the book is scaled, and it reads the concentration of a book and not its leverage. On weights whose absolute values sum to one, it is the inverse of the Herfindahl-Hirschman index, `1 / ‖w‖₂²`. A norm ceiling bounds the form of order `p` of this count on such weights (#1962).
 *Avoid*: a count of the weights that are not zero, and the Kish effective sample size of a vector of observation weights.
 
+**Concentration Limit**
+A rule that caps each position at `c` and limits the sum of the positions over a threshold `t` to `s`: `ConcentrationLimitEstimator` and its resolved `ConcentrationLimit`, in the slot `conc` of a Constraint Block. The UCITS 5/10/40 rule is the default. A position is an asset, or a row of an asset sets matrix such as one issuer, so two share classes of one issuer are one position. The field `on` of `AssetSetsMatrixEstimator` gives a rule its issuers, so the exceptions of the directive are more rules in a vector. A position reading (`GrossPosition`, `NetPosition`, `LongPosition`) says how a short counts. `ExactConcentration` states the rule with one binary for each position, and `SumLargestConcentration` states a stricter linear form. `concentration_margins` checks the weights of any optimiser against a rule. ADR 0245, #2018.
+*Avoid*: `ConcentrationRadius`, which is the concentration of measure of a calibration rule, and the concentration of a book, which the Effective Number of Assets reads.
+
 **Exact vs Bounded Budgets**
 The distinction between a budget that *bounds* the realised exposure and one that *pins* it. A pin needs a sign bit for each asset, which makes the problem mixed-integer. So a pin is opt-in.
 
