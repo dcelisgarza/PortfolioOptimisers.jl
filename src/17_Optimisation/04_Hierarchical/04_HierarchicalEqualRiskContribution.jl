@@ -153,7 +153,8 @@ HierarchicalEqualRiskContribution
        │          │         │   power ┼ nothing
        │          │         │     alg ┴ CanonicalDistance()
        │          │     alg ┼ HClustAlgorithm
-       │          │         │   linkage ┴ Symbol: :ward
+       │          │         │       linkage ┼ Symbol: :ward
+       │          │         │   branchorder ┴ OptimalLeafOrder()
        │          │     onc ┼ OptimalNumberClusters
        │          │         │   max_k ┼ nothing
        │          │         │     alg ┼ SecondOrderDifference
@@ -626,7 +627,6 @@ Run the Hierarchical Equal Risk Contribution optimisation.
 
   - `hec`: The hierarchical equal risk contribution optimiser to use.
   - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, a standalone optimisation does not need `rd`, but a fallback or the clustering can need it.
-  - `branchorder`: The branch order of the clustering. The weights do not depend on the order of the leaves, so a faster order that is not optimal gives the same weights. When `opt.cle` holds a clustering result, the order has no effect.
   - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
   - `kwargs`: Keyword arguments that the method accepts and does not read.
 
@@ -637,8 +637,8 @@ Run the Hierarchical Equal Risk Contribution optimisation.
   - [`optimise`](@ref)
 """
 function _optimise(hec::HierarchicalEqualRiskContribution,
-                   rd::ReturnsResult = ReturnsResult(); branchorder::Symbol = :optimal,
-                   rmsk::Option{BitVector} = nothing, kwargs...)
+                   rd::ReturnsResult = ReturnsResult(); rmsk::Option{BitVector} = nothing,
+                   kwargs...)
     hec = reset_time_dependent_estimator(hec)
     pr = prior(hec.opt.pe, rd)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
@@ -674,11 +674,11 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     # A distance reader that refuses an asset the prior kept raises before it clusters. Fit
     # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
     clr = distance_reader_call(clusterise, hec.opt.cle, pr; rd = rd, iv = rd.iv,
-                               ivpa = rd.ivpa, branchorder = branchorder)
+                               ivpa = rd.ivpa)
     if clr isa DistanceReaderRefusalError
         return _optimise(rebuild_struct(hec0,
                                         (; opt = rebuild_struct(hec0.opt, (; pe = pr0)))),
-                         rd0; branchorder = branchorder,
+                         rd0;
                          rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
                                                              hec0.opt.strict), kwargs...)
     end

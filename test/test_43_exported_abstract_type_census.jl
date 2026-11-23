@@ -131,6 +131,7 @@
         :AbstractAssetSelector,
         :AbstractBins,
         :AbstractBootstrapDraws,
+        :AbstractBranchOrder,
         :AbstractCalibrationWarmup,
         :AbstractCarryRule,
         :AbstractCentring,

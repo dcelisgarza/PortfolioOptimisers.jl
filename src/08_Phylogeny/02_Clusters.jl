@@ -576,6 +576,94 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for all rules that flip the merges of a dendrogram to order its leaves.
+
+A flip of the two children of a merge keeps the tree and reverses the leaves below that merge. So one tree permits ``2^{N-1}`` leaf orders, and a member of this family picks one of them. The `branchorder` field of [`HClustAlgorithm`](@ref) and of [`DBHT`](@ref) holds a member. `nothing` in that field skips the flip step and gives the tree order, see [`order_branches!`](@ref).
+
+The leaf order is an input of recursive bisection, so it changes the weights of [`HierarchicalRiskParity`](@ref) and [`SchurComplementHierarchicalRiskParity`](@ref). The weights of [`HierarchicalEqualRiskContribution`](@ref) and of [`NestedClustered`](@ref) do not read it, so for them the branch order is a dial of cost alone.
+
+# Interfaces
+
+To add a rule, subtype `AbstractBranchOrder` and implement this method:
+
+## `order_branches!`
+
+  - `order_branches!(hmer::Clustering.HclustMerges, D::MatNum, bo::MyBranchOrder) -> Clustering.HclustMerges`: Flip the merges of `hmer` in place. The method can also reorder the merges, if it renumbers the children that point to them. The clustering of [`HClustAlgorithm`](@ref) and of [`DBHT`](@ref) then reads the leaf order from the merges.
+
+### Arguments
+
+  - `hmer`: The merges, in the form of `Clustering.HclustMerges`. An entry `-i` is the leaf `i`, a positive entry `v` is the merge `v`, and a merge comes after its children.
+  - `D`: The distance matrix of the leaves.
+  - `bo`: The instance of the subtype.
+
+### Returns
+
+  - `hmer::Clustering.HclustMerges`: The same merges, flipped.
+
+# Related
+
+  - [`OptimalLeafOrder`](@ref)
+  - [`BarJosephOrder`](@ref)
+  - [`ROrder`](@ref)
+  - [`order_branches!`](@ref)
+  - [`HClustAlgorithm`](@ref)
+  - [`DBHT`](@ref)
+"""
+abstract type AbstractBranchOrder <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Orders the leaves of a dendrogram so that the sum of the distances between adjacent leaves is the least that the tree permits.
+
+[`order_branches!`](@ref) solves the problem exactly with [`optimal_leaf_order!`](@ref), in ``O(N^3)`` time. This is the default branch order of [`HClustAlgorithm`](@ref) and [`DBHT`](@ref).
+
+# Related
+
+  - [`AbstractBranchOrder`](@ref)
+  - [`BarJosephOrder`](@ref)
+  - [`ROrder`](@ref)
+  - [`optimal_leaf_order!`](@ref)
+
+# References
+
+  - $(ref_dict[:barjoseph2001]) Sections "Problem definition" and "Algorithm".
+"""
+struct OptimalLeafOrder <: AbstractBranchOrder end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Orders the leaves of a dendrogram with the heuristic `Clustering.orderbranches_barjoseph!`.
+
+The heuristic decides each merge once, from the four outermost leaves of its two children. It is faster than [`OptimalLeafOrder`](@ref), and it can miss the least sum of the distances between adjacent leaves. Under the linkage `:ward`, `Clustering.hclust` runs the heuristic on the squares of the distances.
+
+# Related
+
+  - [`AbstractBranchOrder`](@ref)
+  - [`OptimalLeafOrder`](@ref)
+  - [`ROrder`](@ref)
+
+# References
+
+  - $(ref_dict[:barjoseph2001]) Section "Algorithm".
+"""
+struct BarJosephOrder <: AbstractBranchOrder end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Orders the merges of a dendrogram by height, and flips each merge to the order of the R function `hclust`, with `Clustering.orderbranches_r!`.
+
+The flip rule puts a leaf before a merge. Of two leaves, the lower index comes first, and of two merges, the lower one comes first. This is the rule of the tree order, `nothing`, so for [`HClustAlgorithm`](@ref) the two give the same leaf order. This type also sorts the merges by height, and the tree order keeps the merges in the order that the tree builder made them.
+
+# Related
+
+  - [`AbstractBranchOrder`](@ref)
+  - [`OptimalLeafOrder`](@ref)
+  - [`BarJosephOrder`](@ref)
+"""
+struct ROrder <: AbstractBranchOrder end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Builds a dendrogram that merges the two nearest clusters at each step, until one cluster remains.
 
 `linkage` is the criterion for the distance between two clusters that have more than one asset.
@@ -599,7 +687,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     HClustAlgorithm(;
-        linkage::Symbol = :ward
+        linkage::Symbol = :ward,
+        branchorder::Option{<:AbstractBranchOrder} = OptimalLeafOrder()
     ) -> HClustAlgorithm
 
 Keywords correspond to the struct's fields.
@@ -609,12 +698,14 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> HClustAlgorithm(; linkage = :average)
 HClustAlgorithm
-  linkage ┴ Symbol: :average
+      linkage ┼ Symbol: :average
+  branchorder ┴ OptimalLeafOrder()
 ```
 
 # Related
 
   - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
+  - [`AbstractBranchOrder`](@ref)
   - [`ClustersEstimator`](@ref)
   - [`DBHT`](@ref)
   - [`clusterise`](@ref)
@@ -628,12 +719,17 @@ HClustAlgorithm
     Linkage criterion of `Clustering.hclust`, see [`Clustering.jl`](https://juliastats.org/Clustering.jl/stable/hclust.html). The constructor accepts any `Symbol` and checks none, because `Clustering.hclust` owns the set of criteria. `HClustAlgorithm(; linkage = :nonsense)` builds. [`clusterise`](@ref) then throws `ArgumentError: Unsupported cluster linkage nonsense` from `Clustering.hclust`.
     """
     linkage
-    function HClustAlgorithm(linkage::Symbol)
-        return new{typeof(linkage)}(linkage)
+    """
+    $(field_dict[:branchorder])
+    """
+    branchorder
+    function HClustAlgorithm(linkage::Symbol, branchorder::Option{<:AbstractBranchOrder})
+        return new{typeof(linkage), typeof(branchorder)}(linkage, branchorder)
     end
 end
-function HClustAlgorithm(; linkage::Symbol = :ward)::HClustAlgorithm
-    return HClustAlgorithm(linkage)
+function HClustAlgorithm(; linkage::Symbol = :ward,
+                         branchorder::Option{<:AbstractBranchOrder} = OptimalLeafOrder())::HClustAlgorithm
+    return HClustAlgorithm(linkage, branchorder)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -707,7 +803,8 @@ ClustersEstimator
         │   power ┼ nothing
         │     alg ┴ CanonicalDistance()
     alg ┼ HClustAlgorithm
-        │   linkage ┴ Symbol: :ward
+        │       linkage ┼ Symbol: :ward
+        │   branchorder ┴ OptimalLeafOrder()
     onc ┼ OptimalNumberClusters
         │   max_k ┼ nothing
         │     alg ┼ SecondOrderDifference
@@ -794,4 +891,6 @@ Matches an [`AbstractClustersEstimator`](@ref) or an [`AbstractClusteringResult`
 const ClE_Cl = Union{AbstractClustersEstimator, AbstractClusteringResult}
 
 export Clusters, clusterise, SecondOrderDifference, SilhouetteScore, OptimalNumberClusters,
-       HClustAlgorithm, ClustersEstimator
+       HClustAlgorithm, ClustersEstimator, OptimalLeafOrder, BarJosephOrder, ROrder
+# The abstract type of an Open Family. The verb of its interface is `order_branches!`.
+public AbstractBranchOrder

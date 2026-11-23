@@ -827,8 +827,10 @@ end
           var_r(v)
 
     # The weights do not depend on the order of the leaves.
-    for bo in (:r, :barjoseph)
-        @test isapprox(optimise(HierarchicalEqualRiskContribution(), rdx; branchorder = bo).w,
+    for bo in (ROrder(), BarJosephOrder(), nothing)
+        cle = ClustersEstimator(; alg = HClustAlgorithm(; branchorder = bo))
+        hec = HierarchicalEqualRiskContribution(; opt = HierarchicalOptimiser(; cle = cle))
+        @test isapprox(optimise(hec, rdx).w,
                        optimise(HierarchicalEqualRiskContribution(), rdx).w; atol = 1e-15)
     end
 

@@ -627,7 +627,8 @@ SchurComplementHierarchicalRiskParity
          │          │         │   power ┼ nothing
          │          │         │     alg ┴ CanonicalDistance()
          │          │     alg ┼ HClustAlgorithm
-         │          │         │   linkage ┴ Symbol: :ward
+         │          │         │       linkage ┼ Symbol: :ward
+         │          │         │   branchorder ┴ OptimalLeafOrder()
          │          │     onc ┼ OptimalNumberClusters
          │          │         │   max_k ┼ nothing
          │          │         │     alg ┼ SecondOrderDifference
@@ -1254,7 +1255,7 @@ Fit a Schur complement allocation with one bundle.
 
 [`optimise`](@ref) calls this method. [`SchurComplementHierarchicalRiskParity`](@ref) states its steps under `# Algorithm`. The weights, their bounds and the fee take the element type of the returns, so a `Float32` matrix stays in `Float32`.
 
-Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref), this optimiser takes no `branchorder` keyword. Recursive bisection splits the leaf order of the dendrogram, so that order is the input of the algorithm, and the clustering always runs with the optimal order. `kwargs` absorbs a `branchorder` and the fit ignores it.
+Recursive bisection splits the leaf order of the dendrogram, so that order is the input of the algorithm. The `branchorder` field of the clustering algorithm states it, see [`AbstractBranchOrder`](@ref).
 
 # Arguments
 
@@ -1297,8 +1298,8 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     sh0, pr0, rd0 = sh, pr, rd
     _, pr, sh, rd = investable_reduction(pr, sh, rd, imsk)
     X = pr.X
-    # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
-    # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
+    # Recursive bisection splits `clr.res.order`, the leaf order of the branch order of
+    # the clustering algorithm.
     # A distance reader that refuses an asset the prior kept raises before it clusters. Fit
     # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
     clr = distance_reader_call(clusterise, sh.opt.cle, pr; rd = rd, iv = rd.iv,
@@ -1390,8 +1391,8 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     sh0, pr0, rd0 = sh, pr, rd
     _, pr, sh, rd = investable_reduction(pr, sh, rd, imsk)
     X = pr.X
-    # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
-    # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
+    # Recursive bisection splits `clr.res.order`, the leaf order of the branch order of
+    # the clustering algorithm.
     # A distance reader that refuses an asset the prior kept raises before it clusters. Fit
     # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
     clr = distance_reader_call(clusterise, sh.opt.cle, pr; rd = rd, iv = rd.iv,

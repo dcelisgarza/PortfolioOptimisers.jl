@@ -5,7 +5,7 @@
 julia = "1.13.4"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "958c716372"
+commit = "6f0391e693"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 6, cog_sum = 4, arg_sum = 16, macros = [] }
@@ -206,7 +206,7 @@ commit = "958c716372"
 "src/08_Phylogeny/03_Hierarchical.jl" = { cyc = 17, cog = 32, arg = 5, cyc_sum = 84, cog_sum = 122, arg_sum = 47, macros = [] }
 "src/08_Phylogeny/04_NonHierarchicalClustering.jl" = { cyc = 5, cog = 8, arg = 4, cyc_sum = 18, cog_sum = 17, arg_sum = 20, macros = [] }
 "src/08_Phylogeny/05_Phylogeny.jl" = { cyc = 3, cog = 2, arg = 3, cyc_sum = 6, cog_sum = 3, arg_sum = 7, macros = [] }
-"src/08_Phylogeny/06_DBHT/01_DBHT.jl" = { cyc = 1, cog = 1, arg = 2, cyc_sum = 2, cog_sum = 1, arg_sum = 2, macros = [] }
+"src/08_Phylogeny/06_DBHT/01_DBHT.jl" = { cyc = 1, cog = 1, arg = 3, cyc_sum = 2, cog_sum = 1, arg_sum = 3, macros = [] }
 "src/08_Phylogeny/06_DBHT/02_PMFG.jl" = { cyc = 7, cog = 11, arg = 2, cyc_sum = 10, cog_sum = 14, arg_sum = 2, macros = [] }
 "src/08_Phylogeny/06_DBHT/03_GraphTraversal.jl" = { cyc = 7, cog = 14, arg = 2, cyc_sum = 12, cog_sum = 23, arg_sum = 3, macros = [] }
 "src/08_Phylogeny/06_DBHT/04_CliqueHierarchy.jl" = { cyc = 5, cog = 9, arg = 6, cyc_sum = 25, cog_sum = 32, arg_sum = 20, macros = [] }

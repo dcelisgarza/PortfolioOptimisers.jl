@@ -955,7 +955,6 @@ Run the nested clustered optimisation.
 
   - `nco`: The nested clustered optimiser.
   - $(arg_dict[:rd])
-  - `branchorder`: The branch order of a hierarchical clustering. The method also passes it to the inner and outer optimisers.
   - `str_names`: Whether the JuMP models name their variables with strings. The method passes it to the inner and outer optimisers.
   - `save`: Whether the results save their JuMP models. The method passes it to the inner and outer optimisers.
   - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
@@ -976,9 +975,8 @@ Run the nested clustered optimisation.
   - [`NestedClusteredResult`](@ref)
   - [`optimise`](@ref)
 """
-function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol = :optimal,
-                   str_names::Bool = false, save::Bool = true,
-                   rmsk::Option{BitVector} = nothing, kwargs...)
+function _optimise(nco::NestedClustered, rd::ReturnsResult; str_names::Bool = false,
+                   save::Bool = true, rmsk::Option{BitVector} = nothing, kwargs...)
     nco = reset_time_dependent_estimator(nco)
     pr = prior(nco.pe, rd)
     # A weight and a fee take the element type of the returns.
@@ -1012,10 +1010,10 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol 
     # A distance reader that refuses an asset the prior kept raises before it clusters. Fit
     # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
     clr = distance_reader_call(clusterise, nco.cle, pr; rd = rdr, iv = rdr.iv,
-                               ivpa = rdr.ivpa, branchorder = branchorder)
+                               ivpa = rdr.ivpa)
     if clr isa DistanceReaderRefusalError
-        return _optimise(rebuild_struct(nco0, (; pe = pr0)), rd; branchorder = branchorder,
-                         str_names = str_names, save = save,
+        return _optimise(rebuild_struct(nco0, (; pe = pr0)), rd; str_names = str_names,
+                         save = save,
                          rmsk = distance_reader_refusal_mask(clr, imsk, rd, nco0.strict),
                          kwargs...)
     end
@@ -1028,8 +1026,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol 
     FLoops.@floop nco.ex for (i, cl) in pairs(cls)
         optic = port_opt_view(opti, cl, X)
         rdc = port_opt_view(rdr, cl)
-        res = optimise(optic, rdc; branchorder = branchorder, str_names = str_names,
-                       save = save, kwargs...)
+        res = optimise(optic, rdc; str_names = str_names, save = save, kwargs...)
         #! Support efficient frontier?
         @argcheck(!isa(res.retcode, AbstractVector),
                   ArgumentError("res.retcode cannot be an AbstractVector; efficient frontier results are not supported in NCO"))
@@ -1038,8 +1035,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol 
     end
     rdo = predict_outer_returns(nco.cv, nco, ClusterUniverse(cls), rdr, pr, cfees, wi, resi)
     nco = _update_asset_sets(nco, rdo)
-    reso = optimise(nco.opto, rdo; branchorder = branchorder, str_names = str_names,
-                    save = save, kwargs...)
+    reso = optimise(nco.opto, rdo; str_names = str_names, save = save, kwargs...)
     wb = weight_bounds_constraints(nco.wb, nco.sets; rd = rdr, N = size(X, 2),
                                    strict = nco.strict, datatype = Tf)
     retcode, w = outer_optimisation_finaliser(wb, nco.wf, resi, reso.retcode, reso.w, wi)

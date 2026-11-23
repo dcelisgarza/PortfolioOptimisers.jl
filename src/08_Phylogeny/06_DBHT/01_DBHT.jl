@@ -76,7 +76,8 @@ $(DocStringExtensions.FIELDS)
 
     DBHT(;
         sim::AbstractNonNegativeSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
-        root::DBHTRootMethod = UniqueRoot()
+        root::DBHTRootMethod = UniqueRoot(),
+        branchorder::Option{<:AbstractBranchOrder} = OptimalLeafOrder()
     ) -> DBHT
 
 Keywords correspond to the struct's fields.
@@ -86,8 +87,9 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> DBHT()
 DBHT
-   sim ┼ MaximumDistanceSimilarity()
-  root ┴ UniqueRoot()
+          sim ┼ MaximumDistanceSimilarity()
+         root ┼ UniqueRoot()
+  branchorder ┴ OptimalLeafOrder()
 ```
 
 # Related
@@ -96,6 +98,7 @@ DBHT
   - [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref)
   - [`AbstractSimilarityMatrixAlgorithm`](@ref)
   - [`DBHTRootMethod`](@ref)
+  - [`AbstractBranchOrder`](@ref)
   - [`MaximumDistanceSimilarity`](@ref)
   - [`ExponentialSimilarity`](@ref)
   - [`GeneralExponentialSimilarity`](@ref)
@@ -117,14 +120,20 @@ DBHT
     $(field_dict[:root])
     """
     root
-    function DBHT(sim::AbstractNonNegativeSimilarityMatrixAlgorithm, root::DBHTRootMethod)
-        return new{typeof(sim), typeof(root)}(sim, root)
+    """
+    $(field_dict[:branchorder])
+    """
+    branchorder
+    function DBHT(sim::AbstractNonNegativeSimilarityMatrixAlgorithm, root::DBHTRootMethod,
+                  branchorder::Option{<:AbstractBranchOrder})
+        return new{typeof(sim), typeof(root), typeof(branchorder)}(sim, root, branchorder)
     end
 end
 function DBHT(;
               sim::AbstractNonNegativeSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
-              root::DBHTRootMethod = UniqueRoot())::DBHT
-    return DBHT(sim, root)
+              root::DBHTRootMethod = UniqueRoot(),
+              branchorder::Option{<:AbstractBranchOrder} = OptimalLeafOrder())::DBHT
+    return DBHT(sim, root, branchorder)
 end
 
 export UniqueRoot, EqualRoot, DBHT, Clusters

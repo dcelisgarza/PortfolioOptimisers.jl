@@ -1,11 +1,10 @@
 ```@meta
-Description = "DBHT Clustering, private API of PortfolioOptimisers.jl: order_branches!, DBHTs."
+Description = "DBHT Clustering, private API of PortfolioOptimisers.jl: DBHTs."
 ```
 
 # DBHT Clustering: private API
 
 ```@docs
-order_branches!
 DBHTs
 ```
 

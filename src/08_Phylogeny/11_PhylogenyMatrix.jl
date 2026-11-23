@@ -158,8 +158,7 @@ function phylogeny_matrix(nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 
 end
 """
     phylogeny_matrix(cle::ClE_Cl,
-                     X::MatNum; branchorder::Symbol = :optimal, dims::Int = 1,
-                     kwargs...)
+                     X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the phylogeny matrix of a clustering estimator or result.
 
@@ -177,7 +176,6 @@ The method clusters the data into the number of clusters that the estimator sele
 
   - `cle`: Clustering estimator or result.
   - $(arg_dict[:X])
-  - `branchorder`: Order method for the dendrogram branches, `:optimal` by default. [`branch_ordered_hclust`](@ref) and [`DBHTs`](@ref) state what each value does.
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
 
@@ -191,9 +189,8 @@ The method clusters the data into the number of clusters that the estimator sele
   - [`AbstractClusteringResult`](@ref)
   - [`clusterise`](@ref)
 """
-function phylogeny_matrix(cle::ClE_Cl, X::MatNum; branchorder::Symbol = :optimal,
-                          dims::Int = 1, kwargs...)
-    res = clusterise(cle, X; branchorder = branchorder, dims = dims, kwargs...)
+function phylogeny_matrix(cle::ClE_Cl, X::MatNum; dims::Int = 1, kwargs...)
+    res = clusterise(cle, X; dims = dims, kwargs...)
     clusters = assignments(res)
     # One row per asset. `size(X, 2)` counts the observations when `dims = 2`.
     P = zeros(Int, length(clusters), res.k)

@@ -208,7 +208,7 @@
                                                   Distance(), AngularSimilarity(),
                                                   HopCount(), nothing)
         # The admitted members build by either route.
-        @test DBHT(MaximumDistanceSimilarity(), UniqueRoot()) isa DBHT
+        @test DBHT(MaximumDistanceSimilarity(), UniqueRoot(), OptimalLeafOrder()) isa DBHT
         @test LoGo(Distance(), ComplementSimilarity(), Posdef()) isa LoGo
         @test NetworkEstimator(PortfolioOptimisersCovariance(), Distance(), KruskalTree(),
                                HopCount(), nothing) isa NetworkEstimator
@@ -1463,7 +1463,7 @@
         S1 = PortfolioOptimisers.distance_to_similarity(MaximumDistanceSimilarity();
                                                         D = dist)
         _, _, _, _, _, Z1, dbht1d = PortfolioOptimisers.DBHTs(dist, S1;
-                                                              branchorder = :default,
+                                                              branchorder = nothing,
                                                               root = UniqueRoot())
         A1, tri1, separators1, cliques1, cliqueTree1 = PortfolioOptimisers.PMFG_T2s(S1, 5)
         # The five shapes the planar maximal filtered graph must have.
@@ -1541,7 +1541,7 @@
         # The second configuration: `ExponentialSimilarity` and an `EqualRoot`.
         S2 = PortfolioOptimisers.distance_to_similarity(ExponentialSimilarity(); D = dist)
         _, _, _, _, _, Z2, dbht2d = PortfolioOptimisers.DBHTs(dist, S2;
-                                                              branchorder = :default,
+                                                              branchorder = nothing,
                                                               root = EqualRoot())
         A2, tri2, separators2, cliques2, cliqueTree2 = PortfolioOptimisers.PMFG_T2s(S2, 5)
         @test SparseArrays.nnz(A2) == 2 * (3 * N - 6)
@@ -1612,15 +1612,17 @@
         # all three orderings return the same `Z`. The block this testset replaces pinned
         # `Z` once per `branchorder`, so none of its three assertions could see the keyword
         # it varied. The assertion that can see it is the one on the seventh return value.
-        _, _, _, _, _, Z1r, dbht1r = PortfolioOptimisers.DBHTs(dist, S1; branchorder = :r,
+        _, _, _, _, _, Z1r, dbht1r = PortfolioOptimisers.DBHTs(dist, S1;
+                                                               branchorder = ROrder(),
                                                                root = UniqueRoot())
         _, _, _, _, _, Z1o, dbht1o = PortfolioOptimisers.DBHTs(dist, S1;
-                                                               branchorder = :optimal,
+                                                               branchorder = OptimalLeafOrder(),
                                                                root = UniqueRoot())
-        _, _, _, _, _, Z2r, dbht2r = PortfolioOptimisers.DBHTs(dist, S2; branchorder = :r,
+        _, _, _, _, _, Z2r, dbht2r = PortfolioOptimisers.DBHTs(dist, S2;
+                                                               branchorder = ROrder(),
                                                                root = EqualRoot())
         _, _, _, _, _, Z2o, dbht2o = PortfolioOptimisers.DBHTs(dist, S2;
-                                                               branchorder = :optimal,
+                                                               branchorder = OptimalLeafOrder(),
                                                                root = EqualRoot())
         @test Z1r == Z1
         @test Z1o == Z1
@@ -3509,13 +3511,14 @@ end
         @test round.(cut_dispersion.(2:6); digits = 2) ==
               [11.27, 26.04, 47.89, 112.96, 114.11]
         @test round.(cost_dispersion.(2:6); digits = 2) == [6.58, 2.83, 2.57, 2.17, 2.06]
-        # `Clustering.kmeans` refuses a `weights` vector of the wrong length when it runs, and
-        # `Clustering.hclust` refuses a branch order it does not know.
+        # `Clustering.kmeans` refuses a `weights` vector of the wrong length when it runs. A
+        # branch order is a member of `AbstractBranchOrder` or `nothing`, so the constructor
+        # refuses a Symbol (#2174).
         alg_w = KMeansAlgorithm(; kwargs = (; weights = ones(5)))
         @test_throws DimensionMismatch PortfolioOptimisers.get_k_clusters_from_alg(alg_w,
                                                                                    Dg, 3)
-        @test_throws ArgumentError PortfolioOptimisers.branch_ordered_hclust(Dg, :ward,
-                                                                             Val(:x))
+        @test_throws TypeError HClustAlgorithm(; branchorder = :x)
+        @test_throws TypeError DBHT(; branchorder = :optimal)
         # The hierarchical method answers a bare `k`; the flat one answers `(res, k)`.
         @test kh isa Integer
         @test pk isa Clustering.ClusteringResult
@@ -3756,8 +3759,8 @@ end
             S = PO470.distance_to_similarity(sim470; S = rho470[idx, idx],
                                              D = dist470[idx, idx])
             D = dist470[idx, idx]
-            ru = PO470.DBHTs(D, S; branchorder = :default, root = UniqueRoot())
-            re = PO470.DBHTs(D, S; branchorder = :default, root = EqualRoot())
+            ru = PO470.DBHTs(D, S; branchorder = nothing, root = UniqueRoot())
+            re = PO470.DBHTs(D, S; branchorder = nothing, root = EqualRoot())
             @test ru[1] == re[1]          # T8, the discrete clusters
             @test ru[2] == re[2]          # Rpm, the weighted graph
             @test ru[3] == re[3]          # Adjv, the converging-bubble membership
@@ -3768,7 +3771,7 @@ end
 
         # More than one root is the precondition the difference rests on. Assert it, so a
         # regression names its cause rather than the symptom.
-        Rpm = PO470.DBHTs(dist470, S470; branchorder = :default)[2]
+        Rpm = PO470.DBHTs(dist470, S470; branchorder = nothing)[2]
         A = Rpm .!= 0
         cl = PO470.clique3(A)[3]
         M = SparseArrays.spzeros(Int, size(Rpm, 1), size(cl, 1))
@@ -3789,7 +3792,7 @@ end
         cluster membership that `BubbleCluster8s` produced, asset by asset. The assertion is
         equality and not a bijection of the labels, because the two agree label for label.
         =#
-        T8, _, _, _, _, Z, hcl = PO470.DBHTs(dist470, S470; branchorder = :default)
+        T8, _, _, _, _, Z, hcl = PO470.DBHTs(dist470, S470; branchorder = nothing)
         k = maximum(T8)
         @test k == 2
         ct = Clustering.cutree(hcl; k = k)
@@ -3812,7 +3815,7 @@ end
         and it returns `A = W ⊙ mask`, so every stored weight of `Rpm` is one of `W`'s own
         non-negative entries. A negative mass cannot enter `DirectHb` through `DBHTs`.
         =#
-        Rpm = PO470.DBHTs(dist470, S470; branchorder = :default)[2]
+        Rpm = PO470.DBHTs(dist470, S470; branchorder = nothing)[2]
         @test all(>=(0), SparseArrays.nonzeros(Rpm))
         Wneg = Matrix(copy(S470))
         Wneg[2, 3] = -0.5
@@ -4029,20 +4032,20 @@ end
         @test all(>(0), Tc)
         @test size(Adjv) == (length(cols), 2)
         # The full route agrees with the kernel, so the loop is on the shipped path.
-        @test PO470b.DBHTs(D, S; branchorder = :default)[1] == Tc
+        @test PO470b.DBHTs(D, S; branchorder = nothing)[1] == Tc
     end
 
-    @testset "The three `branchorder` values each take their own arm" begin
+    @testset "The three branch orders and `nothing` each take their own arm" begin
         #=
-        `:optimal` calls `optimal_leaf_order!`, `:barjoseph` calls `orderbranches_barjoseph!`,
-        `:r` calls `orderbranches_r!`, and anything else leaves the merge order as
-        `HierarchyConstruct4s` wrote it. The reordering permutes the leaves and leaves the
-        clustering alone, so the cut is the invariant across all four.
+        `OptimalLeafOrder` calls `optimal_leaf_order!`, `BarJosephOrder` calls
+        `orderbranches_barjoseph!`, `ROrder` calls `orderbranches_r!`, and `nothing` leaves
+        the merge order as `HierarchyConstruct4s` wrote it. The reordering permutes the
+        leaves and leaves the clustering alone, so the cut is the invariant across all four.
         =#
         S = PO470b.distance_to_similarity(sim; S = rho, D = dist)
-        res = Dict(b => PO470b.DBHTs(dist, S; branchorder = b)
-                   for b in (:optimal, :barjoseph, :r, :default))
-        for b in (:optimal, :barjoseph, :r, :default)
+        bos = (OptimalLeafOrder(), BarJosephOrder(), ROrder(), nothing)
+        res = Dict(b => PO470b.DBHTs(dist, S; branchorder = b) for b in bos)
+        for b in bos
             hcl = res[b][7]
             @test hcl isa Clustering.Hclust
             @test Clustering.cutree(hcl; k = 2) == res[b][1]
@@ -4052,10 +4055,10 @@ end
             @test sort(hcl.merges[hcl.merges .> 0]) == collect(1:(size(dist, 1) - 2))
         end
         # The two flip the same merges, each child pair in an order of its own.
-        @test sort.(eachrow(res[:optimal][7].merges)) ==
-              sort.(eachrow(res[:barjoseph][7].merges))
-        @test res[:r][7].merges != res[:default][7].merges
-        @test res[:optimal][7].heights == res[:default][7].heights
+        @test sort.(eachrow(res[OptimalLeafOrder()][7].merges)) ==
+              sort.(eachrow(res[BarJosephOrder()][7].merges))
+        @test res[ROrder()][7].merges != res[nothing][7].merges
+        @test res[OptimalLeafOrder()][7].heights == res[nothing][7].heights
     end
 end
 
@@ -4756,7 +4759,7 @@ end
     cle = ClustersEstimator(; alg = DBHT())
     S469, D469 = cor_and_dist(cle.de, cle.ce, X469)
     S469 = PortfolioOptimisers.distance_to_similarity(cle.alg.sim; S = S469, D = D469)
-    _, Rpm, _, _, Mv, Z, hcl = PortfolioOptimisers.DBHTs(D469, S469; branchorder = :default)
+    _, Rpm, _, _, Mv, Z, hcl = PortfolioOptimisers.DBHTs(D469, S469; branchorder = nothing)
     @test size(Z) == (19, 4)
     @test hcl.merges == Int.(Z[:, 1:2])
     @test hcl.heights == Z[:, 3]
@@ -4831,4 +4834,46 @@ end
     doc471 = string(@doc PhylogenyResult)
     @test !occursin("`..", doc471)
     @test occursin("If `X` is a `MatNum`, `LinearAlgebra.issymmetric(X)`", doc471)
+end
+
+@testset "The branch order is a field of the clustering algorithm (#2174)" begin
+    using PortfolioOptimisers, Test, Clustering, StableRNGs, LinearAlgebra
+    PO = PortfolioOptimisers
+    adj(D, o) = sum(D[o[i], o[i + 1]] for i in 1:(length(o) - 1))
+    cle0 = ClustersEstimator()
+    X = randn(StableRNG(2174), 150, 11) * randn(StableRNG(2175), 11, 11)
+    _, D = cor_and_dist(cle0.de, cle0.ce, X)
+    @test HClustAlgorithm().branchorder === OptimalLeafOrder()
+    @test DBHT().branchorder === OptimalLeafOrder()
+    for linkage in (:single, :complete, :average, :ward)
+        # The tree order is the order of R: a leaf before a merge, the lower leaf first, and
+        # the lower merge first in the order of the heights.
+        rr = hclust(D; linkage = linkage, branchorder = :r)
+        rt = PO.branch_ordered_hclust(D, linkage, nothing)
+        @test rt.order == rr.order
+        @test PO.branch_ordered_hclust(D, linkage, ROrder()).order == rr.order
+        rank = invperm(sortperm(rt.heights))
+        key(m) = m < 0 ? (0, -m) : (1, rank[m])
+        @test all(key(rt.merges[v, 1]) < key(rt.merges[v, 2]) for v in axes(rt.merges, 1))
+        # Every order flips the merges of one tree. The exact order costs no more than the
+        # heuristic or the tree order.
+        ro = PO.branch_ordered_hclust(D, linkage, OptimalLeafOrder())
+        rb = PO.branch_ordered_hclust(D, linkage, BarJosephOrder())
+        @test sort.(eachrow(ro.merges)) == sort.(eachrow(rt.merges))
+        @test adj(D, ro.order) <= adj(D, rb.order) + 1e-12
+        @test adj(D, ro.order) <= adj(D, rt.order) + 1e-12
+        # `clusterise` reads the field of the algorithm.
+        for (bo, r) in ((nothing, rt), (OptimalLeafOrder(), ro), (BarJosephOrder(), rb))
+            cle = ClustersEstimator(;
+                                    alg = HClustAlgorithm(; linkage = linkage,
+                                                          branchorder = bo))
+            @test clusterise(cle, X).res.order == r.order
+        end
+    end
+    # The tree order of a DBHT keeps the merges that its hierarchy built.
+    S = PO.distance_to_similarity(MaximumDistanceSimilarity(); D = D)
+    Z, h0 = PO.DBHTs(D, S; branchorder = nothing)[6:7]
+    @test h0.merges == Int.(Z[:, 1:2])
+    @test clusterise(ClustersEstimator(; alg = DBHT(; branchorder = nothing)), X).res.order ==
+          h0.order
 end

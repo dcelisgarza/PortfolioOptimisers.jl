@@ -529,63 +529,154 @@ function optimal_leaf_order!(ml::AbstractVector{Int}, mr::AbstractVector{Int}, D
     return order
 end
 """
-    branch_ordered_hclust(D::MatNum, linkage::Symbol, ::Val{:optimal})
+    order_branches!(hmer::Clustering.HclustMerges, D::MatNum, ::OptimalLeafOrder)
+    order_branches!(hmer::Clustering.HclustMerges, D::MatNum, ::BarJosephOrder)
+    order_branches!(hmer::Clustering.HclustMerges, D::MatNum, ::ROrder)
+    order_branches!(hmer::Clustering.HclustMerges, D::MatNum, ::Nothing)
 
-Cluster `D` with `Clustering.hclust`, and order its leaves with the least sum of the distances between adjacent leaves that the tree permits.
+Flip the merges of `hmer` under a branch order, the interface of [`AbstractBranchOrder`](@ref).
 
-# Algorithm
-
- 1. Cluster `D` into `res` with `Clustering.hclust` under `linkage` and its branch order `:barjoseph`. The branch order flips merges and moves no merge, so the merges keep the order in which the linkage made them.
- 2. Order the leaves of `res` into `order` with [`optimal_leaf_order!`](@ref) on the two columns of `res.merges` and on `D`.
- 3. Return `Clustering.Hclust(res.merges, res.heights, order, res.linkage)`.
+  - [`OptimalLeafOrder`](@ref) flips the merges with [`optimal_leaf_order!`](@ref), so that the leaf order has the least sum of the distances between adjacent leaves that the tree permits.
+  - [`BarJosephOrder`](@ref) flips the merges with the heuristic `Clustering.orderbranches_barjoseph!`, which decides each merge once from its four outermost leaves.
+  - [`ROrder`](@ref) sorts the merges by height and flips them with `Clustering.orderbranches_r!`, the order of the R function `hclust`.
+  - `nothing` skips the flip step. The merges keep the orientation that the tree builder gave them. This is the tree order.
 
 # Arguments
 
-  - `D`: The distance matrix. The cost of an order is the sum of the entries of `D` itself, also when the linkage is `:ward`, which clusters the squares of `D`.
-  - `linkage`: The linkage of `Clustering.hclust`.
+  - `hmer`: The merges. The method changes them in place.
+  - `D`: The distance matrix of the leaves. [`ROrder`](@ref) and `nothing` do not read it.
 
 # Returns
 
-  - `res::Clustering.Hclust`: The dendrogram, with the leaf order of least cost.
+  - `hmer::Clustering.HclustMerges`: The same merges, flipped.
 
 # Related
 
+  - [`AbstractBranchOrder`](@ref)
   - [`optimal_leaf_order!`](@ref)
-  - [`clusterise`](@ref)
+  - [`tree_order!`](@ref)
+  - [`branch_ordered_hclust`](@ref)
+  - [`DBHTs`](@ref)
 """
-function branch_ordered_hclust(D::MatNum, linkage::Symbol, ::Val{:optimal})
-    res = Clustering.hclust(D; linkage = linkage, branchorder = :barjoseph)
-    order = optimal_leaf_order!(view(res.merges, :, 1), view(res.merges, :, 2), D)
-    return Clustering.Hclust(res.merges, res.heights, order, res.linkage)
+function order_branches!(hmer::Clustering.HclustMerges, D::MatNum, ::OptimalLeafOrder)
+    optimal_leaf_order!(hmer.mleft, hmer.mright, D)
+    return hmer
+end
+function order_branches!(hmer::Clustering.HclustMerges, D::MatNum, ::BarJosephOrder)
+    return Clustering.orderbranches_barjoseph!(hmer, D)
+end
+function order_branches!(hmer::Clustering.HclustMerges, ::MatNum, ::ROrder)
+    return Clustering.orderbranches_r!(hmer)
+end
+function order_branches!(hmer::Clustering.HclustMerges, ::MatNum, ::Nothing)
+    return hmer
 end
 """
-    branch_ordered_hclust(D::MatNum, linkage::Symbol, ::Val{B}) where {B}
+    tree_order!(hmer::Clustering.HclustMerges)
 
-Cluster `D` with `Clustering.hclust` under `linkage` and its own branch order `B`.
+Flip each merge of `hmer` to the orientation of a linkage that builds its tree with no flip step.
 
-`B = :barjoseph` gives the heuristic of `Clustering.orderbranches_barjoseph!`, and `B = :r` gives the order of the R function `hclust`. `Clustering.hclust` refuses any other value with an `ArgumentError`.
+`Clustering.hclust` always flips its merges, so the orientation that its linkage builds is not available. This function gives the orientation of a linkage matrix of SciPy, whose rows hold the lower child first. A leaf comes before a merge. Of two leaves, the lower index comes first. Of two merges, the lower one comes first, where the rank of a merge is its position in the order of the heights, and a tie keeps the order of the merges. The function moves no merge. [`ROrder`](@ref) flips by the same rule, so the two give the same leaf order.
 
 # Arguments
 
-  - `D`: The distance matrix.
-  - `linkage`: The linkage of `Clustering.hclust`.
+  - `hmer`: The merges. The function changes them in place.
 
 # Returns
 
-  - `res::Clustering.Hclust`: The dendrogram.
+  - `hmer::Clustering.HclustMerges`: The same merges, flipped.
 
 # Related
 
   - [`branch_ordered_hclust`](@ref)
+  - [`order_branches!`](@ref)
+  - [`ROrder`](@ref)
+"""
+function tree_order!(hmer::Clustering.HclustMerges)
+    rank = invperm(sortperm(hmer.heights))
+    ml = hmer.mleft
+    mr = hmer.mright
+    for v in eachindex(ml, mr)
+        a = ml[v] < 0 ? ml[v] : rank[ml[v]]
+        b = mr[v] < 0 ? mr[v] : rank[mr[v]]
+        # A leaf before a merge, the lower leaf first, the lower merge first.
+        if (a > 0 && b < 0) || (a < 0 && b < 0 && a < b) || (a > 0 && b > 0 && a > b)
+            ml[v], mr[v] = mr[v], ml[v]
+        end
+    end
+    return hmer
+end
+"""
+    hclust_merges(res::Clustering.Hclust)
+
+Copy the merges and the heights of a dendrogram into a `Clustering.HclustMerges`, so that a branch order can flip them.
+
+# Arguments
+
+  - `res`: The dendrogram.
+
+# Returns
+
+  - `hmer::Clustering.HclustMerges`: The merges and the heights of `res`, in its order.
+
+# Related
+
+  - [`branch_ordered_hclust`](@ref)
+  - [`order_branches!`](@ref)
+"""
+function hclust_merges(res::Clustering.Hclust)
+    hmer = Clustering.HclustMerges{eltype(res.heights)}(length(res.order))
+    append!(hmer.mleft, view(res.merges, :, 1))
+    append!(hmer.mright, view(res.merges, :, 2))
+    append!(hmer.heights, res.heights)
+    return hmer
+end
+"""
+    branch_ordered_hclust(D::MatNum, linkage::Symbol, bo::AbstractBranchOrder)
+    branch_ordered_hclust(D::MatNum, linkage::Symbol, ::BarJosephOrder)
+    branch_ordered_hclust(D::MatNum, linkage::Symbol, ::Nothing)
+
+Cluster `D` with `Clustering.hclust` under `linkage`, and order its leaves under the branch order `bo`.
+
+# Algorithm
+
+ 1. Cluster `D` into `res` with `Clustering.hclust` under `linkage` and its branch order `:barjoseph`. The branch order flips merges and moves no merge, so the merges keep the order in which the linkage made them. Under [`BarJosephOrder`](@ref), return `res`. `Clustering.hclust` then runs the heuristic on the squares of `D` under the linkage `:ward`.
+ 2. Copy the merges and the heights of `res` into `hmer` with [`hclust_merges`](@ref).
+ 3. Flip `hmer` under `bo` with [`order_branches!`](@ref). Under `nothing`, flip it to the tree order with [`tree_order!`](@ref).
+ 4. Return `Clustering.Hclust(hmer, res.linkage)`, which reads the leaf order from the merges.
+
+# Arguments
+
+  - `D`: The distance matrix. The cost of an order under [`OptimalLeafOrder`](@ref) is the sum of the entries of `D` itself, also when the linkage is `:ward`, which clusters the squares of `D`.
+  - `linkage`: The linkage of `Clustering.hclust`.
+  - `bo`: The branch order, a member of [`AbstractBranchOrder`](@ref), or `nothing` for the tree order.
+
+# Returns
+
+  - `res::Clustering.Hclust`: The dendrogram, with the leaf order of `bo`.
+
+# Related
+
+  - [`order_branches!`](@ref)
+  - [`tree_order!`](@ref)
+  - [`optimal_leaf_order!`](@ref)
+  - [`AbstractBranchOrder`](@ref)
   - [`clusterise`](@ref)
 """
-function branch_ordered_hclust(D::MatNum, linkage::Symbol, ::Val{B}) where {B}
-    return Clustering.hclust(D; linkage = linkage, branchorder = B)
+function branch_ordered_hclust(D::MatNum, linkage::Symbol, bo::AbstractBranchOrder)
+    res = Clustering.hclust(D; linkage = linkage, branchorder = :barjoseph)
+    return Clustering.Hclust(order_branches!(hclust_merges(res), D, bo), res.linkage)
+end
+function branch_ordered_hclust(D::MatNum, linkage::Symbol, ::BarJosephOrder)
+    return Clustering.hclust(D; linkage = linkage, branchorder = :barjoseph)
+end
+function branch_ordered_hclust(D::MatNum, linkage::Symbol, ::Nothing)
+    res = Clustering.hclust(D; linkage = linkage, branchorder = :barjoseph)
+    return Clustering.Hclust(tree_order!(hclust_merges(res)), res.linkage)
 end
 """
     clusterise(cle::ClustersEstimator{<:Any, <:Any, <:HClustAlgorithm, <:Any},
-               X::MatNum; branchorder::Symbol = :optimal, dims::Int = 1,
-               kwargs...)
+               X::MatNum; dims::Int = 1, kwargs...)
 
 Run hierarchical clustering and return the result as a [`Clusters`](@ref) object.
 
@@ -595,7 +686,7 @@ Estimates the similarity and distance matrices from `X`, makes a dendrogram unde
 
  1. Estimate the similarity matrix `S` and the distance matrix `D` from `X` with [`cor_and_dist`](@ref), under `cle.de` and `cle.ce`.
  2. Refuse each asset that the reader could not estimate with [`assert_distance_reader_rows`](@ref). Then refuse any other `NaN` in `D`.
- 3. Cluster `D` into the dendrogram `res` under the linkage `cle.alg.linkage` with [`branch_ordered_hclust`](@ref) on `Val(branchorder)`.
+ 3. Cluster `D` into the dendrogram `res` under the linkage `cle.alg.linkage` and the branch order `cle.alg.branchorder` with [`branch_ordered_hclust`](@ref).
  4. Select the number of clusters `k` with [`optimal_number_clusters`](@ref)`(cle.onc, res, D)`.
  5. Return `Clusters(; res = res, S = S, D = D, k = k)`. The field `P` keeps its default, `nothing`, because the clustering ran on `D` itself.
 
@@ -603,7 +694,6 @@ Estimates the similarity and distance matrices from `X`, makes a dendrogram unde
 
   - `cle`: The clustering estimator.
   - `X`: The data matrix, with one row per observation and one column per asset when `dims = 1`.
-  - `branchorder`: The order of the branches. `:optimal` orders the leaves with [`optimal_leaf_order!`](@ref). `Clustering.hclust` takes any other value, and it accepts `:barjoseph` and `:r`.
   - $(arg_dict[:dims])
   - `kwargs...`: Keyword arguments for [`cor_and_dist`](@ref).
 
@@ -622,11 +712,11 @@ Estimates the similarity and distance matrices from `X`, makes a dendrogram unde
   - [`ClustersEstimator`](@ref)
 """
 function clusterise(cle::ClustersEstimator{<:Any, <:Any, <:HClustAlgorithm, <:Any},
-                    X::MatNum; branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
+                    X::MatNum; dims::Int = 1, kwargs...)
     S, D = cor_and_dist(cle.de, cle.ce, X; dims = dims, kwargs...)
     assert_distance_reader_rows(D)
     assert_no_nan_distance(D, "a dendrogram")
-    res = branch_ordered_hclust(D, cle.alg.linkage, Val(branchorder))
+    res = branch_ordered_hclust(D, cle.alg.linkage, cle.alg.branchorder)
     k = optimal_number_clusters(cle.onc, res, D)
     return Clusters(; res = res, S = S, D = D, k = k)
 end
@@ -919,3 +1009,5 @@ export ClusterNode, is_leaf, PreorderTreeByID, pre_order, to_tree, optimal_numbe
        assignments
 # The abstract type and the verb its `# Interfaces` section names (ADR 0154, issue #1131).
 public AbstractPreorderBy, get_node_property
+# The branch order family is declared in `02_Clusters.jl`. This is the verb of its interface.
+public order_branches!

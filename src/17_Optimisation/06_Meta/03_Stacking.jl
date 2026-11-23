@@ -730,7 +730,6 @@ Run the stacking optimisation.
 
   - `st`: The stacking optimiser.
   - $(arg_dict[:rd])
-  - `branchorder`: Passed to each inner optimiser and to the outer optimiser. The branch order of a clusterisation.
   - `str_names`: Passed to each inner optimiser and to the outer optimiser. When `true`, the optimisation uses string names for the assets.
   - `save`: Passed to each inner optimiser and to the outer optimiser. When `true`, a JuMP result keeps its model.
   - `kwargs`: Passed to each inner optimiser and to the outer optimiser.
@@ -749,8 +748,8 @@ Run the stacking optimisation.
   - [`optimise`](@ref)
   - [`_optimise`](@ref)
 """
-function _optimise(st::Stacking, rd::ReturnsResult; branchorder::Symbol = :optimal,
-                   str_names::Bool = false, save::Bool = true, kwargs...)
+function _optimise(st::Stacking, rd::ReturnsResult; str_names::Bool = false,
+                   save::Bool = true, kwargs...)
     st = reset_time_dependent_estimator(st)
     pr = prior(st.pe, rd)
     # A weight and a fee take the element type of the returns.
@@ -782,8 +781,7 @@ function _optimise(st::Stacking, rd::ReturnsResult; branchorder::Symbol = :optim
     wi = zeros(Tf, size(X, 2), Ni)
     resi = Vector{NonFiniteAllocationOptimisationResult}(undef, Ni)
     FLoops.@floop st.ex for (i, opt) in pairs(opti)
-        res = optimise(opt, rdr; branchorder = branchorder, str_names = str_names,
-                       save = save, kwargs...)
+        res = optimise(opt, rdr; str_names = str_names, save = save, kwargs...)
         #! Support efficient frontier?
         @argcheck(!isa(res.retcode, AbstractVector),
                   ArgumentError("res.retcode cannot be an AbstractVector; efficient frontier results are not supported here"))
@@ -791,8 +789,7 @@ function _optimise(st::Stacking, rd::ReturnsResult; branchorder::Symbol = :optim
         resi[i] = res
     end
     rdo = predict_outer_returns(st.cv, st, FullUniverse(), rdr, pr, cfees, wi, resi)
-    reso = optimise(st.opto, rdo; branchorder = branchorder, str_names = str_names,
-                    save = save, kwargs...)
+    reso = optimise(st.opto, rdo; str_names = str_names, save = save, kwargs...)
     wb = weight_bounds_constraints(st.wb, st.sets; rd = rdr, N = size(X, 2),
                                    strict = st.strict, datatype = Tf)
     retcode, w = outer_optimisation_finaliser(wb, st.wf, resi, reso.retcode,

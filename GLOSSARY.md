@@ -930,10 +930,10 @@ Beside the family, not in it: `BestConstantRebalancedPortfolio` · BCRP · bench
 
 `HierarchicalOptimiser` is the shared configuration for these.
 
-**Branch order**
-The dendrogram's leaf permutation. It never changes the merge tree or the cluster memberships.
-`:optimal`, the default, is the exact optimal leaf ordering. Of the orders that the tree permits by flips of its merges, it is the one with the least sum of distances between adjacent leaves. `:barjoseph` is the greedy heuristic of Clustering.jl, which decides each merge once from its four outermost leaves. `:r` is the order of the R function `hclust`. Clustering.jl itself maps `:optimal` to the heuristic, so the library dispatches the name on `Val` before it reaches `hclust`. See ADR 0055.
-*Avoid*: reading `:optimal` in Clustering.jl's own documentation as this order.
+**Branch Order**
+The rule that flips the merges of a dendrogram to give its leaf permutation. It never changes the merge tree or the cluster memberships. It is the field `branchorder` of `HClustAlgorithm` and `DBHT`, a member of the Open Family `AbstractBranchOrder`, whose verb is `order_branches!`. No verb takes it as a keyword.
+`OptimalLeafOrder()`, the default, is the exact optimal leaf ordering. Of the orders that the tree permits by flips of its merges, it is the one with the least sum of distances between adjacent leaves. `BarJosephOrder()` is the greedy heuristic of Clustering.jl, which decides each merge once from its four outermost leaves. `ROrder()` is the order of the R function `hclust`. `nothing` skips the flip step and gives the **tree order**: a DBHT keeps the merges that its hierarchy built, and an `HClustAlgorithm` takes the orientation of a SciPy linkage matrix, a leaf before a merge, the lower leaf first and the lower merge first, which is also the rule of `ROrder()`. HRP and Schur bisect the leaf permutation, so for them the Branch Order changes the weights. HERC and NCO read the memberships, so for them it is a dial of cost. See ADR 0055.
+*Avoid*: reading `:optimal` in Clustering.jl's own documentation as this order; a `branchorder` keyword.
 
 ### 4.3 JuMP-based
 

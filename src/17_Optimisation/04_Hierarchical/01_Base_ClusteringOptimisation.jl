@@ -550,7 +550,8 @@ HierarchicalOptimiser
          │         │   power ┼ nothing
          │         │     alg ┴ CanonicalDistance()
          │     alg ┼ HClustAlgorithm
-         │         │   linkage ┴ Symbol: :ward
+         │         │       linkage ┼ Symbol: :ward
+         │         │   branchorder ┴ OptimalLeafOrder()
          │     onc ┼ OptimalNumberClusters
          │         │   max_k ┼ nothing
          │         │     alg ┼ SecondOrderDifference

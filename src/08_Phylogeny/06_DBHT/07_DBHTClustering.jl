@@ -1,94 +1,6 @@
 """
-    order_branches!(hmer::Clustering.HclustMerges, D::MatNum, ::Val{:optimal})
-
-Flip the merges of `hmer` so that its leaf order has the least sum of the distances between adjacent leaves that the tree permits.
-
-# Arguments
-
-  - `hmer`: The merges. The method changes them in place.
-  - `D`: The distance matrix of the leaves.
-
-# Returns
-
-  - `hmer::Clustering.HclustMerges`: The same merges, flipped by [`optimal_leaf_order!`](@ref).
-
-# Related
-
-  - [`optimal_leaf_order!`](@ref)
-  - [`DBHTs`](@ref)
-"""
-function order_branches!(hmer::Clustering.HclustMerges, D::MatNum, ::Val{:optimal})
-    optimal_leaf_order!(hmer.mleft, hmer.mright, D)
-    return hmer
-end
-"""
-    order_branches!(hmer::Clustering.HclustMerges, D::MatNum, ::Val{:barjoseph})
-
-Flip the merges of `hmer` with the heuristic `Clustering.orderbranches_barjoseph!`, which decides each merge once from its four outermost leaves.
-
-# Arguments
-
-  - `hmer`: The merges. The method changes them in place.
-  - `D`: The distance matrix of the leaves.
-
-# Returns
-
-  - `hmer::Clustering.HclustMerges`: The same merges, flipped.
-
-# Related
-
-  - [`order_branches!`](@ref)
-  - [`DBHTs`](@ref)
-"""
-function order_branches!(hmer::Clustering.HclustMerges, D::MatNum, ::Val{:barjoseph})
-    return Clustering.orderbranches_barjoseph!(hmer, D)
-end
-"""
-    order_branches!(hmer::Clustering.HclustMerges, D::MatNum, ::Val{:r})
-
-Order the merges of `hmer` by height with `Clustering.orderbranches_r!`, the order of the R function `hclust`.
-
-# Arguments
-
-  - `hmer`: The merges. The method changes them in place.
-  - `D`: The distance matrix of the leaves. This order does not read it.
-
-# Returns
-
-  - `hmer::Clustering.HclustMerges`: The same merges, ordered.
-
-# Related
-
-  - [`order_branches!`](@ref)
-  - [`DBHTs`](@ref)
-"""
-function order_branches!(hmer::Clustering.HclustMerges, D::MatNum, ::Val{:r})
-    return Clustering.orderbranches_r!(hmer)
-end
-"""
-    order_branches!(hmer::Clustering.HclustMerges, D::MatNum, ::Val)
-
-Keep the merges of `hmer` in the order that they arrive, for a branch order that has no method of its own.
-
-# Arguments
-
-  - `hmer`: The merges.
-  - `D`: The distance matrix of the leaves. This method does not read it.
-
-# Returns
-
-  - `hmer::Clustering.HclustMerges`: The same merges, not changed.
-
-# Related
-
-  - [`order_branches!`](@ref)
-  - [`DBHTs`](@ref)
-"""
-function order_branches!(hmer::Clustering.HclustMerges, D::MatNum, ::Val)
-    return hmer
-end
-"""
-    DBHTs(D::MatNum, S::MatNum; branchorder::Symbol = :optimal,
+    DBHTs(D::MatNum, S::MatNum;
+          branchorder::Option{<:AbstractBranchOrder} = OptimalLeafOrder(),
           root::DBHTRootMethod = UniqueRoot(),
           sim::Option{<:AbstractSimilarityMatrixAlgorithm} = nothing)
 
@@ -108,14 +20,14 @@ The function runs the full DBHT pipeline. It builds the TMFG from the similarity
  6. Lift the clique membership `Mb` to the vertex membership `Mv`. Column `n` of `Mv` marks every vertex of every 3-clique that bubble `n` holds.
  7. Assign the clusters with [`BubbleCluster8s`](@ref), which gives `Adjv` and the discrete membership `T8`.
  8. Build the linkage matrix `Z` with [`HierarchyConstruct4s`](@ref), and convert it with [`turn_into_Hclust_merges`](@ref).
- 9. Load the two merge columns and the heights into a `Clustering.HclustMerges`, and order its branches with [`order_branches!`](@ref) on `Val(branchorder)`.
+ 9. Load the two merge columns and the heights into a `Clustering.HclustMerges`, and order its branches under `branchorder` with [`order_branches!`](@ref).
 10. Wrap the merges in a `Clustering.Hclust` tagged `:DBHT`.
 
 # Arguments
 
   - `D`: `N × N` dissimilarity matrix, such as a distance matrix. It must be symmetric. The caller holds that contract, and this function does not check it.
   - `S`: `N × N` non-negative similarity matrix. It must be symmetric, on the same contract that the function does not check.
-  - `branchorder`: Order method for the dendrogram branches. `:optimal` finds the leaf order with the least sum of the distances between adjacent leaves. `:barjoseph` calls the heuristic `Clustering.orderbranches_barjoseph!`, and `:r` calls `Clustering.orderbranches_r!`. The function refuses no other value. Another value leaves the branches in the order that [`HierarchyConstruct4s`](@ref) built them.
+  - `branchorder`: The branch order of the dendrogram, a member of [`AbstractBranchOrder`](@ref), or `nothing` for the tree order. [`order_branches!`](@ref) states what each member does. The merges come in the order that [`HierarchyConstruct4s`](@ref) built them, and `nothing` keeps them so.
   - `root`: Root selection method for the clique hierarchy.
   - `sim`: Similarity matrix algorithm that made `S`. The function passes it to [`assert_pmfg_weights`](@ref) and reads it for nothing else, so that a refusal names the configuration and not the matrix. A caller that holds only the matrices leaves it `nothing`.
 
@@ -147,7 +59,8 @@ The function does not check the symmetry of `D` or `S`. A caller that derives bo
   - [`turn_into_Hclust_merges`](@ref)
   - [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust)
 """
-function DBHTs(D::MatNum, S::MatNum; branchorder::Symbol = :optimal,
+function DBHTs(D::MatNum, S::MatNum;
+               branchorder::Option{<:AbstractBranchOrder} = OptimalLeafOrder(),
                root::DBHTRootMethod = UniqueRoot(),
                sim::Option{<:AbstractSimilarityMatrixAlgorithm} = nothing)
     @argcheck(!isempty(S), IsEmptyError)
@@ -181,7 +94,7 @@ function DBHTs(D::MatNum, S::MatNum; branchorder::Symbol = :optimal,
     resize!(hmer.mright, n) .= Int.(@view(Z[:, 2]))
     resize!(hmer.heights, n) .= Z[:, 3]
 
-    order_branches!(hmer, D, Val(branchorder))
+    order_branches!(hmer, D, branchorder)
 
     Z_hclust = Clustering.Hclust(hmer, :DBHT)
 
@@ -189,7 +102,7 @@ function DBHTs(D::MatNum, S::MatNum; branchorder::Symbol = :optimal,
 end
 """
     clusterise(cle::ClustersEstimator{<:Any, <:Any, <:DBHT, <:Any}, X::MatNum;
-               branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
+               dims::Int = 1, kwargs...)
 
 Run Direct Bubble Hierarchical Tree (DBHT) clustering with a `ClustersEstimator` whose algorithm is a `DBHT`.
 
@@ -200,7 +113,7 @@ The method computes the similarity and distance matrices of the data matrix `X` 
  1. Take the correlation matrix `S` and the distance matrix `D` from `X` with `cle.ce` and `cle.de`, through [`cor_and_dist`](@ref). Refuse each asset that the reader could not estimate with [`assert_distance_reader_rows`](@ref).
  2. Check with [`assert_similarity_domain`](@ref) that `D` lies in the domain that `cle.alg.sim` needs.
  3. Map `D` to the non-negative similarity `S` with [`distance_to_similarity`](@ref), through the branch that `cle.alg.sim` selects.
- 4. Run the pipeline with [`DBHTs`](@ref), and keep only its last output, the `Clustering.Hclust` dendrogram `res`.
+ 4. Run the pipeline with [`DBHTs`](@ref) under `cle.alg.root` and `cle.alg.branchorder`, and keep only its last output, the `Clustering.Hclust` dendrogram `res`.
  5. Take the number of clusters `k` from `res` and `D` with [`optimal_number_clusters`](@ref), through the branch that `cle.onc` selects.
  6. Wrap `res`, `S`, `D` and `k` in a [`Clusters`](@ref).
 
@@ -208,7 +121,6 @@ The method computes the similarity and distance matrices of the data matrix `X` 
 
   - `cle`: A `ClustersEstimator` whose algorithm is a [`DBHT`](@ref).
   - `X`: Data matrix, `observations × assets` when `dims` is `1` and `assets × observations` when `dims` is `2`.
-  - `branchorder`: Order method for the dendrogram branches, `:optimal` by default, `:barjoseph` or `:r`. [`DBHTs`](@ref) states what each value does, and what another value does.
   - $(arg_dict[:dims])
   - `kwargs...`: Keyword arguments that the method passes to [`cor_and_dist`](@ref).
 
@@ -229,12 +141,13 @@ The method computes the similarity and distance matrices of the data matrix `X` 
   - [`ClustersEstimator`](@ref)
 """
 function clusterise(cle::ClustersEstimator{<:Any, <:Any, <:DBHT, <:Any}, X::MatNum;
-                    branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
+                    dims::Int = 1, kwargs...)
     S, D = cor_and_dist(cle.de, cle.ce, X; dims = dims, kwargs...)
     assert_distance_reader_rows(D)
     assert_similarity_domain(cle.alg.sim, cle.de, D)
     S = distance_to_similarity(cle.alg.sim; S = S, D = D)
-    res = DBHTs(D, S; branchorder = branchorder, root = cle.alg.root, sim = cle.alg.sim)[end]
+    res = DBHTs(D, S; branchorder = cle.alg.branchorder, root = cle.alg.root,
+                sim = cle.alg.sim)[end]
     k = optimal_number_clusters(cle.onc, res, D)
     return Clusters(; res = res, S = S, D = D, k = k)
 end

@@ -141,7 +141,8 @@ HierarchicalRiskParity
       │          │         │   power ┼ nothing
       │          │         │     alg ┴ CanonicalDistance()
       │          │     alg ┼ HClustAlgorithm
-      │          │         │   linkage ┴ Symbol: :ward
+      │          │         │       linkage ┼ Symbol: :ward
+      │          │         │   branchorder ┴ OptimalLeafOrder()
       │          │     onc ┼ OptimalNumberClusters
       │          │         │   max_k ┼ nothing
       │          │         │     alg ┼ SecondOrderDifference
@@ -379,7 +380,7 @@ Run the Hierarchical Risk Parity optimisation for a single risk measure.
 
 [`optimise`](@ref) calls this method. The struct [`HierarchicalRiskParity`](@ref) states the mathematics.
 
-Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref), this optimiser takes no `branchorder` keyword. Recursive bisection splits the leaf order of the dendrogram, so that order is an input of the allocation, and the clusterisation always keeps the optimal order.
+Recursive bisection splits the leaf order of the dendrogram, so that order is an input of the allocation. The `branchorder` field of the clustering algorithm states it, see [`AbstractBranchOrder`](@ref).
 
 # Algorithm
 
@@ -388,7 +389,7 @@ Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref)
  3. Find the Investable Mask `imsk` of `pr`. Resolve the fees `fees` on the full universe, and place them on the assets of `imsk`.
  4. Remove the two liquidation charges, `lq` and `flq`, from `fees`, giving `cfees`, the fees that the risks read.
  5. Reduce `pr`, `hrp` and `rd` to the assets of `imsk`, with [`investable_reduction`](@ref). `X` is the returns matrix of the reduced `pr`.
- 6. Cluster the assets with `opt.cle`, giving `clr`. The call passes no `branchorder`, so the leaf order `clr.res.order` keeps the default optimal order, because a different order changes the allocation.
+ 6. Cluster the assets with `opt.cle`, giving `clr`. The leaf order `clr.res.order` is the order of the branch order of the clustering algorithm.
  7. Resolve the risk measure `r` against `pr` and `opt.slv`, with [`factory`](@ref).
  8. Compute the risk of each asset held alone, `rku`, with [`unitary_expected_risks`](@ref).
  9. Resolve the weight bounds `wb` from `opt.wb` and `opt.sets`. Expand a side that resolves to a scalar or to `nothing` to one bound per asset, because [`split_factor_weight_constraints`](@ref) sums the bounds of each half.
@@ -405,7 +406,7 @@ Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref)
   - `hrp`: The hierarchical risk parity optimiser to use.
   - $(arg_dict[:rd]) When `hrp.opt.pe` holds a prior result, the allocation reads no returns from `rd`, but a fallback or the clusterisation can.
   - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
-  - `kwargs`: Ignored. A `branchorder` passed here has no effect.
+  - `kwargs`: Ignored.
 
 # Related
 
@@ -447,8 +448,8 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     _, pr, hrp, rd = investable_reduction(pr, hrp, rd, imsk)
     hrp = bind_data_benchmark(hrp, rd)
     X = pr.X
-    # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
-    # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
+    # Recursive bisection splits `clr.res.order`, the leaf order of the branch order of
+    # the clustering algorithm.
     # A distance reader that refuses an asset the prior kept raises before it clusters. Fit
     # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
     clr = distance_reader_call(clusterise, hrp.opt.cle, pr; rd = rd, iv = rd.iv,
@@ -593,7 +594,7 @@ Run the Hierarchical Risk Parity optimisation for a vector of risk measures, sca
   - `hrp`: The hierarchical risk parity optimiser to use, with a vector of risk measures.
   - $(arg_dict[:rd]) When `hrp.opt.pe` holds a prior result, the allocation reads no returns from `rd`, but a fallback or the clusterisation can.
   - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
-  - `kwargs`: Ignored. A `branchorder` passed here has no effect.
+  - `kwargs`: Ignored.
 
 # Related
 
@@ -636,8 +637,8 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     _, pr, hrp, rd = investable_reduction(pr, hrp, rd, imsk)
     hrp = bind_data_benchmark(hrp, rd)
     X = pr.X
-    # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
-    # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
+    # Recursive bisection splits `clr.res.order`, the leaf order of the branch order of
+    # the clustering algorithm.
     # A distance reader that refuses an asset the prior kept raises before it clusters. Fit
     # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
     clr = distance_reader_call(clusterise, hrp.opt.cle, pr; rd = rd, iv = rd.iv,

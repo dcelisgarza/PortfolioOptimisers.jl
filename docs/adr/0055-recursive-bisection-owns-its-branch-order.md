@@ -136,3 +136,39 @@ that the caller passed, also under `:ward`, which clusters the squares of that m
 The rule of this ADR does not change: HRP and Schur pin `:optimal`, which is now the order its
 Context describes. The merges and the cluster memberships do not change, so HERC, NCO, Stacking and
 SubsetResampling give the same weights under each name.
+
+## Amendment (2026-11-23)
+
+**No optimiser pins a branch order now** (#2169, built in #2174). The decision of this ADR, that
+HRP and Schur fix `:optimal` and offer no choice, is withdrawn. The leaf order is still an input
+of recursive bisection, and that is the reason why the caller must be able to state it: #2164
+measured that the order of the oracle is not the optimal order in 542 of 1200 cases, so a parity
+test needs the tree order, and a user can want an order of a sector or the spectral order.
+
+**Decision.** The branch order is a field of the hierarchical clustering algorithm, not a keyword
+of a verb:
+
+| Field value | Order |
+| --- | --- |
+| `OptimalLeafOrder()` (default) | The exact optimal leaf order, `optimal_leaf_order!`. |
+| `BarJosephOrder()` | Clustering.jl's heuristic. |
+| `ROrder()` | Clustering.jl's order of the R function `hclust`. |
+| `nothing` | The tree order. The flip step is skipped (ADR 0222). |
+
+`HClustAlgorithm(; linkage, branchorder)` and `DBHT(; sim, root, branchorder)` hold it, and
+`AbstractBranchOrder` is the Open Family, with `order_branches!` as the verb of its interface.
+The `branchorder` keyword leaves `clusterise`, `phylogeny_matrix`, HERC, `NestedClustered`,
+`Stacking` and `SubsetResampling`. A graph verb refuses it with a `MethodError`
+(`graph_verb_keywords`). `DBHTs` keeps a `branchorder` keyword beside `root` and `sim`, because
+it takes each part of a `DBHT` as a keyword, and the keyword now takes the member.
+
+`Clustering.hclust` always flips its merges, so the orientation that its linkage builds is not
+available. For `HClustAlgorithm`, `nothing` flips each merge to the rule of a SciPy linkage
+matrix, `tree_order!`: a leaf before a merge, the lower leaf first, the lower merge first. The
+rule is the rule of `ROrder()`, so for `HClustAlgorithm` the two give the same leaf order. For
+`DBHT`, `nothing` keeps the merges as `HierarchyConstruct4s` built them.
+
+The table of the Context still holds. HRP and Schur read `clr.res.order`, so the branch order
+changes their weights. HERC and NCO read the memberships, so for them it is a dial of cost.
+The seriation slot of HRP and Schur, the next part of #2174, will make the order an Estimator
+of its own, which can also be spectral and is not bound to a tree.

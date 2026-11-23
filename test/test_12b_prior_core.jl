@@ -3843,6 +3843,8 @@ end
               () -> benchmark_relative_returns(rds, true),
               () -> clusterise(ClustersEstimator(), rds; brt = true),
               () -> clusterise(ClustersEstimator(), pr; rd = rds, x_src = :prior),
+              # The branch order is a field of the algorithm since #2174.
+              () -> clusterise(ClustersEstimator(), pr; rd = rds, branchorder = :optimal),
               () -> phylogeny_matrix(NetworkEstimator(), pr; rd = rds, brt = true),
               () -> phylogeny_constraints(SemiDefinitePhylogenyEstimator(), pr; brt = true),
               () -> centrality_vector(CentralityEstimator(), pr; rd = rds, brt = true),
@@ -3853,8 +3855,8 @@ end
         @test_throws MethodError f()
     end
     # The keywords that the library forwards still reach the graph verbs.
-    @test isa(clusterise(ClustersEstimator(), pr; rd = rds, dims = 1,
-                         branchorder = :optimal), PO.AbstractClusteringResult)
+    @test isa(clusterise(ClustersEstimator(), pr; rd = rds, dims = 1),
+              PO.AbstractClusteringResult)
 end
 
 @testset "The claims that the /unslop pass of the base prior corrected (#531)" begin

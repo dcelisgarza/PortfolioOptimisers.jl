@@ -762,7 +762,6 @@ Run the subset resampling optimisation, and return the averaged portfolio.
 
   - `sr`: The subset resampling optimiser to use.
   - $(arg_dict[:rd])
-  - `branchorder`: Branch order, passed to each subset optimisation.
   - `str_names`: Whether each subset optimisation uses string names for the assets.
   - `save`: Whether each subset optimisation saves its JuMP model in its result.
   - `kwargs`: Other keyword arguments, passed to each subset optimisation.
@@ -782,8 +781,8 @@ Run the subset resampling optimisation, and return the averaged portfolio.
   - [`subset_resampling_finaliser`](@ref)
   - [`optimise`](@ref)
 """
-function _optimise(sr::SubsetResampling, rd::ReturnsResult; branchorder::Symbol = :optimal,
-                   str_names::Bool = false, save::Bool = true, kwargs...)
+function _optimise(sr::SubsetResampling, rd::ReturnsResult; str_names::Bool = false,
+                   save::Bool = true, kwargs...)
     sr = reset_time_dependent_estimator(sr)
     pr = prior(sr.pe, rd)
     # A weight and a fee take the element type of the returns.
@@ -818,8 +817,7 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; branchorder::Symbol 
         idx = view(asset_idx, :, i)
         opti = port_opt_view(opt, idx, X)
         rdi = port_opt_view(rdr, idx)
-        ress[i] = optimise(opti, rdi; branchorder = branchorder, str_names = str_names,
-                           save = save, kwargs...)
+        ress[i] = optimise(opti, rdi; str_names = str_names, save = save, kwargs...)
     end
     wb = weight_bounds_constraints(sr.wb, sr.sets; rd = rdr, N = N, strict = sr.strict,
                                    datatype = Tf)

@@ -11,6 +11,10 @@ SilhouetteScore
 OptimalNumberClusters
 HClustAlgorithm
 ClustersEstimator
+AbstractBranchOrder
+OptimalLeafOrder
+BarJosephOrder
+ROrder
 clusterise(cle::AbstractClusteringResult, args...; kwargs...)
 factory(alg::AbstractClustersAlgorithm, args...; kwargs...)
 ```

@@ -533,12 +533,11 @@ function implied_volatility_picker(pr::Pr_RR, X::MatNum, iv::Option{<:MatNum})
     return view(iv, prior_data_rows(pr, size(iv, 1), size(X, 1)), :)
 end
 """
-    graph_verb_keywords(; ivpa = nothing, branchorder = nothing, strict::Bool = false,
-                        dims::Integer = 1) -> Nothing
+    graph_verb_keywords(; ivpa = nothing, strict::Bool = false, dims::Integer = 1) -> Nothing
 
 Refuse a keyword that a graph verb over a [`Pr_RR`](@ref) does not forward.
 
-A graph verb forwards its keywords to the asset-returns method, and the moment estimators of that method ignore a keyword that they do not know. So a keyword that the library removed would run with no error. Each graph verb over a `Pr_RR` calls this function with its own keywords, so an unknown keyword raises the `MethodError` of the language. The four keywords are the ones that the callers of the library forward: `ivpa` to an implied volatility estimator, `branchorder` to a hierarchical clustering, `strict` to a centrality constraint, and `dims`, which the call overrides with `dims = 1`.
+A graph verb forwards its keywords to the asset-returns method, and the moment estimators of that method ignore a keyword that they do not know. So a keyword that the library removed would run with no error. Each graph verb over a `Pr_RR` calls this function with its own keywords, so an unknown keyword raises the `MethodError` of the language. The three keywords are the ones that the callers of the library forward: `ivpa` to an implied volatility estimator, `strict` to a centrality constraint, and `dims`, which the call overrides with `dims = 1`. The branch order of a hierarchical clustering is a field of its algorithm, see [`AbstractBranchOrder`](@ref), so a `branchorder` keyword raises the `MethodError`.
 
 # Returns
 
@@ -549,8 +548,7 @@ A graph verb forwards its keywords to the asset-returns method, and the moment e
   - [`clusterise`](@ref)
   - [`centrality_constraints`](@ref)
 """
-function graph_verb_keywords(; ivpa = nothing, branchorder = nothing, strict::Bool = false,
-                             dims::Integer = 1)
+function graph_verb_keywords(; ivpa = nothing, strict::Bool = false, dims::Integer = 1)
     return nothing
 end
 """
