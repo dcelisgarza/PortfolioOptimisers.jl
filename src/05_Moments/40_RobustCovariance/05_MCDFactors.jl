@@ -89,7 +89,7 @@ The coefficients are those of the R package `robustbase`, version 0.99-7, becaus
 
 !!! warning
 
-    [pison2002](@cite) simulates samples of 20 observations or more. Below that, the fitted factor is an extrapolation, and it is too large when ``n`` is near to ``2p``. At the subset fraction 1/2, ``n = 14`` and ``p = 5``, the factor of the reweighted MCD is 21. A smaller ``n`` gives a factor that is negative, and the fit raises a `DomainError`. Use `ssc = nothing` for such a sample.
+    The figures of [pison2002](@cite) start at 20 observations. For a smaller ``n`` that is near to ``2p``, the fitted factor is too large. At the subset fraction 1/2, ``n = 14`` and ``p = 5``, the factor of the reweighted MCD is 21, and the mean of 1000 simulated normal samples needs 2.3. At ``n = 12`` the factor is negative, and the fit raises a `DomainError`. Use `ssc = nothing` for such a sample.
 
 # Examples
 
