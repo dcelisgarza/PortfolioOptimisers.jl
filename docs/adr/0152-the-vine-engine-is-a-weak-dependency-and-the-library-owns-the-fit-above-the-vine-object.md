@@ -115,3 +115,28 @@ itself.
   preference but a measured precompile failure.
 - Cluster-aware structure selection joins the central-asset boost as the second structure prior of
   the map; its defaults are the next decision ticket's.
+
+## Amendment (2026-11-23)
+
+The maintainer ruled on #1087 that map #1080 works off the `main` branch of both Copulas.jl and
+VineCopulas.jl, with no new release. The facts of that day:
+
+- VineCopulas.jl `main` (`ce4e0436`) still says version 0.1.2, and it declares `Copulas = "1"`.
+  It now has exact conditional sampling (`fixed`, `admits_conditioning`, `sampling_tail`),
+  observation `weights`, `pair_method = :itau`, `trunc = :mbicv`, `groups`, a `tree_criterion`
+  function `(u_a, u_b, a, b, D) -> Real`, and `threaded = true`.
+- Copulas.jl has registered 1.0.0 and 1.0.1. Its `main` is 1.1.0, with interval conditioning,
+  `condition(C, js, lo, hi)`.
+- The registered VineCopulas.jl 0.1.2 still declares `Copulas = "0.1.40 - 0.1"`, so no registered
+  version works with Copulas.jl 1.x.
+
+So the bound `Copulas = "0.1.41 - 0.1.41"` of this ADR no longer holds. The map branch builds on
+the two `main` branches. A `[sources]` entry serves only this repository, so the extension can
+reach a user only through a registered VineCopulas.jl release. Upstream draft 16 on #1080 asks for
+it, and build ticket #1089 sets the compat bound from the version that it names.
+
+Several pieces that this ADR made the library's own now exist upstream: the weights, the tau
+inversion, the truncation by mBICV and the grouped first tree. By the rule "each owned piece is a
+loan", the build tickets take the package's own option where it gives the same result, and the
+central-asset boost is a `tree_criterion` function, with no change upstream. ADR 0245 records the
+Stress Statement decision that found these facts.

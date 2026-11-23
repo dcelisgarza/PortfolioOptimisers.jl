@@ -189,3 +189,18 @@ a refit per fold passes the estimator.
   [#1092](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1092) are sharpened to these
   names; the jitter's richer forms are a new ticket behind #1091.
 - #306 is paid in shape here and closes with the map.
+
+## Amendment (2026-11-23)
+
+ADR 0245 (#1087) decides the routes that this ADR left open:
+
+- The importance route is the member `KernelFallback(; bandwidth = nothing, min_ess = 100,
+  resample = true)` of a fallback family on `VineCopulaEstimator`. Its `Bool` is `resample`:
+  `true` resamples, and `false` gives the weighted panel with `w` and `eoc` on the `LowOrderPrior`
+  and the inner `pe` rebound, as this ADR set. The default fallback is `RejectionFallback()`.
+- A statement on assets that the fit did not arrange first reads the fitted trees again into a new
+  Sampling Order, with no refit. Only a block that the trees do not admit takes the fallback, and
+  `SimulationResult` declares it.
+- The routes of `SimulationResult` are exact, guided, rejection and kernel. It also reports the
+  probability of each row, the probability of all the rows with its standard error, and the rows
+  that a departed asset dropped.

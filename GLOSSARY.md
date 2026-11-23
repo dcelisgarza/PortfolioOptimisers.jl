@@ -541,8 +541,20 @@ The Prior Estimator that wraps a Synthetic-Data Generator. It fits the generator
 *Avoid*: reading `eoc` as the count of observations that the generator was fitted over. It is the count that the inner estimator stated over the synthetic rows. The Result of the generator holds the fitted count.
 
 **Simulation Result**
-The record of how a draw ran. It holds the route that the sampler took (exact, rejection or importance), the acceptance rate, the draws that it took, and the mask of the columns that the constant-column repair changed. The draw returns it with the matrix, and the Prior Result holds it under `sim`. A reweighting wrapper dispatches on it to fit the inner moments again on the drawn panel, and it does not draw again. ADR 0153.
-*Avoid*: reading it as importance weights. A weighted draw states its weights in `w` of the Prior Result and their Kish count in `eoc`. The default importance route resamples, so both stay `nothing`.
+The record of how a draw ran. It holds the route that the sampler took (exact, guided, rejection or kernel), the acceptance rate, the draws that it took, and the mask of the columns that the constant-column repair changed. Under a Stress Statement it also holds the probability of each row under the fitted model, the probability of all the rows together with its standard error, and the rows that a departed asset dropped. The draw returns it with the matrix, and the Prior Result holds it under `sim`. A reweighting wrapper dispatches on it to fit the inner moments again on the drawn panel, and it does not draw again. ADR 0153, ADR 0245.
+*Avoid*: reading it as importance weights. A weighted draw states its weights in `w` of the Prior Result and their Kish count in `eoc`. The kernel route resamples by default, so both stay `nothing`.
+
+**Stress Statement**
+A set of rows that the scenarios of a Synthetic-Data Generator must satisfy. A row states that an asset, or a linear combination of assets, equals a value, lies on one side of a bound, lies in an interval, or lies in a union of such sets: `"B <= -0.10 || B >= 0.10"`. A path states one value of an asset for each scenario. The rows on one asset intersect. A group name stands for the mean of its members. The probability of a row under the fitted model is part of the answer, so a caller who stresses a rare event sees how rare it is. ADR 0245.
+*Avoid*: calling it a view. A **View** (§1) is a selection, and an entropy pooling view reweights the scenarios that exist. A Stress Statement conditions the draw that makes them.
+
+**Sampling Order**
+The order in which a vine generates the coordinates of a scenario, each one conditional on the ones before it. A set of assets **heads** the order when the vine generates them first. Then a stated value of those assets conditions the rest of the scenario exactly, at the cost of an unconditional draw. The fitted trees fix which sets can head an order: every single asset, and a pair only when the two assets share an edge of the first tree. ADR 0245.
+*Avoid*: reading the order as the order of the columns of the panel.
+
+**Guided Draw**
+The exact draw of a block of assets that heads the Sampling Order, under rows that are sets and not points. It draws each asset of the block from its conditional law restricted to its set, and it keeps the proposal with the probability that the later assets of the block fall in their sets. The kept proposals have exactly the law of the block restricted to the sets, and the mean of that probability estimates how probable the sets are together. ADR 0245.
+*Avoid*: drawing each asset of a block on its own interval, independently. That loses the dependence inside the block.
 
 **Group Pair View**
 An entropy pooling correlation or covariance view whose two sides are groups and not single assets, `"(gA, gB) == 0.35"`. The two groups must have equal length. The view **spans** one asset pair per position. It emits one constraint row for each pair, and a `prior(gA, gB)` reference inside it resolves to the prior value of that pair. See ADR 0079.
