@@ -24,6 +24,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :ome => "`me`: Optional expected returns estimator. A vector method does not use it. If it is `nothing`, a matrix method uses a [`SimpleExpectedReturns`](@ref).",
                  :ce => "`ce`: Covariance estimator.",#
                  :ve => "`ve`: Variance estimator.",#
+                 :ve_slot => "`ve`: Variance estimator, or a covariance estimator, of which the fit reads the variances alone. An estimator of another package, such as `StatsBase.SimpleCovariance()`, is a valid value. It keeps its own configuration, so [`factory`](@ref) gives it no observation weights.",#
                  :ske => "`ske`: Coskewness estimator.",
                  :kte => "`kte`: Cokurtosis estimator.",
                  :de => "`de`: Distance matrix estimator.",

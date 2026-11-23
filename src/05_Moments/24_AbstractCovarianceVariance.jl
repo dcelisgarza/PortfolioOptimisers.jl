@@ -215,12 +215,13 @@ function Statistics.std(ve::AbstractVarianceEstimator, X::MatNum; dims::Int = 1,
 end
 """
     variance_series(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
+    variance_series(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the point-in-time variance series, with one row for each observation.
 
 Row `t` holds the variance of each asset, as estimated from observations `1` to `t` only, so row `t - 1` holds a variance that does not contain observation `t`. A weight for observation `t` needs this variance. A variance that contains the squared residual of date `t` gives less weight to an asset for its own shock, and it correlates the weights with the residuals.
 
-This method is the fallback that gives a series to each [`AbstractCovarianceEstimator`](@ref), so a member does not need a method of its own. It fits the estimator again on an expanding window, which costs one fit for each observation. A member whose estimate is a recursion overrides this method with one forward pass.
+This method is the fallback that gives a series to each [`AbstractCovarianceEstimator`](@ref), so a member does not need a method of its own. It fits the estimator again on an expanding window, which costs one fit for each observation. A member whose estimate is a recursion overrides this method with one forward pass. An estimator of another package takes the series of the [`GeneralCovariance`](@ref) that [`library_covariance_estimator`](@ref) wraps it in.
 
 Each fit reads only the observations `1` to `t`, so every input with one entry for each observation is cut to those rows with the returns. These inputs are the observation weights that `ce` holds, the implied volatility `iv`, the active mask and the estimation mask. Row `t` under observation weights is the weighted variance of the first `t` observations. The weights of these observations keep the values that the full sample gives them. A moment estimator of the library normalises its weights over the rows that it fits, so each row is a weighted variance with weights that sum to one over its window.
 
@@ -287,8 +288,12 @@ function variance_series(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int =
                          kwargs...)
     return variance_series(ce, nothing, nothing, X, nothing; dims = dims, kwargs...)
 end
+function variance_series(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
+                         kwargs...)
+    return variance_series(library_covariance_estimator(ce), X; dims = dims, kwargs...)
+end
 """
-    reads_active_mask(ce::AbstractCovarianceEstimator) -> Bool
+    reads_active_mask(ce::StatsBase.CovarianceEstimator) -> Bool
     reads_active_mask(ce::Union{Covariance{<:Any, <:Any, <:Any, <:Any, <:CoveragePolicy},
                                 SimpleVariance{<:Any, <:Any, <:Any, <:CoveragePolicy}}) -> Bool
     reads_active_mask(ce::Union{ExpWeightedVariance, ExpWeightedCovariance}) -> Bool
@@ -317,7 +322,7 @@ A plain estimator takes the reduce-and-expand root of [`Statistics.cov(ce::Abstr
   - [`assert_mask_aware_variance`](@ref)
   - [`CoveragePolicy`](@ref)
 """
-function reads_active_mask(::AbstractCovarianceEstimator)
+function reads_active_mask(::StatsBase.CovarianceEstimator)
     return false
 end
 """
@@ -348,6 +353,8 @@ $(DocStringExtensions.FIELDS)
 end
 """
     variance_count(ve::AbstractCovarianceEstimator, X::MatNum,
+                   amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
+    variance_count(ve::StatsBase.CovarianceEstimator, X::MatNum,
                    amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
     variance_count(ve::SimpleVariance, X::MatNum,
                    amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
@@ -404,7 +411,7 @@ On an unweighted sample of ``T`` observations, ``n_{i} = T``. Then ``m_{i}`` is 
 
 # Algorithm
 
- 1. On [`AbstractCovarianceEstimator`](@ref), return `nothing`.
+ 1. On [`AbstractCovarianceEstimator`](@ref), return `nothing`. An estimator of another package takes the count of the [`GeneralCovariance`](@ref) that [`library_covariance_estimator`](@ref) wraps it in, by step 5.
  2. On [`SimpleVariance`](@ref), take the finite rows of each column with their weights, through [`observed_sample`](@ref), and read the count from those weights with [`simple_variance_count`](@ref). A dynamic weight resolves on the rows of the column.
  3. On [`ExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedVariance`](@ref), take the Kish count of the exponential weights over the finite rows of each column after its last inactive row of `amsk`, with [`variance_count(decay::Number, X::MatNum, centring::AbstractCentring, amsk::Option{<:AbstractMatrix{<:Bool}})`](@ref). The weights sum to one after the correction of the cold start, so the divisor equals the count. The count ignores the regime multiplier and the lags of a Heteroskedasticity and Autocorrelation Consistent (HAC) adjustment.
  4. On [`WindowedVariance`](@ref) and [`WindowedCovariance`](@ref), apply the window and the weights of the wrapper with [`windowed_preamble`](@ref), which cuts `amsk` to the window too. Then return the count of the inner estimator.
@@ -439,6 +446,10 @@ On an unweighted sample of ``T`` observations, ``n_{i} = T``. Then ``m_{i}`` is 
 function variance_count(::AbstractCovarianceEstimator, ::MatNum,
                         ::Option{<:AbstractMatrix{<:Bool}} = nothing)::Nothing
     return nothing
+end
+function variance_count(ve::StatsBase.CovarianceEstimator, X::MatNum,
+                        amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
+    return variance_count(library_covariance_estimator(ve), X, amsk)
 end
 # The diagonal of a full-moment `Covariance` is the variance of its inner estimator, centred on
 # the centre of `ce.me`. The count ignores the centre, as the count of `SimpleVariance` does.

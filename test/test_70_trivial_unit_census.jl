@@ -350,6 +350,7 @@ end
                                                # src/05_Moments (#2092).
                                                :weighted_comoment_guard => "4 functions share its callee `weighted_moment_guard` (rule 3, #2092)",
                                                :library_covariance_estimator => "its callee is the constructor of `GeneralCovariance` (rule 3, #2092)",
+                                               :standardisation_mean => "a public verb that a variance estimator with a mean estimator of its own extends: its generic method calls the constructor of `SimpleExpectedReturns` (rule 3, #2282)",
                                                :comovement_finalise => "2 functions share its callee `comovement_ratio` (rule 3, #2092)",
                                                :adopt_pinned_choice => "its composite methods rebuild through `rebuild_struct`, which many functions share, and its fallback is the leaf of the walk (rule 3, #2109, #2092)",
                                                :windowed_panel => "its callee `port_opt_view` is a shared public verb (rule 3, #2092)",

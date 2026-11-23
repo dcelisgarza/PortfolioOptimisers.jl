@@ -371,7 +371,7 @@ function covers_an_asset(ce::PortfolioOptimisersCovariance, X::MatNum,
     return covers_an_asset(ce.ce, X, pnl; kwargs...)
 end
 """
-    series_folds(ce::AbstractCovarianceEstimator) -> Bool
+    series_folds(ce::StatsBase.CovarianceEstimator) -> Bool
     series_folds(ce::Covariance{<:Any, <:Any, <:FullMoment, <:Any, <:CoveragePolicy}) -> Bool
     series_folds(ce::Union{ExpWeightedCovariance, RegimeAdjustedExpWeightedCovariance}) -> Bool
     series_folds(ce::PortfolioOptimisersCovariance) -> Bool
@@ -396,7 +396,7 @@ The fallback answers `false`. A mask-aware covariance estimator whose fold over 
   - [`partial_fit!`](@ref)
   - [`reads_active_mask`](@ref)
 """
-function series_folds(::AbstractCovarianceEstimator)
+function series_folds(::StatsBase.CovarianceEstimator)
     return false
 end
 function series_folds(ce::PortfolioOptimisersCovariance)

@@ -69,7 +69,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     ImpliedVolatilityRegression(;
-        ve::AbstractVarianceEstimator = SimpleVariance(),
+        ve::StatsBase.CovarianceEstimator = SimpleVariance(),
         ws::Number = 20,
         re::AbstractRegressionTarget = LinearModel()
     ) -> ImpliedVolatilityRegression
@@ -117,7 +117,7 @@ ImpliedVolatilityRegression
 """
 @propagatable @concrete struct ImpliedVolatilityRegression <: ImpliedVolatilityAlgorithm
     """
-    $(field_dict[:ve])
+    $(field_dict[:ve_slot])
     """
     @fprop ve
     """
@@ -129,7 +129,7 @@ ImpliedVolatilityRegression
     $(field_dict[:retgt])
     """
     re
-    function ImpliedVolatilityRegression(ve::AbstractVarianceEstimator, ws::Number,
+    function ImpliedVolatilityRegression(ve::StatsBase.CovarianceEstimator, ws::Number,
                                          re::AbstractRegressionTarget)
         @argcheck(1 < ws,
                   DomainError(ws,
@@ -137,7 +137,7 @@ ImpliedVolatilityRegression
         return new{typeof(ve), typeof(ws), typeof(re)}(ve, ws, re)
     end
 end
-function ImpliedVolatilityRegression(; ve::AbstractVarianceEstimator = SimpleVariance(),
+function ImpliedVolatilityRegression(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
                                      ws::Number = 20,
                                      #  crit::Union{Symbol, MinMaxValStepwiseRegressionCriterion,
                                      #              AbstractStepwiseRegressionCriterion} = :r2,
@@ -309,7 +309,7 @@ A `cache` holds the state of an incremental fit. That state is not part of the c
 """
 show_fields(::ImpliedVolatility) = (:ce, :alg, :ppy)
 """
-    realised_vol(ce::AbstractVarianceEstimator, X::MatNum, ws::Integer,
+    realised_vol(ce::StatsBase.CovarianceEstimator, X::MatNum, ws::Integer,
                  chunk::Option{<:Integer} = nothing, T::Option{<:Integer} = nothing,
                  N::Option{<:Integer} = nothing)
 
@@ -361,12 +361,12 @@ The last row of block ``c`` is ``o + c w_s``. [`implied_vol`](@ref) samples the 
  2. Set `offset` to `T - chunk * ws`, the number of rows at the start of `X` that no block covers.
  3. For each block `c` in `1:chunk`, set `rows` to the `ws` row indices of that block.
  4. Slice `ce` to `rows` with [`obs_weights_view`](@ref). The result is the estimator for this block. [`obs_weights_view`](@ref) indexes each weights field on its own. So an estimator with a weighted mean and an unweighted dispersion keeps that shape, and an unweighted `ce` stays unchanged.
- 5. Call `Statistics.std` with that estimator on the rows of the block of `X`, with `dims = 1`. The result is one row of standard deviations. The function calls the estimator once for each block, so the estimator reads only a matrix.
+ 5. Call `Statistics.std` with that estimator, through [`library_covariance_estimator`](@ref), on the rows of the block of `X`, with `dims = 1`. The result is one row of standard deviations. The function calls the estimator once for each block, so the estimator reads only a matrix.
  6. Stack the `chunk` rows with `vcat` to make `rv`.
 
 # Arguments
 
-  - `ce`: Variance estimator that gives the standard deviations in each block. Its observation weights describe the whole sample, and step 4 slices them to each block.
+  - `ce`: Variance estimator, or a covariance estimator, that gives the standard deviations in each block. Its observation weights describe the whole sample, and step 4 slices them to each block.
   - `X`: Asset returns matrix `observations × assets`.
   - `ws`: Window size, the number of rows in each block.
   - `chunk`: Number of blocks, or `nothing`. Step 1 states the rule when one of `chunk`, `T` and `N` is `nothing`.
@@ -396,7 +396,7 @@ julia> PortfolioOptimisers.realised_vol(SimpleVariance(),
   - [`obs_weights_view`](@ref)
   - [`predict_realised_vols`](@ref)
 """
-function realised_vol(ce::AbstractVarianceEstimator, X::MatNum, ws::Integer,
+function realised_vol(ce::StatsBase.CovarianceEstimator, X::MatNum, ws::Integer,
                       chunk::Option{<:Integer} = nothing, T::Option{<:Integer} = nothing,
                       N::Option{<:Integer} = nothing)
     if isnothing(chunk) || isnothing(T) || isnothing(N)
@@ -404,6 +404,7 @@ function realised_vol(ce::AbstractVarianceEstimator, X::MatNum, ws::Integer,
         chunk = div(T, ws)
     end
     offset = T - chunk * ws
+    ce = library_covariance_estimator(ce)
     return mapreduce(vcat, 1:chunk) do c
         rows = (offset + (c - 1) * ws + 1):(offset + c * ws)
         return Statistics.std(obs_weights_view(ce, rows), view(X, rows, :); dims = 1)

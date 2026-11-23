@@ -857,6 +857,36 @@ scenario mean.
                            nans = true)
         end
     end
+    @testset "A covariance estimator of another package as ve (#2282)" begin
+        PO = PortfolioOptimisers
+        sc = StatsBase.SimpleCovariance(; corrected = true)
+        csv(ve; kw...) = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(),
+                                                   minra = 5, ve = ve, kw...)
+        # The second pass reads the variance series of the first pass too.
+        for kw in ((;), (; wa = BlendedInverseVarianceWeights(; lambda = 0.5)))
+            pf = prior(csv(sc; kw...), rd)
+            ps = prior(csv(SimpleVariance(); kw...), rd)
+            @test isapprox(pf.rr.vs, ps.rr.vs; rtol = 1e-10, nans = true)
+            @test isapprox(pf.sigma, ps.sigma; rtol = 1e-10)
+            @test isapprox(pf.mu, ps.mu; rtol = 1e-10)
+            @test pf.rr.ediv == ps.rr.ediv
+        end
+        @test isapprox(descriptor(EWVolatility(; ce = sc), rd),
+                       descriptor(EWVolatility(; ce = SimpleVariance()), rd); rtol = 1e-10,
+                       nans = true)
+        # `sc` has no fold, so the online step fits every idiosyncratic return again.
+        for wa in (MarketCapWeights(), BlendedInverseVarianceWeights(; lambda = 0.5))
+            pe = csv(sc; wa = wa)
+            pb = prior(pe, rd)
+            for i in (1:40, 41:50, 51:60)
+                pe = partial_fit!(pe, PO.port_opt_view(rd, i, :))
+            end
+            po = prior(pe)
+            @test isapprox(po.rr.vs, pb.rr.vs; rtol = 1e-9, nans = true)
+            @test isapprox(po.sigma, pb.sigma; rtol = 1e-9)
+            @test isapprox(po.mu, pb.mu; rtol = 1e-9)
+        end
+    end
 end
 
 @testset "A constrained Factor Family re-bases the fit" begin
