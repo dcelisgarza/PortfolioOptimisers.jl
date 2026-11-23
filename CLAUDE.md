@@ -30,18 +30,22 @@ name.
 
   | `**Lands on:**` | For | Branch |
   | --- | --- | --- |
-  | `own branch` | a standalone feature, an important correctness fix, a large performance fix | `agents/<issue>-<slug>` from `origin/main` |
+  | `own branch` | a standalone feature, an important correctness fix, a large performance fix | `dev-<feature>` from `origin/main` |
   | `dev` | a sweep sub-issue, an ergonomics change, a small performance fix, an unusual composition bug, a docs fix | `dev`, shared |
-  | `map #<map>` | a ticket of a map whose tickets make sense on `main` only together | `agents/<map>-<slug>`, shared |
+  | `map #<map>` | a ticket of a map whose tickets make sense on `main` only together | `dev-<feature>`, shared |
 
   Write the line in each issue that you file, from the same table.
+- **Name a branch for its feature**, with the prefix `dev-`, for example
+  `dev-concentration-limit`. The name of a map branch is the feature of the map. A branch that
+  holds research alone can take the prefix `research-`. A push to it runs no CI, and it does not
+  merge into `main`. Work that lands moves to a `dev-` branch.
 - **Work in your own worktree.** Create it with the `EnterWorktree` tool before your first edit.
   For a shared branch, reset the new worktree to `origin/<branch>` before you edit. Then run
   `bash code_health/gate_stamp.sh base origin/<branch>`, so that the gates measure against it.
   Leave with `ExitWorktree` `remove`. When `git status --short` is empty and
   `git branch -r --contains HEAD` lists the remote branch that you pushed to, pass
   `discard_changes: true`.
-- **Own branch.** Push with `git push origin HEAD:agents/<issue>-<slug>`. The push runs the CI.
+- **Own branch.** Push with `git push origin HEAD:dev-<feature>`. The push runs the CI.
   Open one pull request into `main`, and turn on auto-merge with
   `gh pr merge <number> --auto --squash`. A pull request that needs a ruling of the maintainer
   opens as a draft, with no auto-merge. Keep the pull request to one feature or one fix. A rebase
