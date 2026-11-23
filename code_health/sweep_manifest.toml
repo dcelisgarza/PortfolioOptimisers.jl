@@ -242,17 +242,19 @@
 "src/05_Moments/34_PriceLevelExpectedReturns.jl" = { map = 3, units = 28, algorithm = 6, swept = true, bindings = ["AbstractPriceLevelStatistic", "ExponentialMovingAverage", "LaggedPrice", "MovingAverage", "PriceLevelExpectedReturns", "PriceLevelForecastState", "ReweightedPriceRelative", "SpatialMedian", "WindowPeak", "assert_folding_statistic", "assert_price_window", "cold_statistic", "fold_active", "fold_statistic", "fold_statistic_row", "folds", "mean", "mean", "mean", "memory_rows", "partial_fit!", "price_level_statistic", "price_level_statistic", "price_levels", "push_memory", "rows_needed", "weiszfeld_sums", "window_rows"] }
 "src/05_Moments/35_CompositePriceLevelStatistics.jl" = { map = 3, units = 12, algorithm = 3, swept = true, bindings = ["AbstractTrendTest", "CompositeTrend", "GaussianWeightedDoubleEstimate", "KernelTrendPattern", "PairwiseSlopeSum", "RegressionSlope", "TrendSwitch", "TruncatedExponentialMovingAverage", "member_statistic", "price_level_statistic", "trend_reverting_fraction", "trend_sign"] }
 "src/05_Moments/36_RankOneCovariance.jl" = { map = 3, units = 4, algorithm = 2, swept = true, bindings = ["RankOneCovariance", "cor", "cov", "show_fields"] }
-"src/05_Moments/37_GeodesicShrinkageCovariance.jl" = { map = 3, units = 21, algorithm = 7, swept = true, bindings = ["AbstractCovarianceShrinkageTarget", "CommonCovarianceTarget", "ConstantCorrelationTarget", "GeodesicShrinkageCovariance", "GeodesicShrinkageTarget", "IdentityTarget", "ScaledIdentityTarget", "assert_shrinkage_target", "cov", "cov", "cov", "gap_fill_value", "geodesic_point", "geodesic_power", "geodesic_shrinkage!", "observation_count", "partial_fit!", "port_opt_view", "show_fields", "shrinkage_target", "supports_partial_fit"] }
+"src/05_Moments/37_GeodesicShrinkageCovariance.jl" = { map = 3, units = 21, algorithm = 7, swept = true, bindings = ["AbstractCovarianceShrinkageTarget", "CommonCovarianceTarget", "ConstantCorrelationTarget", "CovarianceShrinkageTarget", "GeodesicShrinkageCovariance", "IdentityTarget", "ScaledIdentityTarget", "assert_shrinkage_target", "cov", "cov", "cov", "gap_fill_value", "geodesic_point", "geodesic_power", "geodesic_shrinkage!", "observation_count", "partial_fit!", "port_opt_view", "show_fields", "shrinkage_target", "supports_partial_fit"] }
 "src/05_Moments/38_ElasticNet.jl" = { map = 3, units = 24, swept = false }
 "src/05_Moments/39_WeightedAvailableCase.jl" = { map = 3, units = 13, swept = false }
-"src/05_Moments/40_RobustCovariance/01_Base_RobustCovariance.jl" = { map = 3, units = 7, swept = false }
+"src/05_Moments/40_RobustCovariance/01_Base_RobustCovariance.jl" = { map = 3, units = 6, swept = false }
 "src/05_Moments/40_RobustCovariance/02_QnScale.jl" = { map = 3, units = 8, swept = false }
-"src/05_Moments/40_RobustCovariance/03_MCDSearch.jl" = { map = 3, units = 15, swept = false }
-"src/05_Moments/40_RobustCovariance/04_DetMCDStarts.jl" = { map = 3, units = 3, swept = false }
-"src/05_Moments/40_RobustCovariance/05_MCDFactors.jl" = { map = 3, units = 6, swept = false }
-"src/05_Moments/40_RobustCovariance/06_MCDCovariance.jl" = { map = 3, units = 8, swept = false }
-"src/05_Moments/40_RobustCovariance/07_TylerCovariance.jl" = { map = 3, units = 11, swept = false }
-"src/05_Moments/40_RobustCovariance/08_RobustExpectedReturns.jl" = { map = 3, units = 2, swept = false }
+"src/05_Moments/40_RobustCovariance/03_RobustShrinkage.jl" = { map = 3, units = 17, swept = false }
+"src/05_Moments/40_RobustCovariance/04_MCDSearch.jl" = { map = 3, units = 19, swept = false }
+"src/05_Moments/40_RobustCovariance/05_DetMCDStarts.jl" = { map = 3, units = 3, swept = false }
+"src/05_Moments/40_RobustCovariance/06_MCDFactors.jl" = { map = 3, units = 6, swept = false }
+"src/05_Moments/40_RobustCovariance/07_MCDCovariance.jl" = { map = 3, units = 15, swept = false }
+"src/05_Moments/40_RobustCovariance/08_TylerShrinkage.jl" = { map = 3, units = 12, swept = false }
+"src/05_Moments/40_RobustCovariance/09_TylerCovariance.jl" = { map = 3, units = 11, swept = false }
+"src/05_Moments/40_RobustCovariance/10_RobustExpectedReturns.jl" = { map = 3, units = 2, swept = false }
 "src/06_Distance/01_Base_Distance.jl" = { map = 2, units = 9, algorithm = 2, swept = true, bindings = ["AbstractDistanceAlgorithm", "AbstractDistanceEstimator", "CanonicalDistance", "CorrelationDistance", "LogDistance", "SimpleAbsoluteDistance", "SimpleDistance", "VariationInfoDistance", "reads_sample_values"] }
 "src/06_Distance/02_Distance.jl" = { map = 2, units = 14, algorithm = 9, swept = true, bindings = ["AllInternalMutualInfoCov", "DistCov_AllInternalDistCov", "Distance", "LTDCov_AllInternalLTDCov", "RhoDistanceAlgorithm", "_absguard", "_as_correlation", "_dist_from_cor", "cor_and_dist", "distance", "distance", "distance", "distance", "reads_sample_values"] }
 "src/06_Distance/03_DistanceDistance.jl" = { map = 2, units = 4, algorithm = 3, swept = true, bindings = ["DistanceDistance", "cor_and_dist", "distance", "distance"] }

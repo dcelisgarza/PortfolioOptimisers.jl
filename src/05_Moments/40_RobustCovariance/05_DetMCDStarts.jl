@@ -86,8 +86,7 @@ Section 3.1 of [hubert2012](@cite) states the steps. The eigenvalues of a robust
 
  1. Project the data on the directions, `Y = Z * P`. Take the robust scale ``\\lambda_k`` of each column of `Y` about its median with [`robust_column_scale`](@ref).
  2. Take the centre as the coordinatewise median of the data in the sphered coordinates ``\\mathbf{P} \\mathrm{Diag}(\\lambda)^{-1} \\mathbf{P}^\\intercal``, mapped back. When `fixed` is `true`, the centre is zero.
- 3. Compute the distance of each observation from the centre in the metric ``\\mathbf{P} \\mathrm{Diag}(\\lambda)^2 \\mathbf{P}^\\intercal``, and take the `h` nearest observations.
- 4. Fit the subset with [`mcd_subset_fit`](@ref), and return the `h` observations nearest to its centre in the metric of its covariance matrix.
+ 3. Compute the distance of each observation from the centre in the metric ``\\mathbf{P} \\mathrm{Diag}(\\lambda)^2 \\mathbf{P}^\\intercal``, and return the `h` nearest observations. The first concentration step of the search is the next step of [hubert2012](@cite).
 
 # Arguments
 
@@ -119,6 +118,5 @@ function detmcd_initset(Z::MatNum, P::MatNum, h::Integer, fixed::Bool)
         P * (lambda .* (transpose(P) * vec(Statistics.median(Z * sqrtinv; dims = 1))))
     end
     d = vec(sum(abs2, ((Z .- transpose(loc)) * P) ./ transpose(lambda); dims = 2))
-    m, S = mcd_subset_fit(Z, nearest_positions(d, h), fixed)
-    return nearest_positions(squared_distances(Z, m, S), h)
+    return nearest_positions(d, h)
 end

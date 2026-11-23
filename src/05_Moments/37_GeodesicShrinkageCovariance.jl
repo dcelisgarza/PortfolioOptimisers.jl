@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the rules that build a covariance shrinkage target from the matrix being shrunk.
 
-Each rule builds one of the targets of Table 2 of [schaferstrimmer2005](@cite). The target is positive definite when the matrix being shrunk is, so a geodesic reaches it. Target E of that table has perfect positive correlation and rank one, so no rule builds it. [`DiagonalTarget`](@ref) builds target D of the same table. It is a [`RegimeAdjustedTarget`](@ref), so it joins the rules through [`GeodesicShrinkageTarget`](@ref) and not through this type.
+Each rule builds one of the targets of Table 2 of [schaferstrimmer2005](@cite). The target is positive definite when the matrix being shrunk is, so a geodesic reaches it. Target E of that table has perfect positive correlation and rank one, so no rule builds it. [`DiagonalTarget`](@ref) builds target D of the same table. It is a [`RegimeAdjustedTarget`](@ref), so it joins the rules through [`CovarianceShrinkageTarget`](@ref) and not through this type.
 
 # Interfaces
 
@@ -46,7 +46,7 @@ julia> cov(ce, [1.0 2.0; 2.0 1.0; 0.0 0.5])
   - [`ScaledIdentityTarget`](@ref)
   - [`CommonCovarianceTarget`](@ref)
   - [`ConstantCorrelationTarget`](@ref)
-  - [`GeodesicShrinkageTarget`](@ref)
+  - [`CovarianceShrinkageTarget`](@ref)
   - [`shrinkage_target`](@ref)
 
 # References
@@ -229,12 +229,12 @@ ConstantCorrelationTarget()
 """
 struct ConstantCorrelationTarget <: AbstractCovarianceShrinkageTarget end
 """
-    const GeodesicShrinkageTarget = Union{AbstractCovarianceShrinkageTarget,
-                                          DiagonalTarget, MatNum}
+    const CovarianceShrinkageTarget = Union{AbstractCovarianceShrinkageTarget,
+                                            DiagonalTarget, MatNum}
 
-Groups the targets a [`GeodesicShrinkageCovariance`](@ref) accepts: the rules that build the target from the matrix being shrunk, and a fixed positive definite matrix.
+Groups the targets that a covariance shrinkage accepts: the rules that build the target from a matrix, and a fixed positive definite matrix.
 
-The members share no supertype. [`DiagonalTarget`](@ref) is also a [`RegimeAdjustedTarget`](@ref), and a matrix is data. So this union bounds the `tgt` field, and [`shrinkage_target`](@ref) dispatches on its members.
+The members share no supertype. [`DiagonalTarget`](@ref) is also a [`RegimeAdjustedTarget`](@ref), and a matrix is data. So this union bounds the `tgt` field of [`GeodesicShrinkageCovariance`](@ref), of [`MCDShrinkage`](@ref) and of [`TylerShrinkage`](@ref), and [`shrinkage_target`](@ref) dispatches on its members.
 
 # Related
 
@@ -242,8 +242,8 @@ The members share no supertype. [`DiagonalTarget`](@ref) is also a [`RegimeAdjus
   - [`DiagonalTarget`](@ref)
   - [`MatNum`](@ref)
 """
-const GeodesicShrinkageTarget = Union{AbstractCovarianceShrinkageTarget, DiagonalTarget,
-                                      MatNum}
+const CovarianceShrinkageTarget = Union{AbstractCovarianceShrinkageTarget, DiagonalTarget,
+                                        MatNum}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -273,7 +273,7 @@ Each rule states its target under `# Mathematical definition`. The function retu
 # Related
 
   - [`AbstractCovarianceShrinkageTarget`](@ref)
-  - [`GeodesicShrinkageTarget`](@ref)
+  - [`CovarianceShrinkageTarget`](@ref)
 """
 function shrinkage_target(::IdentityTarget, sigma::MatNum)
     return LinearAlgebra.Diagonal(fill(one(eltype(sigma)), size(sigma, 1)))
@@ -401,7 +401,7 @@ $(DocStringExtensions.FIELDS)
     GeodesicShrinkageCovariance(;
         ce::StatsBase.CovarianceEstimator = Covariance(),
         pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
-        tgt::GeodesicShrinkageTarget = ScaledIdentityTarget(),
+        tgt::CovarianceShrinkageTarget = ScaledIdentityTarget(),
         alpha::Number = 0.1,
         cache::Option{<:AbstractPartialFitState} = nothing
     ) -> GeodesicShrinkageCovariance
@@ -457,7 +457,7 @@ true
 # Related
 
   - [`AbstractCovarianceShrinkageTarget`](@ref)
-  - [`GeodesicShrinkageTarget`](@ref)
+  - [`CovarianceShrinkageTarget`](@ref)
   - [`Covariance`](@ref)
   - [`Posdef`](@ref)
   - [`factory`](@ref)
@@ -478,7 +478,7 @@ true
     """
     pdm
     """
-    $(field_dict[:mutgt]) A rule of [`GeodesicShrinkageTarget`](@ref), or a fixed positive definite matrix.
+    $(field_dict[:mutgt]) A rule of [`CovarianceShrinkageTarget`](@ref), or a fixed positive definite matrix.
     """
     tgt
     """
@@ -491,7 +491,7 @@ true
     @fprop cache
     function GeodesicShrinkageCovariance(ce::StatsBase.CovarianceEstimator,
                                          pdm::Option{<:AbstractPosdefEstimator},
-                                         tgt::GeodesicShrinkageTarget, alpha::Number,
+                                         tgt::CovarianceShrinkageTarget, alpha::Number,
                                          cache::Option{<:AbstractPartialFitState})
         assert_covariance_estimator(ce, :ce)
         assert_shrinkage_target(tgt)
@@ -505,7 +505,7 @@ true
 end
 function GeodesicShrinkageCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                                      pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
-                                     tgt::GeodesicShrinkageTarget = ScaledIdentityTarget(),
+                                     tgt::CovarianceShrinkageTarget = ScaledIdentityTarget(),
                                      alpha::Number = 0.1,
                                      cache::Option{<:AbstractPartialFitState} = nothing)::GeodesicShrinkageCovariance
     return GeodesicShrinkageCovariance(ce, pdm, tgt, alpha, cache)
@@ -675,7 +675,7 @@ function geodesic_point(::ScaledIdentityTarget, sigma::MatNum, alpha::Number)
     sigma_alpha = vecs * LinearAlgebra.Diagonal(vals) * transpose(vecs)
     return (sigma_alpha + transpose(sigma_alpha)) / 2
 end
-function geodesic_point(tgt::GeodesicShrinkageTarget, sigma::MatNum, alpha::Number)
+function geodesic_point(tgt::CovarianceShrinkageTarget, sigma::MatNum, alpha::Number)
     tgt_mat = shrinkage_target(tgt, sigma)
     if isone(alpha)
         return copy(tgt_mat)

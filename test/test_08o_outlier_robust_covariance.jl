@@ -74,13 +74,13 @@ end
         # The shape of `ICSNP` has the determinant one. The stop rule of the library is
         # `sqrt(eps)` on a step, so the fit is near to the limit of the iteration by 1e-7.
         shape(V) = V / det(V)^(1 / size(V, 1))
-        V = last(POR.tyler_fixed_point(X, nothing, vec(median(X; dims = 1))))
+        V = last(POR.tyler_fixed_point(X, nothing, vec(median(X; dims = 1)), nothing))
         @test isapprox(shape(V),
                        [1.88859915647789878 0.94601098862414912 1.74109641251885061
                         0.94601098862414912 1.24327631827079554 1.26499011224387026
                         1.74109641251885106 1.26499011224387026 2.49388847143658277];
                        rtol = 1e-6)
-        mu, V = POR.tyler_fixed_point(X, nothing, nothing)
+        mu, V = POR.tyler_fixed_point(X, nothing, nothing, nothing)
         @test isapprox(mu, [0.64721712353539251, 0.33552574391256379, 0.60611848121963507];
                        rtol = 1e-6)
         @test isapprox(shape(V),
@@ -126,8 +126,8 @@ end
         q = 2 * log(2)
         @test POR.mcd_consistency(2, 0.5) ≈ 0.5 / (1 - exp(-q / 2) * (1 + q / 2))
         @test POR.mcd_consistency(4, 1.0) == 1
-        @test POR.mcd_subset_size(0.5, 100, 5) == 53
-        @test POR.mcd_subset_size(1, 100, 5) == 100
+        @test POR.mcd_subset_size(nothing, 0.5, 100, 5) == 53
+        @test POR.mcd_subset_size(nothing, 1, 100, 5) == 100
         for p in (1, 2, 5), kind in (:raw, :rew)
             f = POR.mcd_correction(MCDSmallSampleCorrection(), p, 60, 0.5, kind)
             @test f > 1
@@ -155,7 +155,7 @@ end
         @test all(iszero, r.w[bad])
         @test sum(r.w) > 0.9 * 380
         raw = StatsAPI.fit(MCDCovariance(; rw = nothing), X)
-        @test sum(raw.w) == POR.mcd_subset_size(0.5, 400, 5)
+        @test sum(raw.w) == POR.mcd_subset_size(nothing, 0.5, 400, 5)
         rt = StatsAPI.fit(TylerCovariance(), X)
         @test rt.w ≈ 5 ./ rt.d2
         @test all(rt.w[bad] .< 0.2)
@@ -169,16 +169,16 @@ end
     end
     @testset "Searches" begin
         X, = robust_test_sample(StableRNG(7), 150, 3; nbad = 20, shift = 5)
-        Z = POR.mcd_standardise(X, nothing)
-        h = POR.mcd_subset_size(0.5, 150, 3)
-        idx = POR.mcd_search(DetMCD(), Z, h, false)
+        Z = first(POR.mcd_standardise(X, nothing))
+        h = POR.mcd_subset_size(nothing, 0.5, 150, 3)
+        idx = first(POR.mcd_search(DetMCD(), POR.mcd_sample(nothing, X, nothing), h, 1.0))
         # The best subset of the search is a fixed point of the C-step.
-        @test first(POR.mcd_csteps(Z, idx, h, false, 1)) == idx
+        @test first(POR.mcd_csteps(Z, idx, h, false, nothing, 1)) == idx
         # A C-step never raises the determinant.
         start = collect(1:h)
-        _, o0 = POR.mcd_csteps(Z, start, h, false, 0)
-        _, o1 = POR.mcd_csteps(Z, start, h, false, 1)
-        _, o9 = POR.mcd_csteps(Z, start, h, false, 200)
+        _, o0 = POR.mcd_csteps(Z, start, h, false, nothing, 0)
+        _, o1 = POR.mcd_csteps(Z, start, h, false, nothing, 1)
+        _, o9 = POR.mcd_csteps(Z, start, h, false, nothing, 200)
         @test o9 <= o1 <= o0
         # A seed makes FastMCD reproducible, and no seed draws from the generator.
         fm = MCDCovariance(; alg = FastMCD(; n_starts = 50, seed = 11))
@@ -192,7 +192,7 @@ end
         # The exact search of one variable, with a free and a fixed centre.
         x = X[:, 1:1]
         r1 = StatsAPI.fit(MCDCovariance(; rw = nothing, ssc = nothing), x)
-        hx = POR.mcd_subset_size(0.5, 150, 1)
+        hx = POR.mcd_subset_size(nothing, 0.5, 150, 1)
         sx = sort(vec(x))
         best = minimum(var(sx[k:(k + hx - 1)]) for k in 1:(150 - hx + 1))
         @test r1.sigma[1] ≈ best * POR.mcd_consistency(1, hx / 150)
@@ -226,7 +226,7 @@ end
         F = Float32.(C)
         F[1:40, 2] .= 0.0f0
         F[41:60, 2] .= randn(StableRNG(6), Float32, 20)
-        @test eltype(POR.mcd_standardise(F, nothing)) == Float32
+        @test eltype(first(POR.mcd_standardise(F, nothing))) == Float32
     end
     @testset "Outliers of any size" begin
         # A bad tick can be many orders of magnitude larger than a return.
@@ -243,7 +243,7 @@ end
             end
             # The subset of one variable does not depend on the size of an outlier.
             y = Y[:, 1:1]
-            h = POR.mcd_subset_size(0.5, 300, 1)
+            h = POR.mcd_subset_size(nothing, 0.5, 300, 1)
             sy = sort(vec(y))
             best = minimum(var(sy[k:(k + h - 1)]) for k in 1:(300 - h + 1))
             @test cov(MCDCovariance(; rw = nothing, ssc = nothing), y)[1] ≈
@@ -253,7 +253,7 @@ end
     @testset "Tyler" begin
         X, = robust_test_sample(StableRNG(5), 300, 4)
         X .+= [0.1 -0.2 0.3 0.0]
-        mu, V = POR.tyler_fixed_point(X, nothing, nothing)
+        mu, V = POR.tyler_fixed_point(X, nothing, nothing, nothing)
         D = X .- mu'
         d2 = POR.squared_distances(X, mu, V)
         Vfp = 4 * (D' * (D ./ d2)) / 300
@@ -301,7 +301,8 @@ end
         # Half of the rows on a line through the centre: the shape does not exist, and the
         # iteration warns.
         Yb = vcat(hcat(randn(StableRNG(1), 10), zeros(10)), randn(StableRNG(2), 10, 2))
-        @test_logs (:warn, r"did not converge") POR.tyler_fixed_point(Yb, nothing, zeros(2))
+        @test_logs (:warn, r"did not converge") POR.tyler_fixed_point(Yb, nothing, zeros(2),
+                                                                      nothing)
     end
     @testset "Element type, orientation and composition" begin
         X, = robust_test_sample(StableRNG(8), 200, 3)
@@ -324,8 +325,8 @@ end
             @test !POR.supports_partial_fit(ce)
         end
         # The weights of a factory call reach `me` of MCD and `w` of Tyler.
-        @test POR.show_fields(MCDCovariance()) == (:me, :alg, :alpha, :ssc, :rw, :q)
-        @test POR.show_fields(TylerCovariance()) == (:me, :ve, :w, :q)
+        @test POR.show_fields(MCDCovariance()) == (:me, :alg, :alpha, :shr, :ssc, :rw, :q)
+        @test POR.show_fields(TylerCovariance()) == (:me, :ve, :shr, :w, :q)
         w = eweights(1:200, 0.05)
         @test POR.factory(MCDCovariance(; me = MedianExpectedReturns()), w).me.w === w
         @test POR.factory(TylerCovariance(), w).w === w

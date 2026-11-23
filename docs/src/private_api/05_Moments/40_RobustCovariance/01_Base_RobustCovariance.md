@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base robust covariance, private API of PortfolioOptimisers.jl: robust_centre, assert_robust_rows, robust_result."
+Description = "Base robust covariance, private API of PortfolioOptimisers.jl: robust_centre, assert_robust_rows."
 ```
 
 # Base robust covariance: private API
@@ -7,5 +7,4 @@ Description = "Base robust covariance, private API of PortfolioOptimisers.jl: ro
 ```@docs
 PortfolioOptimisers.robust_centre
 PortfolioOptimisers.assert_robust_rows
-PortfolioOptimisers.robust_result
 ```

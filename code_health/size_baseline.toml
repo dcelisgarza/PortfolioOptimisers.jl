@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.4"
 julia_syntax = "1.0.2"
-commit = "43cd47031a"
+commit = "9ae9fdfb2e"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { code = 35, doc = 0, comment = 5, blank = 4, total = 44 }
@@ -26,18 +26,18 @@ commit = "43cd47031a"
 "ext/PortfolioOptimisersPlotsExt/14_ReportFigures.jl" = { code = 80, doc = 0, comment = 15, blank = 0, total = 95 }
 "ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { code = 45, doc = 0, comment = 8, blank = 5, total = 58 }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { code = 17, doc = 122, comment = 0, blank = 44, total = 183 }
-"src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { code = 218, doc = 0, comment = 24, blank = 0, total = 242 }
+"src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { code = 250, doc = 0, comment = 25, blank = 0, total = 275 }
 "src/01_Base/01_DocstringDictionaries/03_ArgPriorsAndUncertaintySets.jl" = { code = 140, doc = 0, comment = 14, blank = 0, total = 154 }
 "src/01_Base/01_DocstringDictionaries/04_ArgPhylogenyAndConstraints.jl" = { code = 106, doc = 0, comment = 19, blank = 0, total = 125 }
-"src/01_Base/01_DocstringDictionaries/05_ArgRiskMeasuresAndCosts.jl" = { code = 119, doc = 0, comment = 25, blank = 0, total = 144 }
-"src/01_Base/01_DocstringDictionaries/06_ArgOptimisation.jl" = { code = 272, doc = 0, comment = 29, blank = 0, total = 301 }
+"src/01_Base/01_DocstringDictionaries/05_ArgRiskMeasuresAndCosts.jl" = { code = 120, doc = 0, comment = 25, blank = 0, total = 145 }
+"src/01_Base/01_DocstringDictionaries/06_ArgOptimisation.jl" = { code = 275, doc = 0, comment = 29, blank = 0, total = 304 }
 "src/01_Base/01_DocstringDictionaries/07_FieldDict.jl" = { code = 3, doc = 0, comment = 2, blank = 0, total = 5 }
 "src/01_Base/01_DocstringDictionaries/08_ValidationsAndReturns.jl" = { code = 92, doc = 0, comment = 4, blank = 0, total = 96 }
-"src/01_Base/01_DocstringDictionaries/09_MathDataAndMoments.jl" = { code = 216, doc = 0, comment = 62, blank = 0, total = 278 }
+"src/01_Base/01_DocstringDictionaries/09_MathDataAndMoments.jl" = { code = 221, doc = 0, comment = 66, blank = 0, total = 287 }
 "src/01_Base/01_DocstringDictionaries/10_MathPriorsAndNetworks.jl" = { code = 57, doc = 0, comment = 37, blank = 0, total = 94 }
 "src/01_Base/01_DocstringDictionaries/11_MathRiskAndOptimisation.jl" = { code = 229, doc = 0, comment = 80, blank = 0, total = 309 }
-"src/01_Base/01_DocstringDictionaries/12_MathOnlineSelection.jl" = { code = 88, doc = 0, comment = 16, blank = 0, total = 104 }
-"src/01_Base/01_DocstringDictionaries/13_References.jl" = { code = 306, doc = 0, comment = 3, blank = 0, total = 309 }
+"src/01_Base/01_DocstringDictionaries/12_MathOnlineSelection.jl" = { code = 91, doc = 0, comment = 16, blank = 0, total = 107 }
+"src/01_Base/01_DocstringDictionaries/13_References.jl" = { code = 320, doc = 0, comment = 3, blank = 0, total = 323 }
 "src/01_Base/02_TypeRoots.jl" = { code = 30, doc = 336, comment = 0, blank = 168, total = 534 }
 "src/01_Base/03_PrettyShow.jl" = { code = 121, doc = 139, comment = 0, blank = 77, total = 337 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 213, doc = 620, comment = 2, blank = 278, total = 1113 }
@@ -195,14 +195,16 @@ commit = "43cd47031a"
 "src/05_Moments/37_GeodesicShrinkageCovariance.jl" = { code = 204, doc = 557, comment = 1, blank = 260, total = 1022 }
 "src/05_Moments/38_ElasticNet.jl" = { code = 266, doc = 745, comment = 2, blank = 311, total = 1324 }
 "src/05_Moments/39_WeightedAvailableCase.jl" = { code = 195, doc = 258, comment = 2, blank = 118, total = 573 }
-"src/05_Moments/40_RobustCovariance/01_Base_RobustCovariance.jl" = { code = 53, doc = 143, comment = 0, blank = 63, total = 259 }
+"src/05_Moments/40_RobustCovariance/01_Base_RobustCovariance.jl" = { code = 50, doc = 131, comment = 0, blank = 55, total = 236 }
 "src/05_Moments/40_RobustCovariance/02_QnScale.jl" = { code = 83, doc = 124, comment = 0, blank = 73, total = 280 }
-"src/05_Moments/40_RobustCovariance/03_MCDSearch.jl" = { code = 129, doc = 287, comment = 1, blank = 148, total = 565 }
-"src/05_Moments/40_RobustCovariance/04_DetMCDStarts.jl" = { code = 35, doc = 56, comment = 0, blank = 33, total = 124 }
-"src/05_Moments/40_RobustCovariance/05_MCDFactors.jl" = { code = 56, doc = 110, comment = 0, blank = 64, total = 230 }
-"src/05_Moments/40_RobustCovariance/06_MCDCovariance.jl" = { code = 85, doc = 219, comment = 2, blank = 97, total = 403 }
-"src/05_Moments/40_RobustCovariance/07_TylerCovariance.jl" = { code = 114, doc = 243, comment = 0, blank = 117, total = 474 }
-"src/05_Moments/40_RobustCovariance/08_RobustExpectedReturns.jl" = { code = 24, doc = 58, comment = 2, blank = 29, total = 113 }
+"src/05_Moments/40_RobustCovariance/03_RobustShrinkage.jl" = { code = 90, doc = 400, comment = 1, blank = 194, total = 685 }
+"src/05_Moments/40_RobustCovariance/04_MCDSearch.jl" = { code = 180, doc = 395, comment = 1, blank = 185, total = 761 }
+"src/05_Moments/40_RobustCovariance/05_DetMCDStarts.jl" = { code = 34, doc = 55, comment = 0, blank = 33, total = 122 }
+"src/05_Moments/40_RobustCovariance/06_MCDFactors.jl" = { code = 65, doc = 116, comment = 0, blank = 67, total = 248 }
+"src/05_Moments/40_RobustCovariance/07_MCDCovariance.jl" = { code = 165, doc = 369, comment = 2, blank = 167, total = 703 }
+"src/05_Moments/40_RobustCovariance/08_TylerShrinkage.jl" = { code = 179, doc = 201, comment = 2, blank = 105, total = 487 }
+"src/05_Moments/40_RobustCovariance/09_TylerCovariance.jl" = { code = 119, doc = 259, comment = 0, blank = 117, total = 495 }
+"src/05_Moments/40_RobustCovariance/10_RobustExpectedReturns.jl" = { code = 24, doc = 59, comment = 2, blank = 29, total = 114 }
 "src/06_Distance/01_Base_Distance.jl" = { code = 24, doc = 228, comment = 0, blank = 93, total = 345 }
 "src/06_Distance/02_Distance.jl" = { code = 162, doc = 350, comment = 0, blank = 157, total = 669 }
 "src/06_Distance/03_DistanceDistance.jl" = { code = 39, doc = 132, comment = 0, blank = 58, total = 229 }
@@ -454,4 +456,4 @@ commit = "43cd47031a"
 "src/24_Report/02_ReportModel.jl" = { code = 123, doc = 192, comment = 2, blank = 83, total = 400 }
 "src/24_Report/03_ReportWriters.jl" = { code = 317, doc = 231, comment = 2, blank = 130, total = 680 }
 "src/24_Report/04_PortfolioReport.jl" = { code = 306, doc = 377, comment = 4, blank = 179, total = 866 }
-"src/PortfolioOptimisers.jl" = { code = 452, doc = 3, comment = 29, blank = 5, total = 489 }
+"src/PortfolioOptimisers.jl" = { code = 470, doc = 3, comment = 29, blank = 5, total = 507 }

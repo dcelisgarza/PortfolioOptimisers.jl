@@ -9,7 +9,11 @@ The minimum covariance determinant of [`MCDCovariance`](@ref) is the subset of `
 
 To implement a new search, subtype `AbstractMCDAlgorithm`, keep each parameter in a field, and implement one method:
 
-  - `PortfolioOptimisers.mcd_starts(alg, Z::MatNum, h::Integer, fixed::Bool) -> Vector{Vector{Int}}`: Returns the start subsets of `h` observations of the standardised data `Z`. When `fixed` is `true`, the centre is fixed at zero. The fit does concentration steps from each start and keeps the best subset.
+  - `PortfolioOptimisers.mcd_starts(alg, Z::MatNum, h::Integer, fixed::Bool, intensity) -> Vector{Vector{Int}}`: Returns the start subsets of `h` observations of the standardised data `Z`. When `fixed` is `true`, the centre is fixed at zero. `intensity` is the shrinkage intensity or its rule, or `nothing` for a scatter with no shrinkage.
+
+The fit does concentration steps from each start and keeps the best subset. A search with many starts can keep a part of them first, with one more method:
+
+  - `PortfolioOptimisers.mcd_refine(alg, Z::MatNum, starts, h::Integer, fixed::Bool, reg) -> Vector{Vector{Int}}`: Returns the subsets from which the fit does concentration steps until they do not change. The default returns `starts`. `reg` is the [`SubsetShrinkage`](@ref), or `nothing`.
 
 # Related
 
@@ -153,7 +157,56 @@ The concentration steps of [`mcd_csteps`](@ref) stop when the subset does not ch
 """
 const MCD_MAX_CSTEPS = 200
 """
-    mcd_standardise(X::MatNum, centre::Option{<:VecNum}) -> MatNum
+$(DocStringExtensions.TYPEDEF)
+
+Holds the data that each step of the fit of an [`MCDCovariance`](@ref) reads.
+
+[`mcd_sample`](@ref) builds it. A reweighting step reads it too, see [`mcd_reweight`](@ref).
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    MCDSample(
+        X::MatNum,
+        Z::MatNum,
+        tgt::Option{<:MatNum},
+        intensity,
+        centre::Option{<:VecNum}
+    ) -> MCDSample
+
+# Related
+
+  - [`mcd_sample`](@ref)
+  - [`mcd_fit`](@ref)
+  - [`MCDCovariance`](@ref)
+"""
+@concrete struct MCDSample
+    """
+    $(field_dict[:mcd_X])
+    """
+    X
+    """
+    $(field_dict[:mcd_Z])
+    """
+    Z
+    """
+    $(field_dict[:mcd_smp_tgt])
+    """
+    tgt
+    """
+    $(field_dict[:mcd_smp_intensity])
+    """
+    intensity
+    """
+    $(field_dict[:mcd_centre])
+    """
+    centre
+end
+"""
+    mcd_standardise(X::MatNum, centre::Option{<:VecNum}) -> Tuple{MatNum, VecNum}
 
 Centres each column of the data and divides it by its robust scale.
 
@@ -179,7 +232,7 @@ A value that is further than `eps^(-1/4)` scales from the median of its column, 
 
 # Returns
 
-  - `Z::MatNum`: The standardised data.
+  - `(Z, s)`: The standardised data, and the scale of each column.
 
 # Related
 
@@ -195,7 +248,7 @@ function mcd_standardise(X::MatNum, centre::Option{<:VecNum})
     c = isnothing(centre) ? m : transpose(centre)
     s = mapslices(robust_column_scale, X .- c; dims = 1)
     b = s ./ sqrt(sqrt(eps(real(eltype(s)))))
-    return (clamp.(X, m .- b, m .+ b) .- c) ./ s
+    return (clamp.(X, m .- b, m .+ b) .- c) ./ s, vec(s)
 end
 """
     mcd_subset_fit(Z::MatNum, idx::AbstractVector{<:Integer}, fixed::Bool) -> Tuple{VecNum, MatNum}
@@ -223,6 +276,81 @@ function mcd_subset_fit(Z::MatNum, idx::AbstractVector{<:Integer}, fixed::Bool)
     m = fixed ? zeros(eltype(Z), size(Z, 2)) : vec(Statistics.mean(Zs; dims = 1))
     D = Zs .- transpose(m)
     return m, (transpose(D) * D) / (length(idx) - !fixed)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Holds the blend of the scatter of a subset with the target of an [`MCDShrinkage`](@ref).
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    SubsetShrinkage(
+        rho::Number,
+        c::Number,
+        tgt::MatNum
+    ) -> SubsetShrinkage
+
+# Related
+
+  - [`shrink_scatter!`](@ref)
+  - [`MCDShrinkage`](@ref)
+"""
+@concrete struct SubsetShrinkage
+    """
+    $(field_dict[:rob_rho_fit])
+    """
+    rho
+    """
+    $(field_dict[:mcd_c])
+    """
+    c
+    """
+    $(field_dict[:mcd_tgt])
+    """
+    tgt
+end
+"""
+    shrink_scatter!(S::MatNum, reg::Nothing) -> MatNum
+    shrink_scatter!(S::MatNum, c::Number) -> MatNum
+    shrink_scatter!(S::MatNum, reg::SubsetShrinkage) -> MatNum
+
+Scales the scatter of a subset in place, and blends it with the target.
+
+The `nothing` method returns the scatter of a search with no shrinkage, where a common factor does not change the subset. The number method multiplies the scatter by the factor `c`. The [`SubsetShrinkage`](@ref) method gives ``\\rho \\mathbf{T} + (1 - \\rho) c \\mathbf{S}``, Equation 7 of [boudt2020](@cite).
+
+# Arguments
+
+  - `S`: The scatter of the subset.
+  - `reg`, `c`: The shrinkage, the factor, or `nothing`.
+
+# Returns
+
+  - `S::MatNum`: The input matrix.
+
+# Related
+
+  - [`mcd_subset_fit`](@ref)
+  - [`SubsetShrinkage`](@ref)
+
+# References
+
+  - $(ref_dict[:boudt2020]) Section 2.2, Equation 7.
+"""
+function shrink_scatter!(S::MatNum, ::Nothing)
+    return S
+end
+function shrink_scatter!(S::MatNum, c::Number)
+    S .*= c
+    return S
+end
+function shrink_scatter!(S::MatNum, reg::SubsetShrinkage)
+    S .*= (1 - reg.rho) * reg.c
+    S .+= reg.rho .* reg.tgt
+    return S
 end
 """
     scatter_cholesky(S::MatNum) -> Option{<:LinearAlgebra.Cholesky}
@@ -317,15 +445,15 @@ function nearest_positions(d::VecNum, h::Integer)
 end
 """
     mcd_csteps(Z::MatNum, idx::AbstractVector{<:Integer}, h::Integer, fixed::Bool,
-               maxsteps::Integer) -> Tuple{Vector{Int}, Number}
+               reg::Option{<:SubsetShrinkage}, maxsteps::Integer) -> Tuple{Vector{Int}, Number}
 
 Does concentration steps from the subset `idx` and returns the last subset and the logarithm of the determinant of its covariance matrix.
 
-A concentration step fits the mean and the covariance matrix of the subset, computes the distance of every observation, and takes the `h` nearest observations as the new subset. Theorem 1 of [rousseeuw1999](@cite) states that the determinant of the new covariance matrix is not larger than the old one. The steps stop when the subset does not change, or after `maxsteps` steps.
+A concentration step fits the mean and the covariance matrix of the subset, computes the distance of every observation, and takes the `h` nearest observations as the new subset. Theorem 1 of [rousseeuw1999](@cite) states that the determinant of the new covariance matrix is not larger than the old one. Theorem 1 of [boudt2020](@cite) states the same for a shrunk scatter. The steps stop when the subset does not change, or after `maxsteps` steps.
 
 # Algorithm
 
- 1. Fit the subset with [`mcd_subset_fit`](@ref).
+ 1. Fit the subset with [`mcd_subset_fit`](@ref), and shrink its scatter with [`shrink_scatter!`](@ref).
  2. Repeat at most `maxsteps` times. Compute the distances with [`squared_distances`](@ref). Take the `h` nearest observations with a partial sort. Stop if this subset is the old subset. Otherwise, fit the new subset.
  3. Return the subset and the logarithm of the determinant of its covariance matrix. The logarithm is `-Inf` for a singular matrix, see [`scatter_cholesky`](@ref).
 
@@ -335,6 +463,7 @@ A concentration step fits the mean and the covariance matrix of the subset, comp
   - `idx`: The positions of the start subset, `h` of them.
   - `h`: The size of the subset.
   - `fixed`: Whether the centre is fixed at zero.
+  - `reg`: The [`SubsetShrinkage`](@ref) of the subset scatter, or `nothing`.
   - `maxsteps`: The largest number of steps.
 
 # Returns
@@ -350,12 +479,14 @@ A concentration step fits the mean and the covariance matrix of the subset, comp
 # References
 
   - $(ref_dict[:rousseeuw1999]) Section 2, Theorem 1.
+  - $(ref_dict[:boudt2020]) Section 3, Theorem 1.
 """
 function mcd_csteps(Z::MatNum, idx::AbstractVector{<:Integer}, h::Integer, fixed::Bool,
-                    maxsteps::Integer)
+                    reg::Option{<:SubsetShrinkage}, maxsteps::Integer)
     idx = sort(idx)
     nidx = similar(idx)
     m, S = mcd_subset_fit(Z, idx, fixed)
+    shrink_scatter!(S, reg)
     for _ in 1:maxsteps
         sort!(copyto!(nidx, nearest_positions(squared_distances(Z, m, S), h)))
         if nidx == idx
@@ -363,6 +494,7 @@ function mcd_csteps(Z::MatNum, idx::AbstractVector{<:Integer}, h::Integer, fixed
         end
         idx, nidx = nidx, idx
         m, S = mcd_subset_fit(Z, idx, fixed)
+        shrink_scatter!(S, reg)
     end
     C = scatter_cholesky(S)
     return idx, isnothing(C) ? typemin(real(eltype(S))) : LinearAlgebra.logdet(C)
@@ -402,46 +534,58 @@ function mcd_univariate_subset(z::VecNum, h::Integer, fixed::Bool)
     return o[k:(k + h - 1)]
 end
 """
-    mcd_search(alg::AbstractMCDAlgorithm, Z::MatNum, h::Integer, fixed::Bool) -> Vector{Int}
+    mcd_search(alg::AbstractMCDAlgorithm, smp::MCDSample, h::Integer, c::Number) -> Tuple{Vector{Int}, Option{<:Number}}
 
-Returns the positions of the best subset of `h` observations of the standardised data `Z` that the search `alg` finds.
+Returns the positions of the best subset of `h` observations that the search `alg` finds, and the shrinkage intensity.
 
-The data of one variable have an exact subset, which [`mcd_univariate_subset`](@ref) finds for every search. A subset of every observation needs no search.
+The data of one variable have an exact subset, which [`mcd_univariate_subset`](@ref) finds for every search. A shrinkage does not change it. A subset of every observation needs no search.
 
 # Algorithm
 
- 1. When `h` is the number of observations, return every position.
- 2. When `Z` has one column, return the exact subset of [`mcd_univariate_subset`](@ref).
- 3. Otherwise, take the starts of the search with [`mcd_starts`](@ref): six deterministic starts for [`DetMCD`](@ref), and the best random starts for [`FastMCD`](@ref). Do concentration steps from each start with [`mcd_csteps`](@ref) until the subset does not change, and return the subset with the smallest determinant. The first start wins a tie.
+ 1. When `h` is the number of observations, or the data have one column, take every position, or the exact subset of [`mcd_univariate_subset`](@ref). The intensity is the one of [`mcd_intensity`](@ref) for this subset.
+ 2. Otherwise, take the starts of the search with [`mcd_starts`](@ref), and the intensity and the starts that it permits with [`pooled_intensity`](@ref).
+ 3. Keep the best starts of a search with many starts with [`mcd_refine`](@ref).
+ 4. Do concentration steps from each start with [`mcd_csteps`](@ref) until the subset does not change, and return the subset with the smallest determinant. The first start wins a tie.
 
 # Arguments
 
   - `alg`: The search algorithm.
-  - `Z`: The standardised data, `observations × assets`.
+  - `smp`: The data of the fit.
   - `h`: The size of the subset.
-  - `fixed`: Whether the centre is fixed at zero.
+  - `c`: The consistency factor of the scatter of the subset.
 
 # Returns
 
-  - `idx::Vector{Int}`: The sorted positions of the best subset.
+  - `(idx, rho)`: The sorted positions of the best subset, and the intensity, or `nothing` with no shrinkage.
 
 # Related
 
   - [`AbstractMCDAlgorithm`](@ref)
+  - [`MCDSample`](@ref)
   - [`mcd_csteps`](@ref)
   - [`mcd_starts`](@ref)
+
+# References
+
+  - $(ref_dict[:boudt2020]) Section 3, step 3 of the algorithm.
 """
-function mcd_search(alg::AbstractMCDAlgorithm, Z::MatNum, h::Integer, fixed::Bool)
+function mcd_search(alg::AbstractMCDAlgorithm, smp::MCDSample, h::Integer, c::Number)
+    Z = smp.Z
     n, p = size(Z)
-    if h == n
-        return collect(1:n)
-    elseif p == 1
-        return sort!(mcd_univariate_subset(view(Z, :, 1), h, fixed))
+    fixed = !isnothing(smp.centre)
+    if h == n || p == 1
+        idx = h == n ? collect(1:n) : sort!(mcd_univariate_subset(view(Z, :, 1), h, fixed))
+        return idx, mcd_intensity(smp.intensity, Z, idx, c, fixed)
     end
-    return best_mcd_subset(Z, mcd_starts(alg, Z, h, fixed), h, fixed)
+    starts = mcd_starts(alg, Z, h, fixed, smp.intensity)
+    rho, starts = pooled_intensity(smp.intensity, Z, starts, c, fixed)
+    reg = subset_shrinkage(rho, c, p)
+    starts = mcd_refine(alg, Z, starts, h, fixed, reg)
+    return best_mcd_subset(Z, starts, h, fixed, reg), rho
 end
 """
-    best_mcd_subset(Z::MatNum, starts, h::Integer, fixed::Bool) -> Vector{Int}
+    best_mcd_subset(Z::MatNum, starts, h::Integer, fixed::Bool,
+                    reg::Option{<:SubsetShrinkage}) -> Vector{Int}
 
 Does concentration steps from each start until the subset does not change, and returns the subset with the smallest determinant.
 
@@ -451,6 +595,7 @@ Does concentration steps from each start until the subset does not change, and r
   - `starts`: The start subsets.
   - `h`: The size of the subset.
   - `fixed`: Whether the centre is fixed at zero.
+  - `reg`: The [`SubsetShrinkage`](@ref) of the subset scatter, or `nothing`.
 
 # Returns
 
@@ -461,10 +606,11 @@ Does concentration steps from each start until the subset does not change, and r
   - [`mcd_search`](@ref)
   - [`mcd_csteps`](@ref)
 """
-function best_mcd_subset(Z::MatNum, starts, h::Integer, fixed::Bool)
+function best_mcd_subset(Z::MatNum, starts, h::Integer, fixed::Bool,
+                         reg::Option{<:SubsetShrinkage})
     best, bobj = Int[], typemax(real(eltype(Z)))
     for start in starts
-        idx, obj = mcd_csteps(Z, start, h, fixed, MCD_MAX_CSTEPS)
+        idx, obj = mcd_csteps(Z, start, h, fixed, reg, MCD_MAX_CSTEPS)
         if obj < bobj
             best, bobj = idx, obj
         end
@@ -472,20 +618,12 @@ function best_mcd_subset(Z::MatNum, starts, h::Integer, fixed::Bool)
     return best
 end
 """
-    mcd_starts(alg::DetMCD, Z::MatNum, h::Integer, fixed::Bool) -> Vector{Vector{Int}}
-    mcd_starts(alg::FastMCD, Z::MatNum, h::Integer, fixed::Bool) -> Vector{Vector{Int}}
+    mcd_starts(alg::DetMCD, Z::MatNum, h::Integer, fixed::Bool, intensity) -> Vector{Vector{Int}}
+    mcd_starts(alg::FastMCD, Z::MatNum, h::Integer, fixed::Bool, intensity) -> Vector{Vector{Int}}
 
 Returns the start subsets of the search `alg`.
 
-# Algorithm
-
-The [`DetMCD`](@ref) method returns six starts, one for each set of directions of [`detmcd_directions`](@ref), through [`detmcd_initset`](@ref).
-
-The [`FastMCD`](@ref) method returns the `n_best` random starts with the smallest determinants after `n_csteps` concentration steps:
-
- 1. Resolve the generator from `alg.rng` and `alg.seed` with [`resolve_rng`](@ref).
- 2. For each of the `n_starts` starts, draw a start subset with [`fastmcd_random_start`](@ref), and do `alg.n_csteps` concentration steps from it with [`mcd_csteps`](@ref).
- 3. Return the `alg.n_best` subsets with the smallest determinants, in increasing order of the determinant.
+The [`DetMCD`](@ref) method returns six starts, one for each set of directions of [`detmcd_directions`](@ref), through [`detmcd_initset`](@ref). The [`FastMCD`](@ref) method resolves the generator from `alg.rng` and `alg.seed` with [`resolve_rng`](@ref), and draws `alg.n_starts` starts with [`fastmcd_random_start`](@ref).
 
 # Arguments
 
@@ -493,6 +631,7 @@ The [`FastMCD`](@ref) method returns the `n_best` random starts with the smalles
   - `Z`: The standardised data.
   - `h`: The size of the subset.
   - `fixed`: Whether the centre is fixed at zero.
+  - `intensity`: The shrinkage intensity or its rule, or `nothing`.
 
 # Returns
 
@@ -501,31 +640,76 @@ The [`FastMCD`](@ref) method returns the `n_best` random starts with the smalles
 # Related
 
   - [`mcd_search`](@ref)
+  - [`mcd_refine`](@ref)
   - [`detmcd_directions`](@ref)
   - [`detmcd_initset`](@ref)
   - [`fastmcd_random_start`](@ref)
-  - [`mcd_csteps`](@ref)
 
 # References
 
   - $(ref_dict[:hubert2012]) Section 3.
-  - $(ref_dict[:rousseeuw1999]) Sections 3.1 and 3.2.
+  - $(ref_dict[:rousseeuw1999]) Section 3.1.
 """
-function mcd_starts(::DetMCD, Z::MatNum, h::Integer, fixed::Bool)
+function mcd_starts(::DetMCD, Z::MatNum, h::Integer, fixed::Bool, ::Any)
     return [detmcd_initset(Z, P, h, fixed) for P in detmcd_directions(Z)]
 end
-function mcd_starts(alg::FastMCD, Z::MatNum, h::Integer, fixed::Bool)
+function mcd_starts(alg::FastMCD, Z::MatNum, h::Integer, fixed::Bool, intensity)
     rng = resolve_rng(alg.rng, alg.seed)
-    runs = [mcd_csteps(Z, fastmcd_random_start(rng, Z, h, fixed), h, fixed, alg.n_csteps)
-            for _ in 1:(alg.n_starts)]
-    return [first(runs[i]) for i in nearest_positions(map(last, runs), alg.n_best)]
+    return [fastmcd_random_start(rng, Z, h, fixed, intensity) for _ in 1:(alg.n_starts)]
 end
 """
-    fastmcd_random_start(rng::Random.AbstractRNG, Z::MatNum, h::Integer, fixed::Bool) -> Vector{Int}
+    mcd_refine(alg::AbstractMCDAlgorithm, Z::MatNum, starts, h::Integer, fixed::Bool,
+               reg::Option{<:SubsetShrinkage}) -> Vector{Vector{Int}}
+    mcd_refine(alg::FastMCD, Z::MatNum, starts, h::Integer, fixed::Bool,
+               reg::Option{<:SubsetShrinkage}) -> Vector{Vector{Int}}
+
+Keeps the best starts of a search.
+
+The default method keeps every start. The [`FastMCD`](@ref) method does `alg.n_csteps` concentration steps from each start with [`mcd_csteps`](@ref), and returns the `alg.n_best` subsets with the smallest determinants, in increasing order of the determinant. A start that the shrinkage excludes leaves fewer starts, and the method then keeps at most that number.
+
+# Arguments
+
+  - `alg`: The search algorithm.
+  - `Z`: The standardised data.
+  - `starts`: The start subsets.
+  - `h`: The size of the subset.
+  - `fixed`: Whether the centre is fixed at zero.
+  - `reg`: The [`SubsetShrinkage`](@ref) of the subset scatter, or `nothing`.
+
+# Returns
+
+  - `starts::Vector{Vector{Int}}`: The subsets from which the search does concentration steps until they do not change.
+
+# Related
+
+  - [`mcd_starts`](@ref)
+  - [`mcd_csteps`](@ref)
+
+# References
+
+  - $(ref_dict[:rousseeuw1999]) Section 3.2.
+"""
+function mcd_refine(::AbstractMCDAlgorithm, ::MatNum, starts, ::Integer, ::Bool,
+                    ::Option{<:SubsetShrinkage})
+    return starts
+end
+function mcd_refine(alg::FastMCD, Z::MatNum, starts, h::Integer, fixed::Bool,
+                    reg::Option{<:SubsetShrinkage})
+    runs = [mcd_csteps(Z, start, h, fixed, reg, alg.n_csteps) for start in starts]
+    best = nearest_positions(map(last, runs), min(alg.n_best, length(runs)))
+    return [first(runs[i]) for i in best]
+end
+"""
+    fastmcd_random_start(rng::Random.AbstractRNG, Z::MatNum, h::Integer, fixed::Bool,
+                         intensity::Nothing) -> Vector{Int}
+    fastmcd_random_start(rng::Random.AbstractRNG, Z::MatNum, h::Integer, fixed::Bool,
+                         intensity::Union{Number, AbstractSubsetShrinkageIntensity}) -> Vector{Int}
 
 Draws one start subset of [`FastMCD`](@ref).
 
-The method draws ``p + 1`` observations with no repetition. While their covariance matrix is singular, it adds one more observation that it draws from the rest. Section 3.1 of [rousseeuw1999](@cite) gives this rule. The start is then the `h` observations nearest to the mean of the drawn observations in the metric of their covariance matrix.
+The method with no shrinkage draws ``p + 1`` observations with no repetition. While their covariance matrix is singular, it adds one more observation that it draws from the rest. Section 3.1 of [rousseeuw1999](@cite) gives this rule. The start is then the `h` observations nearest to the mean of the drawn observations in the metric of their covariance matrix.
+
+With a shrinkage, the scatter of the drawn observations is not necessary, because the target gives a metric. The method draws two observations, the fewest that have a spread, so a start with no outlier is likely. The start is the `h` observations nearest to their mean in the metric of the target. With a fixed centre, every start is the `h` observations nearest to the centre.
 
 # Arguments
 
@@ -533,10 +717,11 @@ The method draws ``p + 1`` observations with no repetition. While their covarian
   - `Z`: The standardised data.
   - `h`: The size of the subset.
   - `fixed`: Whether the centre is fixed at zero.
+  - `intensity`: The shrinkage intensity or its rule, or `nothing`.
 
 # Validation
 
-  - The covariance matrix of the data is not singular. Otherwise, the method raises the `DomainError` of [`squared_distances`](@ref).
+  - With no shrinkage, the covariance matrix of the data is not singular. Otherwise, the method raises the `DomainError` of [`squared_distances`](@ref).
 
 # Returns
 
@@ -550,7 +735,8 @@ The method draws ``p + 1`` observations with no repetition. While their covarian
 
   - $(ref_dict[:rousseeuw1999]) Section 3.1.
 """
-function fastmcd_random_start(rng::Random.AbstractRNG, Z::MatNum, h::Integer, fixed::Bool)
+function fastmcd_random_start(rng::Random.AbstractRNG, Z::MatNum, h::Integer, fixed::Bool,
+                              ::Nothing)
     n, p = size(Z)
     idx = StatsBase.sample(rng, 1:n, min(p + 1, n); replace = false)
     m, S = mcd_subset_fit(Z, idx, fixed)
@@ -560,6 +746,16 @@ function fastmcd_random_start(rng::Random.AbstractRNG, Z::MatNum, h::Integer, fi
     end
     return nearest_positions(squared_distances(Z, m, S), h)
 end
+function fastmcd_random_start(rng::Random.AbstractRNG, Z::MatNum, h::Integer, fixed::Bool,
+                              ::Union{Number, AbstractSubsetShrinkageIntensity})
+    idx = StatsBase.sample(rng, axes(Z, 1), 2; replace = false)
+    m = if fixed
+        zeros(eltype(Z), size(Z, 2))
+    else
+        vec(Statistics.mean(view(Z, idx, :); dims = 1))
+    end
+    return nearest_positions(vec(sum(abs2, Z .- transpose(m); dims = 2)), h)
+end
 
 export DetMCD, FastMCD
-public AbstractMCDAlgorithm, mcd_starts
+public AbstractMCDAlgorithm, mcd_starts, mcd_refine

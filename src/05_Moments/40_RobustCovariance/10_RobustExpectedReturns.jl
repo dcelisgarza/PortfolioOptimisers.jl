@@ -35,10 +35,11 @@ Keywords correspond to the struct's fields.
 julia> RobustExpectedReturns(; ce = TylerCovariance())
 RobustExpectedReturns
   ce ┼ TylerCovariance
-     │   me ┼ nothing
-     │   ve ┼ nothing
-     │    w ┼ nothing
-     │    q ┴ Float64: 0.975
+     │    me ┼ nothing
+     │    ve ┼ nothing
+     │   shr ┼ nothing
+     │     w ┼ nothing
+     │     q ┴ Float64: 0.975
 ```
 
 # Related

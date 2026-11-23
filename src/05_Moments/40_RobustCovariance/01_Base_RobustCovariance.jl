@@ -27,7 +27,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the fit of a robust covariance estimator: the location, the scatter, and the squared distance, the weight and the outlier flag of each observation.
 
-`StatsAPI.fit` of an [`AbstractRobustCovarianceEstimator`](@ref) returns it. The weight of an observation is the weight that it has in the estimate of `sigma`. The flag marks an observation whose squared distance is above the quantile `q` of the ``\\chi^2_p`` distribution, where `q` is the field of the estimator.
+`StatsAPI.fit` of an [`AbstractRobustCovarianceEstimator`](@ref) returns it. The weight of an observation is the weight that it has in the estimate of `sigma`. The flag marks an observation whose squared distance is above a cut-off of the probability `q`, the field of the estimator. With no shrinkage, the cut-off is the quantile of the ``\\chi^2_p`` distribution, see [`robust_outliers`](@ref).
 
 # Fields
 
@@ -40,7 +40,8 @@ $(DocStringExtensions.FIELDS)
         sigma::MatNum,
         d2::VecNum,
         w::VecNum,
-        outlier::AbstractVector{Bool}
+        outlier::AbstractVector{Bool},
+        intensity::Option{<:Number} = nothing
     ) -> RobustCovarianceResult
 
 Keywords correspond to the struct's fields.
@@ -89,21 +90,25 @@ julia> r.outlier
     $(field_dict[:rob_outlier])
     """
     outlier
+    """
+    $(field_dict[:rob_rho])
+    """
+    intensity
     function RobustCovarianceResult(mu::VecNum, sigma::MatNum, d2::VecNum, w::VecNum,
-                                    outlier::AbstractVector{Bool})
+                                    outlier::AbstractVector{Bool},
+                                    intensity::Option{<:Number})
         @argcheck(size(sigma) == (length(mu), length(mu)),
                   DimensionMismatch("sigma must be square, with the size of mu. Got size(sigma) => $(size(sigma)) and length(mu) => $(length(mu))"))
         @argcheck(length(d2) == length(w) == length(outlier),
                   DimensionMismatch("d2, w and outlier must have one length. Got $(length(d2)), $(length(w)) and $(length(outlier))"))
-        return new{typeof(mu), typeof(sigma), typeof(d2), typeof(w), typeof(outlier)}(mu,
-                                                                                      sigma,
-                                                                                      d2, w,
-                                                                                      outlier)
+        return new{typeof(mu), typeof(sigma), typeof(d2), typeof(w), typeof(outlier),
+                   typeof(intensity)}(mu, sigma, d2, w, outlier, intensity)
     end
 end
 function RobustCovarianceResult(; mu::VecNum, sigma::MatNum, d2::VecNum, w::VecNum,
-                                outlier::AbstractVector{Bool})::RobustCovarianceResult
-    return RobustCovarianceResult(mu, sigma, d2, w, outlier)
+                                outlier::AbstractVector{Bool},
+                                intensity::Option{<:Number} = nothing)::RobustCovarianceResult
+    return RobustCovarianceResult(mu, sigma, d2, w, outlier, intensity)
 end
 """
     Statistics.cov(ce::AbstractRobustCovarianceEstimator, X::MatNum; dims::Int = 1,
@@ -223,36 +228,8 @@ A robust scatter of `p` assets needs more than `p` observations in the set that 
 function assert_robust_rows(n::Integer, p::Integer, what::AbstractString)
     @argcheck(n > p,
               DomainError((n, p),
-                          "a robust scatter of p assets needs $(what) to be larger than p, got $(what) = $n and p = $p. Use a longer window or fewer assets"))
+                          "a robust scatter of p assets needs $(what) to be larger than p, got $(what) = $n and p = $p. Use a longer window or fewer assets, or shrink the scatter: `MCDCovariance(; shr = MCDShrinkage())` or `TylerCovariance(; shr = TylerShrinkage())`"))
     return nothing
-end
-"""
-    robust_result(mu::VecNum, sigma::MatNum, d2::VecNum, w::VecNum, q::Number) -> RobustCovarianceResult
-
-Builds the [`RobustCovarianceResult`](@ref) of a robust fit.
-
-The function flags each observation whose squared distance is above the quantile `q` of the ``\\chi^2_p`` distribution.
-
-# Arguments
-
-  - `mu`: The robust location.
-  - `sigma`: The robust scatter.
-  - `d2`: The squared distance of each observation, from [`squared_distances`](@ref).
-  - `w`: The weight of each observation in the estimate of `sigma`.
-  - `q`: The probability of the cut-off of the outlier flag.
-
-# Returns
-
-  - `res::RobustCovarianceResult`: The fit.
-
-# Related
-
-  - [`RobustCovarianceResult`](@ref)
-  - [`squared_distances`](@ref)
-"""
-function robust_result(mu::VecNum, sigma::MatNum, d2::VecNum, w::VecNum, q::Number)
-    cut = Distributions.quantile(Distributions.Chisq(length(mu)), q)
-    return RobustCovarianceResult(mu, sigma, d2, w, d2 .> cut)
 end
 
 export RobustCovarianceResult

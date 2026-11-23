@@ -1,5 +1,5 @@
 ```@meta
-Description = "MCD covariance, public API of PortfolioOptimisers.jl: AbstractRobustReweighting, MCDReweighting, MCDCovariance, mcd_reweight, StatsAPI.fit."
+Description = "MCD covariance, public API of PortfolioOptimisers.jl: AbstractRobustReweighting, MCDReweighting, MCDCovariance, mcd_fit, mcd_intensity, mcd_reweight, …"
 ```
 
 # MCD covariance
@@ -8,6 +8,8 @@ Description = "MCD covariance, public API of PortfolioOptimisers.jl: AbstractRob
 AbstractRobustReweighting
 MCDReweighting
 MCDCovariance
+PortfolioOptimisers.mcd_fit
+PortfolioOptimisers.mcd_intensity
 PortfolioOptimisers.mcd_reweight
 StatsAPI.fit(ce::MCDCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 ```

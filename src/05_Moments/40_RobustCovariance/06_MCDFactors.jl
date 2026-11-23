@@ -1,9 +1,12 @@
 """
-    mcd_subset_size(alpha::Number, n::Integer, p::Integer) -> Int
+    mcd_subset_size(shr::Nothing, alpha::Number, n::Integer, p::Integer) -> Int
+    mcd_subset_size(shr::MCDShrinkage, alpha::Number, n::Integer, p::Integer) -> Int
 
 Returns the size `h` of the MCD subset for the subset fraction `alpha`.
 
 At `alpha = 1/2`, ``h = \\lfloor (n + p + 1)/2 \\rfloor``, the size of the largest breakdown point. At `alpha = 1`, ``h = n``. The function interpolates between the two, as the function `h.alpha.n` of the R package `robustbase`, version 0.99-7, does.
+
+With a shrinkage, the scatter of a subset exists for every size, so the size does not depend on the number of assets. It is ``\\lceil \\alpha n \\rceil``, as [boudt2020](@cite) has it, and at least the smallest number above ``n/2``, which Theorem 1 of that work needs.
 
 # Mathematical definition
 
@@ -16,9 +19,14 @@ h &= \\lfloor 2 h_2 - n + 2 (n - h_2) \\alpha \\rfloor\\,.
 
 # Arguments
 
+  - `shr`: The shrinkage, or `nothing`.
   - `alpha`: The subset fraction, `1/2 <= alpha <= 1`.
   - `n`: The number of observations.
   - `p`: The number of assets.
+
+# Validation
+
+  - With no shrinkage, `h > p`, see [`assert_robust_rows`](@ref). With a shrinkage, `h > 1`. Otherwise, the function raises a `DomainError`.
 
 # Returns
 
@@ -31,10 +39,20 @@ h &= \\lfloor 2 h_2 - n + 2 (n - h_2) \\alpha \\rfloor\\,.
 # References
 
   - $(ref_dict[:rousseeuw1999]) Section 4, step 1.
+  - $(ref_dict[:boudt2020]) Section 2.1 and Section 3, Theorem 1.
 """
-function mcd_subset_size(alpha::Number, n::Integer, p::Integer)
+function mcd_subset_size(::Nothing, alpha::Number, n::Integer, p::Integer)
     h2 = div(n + p + 1, 2)
-    return floor(Int, 2 * h2 - n + 2 * (n - h2) * alpha)
+    h = floor(Int, 2 * h2 - n + 2 * (n - h2) * alpha)
+    assert_robust_rows(h, p, "the size h of the MCD subset")
+    return h
+end
+function mcd_subset_size(::MCDShrinkage, alpha::Number, n::Integer, p::Integer)
+    h = max(ceil(Int, alpha * n), div(n, 2) + 1)
+    @argcheck(1 < h <= n,
+              DomainError((n, p),
+                          "a shrunk MCD needs a subset of two observations or more, got $n observations of $p assets"))
+    return h
 end
 """
     mcd_consistency(p::Integer, a::Number) -> Number
