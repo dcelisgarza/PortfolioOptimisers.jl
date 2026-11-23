@@ -355,8 +355,8 @@ euclidean(X) = [norm(X[:, i] - X[:, j]) for i in axes(X, 2), j in axes(X, 2)]
         # is shorter.
         D = [0.0 1.653 1.25 0.746; 1.653 0.0 1.799 2.343; 1.25 1.799 0.0 1.833;
              0.746 2.343 1.833 0.0]
-        h = PO.branch_ordered_hclust(D, :ward, BarJosephOrder())
-        r = PO.branch_ordered_hclust(D, :ward, OptimalLeafOrder())
+        h = PO.branch_ordered_hclust(D, WardLinkage(), BarJosephOrder())
+        r = PO.branch_ordered_hclust(D, WardLinkage(), OptimalLeafOrder())
         @test h.order == [3, 1, 4, 2]
         @test r.order == [4, 1, 3, 2]
         @test adjacent_sum(D, r.order) ≈ 3.795 rtol = 1e-15
@@ -368,7 +368,10 @@ euclidean(X) = [norm(X[:, i] - X[:, j]) for i in axes(X, 2), j in axes(X, 2)]
     @testset "Every linkage reaches the brute-force minimum" begin
         rng = StableRNG(1494)
         misses = 0
-        for linkage in (:single, :average, :complete, :ward), _ in 1:40
+        for linkage in
+            (SingleLinkage(), AverageLinkage(), CompleteLinkage(), WardLinkage()), _ in
+                                                                                   1:40
+
             N = rand(rng, 4:9)
             D = euclidean(randn(rng, 3, N))
             h = PO.branch_ordered_hclust(D, linkage, BarJosephOrder())

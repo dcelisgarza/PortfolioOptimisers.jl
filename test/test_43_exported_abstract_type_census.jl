@@ -180,6 +180,7 @@
         :AbstractLearningRateSchedule,
         :AbstractLevelRecursion,
         :AbstractLeverageOneMask,
+        :AbstractLinkage,
         :AbstractLongRunForm,
         :AbstractLongRunKernel,
         :AbstractLowOrderPriorEstimator_A,

@@ -818,7 +818,7 @@ end
                                          cle = TimeDependent([ClustersEstimator(),
                                                               ClustersEstimator(;
                                                                                 alg = HClustAlgorithm(;
-                                                                                                      linkage = :single))]),
+                                                                                                      linkage = SingleLinkage()))]),
                                          wf = TimeDependent([IterativeWeightFinaliser(),
                                                              IterativeWeightFinaliser(;
                                                                                       iter = 7)]))
@@ -830,7 +830,7 @@ end
             @test isnothing(h0.sets)
             h2 = PortfolioOptimisers.update_time_dependent_estimator(hopt, ctx2)
             @test h2.pe == pe_semi
-            @test h2.cle.alg.linkage == :single
+            @test h2.cle.alg.linkage === SingleLinkage()
             @test h2.wf.iter == 7
             @test h2.sets === setsB
         end
@@ -893,8 +893,9 @@ end
         end
         @testset "Per-fold clustering estimator" begin
             # Under the exact leaf order every linkage gives the same order on fold 1, so the
-            # two estimators are told apart on fold 2, where `:single` and Ward differ by 0.029.
-            single = ClustersEstimator(; alg = HClustAlgorithm(; linkage = :single))
+            # two estimators are told apart on fold 2, where single linkage and Ward differ by
+            # 0.029.
+            single = ClustersEstimator(; alg = HClustAlgorithm(; linkage = SingleLinkage()))
             tdcle = TimeDependent([ClustersEstimator(), single])
             p = cross_val_predict(HierarchicalRiskParity(;
                                                          opt = HierarchicalOptimiser(;

@@ -300,6 +300,8 @@ end
     # The functions whose forward methods are interface methods, with the check that shows
     # it. #2072 adds a name after a check of each one.
     interface_functions = Dict{Symbol, String}(#
+                                               # src/08_Phylogeny (#2175).
+                                               :linkage_merges => "the interface verb of `AbstractLinkage`: its default method and the `WeightedLinkage` method each call a public seam that its `# Interfaces` section names, `generic_linkage_merges` or `nn_chain_merges`, so a linkage of a user calls the same seam (rule 3, #2175)",
                                                # src/02_Tools (#2089).
                                                :port_opt_view => "the leaf of the view traversal: 12 functions share its callee `nothing_scalar_array_view` (rule 3, #2089)",
                                                :obs_weights_index => "its mask method shares the callee `observed_weights` with `observed_sample` (rule 3, #2089)",

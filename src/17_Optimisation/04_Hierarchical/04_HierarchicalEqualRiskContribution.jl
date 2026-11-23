@@ -153,7 +153,8 @@ HierarchicalEqualRiskContribution
        │          │         │   power ┼ nothing
        │          │         │     alg ┴ CanonicalDistance()
        │          │     alg ┼ HClustAlgorithm
-       │          │         │       linkage ┼ Symbol: :ward
+       │          │         │       linkage ┼ WardLinkage
+       │          │         │               │   presquared ┴ Bool: false
        │          │         │   branchorder ┴ OptimalLeafOrder()
        │          │     onc ┼ OptimalNumberClusters
        │          │         │   max_k ┼ nothing
@@ -617,7 +618,7 @@ Run the Hierarchical Equal Risk Contribution optimisation.
  5. Reduce `pr`, `hec` and `rd` to the assets of `imsk`, with [`investable_reduction`](@ref). `X` is the returns matrix of the reduced `pr`, and `N` its number of assets.
  6. Cluster the assets with `opt.cle`, giving `clr`, and cut its dendrogram into `clr.k` clusters, giving `cls`, the asset indices of each cluster.
  7. Compute the shares `w` and the cluster risks `rkcl` with [`herc_risk`](@ref).
- 8. Build the nodes `nd` of the dendrogram with [`to_tree`](@ref). The cut does the first `N - clr.k` merges in the order of their heights, as `Clustering.cutree` does, so the other `clr.k - 1` merges are the nodes above the cut.
+ 8. Build the nodes `nd` of the dendrogram with [`to_tree`](@ref). The cut does the first `N - clr.k` merges of [`cophenetic_order`](@ref), as [`cut_dendrogram`](@ref) does, so the other `clr.k - 1` merges are the nodes above the cut, also on a tree with an inversion.
  9. For each node above the cut, read the assets `ln` and `rn` of its two branches, and the clusters `lc` and `rc` inside them.
 10. Form the split factor `alpha` from the risks of `lc` and `rc`. Multiply `w[ln]` by `alpha` and `w[rn]` by `1 - alpha`.
 11. Resolve the weight bounds `wb` from `opt.wb` and `opt.sets`. Divide `w` by its sum, and apply the weight finaliser `opt.wf` with [`finalise_weight_bounds`](@ref), giving `retcode` and the final `w`.
@@ -687,13 +688,13 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     w, rkcl, ri, ro = herc_risk(hec, pr, cls, cfees)
     nd = to_tree(clr.res)[2]
-    # `Clustering.cutree` does the first `N - k` merges in the order of `sortperm` of the
-    # heights, so the last `k - 1` merges of that order are the nodes above the cut. A sort
-    # of the nodes by height alone picks a node inside a cluster when two heights tie at
-    # the cut, and the split factor of that node is `0 / 0`.
+    # `cut_dendrogram` does the first `N - k` merges of `cophenetic_order`, so the last
+    # `k - 1` merges of that order are the nodes above the cut. A sort of the nodes by height
+    # alone picks a node inside a cluster when two heights tie at the cut, or below an
+    # inversion, and the split factor of that node is `0 / 0`.
     lc = Vector{Int}(undef, 0)
     rc = Vector{Int}(undef, 0)
-    for j in view(sortperm(clr.res.heights), (N - clr.k + 1):(N - 1))
+    for j in view(cophenetic_order(clr.res), (N - clr.k + 1):(N - 1))
         node = nd[N + j]
         ln = pre_order(node.left)
         rn = pre_order(node.right)

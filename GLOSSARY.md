@@ -935,6 +935,17 @@ The rule that flips the merges of a dendrogram to give its leaf permutation. It 
 `OptimalLeafOrder()`, the default, is the exact optimal leaf ordering. Of the orders that the tree permits by flips of its merges, it is the one with the least sum of distances between adjacent leaves. `BarJosephOrder()` is the greedy heuristic of Clustering.jl, which decides each merge once from its four outermost leaves. `ROrder()` is the order of the R function `hclust`. `nothing` skips the flip step and gives the **tree order**: a DBHT keeps the merges that its hierarchy built, and an `HClustAlgorithm` takes the orientation of a SciPy linkage matrix, a leaf before a merge, the lower leaf first and the lower merge first, which is also the rule of `ROrder()`. HRP and Schur bisect the leaf permutation, so for them the Branch Order changes the weights. HERC and NCO read the memberships, so for them it is a dial of cost. See ADR 0055.
 *Avoid*: reading `:optimal` in Clustering.jl's own documentation as this order; a `branchorder` keyword.
 
+**Linkage**
+The rule that sets the distance between two clusters from the distances between their members. It is the field `linkage` of `HClustAlgorithm`, a member of the Open Family `AbstractLinkage`: `SingleLinkage()`, `CompleteLinkage()`, `AverageLinkage()` (UPGMA), `WeightedLinkage()` (WPGMA), `CentroidLinkage()` (UPGMC), `MedianLinkage()` (WPGMC) and `WardLinkage(; presquared)`. The single, complete, average and Ward linkages run in Clustering.jl. WPGMA, centroid and median run in the Lance-Williams kernel of the library, a port of SciPy, with the trees of SciPy. See ADR 0241.
+*Avoid*: a Symbol such as `:ward`.
+
+**Inversion**
+A merge of a dendrogram that is lower than a merge below it. Only `CentroidLinkage()` and `MedianLinkage()` make one, and on correlation distances they make one in almost every tree. The raw heights keep it, so a plot shows it. A reader that needs a monotone tree reads the Cophenetic Height.
+
+**Cophenetic Height**
+The largest merge height in the subtree of a merge, `cophenetic_heights(res)`. On a tree with no inversion it is the raw height. The merges in the order of their Cophenetic Heights, the earlier merge first in a tie, put each parent after its children. So `cut_dendrogram(res, k)`, which does the first `N - k` merges of that order, always gives `k` clusters, also on an Inversion.
+*Avoid*: `Clustering.cutree` on a tree with an Inversion, which throws a `BoundsError`.
+
 ### 4.3 JuMP-based
 
 - **MeanRisk**: the efficient-frontier trade-off between expected return and risk. The classic objective optimiser.

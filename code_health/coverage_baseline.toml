@@ -202,7 +202,8 @@ commit = "391be5e"
 "src/07_JuMPModelOptimisation.jl" = { lines = 46, misses = 0 }
 "src/08_Phylogeny/01_Base_Phylogeny.jl" = { lines = 56, misses = 0 }
 "src/08_Phylogeny/02_Clusters.jl" = { lines = 42, misses = 0 }
-"src/08_Phylogeny/03_Hierarchical.jl" = { lines = 254, misses = 1 }
+"src/08_Phylogeny/03_Hierarchical_a.jl" = { lines = 254, misses = 1 }
+"src/08_Phylogeny/03_Hierarchical_b.jl" = { lines = 229, misses = 0 }
 "src/08_Phylogeny/04_NonHierarchicalClustering.jl" = { lines = 60, misses = 0 }
 "src/08_Phylogeny/05_Phylogeny.jl" = { lines = 11, misses = 0 }
 "src/08_Phylogeny/06_DBHT/01_DBHT.jl" = { lines = 6, misses = 0 }

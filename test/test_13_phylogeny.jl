@@ -3208,16 +3208,18 @@ end
             @test all(isone, assignments(clr))
         end
     end
-    @testset "`linkage` is unchecked at construction and raises at use" begin
-        # The set of criteria belongs to `Clustering.hclust`, so the constructor takes any
-        # `Symbol` and the raise lands inside `clusterise`.
-        alg = HClustAlgorithm(; linkage = :nonsense)
-        @test alg.linkage === :nonsense
+    @testset "`linkage` is a member of `AbstractLinkage`, checked by type at construction" begin
+        # A `Symbol` built before #2175, and `clusterise` raised. It now fails at once.
+        @test_throws TypeError HClustAlgorithm(; linkage = :nonsense)
         X = randn(StableRNG(987654321), 200, 10)
-        @test_throws ArgumentError clusterise(ClustersEstimator(; alg = alg), X)
-        # A criterion the package does accept clusters without a raise.
-        @test clusterise(ClustersEstimator(; alg = HClustAlgorithm(; linkage = :average)),
-                         X) isa Clusters
+        for l in (SingleLinkage(), CompleteLinkage(), AverageLinkage(), WeightedLinkage(),
+                  CentroidLinkage(), MedianLinkage(), WardLinkage(),
+                  WardLinkage(; presquared = true))
+            clr = clusterise(ClustersEstimator(; alg = HClustAlgorithm(; linkage = l)), X)
+            @test clr isa Clusters
+            @test clr.res.linkage === PortfolioOptimisers.linkage_symbol(l)
+            @test maximum(assignments(clr)) == clr.k
+        end
     end
     @testset "Every `Clusters` validation arm throws" begin
         res = clusterise(ClustersEstimator(), randn(StableRNG(1), 50, 3)).res
@@ -3242,7 +3244,7 @@ end
     end
     @testset "`factory` is the identity on a clustering algorithm" begin
         w = pweights(fill(1 / 400, 400))
-        alg = HClustAlgorithm(; linkage = :average)
+        alg = HClustAlgorithm(; linkage = AverageLinkage())
         # An algorithm carries no prior-dependent field, so the same object comes back.
         @test factory(alg, w) === alg
         dbht = DBHT()
@@ -3269,7 +3271,7 @@ function PortfolioOptimisers.get_node_property(::PreorderTreeByLabel,
                                                a::PortfolioOptimisers.ClusterNode)
     return string("asset_", a.id)
 end
-# The claims `src/08_Phylogeny/03_Hierarchical.jl` and
+# The claims `src/08_Phylogeny/03_Hierarchical_a.jl` and
 # `src/08_Phylogeny/04_NonHierarchicalClustering.jl` make about the tree, about the search
 # that replaces an invalid cut, and about the flat partition. Defined at top level because a
 # `@testset` body becomes a function, and the sweep of #468 reads these numbers.
@@ -3480,7 +3482,8 @@ end
         Xg[:, 4] = Xg[:, 3] + 0.02 * randn(rng, 200)
         cle = ClustersEstimator(; alg = HClustAlgorithm())
         Sg, Dg = cor_and_dist(cle.de, cle.ce, Xg)
-        rg = hclust(Dg; linkage = cle.alg.linkage, branchorder = :optimal)
+        rg = hclust(Dg; linkage = PortfolioOptimisers.linkage_symbol(cle.alg.linkage),
+                    branchorder = :optimal)
         algk = KMeansAlgorithm(; rng = StableRNG(987654321), seed = 987654321)
         kh = PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
                                                                                alg = SecondOrderDifference()),
@@ -4845,10 +4848,10 @@ end
     _, D = cor_and_dist(cle0.de, cle0.ce, X)
     @test HClustAlgorithm().branchorder === OptimalLeafOrder()
     @test DBHT().branchorder === OptimalLeafOrder()
-    for linkage in (:single, :complete, :average, :ward)
+    for linkage in (SingleLinkage(), CompleteLinkage(), AverageLinkage(), WardLinkage())
         # The tree order is the order of R: a leaf before a merge, the lower leaf first, and
         # the lower merge first in the order of the heights.
-        rr = hclust(D; linkage = linkage, branchorder = :r)
+        rr = hclust(D; linkage = PO.linkage_symbol(linkage), branchorder = :r)
         rt = PO.branch_ordered_hclust(D, linkage, nothing)
         @test rt.order == rr.order
         @test PO.branch_ordered_hclust(D, linkage, ROrder()).order == rr.order

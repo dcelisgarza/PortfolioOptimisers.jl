@@ -913,10 +913,19 @@ rationale = "a-definition-a-file-split-moved-unchanged"
 # the test. ADR 0082, issue #411.
 
 [[coverage_exemption]]
-path = "src/08_Phylogeny/03_Hierarchical.jl"
+path = "src/08_Phylogeny/03_Hierarchical_a.jl"
 definition = "optimal_number_clusters"
 misses = 1
 rationale = "a-cut-into-one-cluster-is-always-valid"
+
+# The coverage run of #2175: six one-line methods of `linkage_symbol` that return a constant read 0,
+# and the `WardLinkage` method beside them, which reads a field, carries hits. Each is reached:
+# `test_13_phylogeny.jl` and `test_13g_linkage_parity.jl` assert the label of every member.
+[[coverage_exemption]]
+path = "src/08_Phylogeny/02_Clusters.jl"
+definition = "linkage_symbol"
+misses = 6
+rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
 
 # Run 41046186365 (#1912): the `function` line of this method reads 0 while every line of its body
 # carries hits, and the body is reached by each fold of a price-level statistic.

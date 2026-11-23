@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.4"
 julia_syntax = "1.0.2"
-commit = "4d83c186be"
+commit = "6175a28437"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { code = 35, doc = 0, comment = 5, blank = 4, total = 44 }
@@ -204,7 +204,8 @@ commit = "4d83c186be"
 "src/07_JuMPModelOptimisation.jl" = { code = 94, doc = 210, comment = 3, blank = 92, total = 399 }
 "src/08_Phylogeny/01_Base_Phylogeny.jl" = { code = 134, doc = 612, comment = 11, blank = 300, total = 1057 }
 "src/08_Phylogeny/02_Clusters.jl" = { code = 127, doc = 479, comment = 0, blank = 191, total = 797 }
-"src/08_Phylogeny/03_Hierarchical.jl" = { code = 319, doc = 393, comment = 12, blank = 197, total = 921 }
+"src/08_Phylogeny/03_Hierarchical_a.jl" = { code = 319, doc = 393, comment = 12, blank = 197, total = 921 }
+"src/08_Phylogeny/03_Hierarchical_b.jl" = { code = 291, doc = 362, comment = 2, blank = 196, total = 851 }
 "src/08_Phylogeny/04_NonHierarchicalClustering.jl" = { code = 90, doc = 147, comment = 1, blank = 74, total = 312 }
 "src/08_Phylogeny/05_Phylogeny.jl" = { code = 21, doc = 74, comment = 0, blank = 38, total = 133 }
 "src/08_Phylogeny/06_DBHT/01_DBHT.jl" = { code = 16, doc = 79, comment = 0, blank = 35, total = 130 }

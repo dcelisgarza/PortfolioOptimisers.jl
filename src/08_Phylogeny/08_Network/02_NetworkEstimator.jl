@@ -263,7 +263,8 @@ NetworkClustersEstimator
         │         │     │   val ┴ Int64: 1
         │   x_src ┴ nothing
     alg ┼ HClustAlgorithm
-        │       linkage ┼ Symbol: :ward
+        │       linkage ┼ WardLinkage
+        │               │   presquared ┴ Bool: false
         │   branchorder ┴ OptimalLeafOrder()
     onc ┼ OptimalNumberClusters
         │   max_k ┼ nothing

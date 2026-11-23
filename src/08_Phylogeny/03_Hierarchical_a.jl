@@ -99,7 +99,7 @@ end
 
 Alias for a vector of [`ClusterNode`](@ref) objects.
 
-[`to_tree`](@ref) returns one, with the leaves first and the merges after them. [`validate_k_value`](@ref) walks one sorted by descending height.
+[`to_tree`](@ref) returns one, with the leaves first and the merges after them. [`validate_k_value`](@ref) walks one in the order of [`tall_first_nodes`](@ref).
 
 # Related
 
@@ -301,7 +301,7 @@ Reads a `Clustering.Hclust` from [`Clustering.jl`](https://juliastats.org/Cluste
 # Returns
 
   - `root::ClusterNode`: The root of the tree, which is the node of the last merge.
-  - `nodes::Vector{ClusterNode{Int, H}}`: All `2N - 1` nodes, the leaves first and then the merges in their order. The vector is not sorted by height. A caller that needs that order sorts it, as [`valid_k_clusters`](@ref) and [`optimal_number_clusters`](@ref) do.
+  - `nodes::Vector{ClusterNode{Int, H}}`: All `2N - 1` nodes, the leaves first and then the merges in their order. The vector is not sorted by height. A caller that needs that order sorts it, as [`tall_first_nodes`](@ref) does.
 
 # Related
 
@@ -538,7 +538,7 @@ Flip the merges of `hmer` under a branch order, the interface of [`AbstractBranc
 
   - [`OptimalLeafOrder`](@ref) flips the merges with [`optimal_leaf_order!`](@ref), so that the leaf order has the least sum of the distances between adjacent leaves that the tree permits.
   - [`BarJosephOrder`](@ref) flips the merges with the heuristic `Clustering.orderbranches_barjoseph!`, which decides each merge once from its four outermost leaves.
-  - [`ROrder`](@ref) sorts the merges by height and flips them with `Clustering.orderbranches_r!`, the order of the R function `hclust`.
+  - [`ROrder`](@ref) sorts the merges by their [`cophenetic_heights`](@ref), with the earlier merge first in a tie, and flips each so that its older child comes first, with [`older_first`](@ref). This is the order of the R function `hclust`. `Clustering.orderbranches_r!` sorts by the raw heights, so on a tree with an inversion it puts a parent before its child. On a tree with no inversion, the two give the same result.
   - `nothing` skips the flip step. The merges keep the orientation that the tree builder gave them. This is the tree order.
 
 # Arguments
@@ -566,7 +566,18 @@ function order_branches!(hmer::Clustering.HclustMerges, D::MatNum, ::BarJosephOr
     return Clustering.orderbranches_barjoseph!(hmer, D)
 end
 function order_branches!(hmer::Clustering.HclustMerges, ::MatNum, ::ROrder)
-    return Clustering.orderbranches_r!(hmer)
+    (; mleft, mright) = hmer
+    o = sortperm(cophenetic_heights(hmer.heights, mleft, mright))
+    io = invperm(o)
+    for i in eachindex(mleft, mright)
+        a = mleft[i] > 0 ? io[mleft[i]] : mleft[i]
+        b = mright[i] > 0 ? io[mright[i]] : mright[i]
+        mleft[i], mright[i] = older_first(a, b)
+    end
+    permute!(mleft, o)
+    permute!(mright, o)
+    permute!(hmer.heights, o)
+    return hmer
 end
 function order_branches!(hmer::Clustering.HclustMerges, ::MatNum, ::Nothing)
     return hmer
@@ -576,7 +587,9 @@ end
 
 Flip each merge of `hmer` to the orientation of a linkage that builds its tree with no flip step.
 
-`Clustering.hclust` always flips its merges, so the orientation that its linkage builds is not available. This function gives the orientation of a linkage matrix of SciPy, whose rows hold the lower child first. A leaf comes before a merge. Of two leaves, the lower index comes first. Of two merges, the lower one comes first, where the rank of a merge is its position in the order of the heights, and a tie keeps the order of the merges. The function moves no merge. [`ROrder`](@ref) flips by the same rule, so the two give the same leaf order.
+`Clustering.hclust` always flips its merges, so the orientation that its linkage builds is not available. This function gives the orientation of a linkage matrix of SciPy, whose rows hold the lower child first. A leaf comes before a merge. Of two leaves, the lower index comes first. Of two merges, the lower one comes first, where the rank of a merge is its position in [`cophenetic_order`](@ref), and a tie keeps the order of the merges. The cophenetic height is the raw height on a tree with no inversion, and on a tree with an inversion it keeps each child below its parent. The function moves no merge. [`ROrder`](@ref) flips by the same rule, so the two give the same leaf order.
+
+The kernel of [`AbstractLinkage`](@ref) writes this orientation itself, so its trees do not need this function.
 
 # Arguments
 
@@ -593,9 +606,9 @@ Flip each merge of `hmer` to the orientation of a linkage that builds its tree w
   - [`ROrder`](@ref)
 """
 function tree_order!(hmer::Clustering.HclustMerges)
-    rank = invperm(sortperm(hmer.heights))
     ml = hmer.mleft
     mr = hmer.mright
+    rank = invperm(sortperm(cophenetic_heights(hmer.heights, ml, mr)))
     for v in eachindex(ml, mr)
         a = ml[v] < 0 ? ml[v] : rank[ml[v]]
         b = mr[v] < 0 ? mr[v] : rank[mr[v]]
@@ -607,72 +620,99 @@ function tree_order!(hmer::Clustering.HclustMerges)
     return hmer
 end
 """
-    hclust_merges(res::Clustering.Hclust)
+    hclust_merges(ml::AbstractVector{<:Integer}, mr::AbstractVector{<:Integer},
+                  heights::AbstractVector)
 
 Copy the merges and the heights of a dendrogram into a `Clustering.HclustMerges`, so that a branch order can flip them.
 
 # Arguments
 
-  - `res`: The dendrogram.
+  - `ml`, `mr`: The left and the right child of each merge, in the convention of `Clustering.Hclust`.
+  - `heights`: The height of each merge.
 
 # Returns
 
-  - `hmer::Clustering.HclustMerges`: The merges and the heights of `res`, in its order.
+  - `hmer::Clustering.HclustMerges`: The merges and the heights, in their order, with `length(heights) + 1` leaves.
 
 # Related
 
   - [`branch_ordered_hclust`](@ref)
   - [`order_branches!`](@ref)
+  - [`generic_linkage_merges`](@ref)
+  - [`nn_chain_merges`](@ref)
 """
-function hclust_merges(res::Clustering.Hclust)
-    hmer = Clustering.HclustMerges{eltype(res.heights)}(length(res.order))
-    append!(hmer.mleft, view(res.merges, :, 1))
-    append!(hmer.mright, view(res.merges, :, 2))
-    append!(hmer.heights, res.heights)
+function hclust_merges(ml::AbstractVector{<:Integer}, mr::AbstractVector{<:Integer},
+                       heights::AbstractVector)
+    hmer = Clustering.HclustMerges{eltype(heights)}(length(heights) + 1)
+    append!(hmer.mleft, ml)
+    append!(hmer.mright, mr)
+    append!(hmer.heights, heights)
     return hmer
 end
 """
-    branch_ordered_hclust(D::MatNum, linkage::Symbol, bo::AbstractBranchOrder)
-    branch_ordered_hclust(D::MatNum, linkage::Symbol, ::BarJosephOrder)
-    branch_ordered_hclust(D::MatNum, linkage::Symbol, ::Nothing)
+    branch_ordered_hclust(D::MatNum, linkage::ClusteringLinkage, bo::AbstractBranchOrder)
+    branch_ordered_hclust(D::MatNum, linkage::ClusteringLinkage, ::BarJosephOrder)
+    branch_ordered_hclust(D::MatNum, linkage::ClusteringLinkage, ::Nothing)
+    branch_ordered_hclust(D::MatNum, linkage::AbstractLinkage,
+                          bo::Option{<:AbstractBranchOrder})
 
-Cluster `D` with `Clustering.hclust` under `linkage`, and order its leaves under the branch order `bo`.
+Cluster `D` under a member of [`AbstractLinkage`](@ref), and order its leaves under the branch order `bo`.
+
+A member that runs in `Clustering.hclust` gives its label of [`linkage_symbol`](@ref) to that function. Any other member runs in the kernel of the library, through [`linkage_merges`](@ref).
 
 # Algorithm
 
- 1. Cluster `D` into `res` with `Clustering.hclust` under `linkage` and its branch order `:barjoseph`. The branch order flips merges and moves no merge, so the merges keep the order in which the linkage made them. Under [`BarJosephOrder`](@ref), return `res`. `Clustering.hclust` then runs the heuristic on the squares of `D` under the linkage `:ward`.
+For a member that runs in `Clustering.hclust`:
+
+ 1. Cluster `D` into `res` with `Clustering.hclust` under the label of `linkage` and its branch order `:barjoseph`. The branch order flips merges and moves no merge, so the merges keep the order in which the linkage made them. Under [`BarJosephOrder`](@ref), return `res`. `Clustering.hclust` then runs the heuristic on the squares of `D` under the linkage `:ward`.
  2. Copy the merges and the heights of `res` into `hmer` with [`hclust_merges`](@ref).
  3. Flip `hmer` under `bo` with [`order_branches!`](@ref). Under `nothing`, flip it to the tree order with [`tree_order!`](@ref).
  4. Return `Clustering.Hclust(hmer, res.linkage)`, which reads the leaf order from the merges.
 
+For a member of the kernel:
+
+ 1. Cluster `D` into the merges `hmer` with [`linkage_merges`](@ref). The merges are in the order in which they happen, with their raw heights, and each row holds its older child first, which is the tree order.
+ 2. Flip `hmer` under `bo` with [`order_branches!`](@ref). [`ROrder`](@ref) sorts the merges by their cophenetic height, so no order puts a merge before its children.
+ 3. Return the `Clustering.Hclust` of `hmer`, under the label of [`linkage_symbol`](@ref).
+
 # Arguments
 
-  - `D`: The distance matrix. The cost of an order under [`OptimalLeafOrder`](@ref) is the sum of the entries of `D` itself, also when the linkage is `:ward`, which clusters the squares of `D`.
-  - `linkage`: The linkage of `Clustering.hclust`.
+  - `D`: The distance matrix. The cost of an order under [`OptimalLeafOrder`](@ref) is the sum of the entries of `D` itself, also when the linkage is [`WardLinkage`](@ref), which clusters the squares of `D`.
+  - `linkage`: The linkage.
   - `bo`: The branch order, a member of [`AbstractBranchOrder`](@ref), or `nothing` for the tree order.
 
 # Returns
 
-  - `res::Clustering.Hclust`: The dendrogram, with the leaf order of `bo`.
+  - `res::Clustering.Hclust`: The dendrogram, with the raw heights and the leaf order of `bo`.
 
 # Related
 
+  - [`AbstractLinkage`](@ref)
+  - [`linkage_merges`](@ref)
   - [`order_branches!`](@ref)
   - [`tree_order!`](@ref)
   - [`optimal_leaf_order!`](@ref)
   - [`AbstractBranchOrder`](@ref)
   - [`clusterise`](@ref)
 """
-function branch_ordered_hclust(D::MatNum, linkage::Symbol, bo::AbstractBranchOrder)
-    res = Clustering.hclust(D; linkage = linkage, branchorder = :barjoseph)
-    return Clustering.Hclust(order_branches!(hclust_merges(res), D, bo), res.linkage)
+function branch_ordered_hclust(D::MatNum, linkage::ClusteringLinkage,
+                               bo::AbstractBranchOrder)
+    res = Clustering.hclust(D; linkage = linkage_symbol(linkage), branchorder = :barjoseph)
+    hmer = hclust_merges(view(res.merges, :, 1), view(res.merges, :, 2), res.heights)
+    return Clustering.Hclust(order_branches!(hmer, D, bo), res.linkage)
 end
-function branch_ordered_hclust(D::MatNum, linkage::Symbol, ::BarJosephOrder)
-    return Clustering.hclust(D; linkage = linkage, branchorder = :barjoseph)
+function branch_ordered_hclust(D::MatNum, linkage::ClusteringLinkage, ::BarJosephOrder)
+    return Clustering.hclust(D; linkage = linkage_symbol(linkage), branchorder = :barjoseph)
 end
-function branch_ordered_hclust(D::MatNum, linkage::Symbol, ::Nothing)
-    res = Clustering.hclust(D; linkage = linkage, branchorder = :barjoseph)
-    return Clustering.Hclust(tree_order!(hclust_merges(res)), res.linkage)
+function branch_ordered_hclust(D::MatNum, linkage::ClusteringLinkage, ::Nothing)
+    res = Clustering.hclust(D; linkage = linkage_symbol(linkage), branchorder = :barjoseph)
+    hmer = hclust_merges(view(res.merges, :, 1), view(res.merges, :, 2), res.heights)
+    return Clustering.Hclust(tree_order!(hmer), res.linkage)
+end
+function branch_ordered_hclust(D::MatNum, linkage::AbstractLinkage,
+                               bo::Option{<:AbstractBranchOrder})
+    hmer = linkage_merges(linkage, D)
+    return Clustering.Hclust(order_branches!(hmer, D, bo), linkage_symbol(linkage))
 end
 """
     clusterise(cle::ClustersEstimator{<:Any, <:Any, <:HClustAlgorithm, <:Any},
@@ -686,7 +726,7 @@ Estimates the similarity and distance matrices from `X`, makes a dendrogram unde
 
  1. Estimate the similarity matrix `S` and the distance matrix `D` from `X` with [`cor_and_dist`](@ref), under `cle.de` and `cle.ce`.
  2. Refuse each asset that the reader could not estimate with [`assert_distance_reader_rows`](@ref). Then refuse any other `NaN` in `D`.
- 3. Cluster `D` into the dendrogram `res` under the linkage `cle.alg.linkage` and the branch order `cle.alg.branchorder` with [`branch_ordered_hclust`](@ref).
+ 3. Cluster `D` into the dendrogram `res` under the linkage `cle.alg.linkage`, a member of [`AbstractLinkage`](@ref), and the branch order `cle.alg.branchorder` with [`branch_ordered_hclust`](@ref).
  4. Select the number of clusters `k` with [`optimal_number_clusters`](@ref)`(cle.onc, res, D)`.
  5. Return `Clusters(; res = res, S = S, D = D, k = k)`. The field `P` keeps its default, `nothing`, because the clustering ran on `D` itself.
 
@@ -729,13 +769,13 @@ Cuts the tree at `k`, then walks the `k - 1` tallest nodes. Each internal node a
 
 # Only a tie in the heights makes the answer `false`
 
-When every height is distinct, the `k - 1` tallest nodes are the merges that the cut removes. Each of them then holds a whole cluster below one of its children, and the answer is `true`. Two merges of equal height break that match. `sortperm` orders `nodes` and `Clustering.cutree` makes the cut, and the two can disagree inside a tie, so the walk can reach a merge that the cut keeps. A dendrogram with distinct heights rejects no `k`. A balanced tree of eight leaves, with four merges at height 1, two at height 2 and one at height 3, admits only `k` in 1, 2, 4 and 8.
+When every height is distinct, the `k - 1` tallest nodes are the merges that the cut removes. Each of them then holds a whole cluster below one of its children, and the answer is `true`. Two merges of equal height break that match. [`tall_first_nodes`](@ref) puts the earlier of two tied merges first, and [`cut_dendrogram`](@ref) removes the later one first, so the walk can reach a merge that the cut keeps. A dendrogram with distinct heights rejects no `k`, also when it has an inversion. A balanced tree of eight leaves, with four merges at height 1, two at height 2 and one at height 3, admits only `k` in 1, 2, 4 and 8.
 
 `k = 1` is always valid, because the walk of step 3 is then empty.
 
 # Algorithm
 
- 1. Cut the tree at `k` with `Clustering.cutree`. The result is `idx`, one label per asset.
+ 1. Cut the tree at `k` with [`cut_dendrogram`](@ref). The result is `idx`, one label per asset.
  2. Collect the assets of each label into `clusters`, one vector of asset indices per cluster.
  3. Walk the `k - 1` tallest entries of `nodes`, and skip a leaf among them.
  4. List the leaves below the `left` child and below the `right` child of the node with [`pre_order`](@ref). Call the two lists `ln` and `rn`.
@@ -745,7 +785,7 @@ When every height is distinct, the `k - 1` tallest nodes are the merges that the
 # Arguments
 
   - `res`: The dendrogram.
-  - `nodes`: The nodes of the tree of `res`, sorted by descending height.
+  - `nodes`: The nodes of the tree of `res`, in the order of [`tall_first_nodes`](@ref).
   - `k`: The number of clusters to test.
 
 # Returns
@@ -758,7 +798,7 @@ When every height is distinct, the `k - 1` tallest nodes are the merges that the
   - [`ClusterNode`](@ref)
 """
 function validate_k_value(res::Clustering.Hclust, nodes::VecClN, k::Integer)
-    idx = Clustering.cutree(res; k = k)
+    idx = cut_dendrogram(res, k)
     clusters = Vector{Vector{Int}}(undef, length(minimum(idx):maximum(idx)))
     for i in eachindex(clusters)
         clusters[i] = findall(idx .== i)
@@ -794,7 +834,7 @@ The candidate is `argmax(arr)`, or `length(arr)` when no entry of `arr` is finit
 
 # Algorithm
 
- 1. Rebuild the tree with [`to_tree`](@ref) and sort its nodes by descending height into `nodes`.
+ 1. Rebuild the tree and order its nodes from the tallest into `nodes`, with [`tall_first_nodes`](@ref).
  2. Take the candidate `k`. It is `argmax(arr)`, or `length(arr)` when no entry of `arr` is finite.
  3. Ask [`validate_k_value`](@ref) whether the tree has a valid cut at `k`, and return `k` when it has.
  4. Return `1` when step 3 rejected `k` and no entry of `arr` is finite. A non-finite entry set to `typemin` stays non-finite, so step 2 would offer the same candidate again.
@@ -817,9 +857,7 @@ The loop ends after at most `length(arr)` rejections. Step 5 sets a rejected ent
   - [`optimal_number_clusters`](@ref)
 """
 function valid_k_clusters(res::Clustering.Hclust, arr::VecNum)
-    nodes = to_tree(res)[2]
-    heights = [i.height for i in nodes]
-    nodes = nodes[sortperm(heights; rev = true)]
+    nodes = tall_first_nodes(res)
     while true
         k = all(!isfinite, arr) ? length(arr) : argmax(arr)
         if validate_k_value(res, nodes, k)
@@ -853,7 +891,7 @@ The `Integer` method runs these steps. It replaces a stated count that is not va
 
  1. Read the stated count `onc.alg` into `k`, and the ceiling into `max_k`. The ceiling is `min(floor(Int, sqrt(N)), onc.max_k)`, where `N` is the number of assets. A `max_k` of `nothing` gives `floor(Int, sqrt(N))`.
  2. Lower `k` to `max_k` when it is larger.
- 3. Rebuild the tree with [`to_tree`](@ref) and sort its nodes by descending height into `nodes`.
+ 3. Rebuild the tree and order its nodes from the tallest into `nodes`, with [`tall_first_nodes`](@ref).
  4. Ask [`validate_k_value`](@ref) whether the tree has a valid cut at `k`, and return `k` when it has.
  5. Search upward from `k + 1` to `max_k` for the first valid count `ku`, at the distance `du = ku - k`. If the search finds none, `ku` stays at `k` and `du` at `0`.
  6. Search downward from `k - 1` to `1` for the first valid count `kl`, at the distance `dl = k - kl`. This search always finds one when `k > 1`, because `k = 1` is always a valid cut.
@@ -895,9 +933,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:Integer},
     if k > max_k
         k = max_k
     end
-    nodes = to_tree(res)[2]
-    heights = [i.height for i in nodes]
-    nodes = nodes[sortperm(heights; rev = true)]
+    nodes = tall_first_nodes(res)
     flag = validate_k_value(res, nodes, k)
     if !flag
         # Above k
@@ -946,7 +982,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
     max_k = isnothing(onc.max_k) ? floor(Int, sqrt(N)) : onc.max_k
     max_k = min(floor(Int, sqrt(N)), max_k)
     c1 = min(max_k + 2, N)
-    cluster_lvls = [Clustering.cutree(res; k = k) for k in 1:c1]
+    cluster_lvls = [cut_dendrogram(res, k) for k in 1:c1]
     measure_alg = onc.alg.alg
     W_list = Vector{eltype(D)}(undef, c1)
     W_list[1] = typemin(eltype(D))
@@ -957,7 +993,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
         for j in 1:c2
             cluster = lvl .== j
             cluster_D = D[cluster, cluster]
-            # No `isempty` guard. `Clustering.cutree` labels the assets `1:c2`, so no `j`
+            # No `isempty` guard. `cut_dendrogram` labels the assets `1:c2`, so no `j`
             # selects an empty submatrix; and an empty one would fall through to the
             # `isone(k)` arm below and contribute a zero, where the guard it replaced left
             # `D_list[j]` undefined for `sum` to read.
@@ -991,7 +1027,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SilhouetteS
     N = size(D, 1)
     max_k = isnothing(onc.max_k) ? floor(Int, sqrt(N)) : onc.max_k
     c1 = min(floor(Int, sqrt(N)), max_k)
-    cluster_lvls = [Clustering.cutree(res; k = i) for i in 1:c1]
+    cluster_lvls = [cut_dendrogram(res, i) for i in 1:c1]
     measure_alg = onc.alg.alg
     W_list = Vector{eltype(D)}(undef, c1)
     W_list[1] = typemin(eltype(D))
@@ -1002,7 +1038,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SilhouetteS
     return valid_k_clusters(res, W_list)
 end
 function Clustering.assignments(clr::Clusters{<:Clustering.Hclust, <:Any, <:Any, <:Any})
-    return Clustering.cutree(clr.res; k = clr.k)
+    return cut_dendrogram(clr.res, clr.k)
 end
 
 export ClusterNode, is_leaf, PreorderTreeByID, pre_order, to_tree, optimal_number_clusters,

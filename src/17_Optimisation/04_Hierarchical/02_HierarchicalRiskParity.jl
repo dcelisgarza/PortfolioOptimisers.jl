@@ -141,7 +141,8 @@ HierarchicalRiskParity
       │          │         │   power ┼ nothing
       │          │         │     alg ┴ CanonicalDistance()
       │          │     alg ┼ HClustAlgorithm
-      │          │         │       linkage ┼ Symbol: :ward
+      │          │         │       linkage ┼ WardLinkage
+      │          │         │               │   presquared ┴ Bool: false
       │          │         │   branchorder ┴ OptimalLeafOrder()
       │          │     onc ┼ OptimalNumberClusters
       │          │         │   max_k ┼ nothing
