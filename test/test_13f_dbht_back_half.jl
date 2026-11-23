@@ -308,12 +308,12 @@ using PortfolioOptimisers, Test, LinearAlgebra, StableRNGs, Clustering
 const PO = PortfolioOptimisers
 
 #=
-`branchorder = :optimal` is the exact optimal leaf ordering, #1494.
+`OptimalLeafOrder()` is the exact optimal leaf ordering, #1494.
 
 Clustering.jl maps `:optimal` and `:barjoseph` to one function, `orderbranches_barjoseph!`, a
-heuristic that flips each merge once from its four outermost leaves. The library dispatches
-`Val(branchorder)` before Clustering.jl reads the keyword: `:optimal` runs the dynamic
-programme of `optimal_leaf_order!`, and `:barjoseph` keeps the heuristic under its own name.
+heuristic that flips each merge once from its four outermost leaves. The library dispatches on
+the branch order member before Clustering.jl reads a keyword (#2174): `OptimalLeafOrder()` runs
+the dynamic programme of `optimal_leaf_order!`, and `BarJosephOrder()` keeps the heuristic.
 
 Every expected value here is a brute-force minimum over each combination of flips of the
 merges, never a value recorded from a run. A tree of `N` leaves has `N - 1` merges, so the
@@ -355,8 +355,8 @@ euclidean(X) = [norm(X[:, i] - X[:, j]) for i in axes(X, 2), j in axes(X, 2)]
         # is shorter.
         D = [0.0 1.653 1.25 0.746; 1.653 0.0 1.799 2.343; 1.25 1.799 0.0 1.833;
              0.746 2.343 1.833 0.0]
-        h = PO.branch_ordered_hclust(D, :ward, Val(:barjoseph))
-        r = PO.branch_ordered_hclust(D, :ward, Val(:optimal))
+        h = PO.branch_ordered_hclust(D, :ward, BarJosephOrder())
+        r = PO.branch_ordered_hclust(D, :ward, OptimalLeafOrder())
         @test h.order == [3, 1, 4, 2]
         @test r.order == [4, 1, 3, 2]
         @test adjacent_sum(D, r.order) ≈ 3.795 rtol = 1e-15
@@ -371,8 +371,8 @@ euclidean(X) = [norm(X[:, i] - X[:, j]) for i in axes(X, 2), j in axes(X, 2)]
         for linkage in (:single, :average, :complete, :ward), _ in 1:40
             N = rand(rng, 4:9)
             D = euclidean(randn(rng, 3, N))
-            h = PO.branch_ordered_hclust(D, linkage, Val(:barjoseph))
-            r = PO.branch_ordered_hclust(D, linkage, Val(:optimal))
+            h = PO.branch_ordered_hclust(D, linkage, BarJosephOrder())
+            r = PO.branch_ordered_hclust(D, linkage, OptimalLeafOrder())
             best = brute_force_minimum(D, h.merges[:, 1], h.merges[:, 2])
             # The measured gap is 0 on every tree, so the tolerance holds round-off alone.
             @test adjacent_sum(D, r.order) ≈ best rtol = 1e-12
@@ -397,15 +397,18 @@ euclidean(X) = [norm(X[:, i] - X[:, j]) for i in axes(X, 2), j in axes(X, 2)]
         rng = StableRNG(2001)
         X = randn(rng, 200, 9)
         clr = clusterise(ClustersEstimator(), X)
-        clh = clusterise(ClustersEstimator(), X; branchorder = :barjoseph)
+        clh = clusterise(ClustersEstimator(;
+                                           alg = HClustAlgorithm(;
+                                                                 branchorder = BarJosephOrder())),
+                         X)
         D = clr.D
         best = brute_force_minimum(D, clh.res.merges[:, 1], clh.res.merges[:, 2])
         @test adjacent_sum(D, clr.res.order) ≈ best rtol = 1e-12
         @test clr.k == clh.k
-        @test clusterise(ClustersEstimator(), X; branchorder = :r).res.order ==
-              hclust(D; linkage = :ward, branchorder = :r).order
-        @test_throws ArgumentError clusterise(ClustersEstimator(), X;
-                                              branchorder = :unknown)
+        @test clusterise(ClustersEstimator(;
+                                           alg = HClustAlgorithm(; branchorder = ROrder())),
+                         X).res.order == hclust(D; linkage = :ward, branchorder = :r).order
+        @test_throws TypeError HClustAlgorithm(; branchorder = :unknown)
     end
 
     @testset "DBHT dispatches the same names" begin
@@ -415,14 +418,14 @@ euclidean(X) = [norm(X[:, i] - X[:, j]) for i in axes(X, 2), j in axes(X, 2)]
             C = cor(X)
             D = sqrt.(clamp.((1 .- C) ./ 2, 0, 1))
             S = 1 .- D .^ 2
-            ro = PO.DBHTs(D, S; branchorder = :optimal)[end]
-            rb = PO.DBHTs(D, S; branchorder = :barjoseph)[end]
-            rd = PO.DBHTs(D, S; branchorder = :default)[end]
+            ro = PO.DBHTs(D, S; branchorder = OptimalLeafOrder())[end]
+            rb = PO.DBHTs(D, S; branchorder = BarJosephOrder())[end]
+            rd = PO.DBHTs(D, S; branchorder = nothing)[end]
             best = brute_force_minimum(D, rb.merges[:, 1], rb.merges[:, 2])
             @test adjacent_sum(D, ro.order) ≈ best rtol = 1e-12
             @test sort.(eachrow(ro.merges)) == sort.(eachrow(rb.merges))
             @test ro.heights == rb.heights == rd.heights
-            # `:barjoseph` is Clustering.jl's own heuristic on the unordered merges.
+            # `BarJosephOrder()` is Clustering.jl's own heuristic on the unordered merges.
             hmer = Clustering.HclustMerges{Float64}(9)
             append!(hmer.mleft, rd.merges[:, 1])
             append!(hmer.mright, rd.merges[:, 2])
