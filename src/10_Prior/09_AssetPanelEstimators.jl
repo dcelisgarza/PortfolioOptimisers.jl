@@ -402,7 +402,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Builds an Asset Panel that holds the factor loadings of the wrapped prior.
 
-`RegressionPanel` takes `pr.rr.L`, the coordinates that a factor model gives each asset, as the values of one tensor Panel Field, `"loadings"` on the axis `"factor"`. It needs no estimation of its own. A factor prior computes the loadings already, and refits them in each fold, so the features follow the fold.
+`RegressionPanel` takes `pr.rr.L`, the coordinates that a factor model gives each asset, as the values of one tensor Panel Field on the axis `"factor"`. The field is named `"loadings"`, or `name` when it is a string. It needs no estimation of its own. A factor prior computes the loadings already, and refits them in each fold, so the features follow the fold.
 
 # The matrix is `L`, not `M`
 
@@ -414,6 +414,22 @@ Both matrices have one row per asset, so the asset axis of the panel is the asse
 
     A walk-forward measurement compared the loadings of this producer, under [`FactorPrior`](@ref), with the distances that read the returns alone under the same prior. [`NestedClustered`](@ref) with the loadings had a lower risk on one data set, over 31 folds. It was one pass in about 75 comparisons of feature distances, so chance can explain it. Under [`HierarchicalRiskParity`](@ref), [`HierarchicalEqualRiskContribution`](@ref) and [`SchurComplementHierarchicalRiskParity`](@ref), the loadings gave no lower risk and no higher Sharpe ratio. [`FeatureDistance`](@ref) states the whole measurement.
 
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    RegressionPanel(;
+        name::Option{<:AbstractString} = nothing
+    ) -> RegressionPanel
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - $(val_dict[:pfname])
+
 # Validation
 
   - The call supplies a prior result. Raises an [`IsNothingError`](@ref) that names the call site.
@@ -423,7 +439,8 @@ Both matrices have one row per asset, so the asset axis of the panel is the asse
 
 ```jldoctest
 julia> RegressionPanel()
-RegressionPanel()
+RegressionPanel
+  name ┴ nothing
 ```
 
 # Related
@@ -435,14 +452,27 @@ RegressionPanel()
   - [`Regression`](@ref)
   - [`assert_prior_regression`](@ref)
   - [`panel_axis_labels`](@ref)
+  - [`resolve_panel_field_name`](@ref)
 """
-struct RegressionPanel <: AbstractAssetPanelEstimator end
+@concrete struct RegressionPanel <: AbstractAssetPanelEstimator
+    """
+    $(field_dict[:pfname])
+    """
+    name
+    function RegressionPanel(name::Option{<:AbstractString})
+        assert_panel_field_name(name)
+        return new{typeof(name)}(name)
+    end
+end
+function RegressionPanel(; name::Option{<:AbstractString} = nothing)::RegressionPanel
+    return RegressionPanel(name)
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Builds an Asset Panel that holds a square proximity matrix, graded from a graph or a partition.
 
-In an `assets × assets` proximity matrix, feature `k` of a row reads "is close to asset `k`". So a metric over the rows measures the overlap of two neighbourhoods, which is a standard measure of topological similarity, and it needs almost no new estimation code. `PhylogenyPanel` returns the matrix as one tensor Panel Field, `"proximity"` on the axis `"asset"`.
+In an `assets × assets` proximity matrix, feature `k` of a row reads "is close to asset `k`". So a metric over the rows measures the overlap of two neighbourhoods, which is a standard measure of topological similarity, and it needs almost no new estimation code. `PhylogenyPanel` returns the matrix as one tensor Panel Field on the axis `"asset"`. The field is named `"proximity"`, or `name` when it is a string.
 
 It is the one producer whose label axis is the asset axis, and it needs no flag for that. It refits, so a subproblem gets its own square matrix over its own assets, not a slice of a larger matrix. Where a panel supplied by hand meets a view, [`features_are_assets`](@ref) compares the labels of the field with the asset names of the returns data.
 
@@ -458,10 +488,16 @@ $(DocStringExtensions.FIELDS)
 
     PhylogenyPanel(;
         pl::NwE_ClE = NetworkEstimator(),
-        alg::AbstractPhylogenyFeatureAlgorithm = Proximity()
+        alg::AbstractPhylogenyFeatureAlgorithm = Proximity(),
+        name::Option{<:AbstractString} = nothing
     ) -> PhylogenyPanel
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `isnothing(returns_source(pl))`, else an `ArgumentError`, through [`assert_inner_reader`](@ref).
+  - $(val_dict[:pfname])
 
 ## Propagated parameters
 
@@ -511,36 +547,37 @@ It reads no prior result, so it is the one producer that runs where no prior exi
 ```jldoctest
 julia> PhylogenyPanel()
 PhylogenyPanel
-   pl ┼ NetworkEstimator
-      │      ce ┼ PortfolioOptimisersCovariance
-      │         │   ce ┼ Covariance
-      │         │      │    me ┼ SimpleExpectedReturns
-      │         │      │       │   w ┴ nothing
-      │         │      │    ce ┼ GeneralCovariance
-      │         │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │         │      │       │    w ┴ nothing
-      │         │      │   alg ┼ FullMoment()
-      │         │      │     w ┴ nothing
-      │         │   mp ┼ MatrixProcessing
-      │         │      │     pdm ┼ Posdef
-      │         │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │         │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │         │      │      dn ┼ nothing
-      │         │      │      dt ┼ nothing
-      │         │      │     alg ┼ nothing
-      │         │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │      de ┼ Distance
-      │         │   power ┼ nothing
-      │         │     alg ┴ CanonicalDistance()
-      │     alg ┼ KruskalTree
-      │         │     args ┼ Tuple{}: ()
-      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │     sep ┼ HopCount
-      │         │   n ┼ CountOf
-      │         │     │   val ┴ Int64: 1
-      │   x_src ┴ nothing
-  alg ┼ Proximity
-      │   decay ┴ LinearDecay()
+    pl ┼ NetworkEstimator
+       │      ce ┼ PortfolioOptimisersCovariance
+       │         │   ce ┼ Covariance
+       │         │      │    me ┼ SimpleExpectedReturns
+       │         │      │       │   w ┴ nothing
+       │         │      │    ce ┼ GeneralCovariance
+       │         │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+       │         │      │       │    w ┴ nothing
+       │         │      │   alg ┼ FullMoment()
+       │         │      │     w ┴ nothing
+       │         │   mp ┼ MatrixProcessing
+       │         │      │     pdm ┼ Posdef
+       │         │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+       │         │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+       │         │      │      dn ┼ nothing
+       │         │      │      dt ┼ nothing
+       │         │      │     alg ┼ nothing
+       │         │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+       │      de ┼ Distance
+       │         │   power ┼ nothing
+       │         │     alg ┴ CanonicalDistance()
+       │     alg ┼ KruskalTree
+       │         │     args ┼ Tuple{}: ()
+       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+       │     sep ┼ HopCount
+       │         │   n ┼ CountOf
+       │         │     │   val ┴ Int64: 1
+       │   x_src ┴ nothing
+   alg ┼ Proximity
+       │   decay ┴ LinearDecay()
+  name ┴ nothing
 ```
 
 # Related
@@ -562,14 +599,21 @@ PhylogenyPanel
     $(field_dict[:plfalg])
     """
     alg
-    function PhylogenyPanel(pl::NwE_ClE, alg::AbstractPhylogenyFeatureAlgorithm)
+    """
+    $(field_dict[:pfname])
+    """
+    name
+    function PhylogenyPanel(pl::NwE_ClE, alg::AbstractPhylogenyFeatureAlgorithm,
+                            name::Option{<:AbstractString})
         assert_inner_reader(pl, :pl, :PhylogenyPanel)
-        return new{typeof(pl), typeof(alg)}(pl, alg)
+        assert_panel_field_name(name)
+        return new{typeof(pl), typeof(alg), typeof(name)}(pl, alg, name)
     end
 end
 function PhylogenyPanel(; pl::NwE_ClE = NetworkEstimator(),
-                        alg::AbstractPhylogenyFeatureAlgorithm = Proximity())::PhylogenyPanel
-    return PhylogenyPanel(pl, alg)
+                        alg::AbstractPhylogenyFeatureAlgorithm = Proximity(),
+                        name::Option{<:AbstractString} = nothing)::PhylogenyPanel
+    return PhylogenyPanel(pl, alg, name)
 end
 """
     asset_panel(ape::RegressionPanel, pr, rd, X) -> AssetPanel
@@ -577,7 +621,7 @@ end
 
 Build the static [`AssetPanel`](@ref) of a producer, at the point of use.
 
-Each method returns a panel that holds one [`TensorPanelField`](@ref), because a loadings matrix and a proximity matrix are each one quantity with a labelled second axis. The labels of the label axis come from the returns data or from the regression block where a name exists, and are positions otherwise. [`panel_axis_labels`](@ref) and [`regression_factor_names`](@ref) state the rule.
+Each method returns a panel that holds one [`TensorPanelField`](@ref), because a loadings matrix and a proximity matrix are each one quantity with a labelled second axis. The field takes the resolved name of the producer, see [`resolve_panel_field_name`](@ref). The labels of the label axis come from the returns data or from the regression block where a name exists, and are positions otherwise. [`panel_axis_labels`](@ref) and [`regression_factor_names`](@ref) state the rule.
 
 A producer runs on the prior and the returns of its own subproblem, so no view reads the panel that it builds, and a fold refits it. Called on its own, on a prior fitted on a point-in-time Asset Panel, a [`RegressionPanel`](@ref) reads the loadings on the Investable Mask of the prior and answers for the full universe. Outside the mask each asset gets a zero row and a false observed mask, so an optimiser can take the panel back. [`expand_investable_loadings`](@ref) states the rule.
 
@@ -591,13 +635,13 @@ A [`RegressionPanel`](@ref) takes seven steps:
  4. Count the assets on the mask whose loadings are not all finite, giving `nnf`, and refuse a count above zero. Such an asset has a finite moment and a loadings row that is not finite, which is a defect of the regression.
  5. Label the loadings axis with [`panel_axis_labels`](@ref), from [`regression_factor_names`](@ref).
  6. Expand the loadings back onto the full universe with [`expand_investable_loadings`](@ref), giving `vals` and `omsk`.
- 7. Return the panel that holds them as the field `"loadings"` on the axis `"factor"`.
+ 7. Return the panel that holds them as one field on the axis `"factor"`, named `"loadings"` or `ape.name`.
 
 A [`PhylogenyPanel`](@ref) takes three steps:
 
  1. Grade the structure into an `assets × assets` matrix with [`phylogeny_features`](@ref), giving `Zp`.
  2. Label the label axis with [`panel_axis_labels`](@ref), from [`returns_asset_names`](@ref).
- 3. Return the panel that holds `Zp` as the field `"proximity"` on the axis `"asset"`.
+ 3. Return the panel that holds `Zp` as one field on the axis `"asset"`, named `"proximity"` or `ape.name`.
 
 # Arguments
 
@@ -635,7 +679,10 @@ function asset_panel(ape::RegressionPanel, pr, rd, ::Any)
               IsNonFiniteError("`RegressionPanel` reads the factor loadings `pr.rr.L` as a Panel Field, and $(nnf) of the $(size(L, 1)) assets inside the prior's Investable Mask carry a loading that is not finite, so the field cannot be built over them. An asset outside the mask is written as a zero placeholder row and never reaches this check, so every asset it counts has a finite moment and a loadings row that is not: a defect of the regression, not of the universe.\nGot\npr => $(nameof(typeof(pr)))\nrr => $(nameof(typeof(pr.rr)))\nassets with a non-finite loading => $(nnf)"))
     vals, omsk = expand_investable_loadings(L, imsk)
     return AssetPanel(;
-                      pf = [TensorPanelField(; name = "loadings", axis = "factor",
+                      pf = [TensorPanelField(;
+                                             name = resolve_panel_field_name(ape.name,
+                                                                             "loadings"),
+                                             axis = "factor",
                                              labels = panel_axis_labels(regression_factor_names(prr.rr,
                                                                                                 rd),
                                                                         size(L, 2)),
@@ -650,7 +697,7 @@ Write the loadings that a [`RegressionPanel`](@ref) read on the Investable Mask 
 
 A prior fitted on a point-in-time Asset Panel writes `NaN` into the loadings of every asset outside its Investable Mask, and a Panel Field admits no `NaN`. So the producer reads the loadings on the mask, and this function expands them. Each asset outside the mask gets a zero row and a false observed mask. Every uncertainty set that a caller fits on its own on such a prior follows the same rule. The producer marks the row as a placeholder too: its placeholder mask is the negation of the observed mask, because no loading exists there.
 
-A zero row is a placeholder, not a zero feature vector. A [`FeatureDistance`](@ref) reads no placeholder: a direct call refuses such an asset by name. An optimiser hands the producer the prior reduced to the mask, so a fit meets no such row. The selector `"loadings" => :observed` reads the mask as a column.
+A zero row is a placeholder, not a zero feature vector. A [`FeatureDistance`](@ref) reads no placeholder: a direct call refuses such an asset by name. An optimiser hands the producer the prior reduced to the mask, so a fit meets no such row. The selector `"loadings" => :observed` reads the mask as a column. `"loadings"` is the derived name, and the selector names the resolved name of the producer, see [`resolve_panel_field_name`](@ref).
 
 # Mathematical definition
 
@@ -713,7 +760,10 @@ end
 function asset_panel(ape::PhylogenyPanel, ::Any, rd, X::MatNum)
     Zp = phylogeny_features(ape.alg, ape.pl, X)
     return AssetPanel(;
-                      pf = [TensorPanelField(; name = "proximity", axis = "asset",
+                      pf = [TensorPanelField(;
+                                             name = resolve_panel_field_name(ape.name,
+                                                                             "proximity"),
+                                             axis = "asset",
                                              labels = panel_axis_labels(returns_asset_names(rd),
                                                                         size(Zp, 2)),
                                              vals = Zp)])

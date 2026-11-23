@@ -216,7 +216,7 @@ The statement on a Feature Distance that says which Panel Fields the Feature Mat
 *Avoid*: reading an entry as a column position. Every column has a name. And a taxonomy key, which is the name of a categorical Panel Field, not a second namespace.
 
 **Asset Panel Estimator**
-A producer that turns something the library already computes into a static Asset Panel with one Panel Field, at the point of use. `RegressionPanel` builds a loadings tensor from the regression of the prior, and `PhylogenyPanel` builds a proximity tensor from the returns. It is configuration on a Feature Distance, so it refits on the universe of the subproblem that runs it, and it holds no data.
+A producer that turns something the library already computes into a static Asset Panel with one Panel Field, at the point of use. `RegressionPanel` builds a loadings tensor from the regression of the prior, and `PhylogenyPanel` builds a proximity tensor from the returns. Each producer derives the name of its Panel Field, `"loadings"` or `"proximity"`, and a string in its `name` field replaces the derived name. It is configuration on a Feature Distance, so it refits on the universe of the subproblem that runs it, and it holds no data.
 *Avoid*: reading it as a source of a Feature Matrix. It makes a panel, and the matrix is stacked from that panel as from any other panel. And a classification that the caller supplies, which enters `asset_panel` as a categorical Panel Field, not through a producer.
 
 **Asset Panel**

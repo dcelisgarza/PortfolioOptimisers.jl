@@ -83,19 +83,23 @@ function assert_panel_labels(labels::VecStr, sym::Sym_Str)::Nothing
     return nothing
 end
 """
+    assert_panel_field_name(name::Nothing) -> nothing
     assert_panel_field_name(name::AbstractString) -> nothing
 
 Check that a Panel Field's name is not empty.
 
-[`panel_field`](@ref) finds a Panel Field by its name, so it cannot find a Panel Field with an empty name.
+[`panel_field`](@ref) finds a Panel Field by its name, so it cannot find a Panel Field with an empty name. A producer such as [`RegressionPanel`](@ref) runs the check in its constructor, on the name that replaces its derived name. There, `nothing` selects the derived name, which is never empty, so the check passes.
 
 # Algorithm
 
- 1. Check that `name` is not empty.
+The method that Julia selects is the algorithm.
+
+ 1. `name` is `nothing`: return.
+ 2. `name` is a string: check that it is not empty.
 
 # Arguments
 
-  - `name`: The Panel Field's name.
+  - `name`: The Panel Field's name, or `nothing` for the derived name of a producer.
 
 # Validation
 
@@ -109,11 +113,52 @@ Check that a Panel Field's name is not empty.
 
   - [`AbstractPanelField`](@ref)
   - [`panel_field`](@ref)
+  - [`resolve_panel_field_name`](@ref)
 """
+function assert_panel_field_name(::Nothing)::Nothing
+    return nothing
+end
 function assert_panel_field_name(name::AbstractString)::Nothing
     @argcheck(!isempty(name),
               IsEmptyError("the name of a Panel Field cannot be empty: it is the key the panel is looked up by"))
     return nothing
+end
+"""
+    resolve_panel_field_name(name::Nothing, dname::AbstractString) -> dname
+    resolve_panel_field_name(name::AbstractString, dname::AbstractString) -> name
+
+Resolve the name of the Panel Field that a producer builds.
+
+A producer derives the name of its field, such as `"loadings"` for a [`RegressionPanel`](@ref) and `"proximity"` for a [`PhylogenyPanel`](@ref). Its `name` field is `nothing` for that derived name, or a string that replaces it. The Feature Selector, [`feature_labels`](@ref) and every message read the field by the name that this function returns.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `name` is `nothing`: return the derived name `dname`.
+ 2. `name` is a string: return `name`.
+
+# Arguments
+
+  - `name`: The `name` field of the producer.
+  - `dname`: The name that the producer derives.
+
+# Returns
+
+  - `name::AbstractString`: The name of the Panel Field.
+
+# Related
+
+  - [`assert_panel_field_name`](@ref)
+  - [`RegressionPanel`](@ref)
+  - [`PhylogenyPanel`](@ref)
+  - [`asset_panel`](@ref)
+"""
+function resolve_panel_field_name(::Nothing, dname::AbstractString)
+    return dname
+end
+function resolve_panel_field_name(name::AbstractString, ::AbstractString)
+    return name
 end
 """
     assert_panel_field_shape(vals::AbstractArray, name::AbstractString, s::Integer, t::Integer) -> nothing
