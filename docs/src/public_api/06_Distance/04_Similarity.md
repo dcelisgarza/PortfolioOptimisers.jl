@@ -11,6 +11,7 @@ GeneralExponentialSimilarity
 ComplementSimilarity
 AngularSimilarity
 ChordSimilarity
+default_similarity
 ```
 
 ## References

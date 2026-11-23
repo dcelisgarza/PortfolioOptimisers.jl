@@ -179,14 +179,14 @@ end
 
 Answer whether `x` reads the returns matrix with a plain moment estimator, which refuses a gap in the matrix.
 
-A graph reader, a clustering, network, phylogeny, centrality or seriation estimator, computes the correlation of the returns matrix with its `ce`. [`gap_fill_value`](@ref) on `ce` states what the estimator does with a gap. A finite answer marks a plain estimator, which refuses a gapped sample. `NaN` marks a mask-aware estimator, which reads the observed cells. A [`FeatureDistance`](@ref) reads the features of an Asset Panel and not the returns matrix, so a reader that holds one is not plain. A precomputed result reads nothing.
+A graph reader, a clustering, network, phylogeny, centrality or seriation estimator, computes the correlation of the returns matrix with its `ce`. [`gap_fill_value`](@ref) on `ce` states what the estimator does with a gap. A finite answer marks a plain estimator, which refuses a gapped sample. `NaN` marks a mask-aware estimator, which reads the observed cells. A [`FeatureDistance`](@ref) reads the features of an Asset Panel and not the returns matrix, so a reader that holds one is not plain. A reader that holds a [`BlendDistance`](@ref) is plain when one of its parts reads the returns matrix. A precomputed result reads nothing.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
  1. A `Tuple` or a vector: `true` when one of its entries is plain.
- 2. A [`ClustersEstimator`](@ref), a [`NetworkEstimator`](@ref) or a [`SpectralSeriation`](@ref): `true` when `gap_fill_value(x.ce)` is finite, and `false` when `x.de` is a [`FeatureDistance`](@ref).
+ 2. A [`ClustersEstimator`](@ref), a [`NetworkEstimator`](@ref) or a [`SpectralSeriation`](@ref): `true` when [`reads_returns_matrix`](@ref) of `x.de` answers `true` and `gap_fill_value(x.ce)` is finite. So a [`FeatureDistance`](@ref) answers `false`, and a [`BlendDistance`](@ref) answers `true` when one of its parts reads the returns.
  3. An estimator that holds a graph reader: forward to the reader that it holds.
  4. Every other value, a precomputed result and `nothing` among them: `false`.
 
@@ -203,6 +203,7 @@ The method that Julia selects is the algorithm.
   - [`assert_graph_readable`](@ref)
   - [`graph_reader_mask`](@ref)
   - [`gap_fill_value`](@ref)
+  - [`reads_returns_matrix`](@ref)
 """
 function plain_graph_reader(::Any)
     return false
@@ -210,24 +211,15 @@ end
 function plain_graph_reader(xs::Union{Tuple, AbstractVector})
     return any(plain_graph_reader, xs)
 end
-function plain_graph_reader(x::Union{ClustersEstimator, NetworkEstimator})
-    return isfinite(gap_fill_value(x.ce))
-end
-function plain_graph_reader(::Union{ClustersEstimator{<:Any, <:FeatureDistance},
-                                    NetworkEstimator{<:Any, <:FeatureDistance}})
-    return false
+function plain_graph_reader(x::Union{ClustersEstimator, NetworkEstimator,
+                                     SpectralSeriation})
+    return reads_returns_matrix(x.de) && isfinite(gap_fill_value(x.ce))
 end
 function plain_graph_reader(x::NetworkClustersEstimator)
     return plain_graph_reader(x.nte)
 end
 function plain_graph_reader(x::HierarchicalSeriation)
     return plain_graph_reader(x.cle)
-end
-function plain_graph_reader(x::SpectralSeriation)
-    return isfinite(gap_fill_value(x.ce))
-end
-function plain_graph_reader(::SpectralSeriation{<:Any, <:FeatureDistance})
-    return false
 end
 function plain_graph_reader(x::Union{CentralityEstimator, SemiDefinitePhylogenyEstimator,
                                      IntegerPhylogenyEstimator})

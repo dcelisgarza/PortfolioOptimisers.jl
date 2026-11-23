@@ -592,8 +592,10 @@ end
     default_similarity(metric::Distances.SemiMetric)
     default_similarity(metric::AngularDist)
     default_similarity(metric::ChordDist)
+    default_similarity(alg::AbstractDistanceBlendAlgorithm)
+    default_similarity(alg::QuadraticBlend)
 
-Select the similarity matrix algorithm that is the inverse of a distance metric.
+Select the similarity matrix algorithm that is the inverse of a distance metric, or of a blend rule.
 
 A distance algorithm calls it to get the default of its similarity field from its metric. The printed object then shows the selected similarity, and the distance kernel does not select it out of view. The fallback is [`ComplementSimilarity`](@ref), the named inverse of each metric that is one minus a similarity. A metric whose inverse is not linear adds its own method.
 
@@ -601,7 +603,7 @@ A distance algorithm calls it to get the default of its similarity field from it
 
  1. Select the method by the type of `metric`. Dispatch does the selection, so a metric whose inverse is not linear adds a method of its own, and this function needs no branch for it.
 
- 2. Return the similarity that the method names. There are three methods now.
+ 2. Return the similarity that the method names. There are three methods for a metric.
 
       + `metric::Distances.SemiMetric` is the fallback, and returns [`ComplementSimilarity`](@ref). Each metric that is one minus a similarity reaches this method, and the complement recovers that named similarity.
       + `metric::AngularDist` returns [`AngularSimilarity`](@ref), the exact algebraic inverse of the angular distance.
@@ -609,11 +611,17 @@ A distance algorithm calls it to get the default of its similarity field from it
 
     `src/06_Distance/05_FeatureDistance.jl` declares the last two methods, next to their metrics, and this docstring documents them.
 
+ 3. A [`BlendDistance`](@ref) calls it on its blend rule. `src/06_Distance/07_BlendDistance.jl` declares these two methods, and this docstring documents them.
+
+      + `alg::AbstractDistanceBlendAlgorithm` is the fallback, and returns [`ComplementSimilarity`](@ref).
+      + `alg::QuadraticBlend` returns [`ChordSimilarity`](@ref). On chord parts, the quadratic blend is the chord distance of the weighted mean of the cosines or correlations of the parts, and the chord similarity recovers that mean exactly.
+
 The pair that this function makes is correct, because it selects the inverse of the metric that it gets. A similarity that the caller selects has no such guarantee. [`ComplementSimilarity`](@ref), [`AngularSimilarity`](@ref) and [`ChordSimilarity`](@ref) state what a wrong pair returns.
 
 # Arguments
 
   - `metric`: The distance metric.
+  - `alg`: The blend rule of a [`BlendDistance`](@ref).
 
 # Returns
 
@@ -641,6 +649,8 @@ ChordSimilarity()
   - [`AngularDist`](@ref)
   - [`ChordDist`](@ref)
   - [`FeatureDistance`](@ref)
+  - [`BlendDistance`](@ref)
+  - [`QuadraticBlend`](@ref)
   - [`distance_to_similarity`](@ref)
 """
 function default_similarity(::Distances.SemiMetric)::ComplementSimilarity
@@ -649,3 +659,4 @@ end
 
 export MaximumDistanceSimilarity, ExponentialSimilarity, GeneralExponentialSimilarity,
        ComplementSimilarity, AngularSimilarity, ChordSimilarity
+public default_similarity

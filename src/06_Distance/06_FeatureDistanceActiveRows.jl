@@ -821,7 +821,7 @@ Every fit that clusters or builds a phylogeny calls it: [`HierarchicalRiskParity
 The method that Julia selects is the algorithm.
 
  1. For a `Tuple` or a vector, compose the mask of each entry in turn.
- 2. For an estimator that holds a distance estimator, such as a [`ClustersEstimator`](@ref), forward to the estimator it holds.
+ 2. For an estimator that holds a distance estimator, such as a [`ClustersEstimator`](@ref), forward to the estimator it holds. A [`BlendDistance`](@ref) composes the mask of each of its parts with a positive weight in turn, so an asset that one part cannot read leaves the fit. A part with weight zero drops no asset. `07_BlendDistance.jl` declares that method.
  3. For a [`FeatureDistance`](@ref) with no producer, on returns data that holds a panel, take the mask of readable cells in the rows that the collapse reads, with [`entry_activity`](@ref). Compose it with `imsk` through [`compose_readable_mask`](@ref).
  4. In every other case, a producer and returns data with no panel included, return `imsk` unchanged.
 

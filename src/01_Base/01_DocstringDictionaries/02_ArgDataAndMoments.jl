@@ -109,6 +109,12 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :fdstrict => "`strict`: Whether a `sel` entry throws when it names a field, a level, a label or a group that the Asset Panel does not hold. When `strict` is `false`, the entry warns, and the estimator drops it.",#
                  :fdrows => "`rows`: The observation rows a time-varying Asset Panel stacks, as positions or as a `Bool` mask, and `Colon()` for every row. A static panel has no observation axis and refuses any other value.",#
                  :fdplc => "`placeholder`: The value that the Feature Matrix holds at a value column's cell that holds the placeholder of a blank that no fill reached, or `nothing` to keep the stored placeholder. A cell that a fill policy wrote holds data, and the Feature Matrix keeps its value. The default `NaN` shows where no data exists, so no reader takes the placeholder as data.",#
+                 :bddes => "`des`: The parts of the blend, a non-empty vector of distance estimators. Each part computes its own distance matrix from the same arguments.",#
+                 :bdw => "`w`: The weight of each part, one entry for each part, or `nothing` for equal weights. The kernel divides the weights by their sum. A part with weight `0` computes nothing and drops no asset.",#
+                 :bdalg => "`alg`: The blend rule, which joins the distance matrices of the parts into one.",#
+                 :bdscale => "`scale`: The scale rule that changes the units of the distance matrix of a part before the blend. One rule for every part, a vector with one rule or `nothing` for each part, or `nothing` to read each part in its own units.",#
+                 :bdsim => "`sim`: Similarity matrix algorithm that computes the similarity matrix from the blended distance matrix.",#
+                 :bdp => "`p`: The exponent of the power mean, above `1` and not `2`, or `Inf` for the largest distance over the parts with a positive weight.",#
                  # Stats.
                  :sigma => "`sigma`: Covariance matrix `assets × assets`.",#
                  :mu => "`mu`: Expected returns vector `assets × 1`.",#

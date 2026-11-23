@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.4"
 julia_syntax = "1.0.2"
-commit = "dcde7d2b85"
+commit = "b6d553a455"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { code = 35, doc = 0, comment = 5, blank = 4, total = 44 }
@@ -206,6 +206,7 @@ commit = "dcde7d2b85"
 "src/06_Distance/04_Similarity.jl" = { code = 61, doc = 359, comment = 0, blank = 162, total = 582 }
 "src/06_Distance/05_FeatureDistance.jl" = { code = 305, doc = 962, comment = 6, blank = 449, total = 1722 }
 "src/06_Distance/06_FeatureDistanceActiveRows.jl" = { code = 351, doc = 582, comment = 7, blank = 324, total = 1264 }
+"src/06_Distance/07_BlendDistance.jl" = { code = 140, doc = 373, comment = 0, blank = 175, total = 688 }
 "src/07_JuMPModelOptimisation.jl" = { code = 94, doc = 210, comment = 3, blank = 92, total = 399 }
 "src/08_Phylogeny/01_Base_Phylogeny.jl" = { code = 134, doc = 612, comment = 11, blank = 300, total = 1057 }
 "src/08_Phylogeny/02_Clusters.jl" = { code = 127, doc = 479, comment = 0, blank = 191, total = 797 }

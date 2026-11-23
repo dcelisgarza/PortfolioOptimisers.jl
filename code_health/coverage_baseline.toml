@@ -204,6 +204,7 @@ commit = "391be5e"
 "src/06_Distance/04_Similarity.jl" = { lines = 31, misses = 0 }
 "src/06_Distance/05_FeatureDistance.jl" = { lines = 173, misses = 0 }
 "src/06_Distance/06_FeatureDistanceActiveRows.jl" = { lines = 203, misses = 0 }
+"src/06_Distance/07_BlendDistance.jl" = { lines = 69, misses = 0 }
 "src/07_JuMPModelOptimisation.jl" = { lines = 46, misses = 0 }
 "src/08_Phylogeny/01_Base_Phylogeny.jl" = { lines = 56, misses = 0 }
 "src/08_Phylogeny/02_Clusters.jl" = { lines = 42, misses = 0 }

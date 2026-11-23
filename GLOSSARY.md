@@ -657,6 +657,10 @@ An asset that it cannot read departs at the entry of a fit as a non-investable a
 Its checks read the same cells as its collapse. A cell must be finite and in the domain of the metric only where the asset is readable. So a `NaN` or a negative value at an unreadable cell refuses nothing and changes no distance (#1734).
 *Avoid*: reading an inactive cell or a Placeholder as a value that the distance measures. An inactive cell holds a fill value, a zero or a stale value, and a Placeholder holds no data (ADR 0102), so no collapse reads either. Also avoid skipping a cell that a fill policy wrote. It holds data (#1631).
 
+**Distance Blend**
+One Distance Matrix made from the Distance Matrices of several Distance Estimators, its parts, by `BlendDistance`. Each part computes its own matrix from the same arguments, and keeps its own panel, metric, collapse and readable rule. A scale rule (`MaximumScale`, or `nothing` for the units of the part) can change the units of each part, and a blend rule joins the parts under the weights `w`: `QuadraticBlend`, √(Σ w_k D_k²), by default, `ArithmeticBlend`, or `PowerBlend(; p)`. On chord parts, the quadratic blend is the chord distance of the weighted mean of their cosines or correlations, so its default similarity is `ChordSimilarity`. An asset that one part cannot read leaves the fit, and a part with weight zero computes nothing (#2196).
+*Avoid*: a merge of Asset Panels to measure two kinds of data in one distance. The blend needs no merge (#2196). Also avoid reading a weight as the share of the structure that a part gives: a part with a larger spread of values, such as a taxonomy, sets the tree at every weight (#2206).
+
 **Similarity Matrix Algorithm**
 The transform that turns a Distance Matrix into a similarity matrix: `MaximumDistanceSimilarity`, `ExponentialSimilarity`, `GeneralExponentialSimilarity`, `ComplementSimilarity`, `AngularSimilarity`, `ChordSimilarity`.
 

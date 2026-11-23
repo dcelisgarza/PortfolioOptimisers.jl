@@ -362,7 +362,7 @@ struct CanonicalDistance <: AbstractDistanceAlgorithm end
 
 The fallbacks of [`reads_sample_values`](@ref) for the distance family.
 
-[`logo!`](@ref) reads the data `X` only through its distance estimator. So [`reads_sample_values`](@ref) of a [`LoGo`](@ref) gives the answer of its distance estimator, and a [`Distance`](@ref) or a [`DistanceDistance`](@ref) gives the answer of its algorithm. These fallbacks answer `true`, because the library cannot see what a type of your own reads. An incremental fit then refuses the step. The algorithms that read the correlation matrix alone answer `false` with a method in `02_Distance.jl`. [`VariationInfoDistance`](@ref) reads the data and takes the fallback, and so does [`FeatureDistance`](@ref), which reads a panel.
+[`logo!`](@ref) reads the data `X` only through its distance estimator. So [`reads_sample_values`](@ref) of a [`LoGo`](@ref) gives the answer of its distance estimator, and a [`Distance`](@ref) or a [`DistanceDistance`](@ref) gives the answer of its algorithm. These fallbacks answer `true`, because the library cannot see what a type of your own reads. An incremental fit then refuses the step. The algorithms that read the correlation matrix alone answer `false` with a method in `02_Distance.jl`. [`VariationInfoDistance`](@ref) reads the data and takes the fallback, and so does [`FeatureDistance`](@ref), which reads a panel. A [`BlendDistance`](@ref) answers `true` when one of its parts with a positive weight answers `true`, with a method in `07_BlendDistance.jl`.
 
 # Algorithm
 
