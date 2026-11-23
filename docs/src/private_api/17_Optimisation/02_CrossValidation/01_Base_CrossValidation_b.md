@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base Cross Validation (b), private API of PortfolioOptimisers.jl: Fold, fit_and_predict, sort_predictions, cv_sequential_info, parallel_folds, run_folds, …"
+Description = "Base Cross Validation (b), private API of PortfolioOptimisers.jl: Fold, fit_and_predict, reconstruct_rd, sort_predictions, cv_sequential_info, …"
 ```
 
 # Base Cross Validation (b): private API
@@ -7,6 +7,7 @@ Description = "Base Cross Validation (b), private API of PortfolioOptimisers.jl:
 ```@docs
 Fold
 fit_and_predict
+reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult, X::VecNum)
 sort_predictions(test_idx::VecVecInt, predictions::VecPredRes)
 cv_sequential_info
 parallel_folds

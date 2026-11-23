@@ -1783,6 +1783,10 @@ In order to implement a new previous-weights source which will work seamlessly w
   - `previous_weights(pws::AbstractPreviousWeightsSource, prev::PredictionResult) -> VecNum_VecVecNum`: Read the weights the previous fold threads into the fold that follows it. A fallback method reads the held weights of the previous fold, `prev.hw.w`, so it is only needed when the source threads something else.
   - `held_weights_drift(wd::Nothing, pws::AbstractPreviousWeightsSource) -> AbstractWeightDrift`: Give the Weight Drift that computes the held weights when the scheme drifts nothing. A fallback method gives [`SelfFinancingDrift`](@ref), so it is only needed when the source drifts its held weights in another way.
 
+# The second job
+
+The family also names the weights of a fold that a [`DependencyExposure`](@ref) describes, in its field `src`. [`exposure_weights`](@ref) gives them: [`TargetWeights`](@ref) gives the target of each fold, one row for each fold, and [`DriftedWeights`](@ref) gives the weight path, one row for each observation. A new source that the exposure reads implements `exposure_weights(src::MySource, pred::PredictionResult, j::Integer = 1) -> Tuple{Matrix, Vector{Int}}`, the rows of weights of member `j` and the row of the fold of each. A source with no method gives a `MethodError` in [`dependency_exposure`](@ref).
+
 # Related
 
   - [`DriftedWeights`](@ref)
@@ -1790,6 +1794,7 @@ In order to implement a new previous-weights source which will work seamlessly w
   - [`resolve_previous_weights_source`](@ref)
   - [`previous_weights`](@ref)
   - [`held_weights_drift`](@ref)
+  - [`exposure_weights`](@ref)
   - [`AbstractWeightDrift`](@ref)
   - [`IndexWalkForward`](@ref)
   - [`DateWalkForward`](@ref)

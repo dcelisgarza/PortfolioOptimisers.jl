@@ -130,6 +130,8 @@
       - A feature distance averages the integer count of a metric such as `Hamming`.
       - A graph traversal reads a `Bool` or integer connection matrix, and its distances
         must hold `Inf`.
+      - `dependency_exposure` takes bare weights from the user, and a row with no graph in
+        force must hold `NaN` (#2173).
     =#
     ENTRY = Dict("src/03_InputData/01_AssetPanel.jl" => 2,
                  "src/03_InputData/02_AssetPanelBuilder.jl" => 2,
@@ -140,7 +142,8 @@
                  "src/03_InputData/20_PanelFieldValues.jl" => 1,
                  "src/06_Distance/05_FeatureDistance.jl" => 1,
                  "src/06_Distance/06_FeatureDistanceActiveRows.jl" => 2,
-                 "src/08_Phylogeny/06_DBHT/03_GraphTraversal.jl" => 1)
+                 "src/08_Phylogeny/06_DBHT/03_GraphTraversal.jl" => 1,
+                 "src/24_Report/08_DependencyExposureMethods.jl" => 2)
     repairs = Dict{String, Vector{String}}()
 
     #=

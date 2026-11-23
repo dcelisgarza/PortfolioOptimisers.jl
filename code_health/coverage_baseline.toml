@@ -456,4 +456,9 @@ commit = "391be5e"
 "src/24_Report/02_ReportModel.jl" = { lines = 36, misses = 0 }
 "src/24_Report/03_ReportWriters.jl" = { lines = 238, misses = 0 }
 "src/24_Report/04_PortfolioReport.jl" = { lines = 167, misses = 0 }
+"src/24_Report/05_DependencyExposureTypes.jl" = { lines = 47, misses = 0 }
+"src/24_Report/06_DependencyReach.jl" = { lines = 73, misses = 0 }
+"src/24_Report/07_DependencyExposureRows.jl" = { lines = 107, misses = 0 }
+"src/24_Report/08_DependencyExposureMethods.jl" = { lines = 92, misses = 0 }
+"src/24_Report/09_DependencyReport.jl" = { lines = 47, misses = 0 }
 "src/PortfolioOptimisers.jl" = { lines = 0, misses = 0 }

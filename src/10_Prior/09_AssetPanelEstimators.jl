@@ -928,6 +928,7 @@ Keywords correspond to the struct's fields. The defaults walk two hops along the
 
   - A `String` in `ng` is not empty, and a vector in `ng` is not empty, holds names and [`GraphUnion`](@ref)s alone, and holds no empty name and no name twice. The name of a union is its `name`. Raises an [`IsEmptyError`](@ref) or an `ArgumentError`. See [`assert_graph_names`](@ref).
   - A `String` in `prefix` is not empty. Raises an [`IsEmptyError`](@ref). See [`assert_panel_field_name`](@ref).
+  - `dir` has a method of [`walk_parts`](@ref). [`AnyEdges`](@ref) raises a `MethodError`, because the walk distance refuses a walk over the sum of the two directions.
 
 # Examples
 
@@ -1004,6 +1005,9 @@ WalkProfilePanel
                               prefix::Option{<:AbstractString})
         assert_graph_names(ng, :ng)
         assert_panel_field_name(prefix)
+        # A direction that the walk does not take, such as `AnyEdges`, has no method of
+        # `walk_parts`, so its `MethodError` comes here, before any fit.
+        walk_parts(dir)
         return new{typeof(ng), typeof(sep), typeof(decay), typeof(dir), typeof(nrm),
                    typeof(wgt), typeof(self), typeof(prefix)}(ng, sep, decay, dir, nrm, wgt,
                                                               self, prefix)

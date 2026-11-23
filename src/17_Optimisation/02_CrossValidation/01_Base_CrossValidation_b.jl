@@ -31,6 +31,96 @@ function fit_predict(opt::OptE_Opt, rd::ReturnsResult)
     return StatsAPI.predict(res, rd)
 end
 """
+    reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult, X, hw = nothing, w = res.w)
+
+Reconstruct a `PredictionReturnsResult` from an optimisation result and returns data.
+
+It collapses the benchmark returns, the implied volatilities and the implied volatility risk premium adjustment of `rd` with the weights of the fold, and pairs them with the portfolio series `X`.
+
+A benchmark matrix collapses as [`collapse_benchmark`](@ref) states: against the weight path when the fold carries a [`HeldWeightsResult`](@ref), and against the target weights when it does not. `iv` and `ivpa` are rates, so they collapse as convex combinations, against the weights of [`synthetic_asset_weights`](@ref).
+
+The fold does not collapse the panel of `rd`. A *square* feature matrix needs the weights of every synthetic asset at once for its second contraction, and only one weight vector is known here. [`rebuild_returns_result`](@ref) instead computes the collapse for the whole synthetic universe from the original `rd.pnl` and the fold weights `pred[f].res.w`.
+
+# Algorithm
+
+ 1. Collapse the cells of `rd.B` that [`benchmark_cells`](@ref) reads with [`collapse_benchmark`](@ref), from `w` and `hw`. A gap in the benchmark or in the returns, or an inactive cell, gives zero, as the portfolio series zeroes it.
+ 2. When `rd.iv` is given or `rd.ivpa` is a vector, compute the convex weights `cw` of `w` with [`synthetic_asset_weights`](@ref), one vector per member under a population.
+ 3. Collapse `rd.iv` and a vector `rd.ivpa` with [`collapse_fold_rate`](@ref), which reads the active mask of `rd.pnl` and the finite cells, as the collapse of a meta-optimiser does. A scalar `ivpa` stays as it is.
+ 4. Under a population, repeat a scalar `ivpa` once per member.
+ 5. Build the [`PredictionReturnsResult`](@ref) from `nx`, `X`, the factor block, `nb`, the collapsed values, the Exogenous Series, the Exogenous Graphs of the window and `ts`.
+
+# Arguments
+
+  - `res::NonFiniteAllocationOptimisationResult`: Fitted optimisation result.
+  - `rd::ReturnsResult`: Original returns data.
+  - `X`: Portfolio returns (vector or vector of vectors).
+  - `hw`: Held Weights record of the fold, or `nothing`.
+  - `w`: The weights the fold's series was formed from. It defaults to `res.w`, and a fold that viewed its window at the Investable Mask passes the view instead, so the collapse reads the same asset axis `rd` carries.
+
+# Returns
+
+  - [`PredictionReturnsResult`](@ref) with updated benchmark returns, implied volatilities and implied volatility risk premium adjustment.
+
+# Related
+
+  - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
+  - [`PredictionReturnsResult`](@ref)
+  - [`rebuild_returns_result`](@ref)
+  - [`collapse_benchmark`](@ref)
+  - [`HeldWeightsResult`](@ref)
+"""
+function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
+                        X::VecNum, hw::Option{<:HeldWeightsResult} = nothing,
+                        w::VecNum_VecVecNum = res.w)
+    B = collapse_benchmark(benchmark_cells(rd), w, hw)
+    iv = rd.iv
+    ivpa = rd.ivpa
+    iv_flag = !isnothing(iv)
+    ivpa_flag = isa(ivpa, AbstractVector)
+    if iv_flag || ivpa_flag
+        # `iv` and `ivpa` are intensive, so they collapse as convex combinations. They are
+        # collapsed against the same weights the series was formed from, which is the view
+        # at the Investable Mask when the fold took one.
+        cw = synthetic_asset_weights(w)
+        if iv_flag
+            iv = collapse_fold_rate(iv, cw, rd.pnl)
+        end
+        if ivpa_flag
+            ivpa = collapse_fold_rate(rd.ivpa, cw, rd.pnl)
+        end
+    end
+    return PredictionReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, nb = rd.nb,
+                                   B = B, ne = rd.ne, E = rd.E, ng = rd.ng, G = rd.G,
+                                   ts = rd.ts, iv = iv, ivpa = ivpa)
+end
+function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
+                        X::VecVecNum, hw::Option{<:HeldWeightsResult} = nothing,
+                        w::VecNum_VecVecNum = res.w)
+    nb = rd.nb
+    B = collapse_benchmark(benchmark_cells(rd), w, hw)
+    iv = rd.iv
+    ivpa = rd.ivpa
+    iv_flag = !isnothing(iv)
+    ivpa_flag = isa(ivpa, AbstractVector)
+    if iv_flag || ivpa_flag
+        # `iv` and `ivpa` are intensive, so they collapse as convex combinations, against
+        # the same weights the series was formed from — see the singular twin above.
+        cw = [synthetic_asset_weights(wi) for wi in w]
+        if iv_flag
+            iv = [collapse_fold_rate(iv, wi, rd.pnl) for wi in cw]
+        end
+        if ivpa_flag
+            ivpa = [collapse_fold_rate(ivpa, wi, rd.pnl) for wi in cw]
+        end
+    end
+    if isa(ivpa, Number)
+        ivpa = range(; start = ivpa, stop = ivpa, length = length(res.w))
+    end
+    return PredictionReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, nb = nb,
+                                   B = B, ne = rd.ne, E = rd.E, ng = rd.ng, G = rd.G,
+                                   ts = rd.ts, iv = iv, ivpa = ivpa)
+end
+"""
     predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
     predict(res, rd, test_idx, cols = :)
     predict(res, rd, test_idxs::VecVecInt, cols = :)

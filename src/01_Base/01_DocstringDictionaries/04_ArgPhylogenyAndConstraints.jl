@@ -58,6 +58,25 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :gu_dir => "`dir`: The single direction along which `nrm` normalises each part: [`OutEdges`](@ref) for a column sum of `At`, or [`InEdges`](@ref) for a row sum.",#
                  :gu_unknown => "`unknown`: The rule for a part with no graph in force, a member of [`AbstractUnknownEntryRule`](@ref). [`EntrywiseUnknown`](@ref) makes the union unknown, and [`ZeroUnknown`](@ref) reads the part as an empty graph.",#
                  :gu_name => "`name`: The name of the union in the Panel Fields and the messages of a consumer, or `nothing` for `join(ng, \"+\")`.",#
+                 ## Dependency Exposure
+                 :dexp_ng => "`ng`: The Exogenous Graph that the exposure reads: `nothing` for the only graph of the returns data, one name, or a [`GraphUnion`](@ref), built along each part of `dir`. A method that takes an explicit graph needs `nothing`.",#
+                 :dexp_reach => "`reach`: The reach of each held asset over the graph, a member of [`AbstractDependencyReach`](@ref): [`ShortestHops`](@ref) for the shortest path, or [`WalkShares`](@ref) for the shares of the walks.",#
+                 :dexp_dir => "`dir`: The direction of the reach, a member of [`AbstractEdgeDirection`](@ref): [`OutEdges`](@ref) for the nodes that an asset depends on, [`InEdges`](@ref) for the nodes that depend on the asset, [`BothEdges`](@ref) for the two directed reaches apart, or [`AnyEdges`](@ref) for the undirected reach.",#
+                 :dexp_src => "`src`: The weights that the exposure reads from a prediction, a member of [`AbstractPreviousWeightsSource`](@ref) through [`exposure_weights`](@ref): [`TargetWeights`](@ref) for one row for each fold, or [`DriftedWeights`](@ref) for one row for each observation. A method on bare weights reads the weights as given.",#
+                 :dexp_nodes => "`nodes`: The names of the nodes that the Result reports, or `nothing` for every node of the graphs in force, in the order of their first use. A path can go through a node that is not reported.",#
+                 :dexp_strict => "`strict`: Whether a held asset that is not a node of its graph, or a row before the first key of a series, raises an error. With `false`, each gives one warning: the weight of the asset goes in the row `(none)`, and the row is `NaN`.",#
+                 :dexp_sep => "`sep`: The hop budget of the reach, a [`HopCount`](@ref). A node at `h` hops counts for `h` in `1:n`. A [`FractionOf`](@ref) resolves over the hops of the pairs of a held asset and a node that the direction reaches, through [`resolve_separation`](@ref). A rule has no returns to read, so the constructor refuses it, and a [`PathLength`](@ref) fails at dispatch.",#
+                 :dexp_decay => "`decay`: The weight `f(h)` of a node at `h` hops, a separation decay algorithm of [`separation_decay`](@ref) at the separation `h` and the budget `n`, or `nothing` for a weight of one, the indicator of the reach.",#
+                 :dexp_res_nodes => "`nodes`: Names of the reported nodes (nodes × 1), with the row `(none)` last when a held asset is not a node of its graph.",#
+                 :dexp_res_nx => "`nx`: Asset names of the columns of `W` and of each reach (assets × 1), the union of the names of the rows in the order of their first use.",#
+                 :dexp_res_rows => "`rows`: Label of each row of weights (rows × 1): the timestamp or the position of its observation, or the key of a path of a population.",#
+                 :dexp_res_W => "`W`: Weights of each row (rows × assets). A failed fold gives a row of `NaN`.",#
+                 :dexp_res_L => "`L`: Long part of the exposure (rows × nodes × 3), from the positive weights: the `weight`, `direct` and `indirect` parts, in that order. A row with no graph in force, or with no weights, is `NaN`.",#
+                 :dexp_res_S => "`S`: Short part of the exposure, from the negative weights, in the layout of `L`.",#
+                 :dexp_res_R0 => "`R0`: The node of each asset in each distinct snapshot (nodes × assets each). The row `(none)` holds a one for each asset that is not a node.",#
+                 :dexp_res_Rd => "`Rd`: The part of the reach at one hop in each distinct snapshot (nodes × assets each).",#
+                 :dexp_res_Ri => "`Ri`: The part of the reach at two hops or more in each distinct snapshot (nodes × assets each).",#
+                 :dexp_res_ridx => "`ridx`: Position in `R0`, `Rd` and `Ri` of the snapshot of each row (rows × 1), or `0` for a row with no single snapshot: no graph in force, or the mean of the rows of a path.",#
                  ## DBHT
                  :dbhtpower => "`power`: The exponent of each distance in the similarity transformation.",#
                  :dbhtcoef => "`coef`: The scale factor of the distance term in the similarity transformation.",#

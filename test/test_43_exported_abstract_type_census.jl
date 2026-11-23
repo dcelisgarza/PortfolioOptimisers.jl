@@ -154,6 +154,7 @@
         :AbstractDeformationCalibrationAlgorithm,
         :AbstractDenoiseAlgorithm,
         :AbstractDenoiseEstimator,
+        :AbstractDependencyReach,
         :AbstractDescriptorEstimator,
         :AbstractDetoneEstimator,
         :AbstractDiagonalConstruction,

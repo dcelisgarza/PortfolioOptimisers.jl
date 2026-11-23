@@ -27,7 +27,6 @@ VecVecPredRes
 VecPredRes_MultiPredRes
 mapreduce_RetMtx(rd::AbstractVector{<:PredictionReturnsResult{<:Any, <:VecNum}}, sym = :X)
 quantile_by_measure
-reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult, X::VecNum)
 investable_fold_view
 fold_fees
 threads_weights

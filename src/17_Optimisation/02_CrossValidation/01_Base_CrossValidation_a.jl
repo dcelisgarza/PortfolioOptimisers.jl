@@ -334,8 +334,10 @@ aligned to it.
 
 `X` is the portfolio series, not the asset returns: one vector for a single portfolio, or one
 vector per member of a population. Beside it the `PredictionReturnsResult` holds the factor returns, the
-benchmark series, the Exogenous Series, the timestamps, the implied volatilities and the implied volatility risk
+benchmark series, the Exogenous Series, the Exogenous Graphs, the timestamps, the implied volatilities and the implied volatility risk
 premium adjustment of the same observations.
+
+A fold keeps the Exogenous Graphs of its test rows, the view of [`graph_view`](@ref), so [`dependency_exposure`](@ref) reads the graph in force at each row of the fold. The series of a path, [`MultiPeriodPredictionResult`](@ref), holds no graph, because the folds of a combinatorial path are not in time order. Each fold holds its own.
 
 The `PredictionReturnsResult` holds no feature matrix. [`rebuild_returns_result`](@ref) computes the collapse of
 the outer problem from the original `rd.pnl` and the weights of each fold, which is the call the
@@ -358,6 +360,8 @@ $(DocStringExtensions.FIELDS)
         B::Option{<:VecNum_VecVecNum} = nothing,
         ne::Option{<:VecStr} = nothing,
         E::Option{<:MatNum} = nothing,
+        ng::Option{<:VecStr} = nothing,
+        G::Option{<:AbstractVector} = nothing,
         ts::Option{<:VecDate} = nothing,
         iv::Option{<:VecNum_VecVecNum} = nothing,
         ivpa::Option{<:Num_VecNum} = nothing
@@ -370,6 +374,7 @@ Keywords correspond to the struct's fields.
   - `nf` and `F`, and `ne` and `E`, pass [`assert_prediction_series`](@ref): each pair is consistent, and the matrix has one row per observation of each series in `X` and of `ts`.
   - If `B` and `X` are given, they have the same shape (`VecNum` or `VecVecNum`) and matching lengths. A mixed pair raises an `ArgumentError`.
   - If `ts` is given, it is not empty, at least one of `X` and `F` is not `nothing`, and its length matches `X`, `F`, `B` and `E` where they are given.
+  - If `ng` or `G` is not `nothing`, [`check_exogenous_graphs`](@ref) holds against the rows of `X` or `F` and against `ts`.
   - If `iv` is given, `X` is given too, else an `IsNothingError` is raised.
   - If `iv` is a `VecNum`, `ivpa` is a scalar or `nothing`, `iv` is non-empty, non-negative and finite, `ivpa` is positive and finite, and `length(iv) == length(X)`.
   - If `iv` is a `VecVecNum`, `ivpa` is a `VecNum` or `nothing`, `length(iv) == length(X)`, and `length(ivpa) == length(X)` when `ivpa` is given. Each entry of `ivpa` is positive and finite, and each vector of `iv` is non-empty, non-negative, finite, and as long as its series in `X`.
@@ -414,6 +419,14 @@ Keywords correspond to the struct's fields.
     """
     E
     """
+    $(field_dict[:ng])
+    """
+    ng
+    """
+    $(field_dict[:G])
+    """
+    G
+    """
     $(field_dict[:ts])
     """
     ts
@@ -429,10 +442,12 @@ Keywords correspond to the struct's fields.
                                      nf::Option{<:VecStr}, F::Option{<:MatNum},
                                      nb::Option{<:VecStr}, B::Option{<:VecNum_VecVecNum},
                                      ne::Option{<:VecStr}, E::Option{<:MatNum},
+                                     ng::Option{<:VecStr}, G::Option{<:AbstractVector},
                                      ts::Option{<:VecDate}, iv::Option{<:VecNum_VecVecNum},
                                      ivpa::Option{<:Num_VecNum})
         assert_prediction_series(nf, F, X, ts, :nf, :F)
         assert_prediction_series(ne, E, X, ts, :ne, :E)
+        check_exogenous_graphs(ng, G, observation_count(X, F), ts)
         if !isnothing(B) && !isnothing(X)
             if isa(B, VecNum) && isa(X, VecNum)
                 @argcheck(length(B) == length(X), DimensionMismatch)
@@ -484,10 +499,8 @@ Keywords correspond to the struct's fields.
             end
         end
         return new{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(nb), typeof(B),
-                   typeof(ne), typeof(E), typeof(ts), typeof(iv), typeof(ivpa)}(nx, X, nf,
-                                                                                F, nb, B,
-                                                                                ne, E, ts,
-                                                                                iv, ivpa)
+                   typeof(ne), typeof(E), typeof(ng), typeof(G), typeof(ts), typeof(iv),
+                   typeof(ivpa)}(nx, X, nf, F, nb, B, ne, E, ng, G, ts, iv, ivpa)
     end
 end
 function PredictionReturnsResult(; nx::Option{<:VecStr} = nothing,
@@ -498,10 +511,18 @@ function PredictionReturnsResult(; nx::Option{<:VecStr} = nothing,
                                  B::Option{<:VecNum_VecVecNum} = nothing,
                                  ne::Option{<:VecStr} = nothing,
                                  E::Option{<:MatNum} = nothing,
+                                 ng::Option{<:VecStr} = nothing,
+                                 G::Option{<:AbstractVector} = nothing,
                                  ts::Option{<:VecDate} = nothing,
                                  iv::Option{<:VecNum_VecVecNum} = nothing,
                                  ivpa::Option{<:Num_VecNum} = nothing)::PredictionReturnsResult
-    return PredictionReturnsResult(nx, X, nf, F, nb, B, ne, E, ts, iv, ivpa)
+    return PredictionReturnsResult(nx, X, nf, F, nb, B, ne, E, ng, G, ts, iv, ivpa)
+end
+function observation_count(X::VecNum, ::Option{<:MatNum})
+    return length(X)
+end
+function observation_count(X::VecVecNum, F::Option{<:MatNum})
+    return isempty(X) ? observation_count(nothing, F) : length(first(X))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1700,96 +1721,6 @@ function fold_fees(res::OptimisationResult, ::Nothing, ::MatNum)
 end
 function fold_fees(res::OptimisationResult, fees::Fees, X::MatNum)
     return investable_fees_view(fees, result_investable_mask(res), X)
-end
-"""
-    reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult, X, hw = nothing, w = res.w)
-
-Reconstruct a `PredictionReturnsResult` from an optimisation result and returns data.
-
-It collapses the benchmark returns, the implied volatilities and the implied volatility risk premium adjustment of `rd` with the weights of the fold, and pairs them with the portfolio series `X`.
-
-A benchmark matrix collapses as [`collapse_benchmark`](@ref) states: against the weight path when the fold carries a [`HeldWeightsResult`](@ref), and against the target weights when it does not. `iv` and `ivpa` are rates, so they collapse as convex combinations, against the weights of [`synthetic_asset_weights`](@ref).
-
-The fold does not collapse the panel of `rd`. A *square* feature matrix needs the weights of every synthetic asset at once for its second contraction, and only one weight vector is known here. [`rebuild_returns_result`](@ref) instead computes the collapse for the whole synthetic universe from the original `rd.pnl` and the fold weights `pred[f].res.w`.
-
-# Algorithm
-
- 1. Collapse the cells of `rd.B` that [`benchmark_cells`](@ref) reads with [`collapse_benchmark`](@ref), from `w` and `hw`. A gap in the benchmark or in the returns, or an inactive cell, gives zero, as the portfolio series zeroes it.
- 2. When `rd.iv` is given or `rd.ivpa` is a vector, compute the convex weights `cw` of `w` with [`synthetic_asset_weights`](@ref), one vector per member under a population.
- 3. Collapse `rd.iv` and a vector `rd.ivpa` with [`collapse_fold_rate`](@ref), which reads the active mask of `rd.pnl` and the finite cells, as the collapse of a meta-optimiser does. A scalar `ivpa` stays as it is.
- 4. Under a population, repeat a scalar `ivpa` once per member.
- 5. Build the [`PredictionReturnsResult`](@ref) from `nx`, `X`, the factor block, `nb`, the collapsed values and `ts`.
-
-# Arguments
-
-  - `res::NonFiniteAllocationOptimisationResult`: Fitted optimisation result.
-  - `rd::ReturnsResult`: Original returns data.
-  - `X`: Portfolio returns (vector or vector of vectors).
-  - `hw`: Held Weights record of the fold, or `nothing`.
-  - `w`: The weights the fold's series was formed from. It defaults to `res.w`, and a fold that viewed its window at the Investable Mask passes the view instead, so the collapse reads the same asset axis `rd` carries.
-
-# Returns
-
-  - [`PredictionReturnsResult`](@ref) with updated benchmark returns, implied volatilities and implied volatility risk premium adjustment.
-
-# Related
-
-  - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
-  - [`PredictionReturnsResult`](@ref)
-  - [`rebuild_returns_result`](@ref)
-  - [`collapse_benchmark`](@ref)
-  - [`HeldWeightsResult`](@ref)
-"""
-function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                        X::VecNum, hw::Option{<:HeldWeightsResult} = nothing,
-                        w::VecNum_VecVecNum = res.w)
-    B = collapse_benchmark(benchmark_cells(rd), w, hw)
-    iv = rd.iv
-    ivpa = rd.ivpa
-    iv_flag = !isnothing(iv)
-    ivpa_flag = isa(ivpa, AbstractVector)
-    if iv_flag || ivpa_flag
-        # `iv` and `ivpa` are intensive, so they collapse as convex combinations. They are
-        # collapsed against the same weights the series was formed from, which is the view
-        # at the Investable Mask when the fold took one.
-        cw = synthetic_asset_weights(w)
-        if iv_flag
-            iv = collapse_fold_rate(iv, cw, rd.pnl)
-        end
-        if ivpa_flag
-            ivpa = collapse_fold_rate(rd.ivpa, cw, rd.pnl)
-        end
-    end
-    return PredictionReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, nb = rd.nb,
-                                   B = B, ne = rd.ne, E = rd.E, ts = rd.ts, iv = iv,
-                                   ivpa = ivpa)
-end
-function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                        X::VecVecNum, hw::Option{<:HeldWeightsResult} = nothing,
-                        w::VecNum_VecVecNum = res.w)
-    nb = rd.nb
-    B = collapse_benchmark(benchmark_cells(rd), w, hw)
-    iv = rd.iv
-    ivpa = rd.ivpa
-    iv_flag = !isnothing(iv)
-    ivpa_flag = isa(ivpa, AbstractVector)
-    if iv_flag || ivpa_flag
-        # `iv` and `ivpa` are intensive, so they collapse as convex combinations, against
-        # the same weights the series was formed from — see the singular twin above.
-        cw = [synthetic_asset_weights(wi) for wi in w]
-        if iv_flag
-            iv = [collapse_fold_rate(iv, wi, rd.pnl) for wi in cw]
-        end
-        if ivpa_flag
-            ivpa = [collapse_fold_rate(ivpa, wi, rd.pnl) for wi in cw]
-        end
-    end
-    if isa(ivpa, Number)
-        ivpa = range(; start = ivpa, stop = ivpa, length = length(res.w))
-    end
-    return PredictionReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, nb = nb,
-                                   B = B, ne = rd.ne, E = rd.E, ts = rd.ts, iv = iv,
-                                   ivpa = ivpa)
 end
 """
     held_start_weights(retcode::OptimisationSuccess, w::VecNum_VecVecNum, w_prev)

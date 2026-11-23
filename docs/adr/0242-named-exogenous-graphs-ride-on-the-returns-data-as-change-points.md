@@ -125,8 +125,12 @@ that take a `ReturnsResult` or a `PricesResult` sit at the end of the files of t
   the buffer gives back refuses, because that data holds no graph. The online route of a series,
   the Fold Context and a series whose node set changes stay in *Not yet specified* of map #2162.
 - The rule that joins two named graphs in one consumer belongs to #2203 and #2208.
+- The `PredictionReturnsResult` of a fold holds the graphs of its test rows, the view of
+  `graph_view`, so `dependency_exposure` (#2173) reads the graph in force at each row of a fold.
+  The series of a path holds none, because the folds of a combinatorial path are not in time
+  order, and each fold holds its own.
 - The outer problem of a meta-optimiser that a cross-validation fits (`rebuild_returns_result`)
   and the factor returns of a fold (`fold_factor_returns`) build their `ReturnsResult` from a
-  `PredictionReturnsResult`, which holds no graph, so they carry none. The outer problem of a
+  `PredictionReturnsResult`, and they do not read its graphs, so they carry none. The outer problem of a
   meta-optimiser with no cross-validation keeps the graphs of its rows. A consumer at the outer
   level of a cross-validated NCO is a question of #2172.

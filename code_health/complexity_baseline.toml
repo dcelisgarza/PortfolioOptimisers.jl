@@ -5,7 +5,7 @@
 julia = "1.13.4"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "ec67fbde74"
+commit = "af0b8c72d3"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 6, cog_sum = 4, arg_sum = 16, macros = [] }
@@ -338,8 +338,8 @@ commit = "ec67fbde74"
 "src/17_Optimisation/01_Base_Optimisation/06_PanelCollapse.jl" = { cyc = 4, cog = 6, arg = 6, cyc_sum = 85, cog_sum = 53, arg_sum = 208, macros = [] }
 "src/17_Optimisation/01_Base_Optimisation/07_ResultInvestableView.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 20, cog_sum = 11, arg_sum = 62, macros = [] }
 "src/17_Optimisation/01_Base_Optimisation/08_UniverseAxisOrder.jl" = { cyc = 5, cog = 6, arg = 7, cyc_sum = 28, cog_sum = 16, arg_sum = 37, macros = [] }
-"src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_a.jl" = { cyc = 17, cog = 23, arg = 11, cyc_sum = 112, cog_sum = 76, arg_sum = 197, macros = ["@forward_properties"] }
-"src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_b.jl" = { cyc = 10, cog = 14, arg = 12, cyc_sum = 34, cog_sum = 25, arg_sum = 71, macros = [] }
+"src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_a.jl" = { cyc = 17, cog = 23, arg = 13, cyc_sum = 107, cog_sum = 69, arg_sum = 195, macros = ["@forward_properties"] }
+"src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_b.jl" = { cyc = 10, cog = 14, arg = 12, cyc_sum = 45, cog_sum = 38, arg_sum = 82, macros = [] }
 "src/17_Optimisation/02_CrossValidation/02_KFold.jl" = { cyc = 6, cog = 9, arg = 7, cyc_sum = 12, cog_sum = 11, arg_sum = 14, macros = [] }
 "src/17_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { cyc = 11, cog = 21, arg = 9, cyc_sum = 43, cog_sum = 43, arg_sum = 49, macros = [] }
 "src/17_Optimisation/02_CrossValidation/04_WalkForward.jl" = { cyc = 7, cog = 12, arg = 14, cyc_sum = 63, cog_sum = 54, arg_sum = 150, macros = [] }
@@ -456,5 +456,10 @@ commit = "ec67fbde74"
 "src/24_Report/01_PredictionWeights.jl" = { cyc = 1, cog = 1, arg = 2, cyc_sum = 8, cog_sum = 3, arg_sum = 13, macros = [] }
 "src/24_Report/02_ReportModel.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 21, cog_sum = 7, arg_sum = 37, macros = [] }
 "src/24_Report/03_ReportWriters.jl" = { cyc = 9, cog = 11, arg = 4, cyc_sum = 89, cog_sum = 75, arg_sum = 79, macros = [] }
-"src/24_Report/04_PortfolioReport.jl" = { cyc = 4, cog = 5, arg = 7, cyc_sum = 59, cog_sum = 41, arg_sum = 88, macros = [] }
+"src/24_Report/04_PortfolioReport.jl" = { cyc = 5, cog = 5, arg = 8, cyc_sum = 60, cog_sum = 42, arg_sum = 89, macros = [] }
+"src/24_Report/05_DependencyExposureTypes.jl" = { cyc = 2, cog = 1, arg = 10, cyc_sum = 16, cog_sum = 6, arg_sum = 27, macros = [] }
+"src/24_Report/06_DependencyReach.jl" = { cyc = 6, cog = 9, arg = 6, cyc_sum = 22, cog_sum = 19, arg_sum = 27, macros = [] }
+"src/24_Report/07_DependencyExposureRows.jl" = { cyc = 7, cog = 10, arg = 8, cyc_sum = 40, cog_sum = 35, arg_sum = 49, macros = [] }
+"src/24_Report/08_DependencyExposureMethods.jl" = { cyc = 3, cog = 4, arg = 6, cyc_sum = 30, cog_sum = 11, arg_sum = 53, macros = [] }
+"src/24_Report/09_DependencyReport.jl" = { cyc = 5, cog = 3, arg = 4, cyc_sum = 22, cog_sum = 15, arg_sum = 34, macros = [] }
 "src/PortfolioOptimisers.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }

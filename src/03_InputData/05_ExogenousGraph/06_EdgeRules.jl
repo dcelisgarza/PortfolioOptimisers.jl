@@ -7,11 +7,11 @@ An edge of an [`ExogenousGraph`](@ref) goes from a source to a target. A walk al
 
 # Interfaces
 
-To add a direction, subtype `AbstractEdgeDirection` and implement the following methods.
+To add a direction, subtype `AbstractEdgeDirection` and implement the method of each consumer that takes it.
 
 ## `walk_parts`
 
-  - `walk_parts(dir::MyEdgeDirection) -> Tuple`: Return the single directions that the member walks, one Panel Field each, as a tuple of [`OutEdges`](@ref) and [`InEdges`](@ref).
+  - `walk_parts(dir::MyEdgeDirection) -> Tuple`: Return the single directions that [`WalkProfilePanel`](@ref) walks, one Panel Field each, as a tuple of [`OutEdges`](@ref) and [`InEdges`](@ref). A direction with no method is a direction that the walk does not take, such as [`AnyEdges`](@ref), and the constructor of the walk raises its `MethodError`.
 
 ### Arguments
 
@@ -21,12 +21,26 @@ To add a direction, subtype `AbstractEdgeDirection` and implement the following 
 
   - `parts::Tuple`: The single directions.
 
+## `exposure_parts`
+
+  - `exposure_parts(dir::MyEdgeDirection) -> Tuple`: Return the parts of the reach of a [`DependencyExposure`](@ref). The fallback returns [`walk_parts`](@ref), so a direction that the walk takes needs no method.
+
+### Arguments
+
+  - `dir`: The direction.
+
+### Returns
+
+  - `parts::Tuple`: The parts of the reach.
+
 # Related
 
   - [`OutEdges`](@ref)
   - [`InEdges`](@ref)
   - [`BothEdges`](@ref)
+  - [`AnyEdges`](@ref)
   - [`WalkProfilePanel`](@ref)
+  - [`DependencyExposure`](@ref)
 """
 abstract type AbstractEdgeDirection <: AbstractAlgorithm end
 """
@@ -71,6 +85,22 @@ The two profiles are each scaled to unit length, so a cosine of the stack of the
   - [`InEdges`](@ref)
 """
 struct BothEdges <: AbstractEdgeDirection end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Walks each edge in both directions, so a path can change direction at each node.
+
+The reach of a [`DependencyExposure`](@ref) under this direction reads the undirected graph of the adjacency, ``\\mathbf{M} + \\mathbf{M}^{\\top}`` with the diagonal of ``\\mathbf{M}`` taken one time, because a self-loop is one edge. A shock that goes from a firm to its supplier and then to the other customers of that supplier is such a path, a model of contagion. [`BothEdges`](@ref) is different: it reads the two directed reaches apart, and a path does not mix them at an intermediate node.
+
+[`WalkProfilePanel`](@ref) does not take this direction, because the walk distance refuses a walk over the sum of the two directions. Its constructor raises a `MethodError`. A [`GraphUnion`](@ref) under a normalisation has no single direction along this member, so it raises a `MethodError` too.
+
+# Related
+
+  - [`AbstractEdgeDirection`](@ref)
+  - [`BothEdges`](@ref)
+  - [`DependencyExposure`](@ref)
+"""
+struct AnyEdges <: AbstractEdgeDirection end
 """
     walk_parts(dir::OutEdges) -> Tuple{OutEdges}
     walk_parts(dir::InEdges) -> Tuple{InEdges}
@@ -156,6 +186,75 @@ function directed_weights(::OutEdges, At::MatNum)
 end
 function directed_weights(::InEdges, At::MatNum)
     return permutedims(At)
+end
+"""
+    exposure_parts(dir::AbstractEdgeDirection) -> Tuple
+    exposure_parts(dir::AnyEdges) -> Tuple{AnyEdges}
+
+Return the parts of the reach of a [`DependencyExposure`](@ref) along a direction.
+
+A part is a direction along which the reach reads one adjacency. [`BothEdges`](@ref) reads the two single directions apart, and [`AnyEdges`](@ref) reads the undirected graph as one part.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Any direction: return [`walk_parts`](@ref) of `dir`.
+ 2. [`AnyEdges`](@ref): return the direction itself.
+
+# Arguments
+
+  - `dir`: The direction of the exposure.
+
+# Returns
+
+  - `parts::Tuple`: The parts of the reach.
+
+# Related
+
+  - [`AbstractEdgeDirection`](@ref)
+  - [`reach_weights`](@ref)
+  - [`DependencyExposure`](@ref)
+"""
+function exposure_parts(dir::AbstractEdgeDirection)
+    return walk_parts(dir)
+end
+function exposure_parts(::AnyEdges)
+    return (AnyEdges(),)
+end
+"""
+    reach_weights(dir::AbstractEdgeDirection, At::MatNum) -> MatNum
+    reach_weights(dir::AnyEdges, At::MatNum) -> MatNum
+
+Return the adjacency of one part of a reach, with the start of each step in its columns.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A single direction: return [`directed_weights`](@ref).
+ 2. [`AnyEdges`](@ref): return ``\\mathbf{A}_{t} + \\mathbf{A}_{t}^{\\top}``, less the diagonal of ``\\mathbf{A}_{t}``, so a self-loop counts one time. The sum keeps the storage of `At`.
+
+# Arguments
+
+  - `dir`: The part of the reach.
+  - `At`: The adjacency of the graph, with the sources in its columns.
+
+# Returns
+
+  - `M::MatNum`: The adjacency of the part. `M[j, i]` is the weight of the step from node `i` to node `j`.
+
+# Related
+
+  - [`exposure_parts`](@ref)
+  - [`directed_weights`](@ref)
+  - [`AnyEdges`](@ref)
+"""
+function reach_weights(dir::AbstractEdgeDirection, At::MatNum)
+    return directed_weights(dir, At)
+end
+function reach_weights(::AnyEdges, At::MatNum)
+    return At + permutedims(At) - LinearAlgebra.Diagonal(LinearAlgebra.diag(At))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -258,5 +357,6 @@ function normalise_edge_weights(::WeightShare, M::MatNum)
     return M * LinearAlgebra.Diagonal([iszero(x) ? zero(inv(x)) : inv(x) for x in s])
 end
 
-export OutEdges, InEdges, BothEdges, WeightShare
-public AbstractEdgeDirection, AbstractEdgeNormalisation, walk_parts, normalise_edge_weights
+export OutEdges, InEdges, BothEdges, AnyEdges, WeightShare
+public AbstractEdgeDirection, AbstractEdgeNormalisation, walk_parts, exposure_parts,
+       normalise_edge_weights
