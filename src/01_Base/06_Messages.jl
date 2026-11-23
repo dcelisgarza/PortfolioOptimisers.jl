@@ -137,19 +137,21 @@ function empty_row_msg(eqn, nx, key; noun::AbstractString = "constraint",
     return "$(noun) `$(eqn)` resolved every name against the universe ($(length(nx)) $(axis)s under key `$(key)`) and still summed to zero, so it constrains nothing; row dropped"
 end
 """
-    empty_projected_row_msg(eqn, nf, key, n; noun::AbstractString = "constraint") -> String
+    empty_projected_row_msg(eqn, nf, key, n; noun::AbstractString = "constraint",
+                            axis::AbstractString = "factor") -> String
 
-Build the warning or error text for a re-based equation `eqn` whose terms resolved against the factor universe `nf`, which the sets hold under `key`. The projection of the row through the loadings is all zero over `n` assets.
+Build the warning or error text for a re-based equation `eqn` whose terms resolved against the universe `nf` of the basis, under `key`. The projection of the row through the loadings is all zero over `n` assets.
 
-This failure occurs only under a re-basis, and it is different from the failure of [`empty_row_msg`](@ref). In that failure, the coefficients of the row sum to zero. In this failure, they do not, and the projection through the basis makes them zero. The cause is a factor that no asset loads on. A message about the arithmetic of the equation sends the user to check coefficients that are correct.
+This failure occurs only under a re-basis, and it is different from the failure of [`empty_row_msg`](@ref). In that failure, the coefficients of the row sum to zero. In this failure, they do not, and the projection through the basis makes them zero. The cause is a factor, or another name of the basis, that no asset loads on. A message about the arithmetic of the equation sends the user to check coefficients that are correct.
 
 # Arguments
 
   - `eqn`: The re-based equation whose projection is an all-zero row.
-  - `nf`: The factor universe that the terms resolved against. Only its length goes into the message.
-  - `key`: The key of the factor universe in the sets.
+  - `nf`: The universe that the terms resolved against. Only its length goes into the message.
+  - `key`: The key of that universe.
   - `n`: The number of assets of the projected row.
   - `noun::AbstractString = "constraint"`: `"constraint"` for a linear constraint, and `"view"` for a view.
+  - `axis::AbstractString = "factor"`: The word for one name of the universe.
 
 # Returns
 
@@ -160,8 +162,9 @@ This failure occurs only under a re-basis, and it is different from the failure 
   - [`empty_row_msg`](@ref)
   - [`ExposureConstraintEstimator`](@ref)
 """
-function empty_projected_row_msg(eqn, nf, key, n; noun::AbstractString = "constraint")
-    return "$(noun) `$(eqn)` resolved against the factor universe ($(length(nf)) factors under key `$(key)`) but projected to an all-zero row over $(n) assets: every matched factor has zero loadings; row dropped"
+function empty_projected_row_msg(eqn, nf, key, n; noun::AbstractString = "constraint",
+                                 axis::AbstractString = "factor")
+    return "$(noun) `$(eqn)` resolved against the $(axis) universe ($(length(nf)) $(axis)s under key `$(key)`) but projected to an all-zero row over $(n) assets: every matched $(axis) has zero loadings; row dropped"
 end
 """
     zero_centrality_msg(alg, n) -> String

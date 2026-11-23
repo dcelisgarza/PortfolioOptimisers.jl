@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base Pipeline, public API of PortfolioOptimisers.jl: AbstractPipelineEstimator, AbstractPipelineResult, PipelineStep, pipe_constraint_targets, …"
+Description = "Base Pipeline, public API of PortfolioOptimisers.jl: AbstractPipelineEstimator, AbstractPipelineResult, PipelineStep, pipe_constraint_targets, pipe_reads, …"
 ```
 
 # Base Pipeline
@@ -13,5 +13,6 @@ AbstractPipelineEstimator
 AbstractPipelineResult
 PipelineStep
 pipe_constraint_targets
+pipe_reads
 obs_weights_view(ps::PipelineStep, i)
 ```

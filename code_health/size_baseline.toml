@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.4"
 julia_syntax = "1.0.2"
-commit = "af0b8c72d3"
+commit = "96a62f857c"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { code = 35, doc = 0, comment = 5, blank = 4, total = 44 }
@@ -463,4 +463,5 @@ commit = "af0b8c72d3"
 "src/24_Report/07_DependencyExposureRows.jl" = { code = 152, doc = 159, comment = 2, blank = 91, total = 404 }
 "src/24_Report/08_DependencyExposureMethods.jl" = { code = 149, doc = 206, comment = 0, blank = 91, total = 446 }
 "src/24_Report/09_DependencyReport.jl" = { code = 97, doc = 79, comment = 1, blank = 44, total = 221 }
+"src/24_Report/10_DependencySpace.jl" = { code = 59, doc = 116, comment = 3, blank = 56, total = 234 }
 "src/PortfolioOptimisers.jl" = { code = 452, doc = 3, comment = 29, blank = 5, total = 489 }

@@ -5,7 +5,7 @@
 julia = "1.13.4"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "af0b8c72d3"
+commit = "96a62f857c"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 6, cog_sum = 4, arg_sum = 16, macros = [] }
@@ -237,7 +237,7 @@ commit = "af0b8c72d3"
 "src/08_Phylogeny/12_AssetPhylogeny.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 3, cog_sum = 2, arg_sum = 11, macros = [] }
 "src/08_Phylogeny/13_Seriation.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 13, cog_sum = 4, arg_sum = 20, macros = ["@propagatable"] }
 "src/08_Phylogeny/14_SpectralSeriation.jl" = { cyc = 7, cog = 11, arg = 5, cyc_sum = 39, cog_sum = 37, arg_sum = 44, macros = ["@propagatable"] }
-"src/09_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { cyc = 4, cog = 4, arg = 3, cyc_sum = 12, cog_sum = 8, arg_sum = 6, macros = [] }
+"src/09_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { cyc = 4, cog = 4, arg = 4, cyc_sum = 14, cog_sum = 9, arg_sum = 10, macros = [] }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl" = { cyc = 15, cog = 27, arg = 6, cyc_sum = 112, cog_sum = 114, arg_sum = 66, macros = ["@forward_properties"] }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl" = { cyc = 20, cog = 47, arg = 7, cyc_sum = 73, cog_sum = 101, arg_sum = 28, macros = [] }
 "src/09_ConstraintGeneration/03_RiskBudgetConstraintGeneration.jl" = { cyc = 2, cog = 1, arg = 0, cyc_sum = 9, cog_sum = 4, arg_sum = 0, macros = ["@propagatable"] }
@@ -458,8 +458,9 @@ commit = "af0b8c72d3"
 "src/24_Report/03_ReportWriters.jl" = { cyc = 9, cog = 11, arg = 4, cyc_sum = 89, cog_sum = 75, arg_sum = 79, macros = [] }
 "src/24_Report/04_PortfolioReport.jl" = { cyc = 5, cog = 5, arg = 8, cyc_sum = 60, cog_sum = 42, arg_sum = 89, macros = [] }
 "src/24_Report/05_DependencyExposureTypes.jl" = { cyc = 2, cog = 1, arg = 10, cyc_sum = 16, cog_sum = 6, arg_sum = 27, macros = [] }
-"src/24_Report/06_DependencyReach.jl" = { cyc = 6, cog = 9, arg = 6, cyc_sum = 22, cog_sum = 19, arg_sum = 27, macros = [] }
+"src/24_Report/06_DependencyReach.jl" = { cyc = 6, cog = 9, arg = 7, cyc_sum = 22, cog_sum = 19, arg_sum = 28, macros = [] }
 "src/24_Report/07_DependencyExposureRows.jl" = { cyc = 7, cog = 10, arg = 8, cyc_sum = 40, cog_sum = 35, arg_sum = 49, macros = [] }
 "src/24_Report/08_DependencyExposureMethods.jl" = { cyc = 3, cog = 4, arg = 6, cyc_sum = 30, cog_sum = 11, arg_sum = 53, macros = [] }
 "src/24_Report/09_DependencyReport.jl" = { cyc = 5, cog = 3, arg = 4, cyc_sum = 22, cog_sum = 15, arg_sum = 34, macros = [] }
+"src/24_Report/10_DependencySpace.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 13, cog_sum = 4, arg_sum = 18, macros = [] }
 "src/PortfolioOptimisers.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }

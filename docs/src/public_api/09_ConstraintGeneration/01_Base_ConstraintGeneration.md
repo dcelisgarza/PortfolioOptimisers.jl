@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base Constraint Generation, public API of PortfolioOptimisers.jl: AbstractConstraintResult, AbstractConstraintEstimator."
+Description = "Base Constraint Generation, public API of PortfolioOptimisers.jl: AbstractConstraintResult, AbstractConstraintEstimator, ConstraintBasis."
 ```
 
 # Base Constraint Generation
@@ -7,4 +7,5 @@ Description = "Base Constraint Generation, public API of PortfolioOptimisers.jl:
 ```@docs
 AbstractConstraintResult
 AbstractConstraintEstimator
+PortfolioOptimisers.ConstraintBasis
 ```

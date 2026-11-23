@@ -387,8 +387,8 @@ function exposure_result(de::DependencyExposure, blocks::AbstractVector,
     if none > 0
         nodes = [nodes; exposure_none_label(nodes)]
     end
-    R = [snapshot_reach(de, snaps[p], nx, nodes, none, exposure_held(W, ridx, p))
-         for p in eachindex(snaps)]
+    R = [snapshot_reach(de.reach, de.dir, snaps[p], nx, nodes, none,
+                        exposure_held(W, ridx, p)) for p in eachindex(snaps)]
     T = mapreduce(r -> promote_type(eltype(r[2]), eltype(r[3])), promote_type, R;
                   init = eltype(W))
     L = fill(convert(T, NaN), length(ridx), length(nodes), 3)

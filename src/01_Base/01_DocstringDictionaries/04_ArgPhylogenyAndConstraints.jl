@@ -147,6 +147,12 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :lce_val => "`val`: Constraint equation(s) to parse.",#
                  :ece_lce => "`lce`: Wrapped linear constraint estimator, precomputed linear constraint, or vector of either, written in the names of the basis of the space. It takes every shape that `lcse` takes except this wrapper, so every such shape can take a re-basis.",#
                  :ece_space => "`space`: Basis in which the wrapped constraint is written. It has no default. A constraint over the assets needs no space, so use a bare `LinearConstraintEstimator` for it.",#
+                 :dsp_reach => "`reach`: The reach of each asset over the graph, a member of [`AbstractDependencyReach`](@ref): [`ShortestHops`](@ref) for the shortest path, or [`WalkShares`](@ref) for the shares of the walks.",#
+                 :dsp_ng => "`ng`: The Exogenous Graph of the basis: `nothing` for the only graph of the returns data, one name, or a [`GraphUnion`](@ref), built along each part of `dir`.",#
+                 :cb_M => "`M`: The change of basis (assets × names of the basis).",#
+                 :cb_nx => "`nx`: Names of the columns of `M` (names of the basis × 1).",#
+                 :cb_axis => "`axis`: Word for one name of the basis, which a message quotes, such as `\"node\"`.",#
+                 :cb_key => "`key`: Source of the names of the basis, which a message quotes, such as the name of a graph.",#
                  :fs_re => "`re`: Source of the loadings through which the rows are re-based, or `nothing` to read the `rr` of the prior. A precomputed `Regression` states the basis. An estimator fits the basis to the returns, so a factor mandate also works on a prior with no factor block. The precedence is the one of `resolve_factor_regression`. At `x_src = nothing`, a precomputed result comes first, then the `rr` of the prior, then a refit.",#
                  :asets_val => "`val`: Group name key for asset set membership matrix extraction.",#
                  :thr_val => "`val`: Minimum-holding thresholds, as a map from asset or group names to values, a scalar, a vector or an algorithmic rule.",#

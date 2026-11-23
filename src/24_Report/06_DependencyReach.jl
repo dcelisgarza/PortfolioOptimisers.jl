@@ -237,7 +237,7 @@ function dependency_reach(reach::WalkShares, dirs::Tuple, gs::Tuple, ka::VecInt,
     return Rd, Ri
 end
 """
-    snapshot_reach(de::DependencyExposure, gs::Tuple, nx::VecStr, nodes::VecStr, none::Integer, held::AbstractVector{Bool}) -> Tuple{Matrix{Bool}, Matrix, Matrix}
+    snapshot_reach(reach::AbstractDependencyReach, dir::AbstractEdgeDirection, gs::Tuple, nx::VecStr, nodes::VecStr, none::Integer, held::AbstractVector{Bool}) -> Tuple{Matrix{Bool}, Matrix, Matrix}
 
 Return the reach of one snapshot on the reported nodes and on every asset: the own node, the part at one hop and the part at two hops or more.
 
@@ -250,12 +250,13 @@ Return the reach of one snapshot on the reported nodes and on every asset: the o
 
 # Arguments
 
-  - `de`: The configuration.
+  - `reach`: The reach.
+  - `dir`: The direction of the reach.
   - `gs`: The graph of each part of the direction.
   - `nx`: The asset names.
   - `nodes`: The reported nodes.
   - `none`: The row of `(none)` in `nodes`, or `0`.
-  - `held`: `true` for each asset of `nx` that holds a weight at a row of the snapshot.
+  - `held`: `true` for each asset of `nx` that holds a weight at a row of the snapshot. [`DependencySpace`](@ref) marks every asset, because a fit can hold each one.
 
 # Returns
 
@@ -265,12 +266,14 @@ Return the reach of one snapshot on the reported nodes and on every asset: the o
 
   - [`dependency_reach`](@ref)
   - [`exposure_result`](@ref)
+  - [`DependencySpace`](@ref)
 """
-function snapshot_reach(de::DependencyExposure, gs::Tuple, nx::VecStr, nodes::VecStr,
-                        none::Integer, held::AbstractVector{Bool})
+function snapshot_reach(reach::AbstractDependencyReach, dir::AbstractEdgeDirection,
+                        gs::Tuple, nx::VecStr, nodes::VecStr, none::Integer,
+                        held::AbstractVector{Bool})
     ia = walk_positions(first(gs).nodes, nx)
     j = findall(>(0), ia)
-    Rd, Ri = dependency_reach(de.reach, exposure_parts(de.dir), gs, ia[j], held[j])
+    Rd, Ri = dependency_reach(reach, exposure_parts(dir), gs, ia[j], held[j])
     pj = walk_positions(first(gs).nodes, nodes)
     K = findall(>(0), pj)
     R0 = zeros(Bool, length(nodes), length(nx))

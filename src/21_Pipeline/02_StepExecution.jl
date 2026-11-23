@@ -455,15 +455,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute an [`ExposureConstraintEstimator`](@ref) step's value: re-base its rows through the loadings of the *pipeline's* prior into an asset-space [`LinearConstraint`](@ref).
+Compute an [`ExposureConstraintEstimator`](@ref) step's value: re-base its rows through the basis of its space into an asset-space [`LinearConstraint`](@ref).
 
-This is the one constraint step that reads a computed slot other than `:returns`. The basis is `ctx.prior.rr`, so a prior step must come earlier; a prior that carries no regression makes [`constraint_space_basis`](@ref) throw, which is the intended failure — see [`ExposureConstraintEstimator`](@ref).
+This is the one constraint step that can read a computed slot other than `:returns`. [`pipe_reads`](@ref) of the space gives them. For a [`FactorSpace`](@ref) the basis is `ctx.prior.rr`, so a prior step must come earlier; a prior that carries no regression makes [`constraint_space_basis`](@ref) throw, which is the intended failure — see [`ExposureConstraintEstimator`](@ref).
 
-`ctx.returns` is passed as well, so a space that names a regression **estimator** refits the loadings here rather than throwing. That is the one arrangement in which a prior carrying no factor block still admits a factor mandate — see [`FactorSpace`](@ref). The refit reads the returns from the source that the regression of the space states, as it does in the `lcse` field of an optimiser.
+`ctx.returns` is passed as well, so a space that names a regression **estimator** refits the loadings here rather than throwing. That is the one arrangement in which a prior carrying no factor block still admits a factor mandate — see [`FactorSpace`](@ref). The refit reads the returns from the source that the regression of the space states, as it does in the `lcse` field of an optimiser. A [`DependencySpace`](@ref) reads the Exogenous Graph of `ctx.returns`, and it needs no prior step.
 
 !!! warning
 
-    The constraint is **pinned to the pipeline's prior**. Its rows were projected through the loadings this step saw, and a downstream optimiser that refits its own prior does not re-project them. Passing the estimator to the optimiser's `lcse` field instead recomputes the projection with the optimiser's own prior, per fold, which is what a cross-validated factor mandate needs.
+    Under a [`FactorSpace`](@ref) the constraint is **pinned to the pipeline's prior**. Its rows were projected through the loadings this step saw, and a downstream optimiser that refits its own prior does not re-project them. Passing the estimator to the optimiser's `lcse` field instead recomputes the projection with the optimiser's own prior, per fold, which is what a cross-validated factor mandate needs.
 
 # Related
 
@@ -473,9 +473,9 @@ This is the one constraint step that reads a computed slot other than `:returns`
   - [`pipeline_asset_sets`](@ref)
 """
 function constraint_step_value(ce::ExposureConstraintEstimator, ctx::PipelineContext)
-    require_slot(ctx, :prior, ce)
-    return linear_constraints(ce, pipeline_asset_sets(ctx, ce); rr = ctx.prior.rr,
-                              rd = ctx.returns)
+    foreach(s -> require_slot(ctx, s, ce), pipe_reads(ce))
+    rr = isnothing(ctx.prior) ? nothing : ctx.prior.rr
+    return linear_constraints(ce, pipeline_asset_sets(ctx, ce); rr = rr, rd = ctx.returns)
 end
 function constraint_step_value(ce::AbstractPhylogenyConstraintEstimator,
                                ctx::PipelineContext)

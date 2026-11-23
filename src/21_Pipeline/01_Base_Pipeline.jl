@@ -533,7 +533,7 @@ Return the [`PipelineContext`](@ref) slots a pipeline step requires to be popula
 
 These are the *required* reads used for construction-time dependency validation, not every slot the step may consume. Slots an estimator can compute internally when absent (for example a phylogeny-constraint estimator's own phylogeny) are not listed.
 
-Constraint estimators read `:returns` — the minimal [`UniverseSets`](@ref) a bare constraint step resolves against is built from the returns' names (see [`pipeline_asset_sets`](@ref)). An [`ExposureConstraintEstimator`](@ref) additionally reads `:prior`, because the basis it re-bases through is the prior's regression loadings.
+Constraint estimators read `:returns` — the minimal [`UniverseSets`](@ref) a bare constraint step resolves against is built from the returns' names (see [`pipeline_asset_sets`](@ref)). An [`ExposureConstraintEstimator`](@ref) reads the slots that its space states through its own method: `:prior` too for a [`FactorSpace`](@ref), because the basis it re-bases through is the prior's regression loadings.
 
 # Arguments
 
@@ -565,7 +565,8 @@ pipe_reads(::AbstractPriorEstimator) = (:returns,)
 pipe_reads(::AbstractPhylogenyEstimator) = (:returns,)
 pipe_reads(::AbstractUncertaintySetEstimator) = (:returns,)
 pipe_reads(::AbstractConstraintEstimator) = (:returns,)
-pipe_reads(::ExposureConstraintEstimator) = (:returns, :prior)
+pipe_reads(ce::ExposureConstraintEstimator) = pipe_reads(ce.space)
+pipe_reads(::AbstractConstraintSpace) = (:returns, :prior)
 function pipe_reads(::Union{OptimisationEstimator, NonFiniteAllocationOptimisationResult})
     return (:returns,)
 end
@@ -807,4 +808,4 @@ pipe_writes(::TD_OptE_Opt_Inferable) = :opt
 pipe_reads(::TD_OptE_Opt_Inferable) = (:returns,)
 
 export PipelineStep
-public AbstractPipelineEstimator, AbstractPipelineResult
+public AbstractPipelineEstimator, AbstractPipelineResult, pipe_reads

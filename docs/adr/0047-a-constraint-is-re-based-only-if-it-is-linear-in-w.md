@@ -420,3 +420,36 @@ than through the loadings — is designed and deferred to its own effort. It rea
 carrier and carries no data of its own, which is the same decision as this one seen from the other
 side: a space carries the *source* of its basis, and `Z`'s source is already on the carrier by
 ADR 0045.
+
+## Amendment (2026-11-23): `DependencySpace`, and a basis that holds its own names
+
+`DependencySpace(; ng, reach, dir)` is a second member (#2202, row 13 of #2168). Its rows name the
+nodes of an Exogenous Graph, and a row `a` re-bases to `(Rᵀ a)ᵀ w`, with `R` the reach of the
+Dependency Exposure. The rule of this ADR decides its limit: the net exposure is a linear form in
+`w`, so a row can cap it. A gross cap needs the long and the short variables, so it stays outside.
+
+**The names are nodes, not a key of the sets.** The nodes change over time and most of them are not
+assets, so a declared axis repeats what the graph holds. `constraint_space_basis` returns a
+`ConstraintBasis`, which holds `M`, the names, and two words for the messages, and `nothing` as the
+key. The names are the nodes of every snapshot that the fit sees, so a node that left the graph has
+zero exposure and its row stays. A fold sees no later snapshot. The `key` of the wrapped estimator
+declares the names for that case, and a declared name with no column has zero exposure. A group of
+a `ConstraintBasis` keeps a member that left the Investable Mask, because that asset can still be a
+node.
+
+**A precomputed `LinearConstraint` is refused at construction.** Its columns have no names, and the
+nodes of two fits can differ in number and order.
+
+**The outer optimiser refuses the space.** The outer problem of `NestedClustered` and `Stacking`
+keeps the graphs of the returns data and replaces the asset names, so each row has zero coefficients
+and the constraint is silently absent. `assert_outer_spaces` walks `opto` at construction. The space
+holds no asset index, so `port_opt_view` returns it unchanged and an inner solve takes it.
+
+**The reach marks every asset as held.** The fit does not know the weights, so a `FractionOf` budget
+takes its quantile over every asset.
+
+**The space lives in `src/24_Report/`.** It reads the reach of #2173, which loads after the walk
+kernel of the Asset Panel producers.
+
+**A pipeline step reads the slots that the space states.** `pipe_reads` of the estimator is
+`pipe_reads` of its space: `(:returns, :prior)` by default, and `(:returns,)` for `DependencySpace`.

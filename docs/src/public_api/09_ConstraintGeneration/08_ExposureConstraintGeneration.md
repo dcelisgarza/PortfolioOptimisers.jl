@@ -9,6 +9,7 @@ AbstractConstraintSpace
 FactorSpace
 ExposureConstraintEstimator
 constraint_space_basis
+assert_space_constraint
 port_opt_view(space::FactorSpace, i, args...)
 port_opt_view(ece::ExposureConstraintEstimator, i, args...)
 ```

@@ -1044,7 +1044,7 @@ The factor universe that a cross-sectional regression is written on. A Universe 
 *Avoid*: "the factor axis" alone, which no longer names one list.
 
 **Constraint Space**
-The basis in which the names of a constraint resolve. Assets are the absence of a re-basis. `FactorSpace` is the only member, and the `ExposureConstraintEstimator` wrapper declares it.
+The basis in which the names of a constraint resolve. Assets are the absence of a re-basis. `FactorSpace` is the basis of the factors of a regression, and `DependencySpace` is the basis of the nodes of an Exogenous Graph, through which a row caps the net Dependency Exposure to a node. The `ExposureConstraintEstimator` wrapper declares the space. A space whose names are not under a key of a Universe Sets gives a `ConstraintBasis`, which holds its own names.
 
 **Factor Exposure Constraint**
 A linear constraint on a portfolio's factor weights, written in factor names and projected through the loadings.

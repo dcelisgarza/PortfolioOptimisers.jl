@@ -502,6 +502,7 @@ include("24_Report/06_DependencyReach.jl")
 include("24_Report/07_DependencyExposureRows.jl")
 include("24_Report/08_DependencyExposureMethods.jl")
 include("24_Report/09_DependencyReport.jl")
+include("24_Report/10_DependencySpace.jl")
 
 # Every `@propagatable` struct is declared by now, and so is every outer keyword
 # constructor, so the contract behind the generated `factory`/`port_opt_view` methods is

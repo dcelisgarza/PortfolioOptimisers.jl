@@ -101,6 +101,106 @@ Implement both methods, or neither. The fallback of [`pipe_constraint_targets`](
 """
 abstract type AbstractConstraintEstimator <: AbstractEstimator end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds a change of basis of the weights with the names of its columns.
+
+A constraint space whose names are not under a key of a [`UniverseSets`](@ref) returns it from [`constraint_space_basis`](@ref), with `nothing` as the key. A row that names an entry of `nx` re-bases through the column of `M` of that entry. [`DependencySpace`](@ref) is the reference.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+  \\boldsymbol{w}_b &= \\mathbf{M}^\\intercal \\boldsymbol{w} \\\\
+  \\boldsymbol{a}^\\intercal \\boldsymbol{w}_b &= (\\mathbf{M}\\boldsymbol{a})^\\intercal \\boldsymbol{w}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{M}``: ``N \\times Nb`` matrix of the basis, the field `M`.
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{w}_b``: ``Nb \\times 1`` vector of the weights in the basis.
+  - ``\\boldsymbol{a}``: ``Nb \\times 1`` row that the user wrote in the names of the basis.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ConstraintBasis(;
+        M::MatNum,
+        nx::VecStr,
+        axis::AbstractString,
+        key::AbstractString
+    ) -> ConstraintBasis
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `size(M, 2) == length(nx)`. Raises a `DimensionMismatch`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.ConstraintBasis(; M = [1.0 0.0; 0.5 0.5], nx = [\"USD\", \"EUR\"],
+                                           axis = \"currency\", key = \"listing\")
+PortfolioOptimisers.ConstraintBasis
+     M ┼ 2×2 Matrix{Float64}
+    nx ┼ Vector{String}: ["USD", "EUR"]
+  axis ┼ String: "currency"
+   key ┴ String: "listing"
+```
+
+# Related
+
+  - [`AbstractConstraintSpace`](@ref)
+  - [`constraint_space_basis`](@ref)
+  - [`DependencySpace`](@ref)
+"""
+@concrete struct ConstraintBasis <: AbstractConstraintResult
+    """
+    $(field_dict[:cb_M])
+    """
+    M
+    """
+    $(field_dict[:cb_nx])
+    """
+    nx
+    """
+    $(field_dict[:cb_axis])
+    """
+    axis
+    """
+    $(field_dict[:cb_key])
+    """
+    key
+    function ConstraintBasis(M::MatNum, nx::VecStr, axis::AbstractString,
+                             key::AbstractString)
+        @argcheck(size(M, 2) == length(nx),
+                  DimensionMismatch("a change of basis holds one column of M for each of its names, and size(M, 2) ($(size(M, 2))) is not length(nx) ($(length(nx)))"))
+        return new{typeof(M), typeof(nx), typeof(axis), typeof(key)}(M, nx, axis, key)
+    end
+end
+function ConstraintBasis(; M::MatNum, nx::VecStr, axis::AbstractString,
+                         key::AbstractString)::ConstraintBasis
+    return ConstraintBasis(M, nx, axis, key)
+end
+"""
+    const RowBasis = Union{AbstractLoadingsRegressionResult, ConstraintBasis}
+
+Alias for the values that a row of a linear constraint can be re-based through. The row code reads the field `M` of each, one row per asset and one column per name.
+
+# Related
+
+  - [`AbstractLoadingsRegressionResult`](@ref)
+  - [`ConstraintBasis`](@ref)
+  - [`get_linear_constraints`](@ref)
+"""
+const RowBasis = Union{AbstractLoadingsRegressionResult, ConstraintBasis}
+"""
     const ComparisonOperator = Union{typeof(==), typeof(<=), typeof(>=)}
 
 Union of the comparison operators that a constraint accepts.
@@ -301,5 +401,5 @@ function axis_name_indices(members, nx::AbstractVector, on_missing)
     return idx
 end
 
-public AbstractConstraintResult, AbstractConstraintEstimator, implicit_constraint_target,
-       pipe_constraint_targets, constraint_step_value
+public AbstractConstraintResult, AbstractConstraintEstimator, ConstraintBasis,
+       implicit_constraint_target, pipe_constraint_targets, constraint_step_value

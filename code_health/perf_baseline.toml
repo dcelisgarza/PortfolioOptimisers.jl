@@ -5,7 +5,7 @@
 [provenance]
 julia = "1.13.4"
 rules = 2
-commit = "af0b8c72d3"
+commit = "96a62f857c"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
@@ -462,4 +462,5 @@ commit = "af0b8c72d3"
 "src/24_Report/07_DependencyExposureRows.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/24_Report/08_DependencyExposureMethods.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/24_Report/09_DependencyReport.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
+"src/24_Report/10_DependencySpace.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/PortfolioOptimisers.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }

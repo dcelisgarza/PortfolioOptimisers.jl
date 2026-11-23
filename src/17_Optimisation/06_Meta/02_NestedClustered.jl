@@ -415,6 +415,75 @@ function assert_external_lcse(opt)::Nothing
     return nothing
 end
 """
+    holds_outer_space(est::Union{AbstractEstimator, AbstractAlgorithm, StatsBase.CovarianceEstimator}) -> Bool
+    holds_outer_space(space::DependencySpace) -> Bool
+    holds_outer_space(v::AbstractArray{<:Number}) -> Bool
+    holds_outer_space(v::AbstractVector{<:Number}) -> Bool
+    holds_outer_space(v::Union{AbstractVector, Tuple}) -> Bool
+    holds_outer_space(p::Pair) -> Bool
+    holds_outer_space(x) -> Bool
+
+Tell whether an estimator tree holds a constraint space that reads the names of the assets, so that an outer optimiser can refuse it.
+
+A [`DependencySpace`](@ref) finds each asset among the nodes of a graph by its name. An outer solve replaces the assets with synthetic assets, whose names are not nodes. So every row has zero coefficients, and the constraint is silently absent.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`DependencySpace`](@ref): `true`.
+ 2. An estimator, an algorithm or a covariance estimator: walk each field.
+ 3. An array of numbers: `false`.
+ 4. A vector or a tuple: walk each element.
+ 5. A Pair: walk its value.
+ 6. Any other value: `false`.
+
+# Related
+
+  - [`assert_outer_spaces`](@ref)
+  - [`DependencySpace`](@ref)
+"""
+function holds_outer_space(est::Union{AbstractEstimator, AbstractAlgorithm,
+                                      StatsBase.CovarianceEstimator})::Bool
+    return any(f -> holds_outer_space(getfield(est, f)), fieldnames(typeof(est)))
+end
+function holds_outer_space(::AbstractArray{<:Number})::Bool
+    return false
+end
+function holds_outer_space(::AbstractVector{<:Number})::Bool
+    return false
+end
+function holds_outer_space(v::Union{AbstractVector, Tuple})::Bool
+    return any(holds_outer_space, v)
+end
+function holds_outer_space(p::Pair)::Bool
+    return holds_outer_space(p.second)
+end
+function holds_outer_space(::Any)::Bool
+    return false
+end
+"""
+    assert_outer_spaces(opto) -> Nothing
+
+Assert that an outer optimiser holds no constraint space that reads the names of the assets.
+
+[`NestedClustered`](@ref) and [`Stacking`](@ref) apply it to `opto`. An inner optimiser solves over the assets of its slice, so it takes the space.
+
+# Validation
+
+  - `holds_outer_space(opto)` is `false`. The function throws an `ArgumentError` otherwise.
+
+# Related
+
+  - [`holds_outer_space`](@ref)
+  - [`assert_external_optimiser`](@ref)
+"""
+function assert_outer_spaces(opto)::Nothing
+    @argcheck(!holds_outer_space(opto),
+              ArgumentError("the outer optimiser `opto` holds a constraint over a `DependencySpace`. The outer problem replaces the assets with synthetic assets, which are not nodes of the graph, so no row of the constraint can bind. State the constraint on `opti`"))
+    return nothing
+end
+"""
     assert_estimated_prior(pe, name::AbstractString) -> Nothing
 
 Assert that a `pe` slot holds a prior estimator, and no precomputed prior, directly or through a [`TimeDependent`](@ref) schedule.
@@ -560,7 +629,7 @@ An entry of a schedule in `opti` or `opto` must be an estimator, as the static v
 
 ## Validation
 
-  - `opto` passes [`assert_external_optimiser`](@ref) and [`assert_special_nco_requirements`](@ref). A schedule passes when its entries and its `default` pass.
+  - `opto` passes [`assert_external_optimiser`](@ref), [`assert_outer_spaces`](@ref) and [`assert_special_nco_requirements`](@ref). A schedule passes when its entries and its `default` pass.
   - When `opti` is not `opto`, `opti` passes [`assert_internal_optimiser`](@ref) and `assert_special_nco_requirements`.
   - When `cv` is present, `opti` passes `assert_external_optimiser`.
   - `scorer` is `nothing` unless `cv` is a [`CombinatorialCrossValidation`](@ref). The constructor throws an `ArgumentError` otherwise, through [`assert_meta_scorer`](@ref).
@@ -693,6 +762,7 @@ An entry of a schedule in `opti` or `opto` must be an estimator, as the static v
         assert_no_nearest_bind_optimiser_schedule(opto, :opto, :NestedClustered)
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :NestedClustered)
         assert_external_optimiser(opto)
+        assert_outer_spaces(opto)
         assert_special_nco_requirements(opto)
         if !(opti === opto)
             assert_internal_optimiser(opti)

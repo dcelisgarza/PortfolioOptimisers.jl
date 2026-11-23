@@ -8,7 +8,7 @@ jet = "0.13.3"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "af0b8c72d3"
+commit = "96a62f857c"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -468,6 +468,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/24_Report/07_DependencyExposureRows.jl" = { raw = 0, reviewed = 0 }
 "src/24_Report/08_DependencyExposureMethods.jl" = { raw = 0, reviewed = 0 }
 "src/24_Report/09_DependencyReport.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/10_DependencySpace.jl" = { raw = 0, reviewed = 0 }
 "src/PortfolioOptimisers.jl" = { raw = 0, reviewed = 0 }
 
 [run.plots_ext]
@@ -928,6 +929,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/24_Report/07_DependencyExposureRows.jl" = { raw = 0, reviewed = 0 }
 "src/24_Report/08_DependencyExposureMethods.jl" = { raw = 0, reviewed = 0 }
 "src/24_Report/09_DependencyReport.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/10_DependencySpace.jl" = { raw = 0, reviewed = 0 }
 "src/PortfolioOptimisers.jl" = { raw = 0, reviewed = 0 }
 
 [run.graph_ext]
@@ -1388,4 +1390,5 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/24_Report/07_DependencyExposureRows.jl" = { raw = 0, reviewed = 0 }
 "src/24_Report/08_DependencyExposureMethods.jl" = { raw = 0, reviewed = 0 }
 "src/24_Report/09_DependencyReport.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/10_DependencySpace.jl" = { raw = 0, reviewed = 0 }
 "src/PortfolioOptimisers.jl" = { raw = 0, reviewed = 0 }
