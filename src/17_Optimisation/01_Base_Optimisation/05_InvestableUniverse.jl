@@ -513,6 +513,7 @@ It is a batch fit, so [`assert_batch_entry`](@ref) refuses an [`Online`](@ref) a
 """
 function optimise(opt::OptimisationEstimator, args...; kwargs...)
     assert_batch_entry(opt, "`optimise`")
+    assert_graph_entry(opt, args...)
     current_opt = reset_time_dependent_estimator(opt)
     res = shared_series_solve(current_opt, args...; kwargs...)
     # A solve that succeeds, or an estimator with no fallback, is the answer. It returns

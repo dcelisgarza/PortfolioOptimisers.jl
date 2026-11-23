@@ -67,7 +67,11 @@ commit = "391be5e"
 "src/03_InputData/02_AssetPanelBuilder.jl" = { lines = 255, misses = 0 }
 "src/03_InputData/03_ListingSpan.jl" = { lines = 50, misses = 0 }
 "src/03_InputData/04_Preprocessing.jl" = { lines = 8, misses = 0 }
-"src/03_InputData/05_PanelViews.jl" = { lines = 46, misses = 0 }
+"src/03_InputData/05_ExogenousGraph/01_ExogenousGraph.jl" = { lines = 101, misses = 0 }
+"src/03_InputData/05_ExogenousGraph/02_ExogenousGraphSeries.jl" = { lines = 21, misses = 0 }
+"src/03_InputData/05_ExogenousGraph/03_GraphObservations.jl" = { lines = 140, misses = 0 }
+"src/03_InputData/05_ExogenousGraph/04_GraphTables.jl" = { lines = 125, misses = 0 }
+"src/03_InputData/05_ExogenousGraph/05_GraphRequirements.jl" = { lines = 56, misses = 0 }
 "src/03_InputData/06_PricesResult.jl" = { lines = 68, misses = 0 }
 "src/03_InputData/07_PriceIngestion.jl" = { lines = 166, misses = 0 }
 "src/03_InputData/08_PriceGapFill.jl" = { lines = 66, misses = 0 }
@@ -85,6 +89,7 @@ commit = "391be5e"
 "src/03_InputData/20_PanelFieldValues.jl" = { lines = 38, misses = 0 }
 "src/03_InputData/21_AssetPanelSummary.jl" = { lines = 132, misses = 0 }
 "src/03_InputData/22_PanelRoundTrip.jl" = { lines = 209, misses = 0 }
+"src/03_InputData/23_PanelViews.jl" = { lines = 46, misses = 0 }
 "src/04_MatrixProcessing/01_PosdefMatrix.jl" = { lines = 112, misses = 0 }
 "src/04_MatrixProcessing/02_Denoise.jl" = { lines = 82, misses = 0 }
 "src/04_MatrixProcessing/03_Detone.jl" = { lines = 32, misses = 0 }

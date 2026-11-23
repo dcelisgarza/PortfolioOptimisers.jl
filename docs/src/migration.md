@@ -1066,6 +1066,16 @@ A static `TensorPanelField` and a static feature matrix keep `assets × labels` 
 
 `Clustering.cutree(clr.res; k)` throws a `BoundsError` on a tree of `CentroidLinkage()` or `MedianLinkage()` with an inversion, a merge lower than a merge below it, because it replays the merges in the order of their raw heights. Write `cut_dendrogram(clr.res, k)`. It cuts in the order of the cophenetic heights, so it always gives `k` clusters. On a tree with no inversion, it gives the labels of `Clustering.cutree`, so every v0.34 result stays. `assignments(clr)`, the number of clusters, HERC and `ROrder()` read it. `clr.res.heights` keeps the raw heights, and `cophenetic_heights(clr.res)` gives the monotone form.
 
+### [The returns data hold Exogenous Graphs](@id migration-0-35-graphs)
+
+`ReturnsResult` and `PricesResult` hold named Exogenous Graphs: the names `ng` and one `ExogenousGraph` or `ExogenousGraphSeries` for each name in `G`. The keyword constructors take both with the default `nothing`, so code that builds the two types by keyword does not change.
+
+- **`ReturnsResult`** has the fields `ng` and `G` after `E`, so its positional constructor takes fourteen arguments, `ReturnsResult(nx, X, nf, F, nb, B, ne, E, ng, G, ts, iv, ivpa, pnl)`, where v0.34 took twelve. Pass `nothing, nothing` after `E`, or use the keyword constructor.
+- **`PricesResult`** has the fields `ng` and `G` after `E`, so its positional constructor takes ten arguments, `PricesResult(X, F, B, E, ng, G, iv, ivpa, pnl, span)`, where v0.34 took eight.
+- **The type parameters** of both types gain two entries after the one of `E`. A method that names `ReturnsResult{…}` or `PricesResult{…}` with the parameters after `E` adds two `<:Any` entries.
+- **The show** of both types prints the two fields `ng` and `G` after `E`. A doctest of your own that prints a `ReturnsResult` gains the two rows `ng ┼ nothing` and `G ┼ nothing`.
+- **A returns result of your own** that subtypes `AbstractReturnsResult` holds no graph unless it adds the two fields. The user verbs read the graphs of a `ReturnsResult` and a `PricesResult` only.
+
 ### [If you extend the library](@id migration-0-35-extending)
 
 - **A branch order of your own is a subtype of `AbstractBranchOrder`**, which is public, with a method `PortfolioOptimisers.order_branches!(hmer::Clustering.HclustMerges, D, ::MyOrder)`. A method of `order_branches!(hmer, D, ::Val{:my_order})` is not called any more.

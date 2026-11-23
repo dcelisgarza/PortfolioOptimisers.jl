@@ -703,6 +703,9 @@ function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
         assert_batch_entry(est, "the fold loop under a scheme that is not an Online Scheme")
         assert_folds_track_no_series(est, n)
     end
+    # Each fold is a view that drops the snapshots of its future, so the graphs of the
+    # whole data are checked here, before fold 1.
+    assert_graph_entry(est, rd)
     prev_w_flag = needs_previous_weights(est)
     # The per-fold copy. `esti` is the fold's estimator before resolution: the configuration
     # in the batch arms, the threaded estimator in the online arm.

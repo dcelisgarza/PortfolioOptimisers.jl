@@ -172,6 +172,7 @@
         :AbstractGapReturnAlgorithm,
         :AbstractGradientPredictor,
         :AbstractGradientTransform,
+        :AbstractGraphRequirement,
         :AbstractHacFloor,
         :AbstractHacVolatilityTiming,
         :AbstractHighOrderPriorEstimator,

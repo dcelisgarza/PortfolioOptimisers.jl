@@ -1,5 +1,5 @@
 ```@meta
-Description = "Returns result, private API of PortfolioOptimisers.jl: Prices_RR, check_names_and_returns_matrix, check_exogenous_series, assert_asset_panel_supplied, …"
+Description = "Returns result, private API of PortfolioOptimisers.jl: Prices_RR, check_names_and_returns_matrix, check_exogenous_series, observation_count, …"
 ```
 
 # Returns result: private API
@@ -15,6 +15,7 @@ Prices_RR
 ```@docs
 check_names_and_returns_matrix
 check_exogenous_series
+PortfolioOptimisers.observation_count
 PortfolioOptimisers.assert_asset_panel_supplied
 PortfolioOptimisers.shared_series_rows
 PortfolioOptimisers.shared_benchmark

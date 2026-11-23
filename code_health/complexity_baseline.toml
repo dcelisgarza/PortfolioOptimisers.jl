@@ -68,12 +68,16 @@ commit = "6175a28437"
 "src/03_InputData/02_AssetPanelBuilder.jl" = { cyc = 7, cog = 10, arg = 6, cyc_sum = 110, cog_sum = 78, arg_sum = 136, macros = [] }
 "src/03_InputData/03_ListingSpan.jl" = { cyc = 5, cog = 8, arg = 3, cyc_sum = 20, cog_sum = 13, arg_sum = 20, macros = [] }
 "src/03_InputData/04_Preprocessing.jl" = { cyc = 3, cog = 2, arg = 2, cyc_sum = 6, cog_sum = 2, arg_sum = 4, macros = [] }
-"src/03_InputData/05_PanelViews.jl" = { cyc = 3, cog = 3, arg = 3, cyc_sum = 19, cog_sum = 5, arg_sum = 34, macros = [] }
-"src/03_InputData/06_PricesResult.jl" = { cyc = 8, cog = 10, arg = 8, cyc_sum = 31, cog_sum = 35, arg_sum = 23, macros = [] }
+"src/03_InputData/05_ExogenousGraph/01_ExogenousGraph.jl" = { cyc = 3, cog = 3, arg = 5, cyc_sum = 37, cog_sum = 21, arg_sum = 42, macros = [] }
+"src/03_InputData/05_ExogenousGraph/02_ExogenousGraphSeries.jl" = { cyc = 6, cog = 7, arg = 2, cyc_sum = 14, cog_sum = 10, arg_sum = 8, macros = [] }
+"src/03_InputData/05_ExogenousGraph/03_GraphObservations.jl" = { cyc = 7, cog = 8, arg = 7, cyc_sum = 55, cog_sum = 27, arg_sum = 97, macros = [] }
+"src/03_InputData/05_ExogenousGraph/04_GraphTables.jl" = { cyc = 6, cog = 13, arg = 5, cyc_sum = 55, cog_sum = 36, arg_sum = 49, macros = [] }
+"src/03_InputData/05_ExogenousGraph/05_GraphRequirements.jl" = { cyc = 4, cog = 7, arg = 6, cyc_sum = 31, cog_sum = 19, arg_sum = 18, macros = [] }
+"src/03_InputData/06_PricesResult.jl" = { cyc = 8, cog = 10, arg = 10, cyc_sum = 35, cog_sum = 39, arg_sum = 29, macros = [] }
 "src/03_InputData/07_PriceIngestion.jl" = { cyc = 9, cog = 13, arg = 4, cyc_sum = 65, cog_sum = 43, arg_sum = 55, macros = [] }
 "src/03_InputData/08_PriceGapFill.jl" = { cyc = 5, cog = 6, arg = 6, cyc_sum = 26, cog_sum = 19, arg_sum = 34, macros = [] }
 "src/03_InputData/09_PriceFilters.jl" = { cyc = 4, cog = 3, arg = 4, cyc_sum = 22, cog_sum = 8, arg_sum = 8, macros = [] }
-"src/03_InputData/10_ReturnsResult.jl" = { cyc = 18, cog = 25, arg = 12, cyc_sum = 93, cog_sum = 89, arg_sum = 90, macros = [] }
+"src/03_InputData/10_ReturnsResult.jl" = { cyc = 18, cog = 25, arg = 14, cyc_sum = 101, cog_sum = 99, arg_sum = 101, macros = [] }
 "src/03_InputData/11_PricesToReturns.jl" = { cyc = 12, cog = 19, arg = 4, cyc_sum = 48, cog_sum = 52, arg_sum = 30, macros = [] }
 "src/03_InputData/12_TrainTestSplit.jl" = { cyc = 6, cog = 6, arg = 4, cyc_sum = 17, cog_sum = 9, arg_sum = 16, macros = [] }
 "src/03_InputData/13_Base_AssetSelection.jl" = { cyc = 2, cog = 1, arg = 2, cyc_sum = 5, cog_sum = 1, arg_sum = 4, macros = [] }
@@ -86,6 +90,7 @@ commit = "6175a28437"
 "src/03_InputData/20_PanelFieldValues.jl" = { cyc = 3, cog = 3, arg = 4, cyc_sum = 15, cog_sum = 7, arg_sum = 15, macros = [] }
 "src/03_InputData/21_AssetPanelSummary.jl" = { cyc = 9, cog = 11, arg = 4, cyc_sum = 60, cog_sum = 50, arg_sum = 27, macros = [] }
 "src/03_InputData/22_PanelRoundTrip.jl" = { cyc = 7, cog = 10, arg = 6, cyc_sum = 88, cog_sum = 73, arg_sum = 72, macros = [] }
+"src/03_InputData/23_PanelViews.jl" = { cyc = 3, cog = 3, arg = 3, cyc_sum = 19, cog_sum = 5, arg_sum = 34, macros = [] }
 "src/04_MatrixProcessing/01_PosdefMatrix.jl" = { cyc = 4, cog = 4, arg = 3, cyc_sum = 36, cog_sum = 22, arg_sum = 24, macros = [] }
 "src/04_MatrixProcessing/02_Denoise.jl" = { cyc = 4, cog = 6, arg = 7, cyc_sum = 19, cog_sum = 13, arg_sum = 30, macros = [] }
 "src/04_MatrixProcessing/03_Detone.jl" = { cyc = 6, cog = 6, arg = 2, cyc_sum = 11, cog_sum = 7, arg_sum = 8, macros = [] }

@@ -274,6 +274,7 @@ end
     timestamp_positions(ts, i) -> typeof(i)
     timestamp_positions(ts, i::Integer) -> UnitRange
     timestamp_positions(ts, i::Bool) -> Union{}
+    timestamp_positions(ts, i::AbstractVector{Bool}) -> Vector{Int}
     timestamp_positions(ts, i::Union{AbstractString, VecStr}) -> Union{}
     timestamp_positions(ts::Nothing, i::Union{Dates.AbstractTime, VecDate}) -> Union{}
     timestamp_positions(ts::AbstractVector, i::Dates.AbstractTime) -> Vector{Int}
@@ -281,7 +282,7 @@ end
 
 Turn the timestamps that select observations in a view of a [`ReturnsResult`](@ref) or of a [`PricesResult`](@ref) into the positions of those observations.
 
-[`port_opt_view`](@ref) of a `ReturnsResult` calls it on its observation index, so a caller can select the observations by timestamp or by position. The integer view of a `PricesResult` calls it on its integer index, and the timestamp view of a `PricesResult` calls it through [`clock_selection`](@ref). An integer vector, a range and a `Colon` pass through unchanged.
+[`port_opt_view`](@ref) of a `ReturnsResult` calls it on its observation index, so a caller can select the observations by timestamp or by position. The integer view of a `PricesResult` calls it on its integer index, and the timestamp view of a `PricesResult` calls it through [`clock_selection`](@ref). An integer vector, a range and a `Colon` pass through unchanged. A logical mask gives the positions of its `true` entries, so each field of the view, the Exogenous Graphs too, reads the same positions.
 
 A vector of timestamps selects the observations that the clock holds, as the timestamp view of a [`PricesResult`](@ref) does. The rows come back in clock order whatever the order of `i`, and a timestamp that the clock does not hold selects no row. So a calendar range selects the trading days inside it. A window that keeps no row is refused by the [`ReturnsResult`](@ref) constructor, which refuses empty returns.
 
@@ -295,16 +296,17 @@ The method that Julia selects is the algorithm.
 
  1. `i` is not an integer, not a timestamp, not a vector of timestamps, not a name and not a vector of names: return it unchanged.
  2. `i` is one `Bool`: throw.
- 3. `i` is one integer `n`: return `n:n`.
- 4. `i` is a name or a vector of names: throw. A name selects an asset or a factor, and this index selects observations.
- 5. `i` is a timestamp or a vector of timestamps, and `ts` is `nothing`: throw. The returns carry no timestamps to match.
- 6. `i` is a timestamp: check its type, and keep the positions of `ts` that equal `i`. Throw when no position equals `i`.
- 7. `i` is a vector of timestamps: check its element type. When that type is abstract, check the type of each entry. Sort `i`, and keep the position of each timestamp of `ts` that the sorted vector holds, with `insorted`.
+ 3. `i` is a vector of `Bool`: return `findall(i)`.
+ 4. `i` is one integer `n`: return `n:n`.
+ 5. `i` is a name or a vector of names: throw. A name selects an asset or a factor, and this index selects observations.
+ 6. `i` is a timestamp or a vector of timestamps, and `ts` is `nothing`: throw. The returns carry no timestamps to match.
+ 7. `i` is a timestamp: check its type, and keep the positions of `ts` that equal `i`. Throw when no position equals `i`.
+ 8. `i` is a vector of timestamps: check its element type. When that type is abstract, check the type of each entry. Sort `i`, and keep the position of each timestamp of `ts` that the sorted vector holds, with `insorted`.
 
 # Arguments
 
   - `ts`: The timestamps of the returns or of the prices, or `nothing`.
-  - `i`: The observation index of the view: a timestamp, a vector of timestamps, one integer, integer positions, a range or a `Colon`.
+  - `i`: The observation index of the view: a timestamp, a vector of timestamps, one integer, integer positions, a logical mask, a range or a `Colon`.
 
 # Validation
 
@@ -316,7 +318,7 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `idx`: `i` unchanged, the range `i:i` of one integer, or the positions in `ts` of the timestamps that `i` holds, in clock order.
+  - `idx`: `i` unchanged, the range `i:i` of one integer, the positions of the `true` entries of a mask, or the positions in `ts` of the timestamps that `i` holds, in clock order.
 
 # Related
 
@@ -335,6 +337,9 @@ function timestamp_positions(::Any, i::Integer)
 end
 function timestamp_positions(::Any, i::Bool)
     return throw(ArgumentError("one Bool is not a position of the observations, and Julia refuses it in an index. Select one observation by its position, such as 1, or by its timestamp, or pass a vector of Bool with one entry for each observation as a mask. Got\ni => $(i)"))
+end
+function timestamp_positions(::Any, i::AbstractVector{Bool})
+    return findall(i)
 end
 function timestamp_positions(::Any, i::Union{AbstractString, VecStr})
     return throw(ArgumentError("a name selects an asset or a factor, but the first index of port_opt_view(rd, observations, assets, factors) selects the observations. Pass the asset names as the second index and the factor names as the third. Got\ni => $(i)"))

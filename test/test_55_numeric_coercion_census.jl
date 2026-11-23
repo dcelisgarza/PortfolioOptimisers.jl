@@ -133,6 +133,7 @@
     =#
     ENTRY = Dict("src/03_InputData/01_AssetPanel.jl" => 2,
                  "src/03_InputData/02_AssetPanelBuilder.jl" => 2,
+                 "src/03_InputData/05_ExogenousGraph/01_ExogenousGraph.jl" => 1,
                  "src/03_InputData/06_PricesResult.jl" => 5,
                  "src/03_InputData/07_PriceIngestion.jl" => 1,
                  "src/03_InputData/10_ReturnsResult.jl" => 5,

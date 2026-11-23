@@ -1074,6 +1074,25 @@ message = "local variable `racy` may be undefined"
 count = 1
 rationale = "a-form-its-package-recommends"
 
+# The keyword constructor `DataFrames.DataFrame(; graph = String[], key = K[], …)`, the
+# documented constructor of a table, takes the key and weight columns in the types that the
+# graphs state, which JET sees as abstract, and it reaches `@sync` of Base (`base/task.jl`),
+# whose locals `c_ex` and `racy` JET reads as maybe undefined. The edge table and the manifest of
+# the Exogenous Graphs (#2171) write their columns this way, as `panel_manifest` does.
+[[dismissal]]
+file = "src/03_InputData/05_ExogenousGraph/04_GraphTables.jl"
+kind = "UndefVarErrorReport"
+message = "local variable `c_ex` may be undefined"
+count = 3
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/03_InputData/05_ExogenousGraph/04_GraphTables.jl"
+kind = "UndefVarErrorReport"
+message = "local variable `racy` may be undefined"
+count = 1
+rationale = "a-form-its-package-recommends"
+
 [[dismissal]]
 file = "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_a.jl"
 kind = "BuiltinErrorReport"

@@ -69,7 +69,11 @@ commit = "6175a28437"
 "src/03_InputData/02_AssetPanelBuilder.jl" = { code = 444, doc = 848, comment = 4, blank = 385, total = 1681 }
 "src/03_InputData/03_ListingSpan.jl" = { code = 74, doc = 195, comment = 0, blank = 83, total = 352 }
 "src/03_InputData/04_Preprocessing.jl" = { code = 25, doc = 169, comment = 0, blank = 102, total = 296 }
-"src/03_InputData/05_PanelViews.jl" = { code = 65, doc = 148, comment = 0, blank = 79, total = 292 }
+"src/03_InputData/05_ExogenousGraph/01_ExogenousGraph.jl" = { code = 163, doc = 248, comment = 1, blank = 136, total = 548 }
+"src/03_InputData/05_ExogenousGraph/02_ExogenousGraphSeries.jl" = { code = 44, doc = 80, comment = 0, blank = 40, total = 164 }
+"src/03_InputData/05_ExogenousGraph/03_GraphObservations.jl" = { code = 223, doc = 314, comment = 1, blank = 162, total = 700 }
+"src/03_InputData/05_ExogenousGraph/04_GraphTables.jl" = { code = 208, doc = 254, comment = 3, blank = 116, total = 581 }
+"src/03_InputData/05_ExogenousGraph/05_GraphRequirements.jl" = { code = 102, doc = 220, comment = 0, blank = 119, total = 441 }
 "src/03_InputData/06_PricesResult.jl" = { code = 122, doc = 169, comment = 5, blank = 72, total = 368 }
 "src/03_InputData/07_PriceIngestion.jl" = { code = 279, doc = 562, comment = 25, blank = 276, total = 1142 }
 "src/03_InputData/08_PriceGapFill.jl" = { code = 111, doc = 335, comment = 17, blank = 133, total = 596 }
@@ -87,6 +91,7 @@ commit = "6175a28437"
 "src/03_InputData/20_PanelFieldValues.jl" = { code = 62, doc = 144, comment = 0, blank = 59, total = 265 }
 "src/03_InputData/21_AssetPanelSummary.jl" = { code = 239, doc = 489, comment = 4, blank = 224, total = 956 }
 "src/03_InputData/22_PanelRoundTrip.jl" = { code = 347, doc = 612, comment = 8, blank = 303, total = 1270 }
+"src/03_InputData/23_PanelViews.jl" = { code = 65, doc = 148, comment = 0, blank = 79, total = 292 }
 "src/04_MatrixProcessing/01_PosdefMatrix.jl" = { code = 163, doc = 477, comment = 3, blank = 221, total = 864 }
 "src/04_MatrixProcessing/02_Denoise.jl" = { code = 141, doc = 550, comment = 36, blank = 200, total = 927 }
 "src/04_MatrixProcessing/03_Detone.jl" = { code = 51, doc = 191, comment = 2, blank = 82, total = 326 }

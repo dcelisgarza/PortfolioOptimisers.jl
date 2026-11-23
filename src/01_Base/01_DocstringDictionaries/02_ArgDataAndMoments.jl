@@ -140,6 +140,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :rf => "`rf`: Risk-free rate.",#
                  # Fields of the returns data and the price data.
                  :ivpa_iv => "`ivpa`: Implied volatility risk premium adjustment, a positive number that every asset shares, or a vector of positive numbers with one entry per asset.",#
+                 :ng => "`ng`: Names of the Exogenous Graphs (graphs × 1). A consumer of a graph selects an entry of `G` by one of these names.",#
+                 :G => "`G`: Exogenous Graphs (graphs × 1): one [`ExogenousGraph`](@ref) or one [`ExogenousGraphSeries`](@ref) for each name of `ng`. An integer key of a series is a row of the observation axis.",#
                  # Cross-sectional transforms.
                  :min_group_size => "`min_group_size`: Smallest estimation set a group may carry and still be estimated from. A group below it, and every asset that carries no group, takes the whole observation's statistics instead.",#
                  :atol_cs => "`atol`: Absolute tolerance below which a cross-sectional scale counts as zero. An observation at or below it carries no dispersion, so its finite cells score zero rather than dividing by that scale.",#

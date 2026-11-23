@@ -148,11 +148,13 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Returns data of a universe: the asset returns, and optionally the factor returns, the benchmark returns, the Exogenous Series, the timestamps, the implied volatilities and an Asset Panel.
+Returns data of a universe: the asset returns, and optionally the factor returns, the benchmark returns, the Exogenous Series, the Exogenous Graphs, the timestamps, the implied volatilities and an Asset Panel.
 
 [`prices_to_returns`](@ref) builds it, and the priors, the optimisers and the cross-validation folds read it. All of its matrices share the observation axis, which is the rows. `X`, `iv` and a matrix `B` also share the asset axis, which is the columns.
 
 The Exogenous Series `E` holds named series over the observation axis that belong to no asset, for example the Currency Excess Returns that the Currency Factors of a [`CrossSectionalFactorPrior`](@ref) read. A consumer reads a column of `E` only by its name, so no model takes the block whole as its factors, as a time-series factor model takes `F`. `E` can hold `NaN`: the consumer that names a series refuses a non-finite value only on the rows that it fits.
+
+The Exogenous Graphs `G` hold named relations between assets and other entities, such as the suppliers of each asset: one [`ExogenousGraph`](@ref) or one [`ExogenousGraphSeries`](@ref) for each name of `ng`. A consumer names the graph that it reads, and reads the graph in force at the last row of its window, see [`graph_in_force`](@ref). A view of the observations keeps the graph in force at its first row and the change points inside its window, see [`graph_view`](@ref).
 
 The optional [`AssetPanel`](@ref) `pnl` holds the two universe masks of the ingestion layer, and the Panel Fields that [`FeatureDistance`](@ref) turns into a distance. The panel is data, so this type holds it and no estimator does. The clustering code does not know which subset of assets it receives. A Feature Matrix on an estimator would reach a nested clustered subproblem or a cross-validation fold with every asset of the full universe, and its rows would no longer match the assets of the subproblem. `ReturnsResult` implements [`port_opt_view`](@ref), so a view subselects the panel together with `X`.
 
@@ -171,6 +173,8 @@ $(DocStringExtensions.FIELDS)
         B::Option{<:VecNum_MatNum} = nothing,
         ne::Option{<:VecStr} = nothing,
         E::Option{<:MatNum} = nothing,
+        ng::Option{<:VecStr} = nothing,
+        G::Option{<:AbstractVector} = nothing,
         ts::Option{<:VecDate} = nothing,
         iv::Option{<:MatNum} = nothing,
         ivpa::Option{<:Num_VecNum} = nothing,
@@ -191,6 +195,7 @@ Keywords correspond to the struct's fields.
   - If `B` is `nothing`, `nb` is `nothing`.
   - If `X` and a vector `B` are given, `size(X, 1) == size(B, 1)`. If `X` and a matrix `B` are given, `size(X) == size(B)`.
   - If `ne` or `E` is not `nothing`, [`check_exogenous_series`](@ref) holds: the checks of `nx` and `X` hold for `ne` and `E`, and `E` has the row count of each of `X`, `F` and `ts` that is given. `E` can hold `NaN`.
+  - If `ng` or `G` is not `nothing`, [`check_exogenous_graphs`](@ref) holds: both are given, `ng` is not empty and holds no empty or repeated name, `length(ng) == length(G)`, each integer key of a series is a row of `X` or `F`, and a series with date keys needs `ts` of a type that compares with its keys.
   - If `ts` is not `nothing`, `!isempty(ts)`, `X` or `F` is given, and `allunique(ts)`. `length(ts)` equals the row count of each of `X`, `F` and `B` that is given, and of `E`, which [`check_exogenous_series`](@ref) checks. `ts` must be unique because it keys the observation axis. [`feature_row_indices`](@ref) finds the rows of a subset by matching its timestamps back into this clock, and a repeated timestamp resolves to its first occurrence, which pairs an asset with the features of another period.
   - If `iv` is not `nothing`, `X` is given, `!isempty(iv)`, `size(iv) == size(X)`, and every present value is finite and non-negative. `NaN` marks an absent value. See [`assert_nonneg_where_present`](@ref).
   - `ivpa` is checked only when `iv` is given, because with no implied volatility it adjusts nothing. Then `all(x -> x > 0, ivpa)` and `all(isfinite, ivpa)`, and a vector `ivpa` has `length(ivpa) == size(iv, 2)`. The bound is strict, so a zero adjustment is refused.
@@ -211,6 +216,8 @@ ReturnsResult
      B ┼ nothing
     ne ┼ nothing
      E ┼ nothing
+    ng ┼ nothing
+     G ┼ nothing
     ts ┼ nothing
     iv ┼ nothing
   ivpa ┼ nothing
@@ -264,6 +271,14 @@ ReturnsResult
     """
     E
     """
+    $(field_dict[:ng])
+    """
+    ng
+    """
+    $(field_dict[:G])
+    """
+    G
+    """
     Optional timestamps for each observation (observations × 1).
     """
     ts
@@ -282,8 +297,10 @@ ReturnsResult
     function ReturnsResult(nx::Option{<:VecStr}, X::Option{<:MatNum}, nf::Option{<:VecStr},
                            F::Option{<:MatNum}, nb::Option{<:VecStr},
                            B::Option{<:VecNum_MatNum}, ne::Option{<:VecStr},
-                           E::Option{<:MatNum}, ts::Option{<:VecDate}, iv::Option{<:MatNum},
-                           ivpa::Option{<:Num_VecNum}, pnl::Option{<:AssetPanel})
+                           E::Option{<:MatNum}, ng::Option{<:VecStr},
+                           G::Option{<:AbstractVector}, ts::Option{<:VecDate},
+                           iv::Option{<:MatNum}, ivpa::Option{<:Num_VecNum},
+                           pnl::Option{<:AssetPanel})
         # The one entry point of integer data: every kernel downstream reads a float.
         X = float_if_integer(X)
         F = float_if_integer(F)
@@ -352,19 +369,47 @@ ReturnsResult
         end
         check_asset_panel(pnl, isnothing(nx) ? nothing : length(nx),
                           isnothing(X) ? nothing : size(X, 1), "length(nx)")
+        check_exogenous_graphs(ng, G, observation_count(X, F), ts)
         return new{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(nb), typeof(B),
-                   typeof(ne), typeof(E), typeof(ts), typeof(iv), typeof(ivpa),
-                   typeof(pnl)}(nx, X, nf, F, nb, B, ne, E, ts, iv, ivpa, pnl)
+                   typeof(ne), typeof(E), typeof(ng), typeof(G), typeof(ts), typeof(iv),
+                   typeof(ivpa), typeof(pnl)}(nx, X, nf, F, nb, B, ne, E, ng, G, ts, iv,
+                                              ivpa, pnl)
     end
 end
 function ReturnsResult(; nx::Option{<:VecStr} = nothing, X::Option{<:MatNum} = nothing,
                        nf::Option{<:VecStr} = nothing, F::Option{<:MatNum} = nothing,
                        nb::Option{<:VecStr} = nothing, B::Option{<:VecNum_MatNum} = nothing,
                        ne::Option{<:VecStr} = nothing, E::Option{<:MatNum} = nothing,
+                       ng::Option{<:VecStr} = nothing,
+                       G::Option{<:AbstractVector} = nothing,
                        ts::Option{<:VecDate} = nothing, iv::Option{<:MatNum} = nothing,
                        ivpa::Option{<:Num_VecNum} = nothing,
                        pnl::Option{<:AssetPanel} = nothing)::ReturnsResult
-    return ReturnsResult(nx, X, nf, F, nb, B, ne, E, ts, iv, ivpa, pnl)
+    return ReturnsResult(nx, X, nf, F, nb, B, ne, E, ng, G, ts, iv, ivpa, pnl)
+end
+"""
+    observation_count(X::Option{<:MatNum}, F::Option{<:MatNum}) -> Option{Int}
+
+Return the number of rows of the returns data: the rows of `X`, else the rows of `F`, else `nothing`.
+
+The integer keys of an [`ExogenousGraphSeries`](@ref) are rows of the returns data, so the check of the keys and the lookup of the graph in force read this count.
+
+# Arguments
+
+  - `X`: The asset returns, or `nothing`.
+  - `F`: The factor returns, or `nothing`.
+
+# Returns
+
+  - `T::Option{Int}`: The number of rows, or `nothing` when the returns data holds neither `X` nor `F`.
+
+# Related
+
+  - [`ReturnsResult`](@ref)
+  - [`check_exogenous_graphs`](@ref)
+"""
+function observation_count(X::Option{<:MatNum}, F::Option{<:MatNum})
+    return isnothing(X) ? (isnothing(F) ? nothing : size(F, 1)) : size(X, 1)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -416,6 +461,8 @@ ReturnsResult
      B ┼ nothing
     ne ┼ nothing
      E ┼ nothing
+    ng ┼ nothing
+     G ┼ nothing
     ts ┼ nothing
     iv ┼ nothing
   ivpa ┼ nothing
@@ -431,6 +478,8 @@ ReturnsResult
      B ┼ nothing
     ne ┼ nothing
      E ┼ nothing
+    ng ┼ nothing
+     G ┼ nothing
     ts ┼ nothing
     iv ┼ nothing
   ivpa ┼ nothing
@@ -513,6 +562,8 @@ ReturnsResult
      B ┼ nothing
     ne ┼ nothing
      E ┼ nothing
+    ng ┼ nothing
+     G ┼ nothing
     ts ┼ nothing
     iv ┼ nothing
   ivpa ┼ nothing
@@ -528,6 +579,8 @@ ReturnsResult
      B ┼ nothing
     ne ┼ nothing
      E ┼ nothing
+    ng ┼ nothing
+     G ┼ nothing
     ts ┼ nothing
     iv ┼ nothing
   ivpa ┼ nothing
@@ -609,7 +662,8 @@ function port_opt_view(rd::ReturnsResult, i)
     ivpa = nothing_scalar_array_view(rd.ivpa, i)
     pnl = port_opt_view(rd.pnl, :, i, rd.nx)
     return ReturnsResult(; nx = nx, X = X, nf = rd.nf, F = rd.F, nb = nb, B = B, ne = rd.ne,
-                         E = rd.E, ts = rd.ts, iv = iv, ivpa = ivpa, pnl = pnl)
+                         E = rd.E, ng = rd.ng, G = rd.G, ts = rd.ts, iv = iv, ivpa = ivpa,
+                         pnl = pnl)
 end
 function port_opt_view(rd::ReturnsResult, i, j, k = :)
     i = timestamp_positions(rd.ts, i)
@@ -632,8 +686,9 @@ function port_opt_view(rd::ReturnsResult, i, j, k = :)
     iv = isnothing(rd.iv) ? rd.iv : view(rd.iv, i, j)
     ivpa = nothing_scalar_array_view(rd.ivpa, j)
     pnl = port_opt_view(rd.pnl, i, j, rd.nx)
+    G = graphs_view(rd.G, i, rd.ts)
     return ReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B, ne = rd.ne,
-                         E = E, ts = ts, iv = iv, ivpa = ivpa, pnl = pnl)
+                         E = E, ng = rd.ng, G = G, ts = ts, iv = iv, ivpa = ivpa, pnl = pnl)
 end
 function port_opt_view(rd::ReturnsResult, args...; kwargs...)
     kws = keys(kwargs)
@@ -1300,6 +1355,23 @@ function assert_asset_panel_supplied(pnl::AssetPanel)
 end
 function assert_asset_panel_supplied(::Nothing)
     return throw(IsNothingError("`FeatureDistance` with no producer reads the Asset Panel off the ReturnsResult, and the ReturnsResult holds none. Build one with `asset_panel(inputs)` and pass it as `ReturnsResult(; …, pnl = pnl)`, or set a producer on the estimator, `FeatureDistance(; ape = RegressionPanel())`."))
+end
+# The methods below read the Exogenous Graphs of `rd`. Their docstrings are on the functions
+# of `src/03_InputData/05_ExogenousGraph/`, which load before this type exists.
+function graph_in_force(rd::ReturnsResult, name::Option{<:AbstractString} = nothing)
+    return graph_in_force(rd.ng, rd.G, name, observation_count(rd.X, rd.F), rd.ts)
+end
+function consumer_graph(consumer, rd::ReturnsResult, name = graph_names(consumer))
+    return consumer_graph(consumer, rd.ng, rd.G, name, observation_count(rd.X, rd.F), rd.ts)
+end
+function assert_graph_entry(est, rd::ReturnsResult, ::Any...)::Nothing
+    return assert_graph_entry(est, rd.ng, rd.G)
+end
+function graph_dataframe(rd::ReturnsResult)
+    return graph_dataframe(assert_graphs_supplied(rd.ng), rd.G)
+end
+function graph_manifest(rd::ReturnsResult)
+    return graph_manifest(assert_graphs_supplied(rd.ng), rd.G)
 end
 
 export ReturnsResult, benchmark_relative_returns

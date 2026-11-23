@@ -372,7 +372,8 @@ The conversion applies the same rule to a benchmark ``B``, and carries the bench
  9. State the universe. Cut `pr.span` to the asset axis with [`listing_span_view`](@ref). Give it and the asset returns to [`returns_universe_masks`](@ref), which projects the span onto the returns clock and intersects it with finiteness. [`attach_universe_masks`](@ref) puts the two masks on the Asset Panel and keeps its Panel Fields. When the `PricesResult` holds no Panel Field, it makes a panel with `pf = nothing`, or gives `nothing` when both masks are all true, because those masks state nothing that the finiteness of the returns does not state. A `PricesResult` with no span states no universe, so the function attaches no masks, and the panel is the one of step 8, or `nothing`.
 10. Build the factor and benchmark matrices from the columns of each block. A block with no column gives `nothing`, and a benchmark block with one column gives a vector. The asset matrix is always present, because the conversion removes no column.
 11. Build the Exogenous Series from its columns, or `nothing` when `pr.E` is `nothing`. It is converted with the assets, so it takes the same `ret_method`, the same `padding` and the same Gap Return rule, and a gap in it stays `NaN`.
-12. Return the [`ReturnsResult`](@ref).
+12. View the Exogenous Graphs `pr.G` on the returns clock with [`graphs_clock_view`](@ref), and pass `pr.ng` through. A return row keeps the timestamp of its later price row, so an integer key moves to the return row of its price row, and the first return row takes the graph in force at its price row.
+13. Return the [`ReturnsResult`](@ref).
 
 **The conversion removes no observation and no asset.** A deletion is a **Universe Policy**. A policy is fit on a training window and applied again by name, and a stateless conversion cannot do that. [`MissingDataFilter`](@ref) owns the deletion. Its `col_thr` deletes an asset and its `row_thr` deletes an observation.
 
@@ -422,6 +423,8 @@ ReturnsResult
      B ┼ nothing
     ne ┼ nothing
      E ┼ nothing
+    ng ┼ nothing
+     G ┼ nothing
     ts ┼ Vector{Dates.Date}: [Dates.Date("2020-01-02"), Dates.Date("2020-01-03")]
     iv ┼ nothing
   ivpa ┼ nothing
@@ -541,10 +544,13 @@ function prices_to_returns(pr::PricesResult; ret_method::Symbol = :simple,
     end
     ne = exogenous_names
     E = isempty(ne) ? nothing : Matrix(X[!, ne])
+    #! A return row keeps the timestamp of its later price row, so the graphs follow the
+    #! returns clock by the rows of the price clock that it keeps.
+    G = graphs_clock_view(pr.G, ts, asset_ts)
     return ReturnsResult(; ts = ts, nx = nx, X = RX, nf = isempty(nf) ? nothing : nf, F = F,
                          nb = isempty(nb) ? nothing : nb, B = B,
-                         ne = isempty(ne) ? nothing : ne, E = E, iv = iv, ivpa = ivpa,
-                         pnl = pnl)
+                         ne = isempty(ne) ? nothing : ne, E = E, ng = pr.ng, G = G, iv = iv,
+                         ivpa = ivpa, pnl = pnl)
 end
 function prices_to_returns(X::TimeSeries.TimeArray; kwargs...)::ReturnsResult
     return prices_to_returns(price_ingestion(PriceIngestion(), X); kwargs...)

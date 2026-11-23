@@ -174,6 +174,8 @@ end
                                 :matrix_processing_algorithm => "public seam, the out-of-place arm of an Open Family",
                                 # Private names that are simple and convenient.
                                 :cv_sequential_info => "the one message of the sequential fold loop, named beside the rule that sends a run there",
+                                :adjacency => "public accessor: the adjacency of an Exogenous Graph with the sources in its rows, the convention of the reader, as a lazy transpose of the stored `At` (#2165)",
+                                :graph_requirement_rule => "public interface verb of `AbstractGraphRequirement`: each requirement states its rule for the message of the entry check (#2171)",
                                 :_expr_to_lens => "the base case of the lens-building recursion of `expr_to_lens_chain`",
                                 :no_head_block => "the resolver of the block of a bare head, passed as a function value to `resolve_block_entry`, which takes `f` and its arguments and not a closure, so that no variable of the entry is boxed")
 
@@ -232,6 +234,7 @@ end
     kept_forwards = Dict{Tuple{Symbol, Symbol}, String}(#
                                                         (:performance_summary, :summarise_input) => "(interface) the shared driver of the keyword methods of the exported verb: it takes their keyword bundle, and no one method can hold its body (rule 3, the review of #2072)",
                                                         (:performance_summary, :candidate_summary) => "(interface) the shared driver of the keyword methods of the exported verb that take candidates: it takes their keyword bundle, and no one method can hold its body (rule 3, the review of #2072)",
+                                                        (:assert_graph_entry, :assert_graph_walk) => "public: the entry of the user verb over the names and the graphs, which the methods of `ReturnsResult` and `PricesResult` call with their own fields; the walk is a function of its own because its composites call it (#2171)",
                                                         (:set_compact_show!, :set_default!) => "public: (a) a configuration verb that a user calls (#2071)",
                                                         (:with_compact_show, :with_config) => "public: (a) a configuration verb that a user calls (#2071)",
                                                         (:mip_indicators!, :declare_mip_indicators!) => "(b) its kind methods on `mip_indicators!` would be ambiguous with the `AssetMIPSpace` arm, so the generic arm calls `declare_mip_indicators!` (#2071)",
@@ -464,6 +467,7 @@ end
     kept_types = Dict{Symbol, String}(#
                                       :AbstractCrossSectionalRegressionResult => "a second cross-sectional regression result, a robust or a constrained fit",
                                       :AbstractJuMPResult => "a second JuMP result carrier, one that keeps the model",
+                                      :AbstractGraphRequirement => "carries an `# Interfaces` section: an Open Family, each consumer of an Exogenous Graph states its own requirements (#2165)",
                                       :AbstractPenalisedRegressionTarget => "carries an `# Interfaces` section: an Open Family",
                                       :AbstractSearchCrossValidationResult => "carries an `# Interfaces` section: an Open Family",
                                       :AbstractShrunkExpectedReturnsEstimator => "a second shrinkage estimator beside `ShrunkExpectedReturns`, kept by default by #1859 (ADR 0222)",
