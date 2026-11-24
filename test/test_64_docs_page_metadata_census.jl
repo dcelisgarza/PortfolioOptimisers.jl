@@ -321,15 +321,71 @@ end
               "\n## From v0.2.0 to v0.3.0\n\n### [B](@id b)\n\nB.\n\n### [C](@id c)\n\nC.\n"
         @test_throws ErrorException FoldSeam.fold(out, ["# [D](@id d)\n"], "0.2.0", "0.3.0")
         @test FoldSeam.fragment_paths(joinpath(mktempdir(), "absent")) == String[]
-        # Each fragment of the tree has the form that the script folds, and names no version. A
-        # fragment that names one is wrong as soon as another change takes that version.
-        for path in FoldSeam.fragment_paths()
-            text = read(path, String)
-            h1 = filter(startswith("# "), split(text, '\n'))
-            @test length(h1) == 1 &&
-                  occursin(r"\(@id migration-next-[a-z0-9-]+\)$", only(h1))
-            @test !occursin(r"^#+ .*\bv\d+\.\d+"m, text)
+        # A section that does not follow the last one of the guide has a wrong argument.
+        for (from, to) in (("0.1.9", "0.2.0"), ("0.1.0", "0.3.0"), ("0.3.0", "0.2.5"))
+            @test_throws ErrorException FoldSeam.fold(guide, ["# [D](@id d)\n"], from, to)
         end
+        # A line that starts with inline code opens no block, and a longer fence ends one.
+        for block in ("```` ```x``` ````", "```julia\na\n`````", "~~~\n# a\n~~~")
+            @test endswith(FoldSeam.fold_fragment("# [A](@id a)\n\n$block\n\n## Calls\n"),
+                           "\n\n#### Calls")
+        end
+        # The script writes the guide and deletes the pages, or it changes nothing.
+        mktempdir() do dir
+            migration_path = joinpath(dir, "migration.md")
+            pages = mkdir(joinpath(dir, "next_release"))
+            run_fold() = redirect_stdout(devnull) do
+                FoldSeam.main(["0.2.0", "0.3.0"]; migration_path = migration_path,
+                              dir = pages)
+            end
+            write(migration_path, guide)
+            run_fold()
+            @test read(migration_path, String) == guide
+            write(joinpath(pages, "cap.md"), "# No label\n")
+            @test_throws ErrorException run_fold()
+            @test read(migration_path, String) == guide
+            write(joinpath(pages, "cap.md"), fragment)
+            run_fold()
+            @test read(migration_path, String) ==
+                  FoldSeam.fold(guide, [fragment], "0.2.0", "0.3.0")
+            @test isempty(readdir(pages))
+            @test_throws ErrorException FoldSeam.main(["0.3.0"])
+        end
+    end
+
+    @testset "a fragment of the next release has the form that the fold reads" begin
+        guide = "# [Migration guide](@id migration)\n\n## [Old](@id migration-next-old)\n"
+        head = "```@meta\nDescription = \"x\"\n```\n\n# [A cap](@id migration-next-cap)\n"
+        @test isempty(FoldSeam.fragment_defects("cap", head, guide))
+        @test isempty(FoldSeam.fragment_defects("cap",
+                                                head *
+                                                "\n## [B](@id migration-next-cap-b)\n\n#### C\n",
+                                                guide))
+        # A `#` in a code block is a comment, and not a second H1.
+        @test isempty(FoldSeam.fragment_defects("cap",
+                                                head *
+                                                "\n```bash\n# Install.\n##### x\n```\n",
+                                                guide))
+        # Each text has one defect. Two pages with one label, or a link that needs the
+        # `CurrentModule` that the fold drops, stop the docs build.
+        for (text, word) in
+            ((replace(head, "```@meta" => "```@meta\nCurrentModule = X"), "`@meta`"),
+             (head * "\n# Second\n", "one H1"),
+             (replace(head, "[A cap](@id migration-next-cap)" => "A cap"), "one H1"),
+             (head * "\n##### Deep\n", "level four"), (head * "\n```julia\na\n", "no end"),
+             (head * "\n## [B](@id calls)\n", "`calls`"),
+             (head * "\n| Call | v0.34.5 | Now |\n", "`v0.34.5`"))
+            found = FoldSeam.fragment_defects("cap", text, guide)
+            @test length(found) == 1 && occursin(word, only(found))
+        end
+        @test FoldSeam.fragment_defects("old", replace(head, "next-cap" => "next-old"),
+                                        guide) ==
+              ["the migration guide holds the label `migration-next-old`"]
+        @test any(contains("the name of the file"),
+                  FoldSeam.fragment_defects("A_cap", head, guide))
+        # The fragments of the tree.
+        migration = read(joinpath(REPO_ROOT, "docs", "src", "migration.md"), String)
+        @test FoldSeam.tree_defects(FoldSeam.fragment_paths(), migration) == String[]
     end
 
     @testset "every page states a description" begin

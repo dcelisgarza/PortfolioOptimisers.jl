@@ -179,8 +179,8 @@ of cost, the fast ones first, and the slow ones once, on the tree you will push:
    the `public` and `export` declarations, which `sweep_check.jl` does not read. `test_64` holds
    the `Description` line of a mirror page under `docs/src/`, `test_71` refuses an issue number in
    a docstring, `test_72` holds the prose of every page and docstring, those of
-   `docs/src/next_release/` among them, `test_74` refuses a word for a mechanism of the code in a string, such as
-   `read-out`, `test_46` holds the names that a standards file cites, and `test_75` holds a new
+   `docs/src/next_release/` among them, `test_74` refuses a word for a mechanism of the code
+   in a string, such as `read-out`, `test_46` holds the names that a standards file cites, and `test_75` holds a new
    concrete struct. Run them even when your targeted tests leave them out, and run the censuses
    that `gate_stamp.sh reach` names on a change to any `.md` page too. The push guard refuses a
    push without a green run of each census that reads a changed text. Each one once reached

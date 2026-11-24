@@ -27,11 +27,11 @@ reaches.
   name, the count of the callers or the size of the break does not keep a design that a better one
   replaces. A released number that moves is the same cost.
 - **Name the break.** State it in the commit and in `docs/src/next_release/<feature>.md`, where a
-  user reads it. The page is one change: a `@meta` block with its `Description`, one H1 with the
-  label `(@id migration-next-<feature>)`, and the text. It says "before" and "now", and names no
-  version. A release folds the pages into `docs/src/migration.md`, and no other change edits that
-  guide.
-  A docstring states the current behaviour alone.
+  user reads it. The page is one change: a `@meta` block with its `Description` alone, one H1 with
+  the label `(@id migration-next-<feature>)`, and the text. It says "before" and "now", and names
+  no version. A pull request that changes `version` folds the pages into `docs/src/migration.md`,
+  and no other change adds to that guide. A correction of its text is permitted, such as a link
+  that a rename moves. A docstring states the current behaviour alone.
 - **A bug fix is not a break.** A fix that makes the code do what its documentation states, such
   as an option that a path ignored or a number that was wrong, ships in a patch release. The
   commit states it, and no page of the next release lists it.
