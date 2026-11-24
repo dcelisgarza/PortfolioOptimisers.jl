@@ -16,7 +16,7 @@ TraceNormalisedShrinkage
 PenalisedShrinkage
 MCDShrinkage
 TylerShrinkage
-port_opt_view(shr::Union{MCDShrinkage, TylerShrinkage}, i, args...)
+port_opt_view(shr::Union{MCDShrinkage{<:MatNum}, TylerShrinkage{<:Any, <:MatNum}}, i, args...)
 ```
 
 ## References

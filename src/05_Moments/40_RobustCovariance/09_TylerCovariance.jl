@@ -211,7 +211,7 @@ Fits the location and the covariance of [`TylerCovariance`](@ref) to the data.
   - `all(isfinite, X)`.
   - The observation weights have one entry for each observation.
   - With `shr = nothing`, more than `p` observations of positive weight. Otherwise, the method raises a `DomainError` that names `n`, `p` and the limit.
-  - With a `shr`, the intensity is above the one at which the shape exists, see [`assert_tyler_intensity`](@ref).
+  - With a `shr`, two observations of positive weight or more, and an intensity above the one at which the shape exists, see [`assert_tyler_intensity`](@ref).
 
 # Returns
 

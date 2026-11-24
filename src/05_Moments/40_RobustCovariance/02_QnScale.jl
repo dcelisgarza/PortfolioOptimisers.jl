@@ -290,11 +290,72 @@ function qn_scale(x::VecNum)
     return q * convert(typeof(q), 2.21914 * qn_finite_factor(n))
 end
 """
+    observation_quantile(x::VecNum, w::Option{<:StatsBase.AbstractWeights}, a::Number) -> Number
+
+Returns the quantile `a` of `x`, weighted by the observation weights `w` when they are not `nothing`.
+
+The weighted quantile is the one of `StatsBase`. Under `StatsBase.FrequencyWeights` it is the quantile of the data with each value repeated by its weight.
+
+# Arguments
+
+  - `x`: The values.
+  - `w`: The observation weights, or `nothing`.
+  - `a`: The probability.
+
+# Returns
+
+  - `q::Number`: The quantile.
+
+# Related
+
+  - [`quantile_scale`](@ref)
+  - [`observation_median`](@ref)
+"""
+function observation_quantile(x::VecNum, ::Nothing, a::Number)
+    return Statistics.quantile(x, a)
+end
+function observation_quantile(x::VecNum, w::StatsBase.AbstractWeights, a::Number)
+    return Statistics.quantile(x, w, a)
+end
+"""
+    quantile_scale(z::VecNum, w::Option{<:StatsBase.AbstractWeights}) -> Number
+
+Returns the scale of a normal distribution that has the first positive quantile of the absolute values of `z`, or zero.
+
+The function follows the rule of the R package `robustbase`, version 0.99-7, for a column whose ``Q_n`` is zero. It reads the quantiles at the probabilities ``0.5, 0.55, \\ldots, 0.95`` and ``0.9875``. It takes the first quantile ``q_a`` that is not zero, and returns ``q_a / \\Phi^{-1}((a + 1)/2)``. The quantile at ``0.5`` is the median, so the scale is the median absolute deviation when at most half of the values are at the centre. When every quantile is zero, almost every value is at the centre, and the column has no robust scale. The function then returns zero.
+
+# Arguments
+
+  - `z`: The values, centred by their median or by a fixed centre.
+  - `w`: The observation weights, or `nothing`.
+
+# Returns
+
+  - `s::Number`: The scale, of the element type of `z`. It is zero when every quantile is zero.
+
+# Related
+
+  - [`robust_column_scale`](@ref)
+  - [`observation_quantile`](@ref)
+"""
+function quantile_scale(z::VecNum, w::Option{<:StatsBase.AbstractWeights})
+    a = abs.(z)
+    for alpha in ((10:19) ./ 20..., 0.9875)
+        qa = observation_quantile(a, w, alpha)
+        if !iszero(qa)
+            return oftype(first(a),
+                          qa /
+                          Distributions.quantile(Distributions.Normal(), (alpha + 1) / 2))
+        end
+    end
+    return zero(eltype(a))
+end
+"""
     robust_column_scale(z::VecNum) -> Number
 
 Returns the robust scale of a column of the data, with a positive value for a column whose ``Q_n`` is zero.
 
-``Q_n`` is zero when more than half of the values of a column are equal. A division by it then fails. The method follows the rule of the R package `robustbase`, version 0.99-7, for that case. It reads the quantiles of the absolute values of the centred column at the probabilities ``0.5, 0.55, \\ldots, 0.95`` and ``0.9875``. It takes the first quantile ``q_a`` that is not zero, and returns ``q_a / \\Phi^{-1}((a + 1)/2)``, the scale of a normal distribution with that quantile. When every quantile is zero, it returns one.
+``Q_n`` is zero when more than half of the values of a column are equal. A division by it then fails. The method takes the [`quantile_scale`](@ref) in that case, and one when that scale is zero too, as the R package `robustbase`, version 0.99-7, does.
 
 # Arguments
 
@@ -314,14 +375,6 @@ function robust_column_scale(z::VecNum)
     if !iszero(s)
         return s
     end
-    a = abs.(z)
-    for alpha in ((10:19) ./ 20..., 0.9875)
-        qa = Statistics.quantile(a, alpha)
-        if !iszero(qa)
-            return oftype(s,
-                          qa /
-                          Distributions.quantile(Distributions.Normal(), (alpha + 1) / 2))
-        end
-    end
-    return one(s)
+    q = quantile_scale(z, nothing)
+    return iszero(q) ? one(s) : oftype(s, q)
 end

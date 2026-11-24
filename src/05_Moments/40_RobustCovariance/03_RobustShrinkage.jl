@@ -52,13 +52,14 @@ Section 2.4 of [boudt2020](@cite) gives the rule for the shrunk minimum covarian
 
 ```math
 \\begin{align}
-\\rho &= \\max\\left(0, \\frac{\\lambda_{\\max} - \\kappa \\lambda_{\\min}}{\\kappa - 1 + \\lambda_{\\max} - \\kappa \\lambda_{\\min}}\\right)\\,.
+\\rho &= \\frac{a}{\\kappa - 1 + a}\\,, & a &= \\max\\left(0, \\lambda_{\\max} - \\kappa \\lambda_{\\min}\\right)\\,.
 \\end{align}
 ```
 
 Where:
 
   - ``\\rho``: The shrinkage intensity.
+  - ``a``: The amount by which the scatter exceeds the bound.
   - ``\\kappa``: The bound of the condition number, `max_cond`.
   - ``\\lambda_{\\min}``, ``\\lambda_{\\max}``: The smallest and the largest eigenvalue of the scatter of the subset.
 
@@ -506,15 +507,15 @@ function TylerShrinkage(; alg::AbstractTylerShrinkageAlgorithm = TraceNormalised
     return TylerShrinkage(alg, tgt, intensity)
 end
 """
-    port_opt_view(shr::Union{MCDShrinkage, TylerShrinkage}, i, args...)
+    port_opt_view(shr::Union{MCDShrinkage{<:MatNum}, TylerShrinkage{<:Any, <:MatNum}}, i, args...)
 
-Restricts the shrinkage of a robust covariance estimator to the assets `i`.
+Restricts the fixed target of a robust shrinkage to the assets `i`.
 
-A fixed target is an asset-by-asset matrix, so the method slices it on both axes. [`shrinkage_target`](@ref) builds the target of a rule from the pilot of the data, so a rule needs no slice.
+A fixed target is an asset-by-asset matrix, so the method slices it on both axes. [`shrinkage_target`](@ref) builds the target of a rule from the pilot of the data, so a shrinkage with a rule needs no slice, and this method does not take it.
 
 # Arguments
 
-  - `shr`: The shrinkage.
+  - `shr`: The shrinkage, with a matrix in `tgt`.
   - `i`: Indices of the selected assets.
   - `args...`: Not read.
 
@@ -528,11 +529,9 @@ A fixed target is an asset-by-asset matrix, so the method slices it on both axes
   - [`TylerShrinkage`](@ref)
   - [`nothing_scalar_array_view`](@ref)
 """
-function port_opt_view(shr::Union{MCDShrinkage, TylerShrinkage}, i, args...)
-    if isa(shr.tgt, AbstractMatrix)
-        return rebuild_struct(shr, (; tgt = nothing_scalar_array_view(shr.tgt, i)))
-    end
-    return shr
+function port_opt_view(shr::Union{MCDShrinkage{<:MatNum}, TylerShrinkage{<:Any, <:MatNum}},
+                       i, args...)
+    return rebuild_struct(shr, (; tgt = nothing_scalar_array_view(shr.tgt, i)))
 end
 """
     robust_target(tgt::CovarianceShrinkageTarget, pilot::MatNum) -> MatNum
@@ -560,9 +559,9 @@ Builds the target of a shrunk robust scatter from the robust pilot, and refuses 
 """
 function robust_target(tgt::CovarianceShrinkageTarget, pilot::MatNum)
     T = shrinkage_target(tgt, pilot)
-    @argcheck(LinearAlgebra.isposdef(LinearAlgebra.Symmetric(T)),
+    @argcheck(all(isfinite, T) && LinearAlgebra.isposdef(LinearAlgebra.Symmetric(T)),
               DomainError(tgt,
-                          "the shrinkage target that the rule builds from the robust pilot is not positive definite. Use `DiagonalTarget` or `ScaledIdentityTarget`"))
+                          "the shrinkage target that the rule builds from the robust pilot is not positive definite. Use `DiagonalTarget` or `ScaledIdentityTarget`. An asset whose values are almost all equal has no robust variance. With such an asset, use `ScaledIdentityTarget` or a fixed matrix"))
     return T
 end
 """

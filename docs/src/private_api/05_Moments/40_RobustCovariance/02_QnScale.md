@@ -12,6 +12,8 @@ PortfolioOptimisers.pairwise_trial_value!
 PortfolioOptimisers.qn_finite_factor
 PortfolioOptimisers.QN_SMALL_SAMPLE_FACTORS
 PortfolioOptimisers.qn_scale
+PortfolioOptimisers.observation_quantile
+PortfolioOptimisers.quantile_scale
 PortfolioOptimisers.robust_column_scale
 ```
 

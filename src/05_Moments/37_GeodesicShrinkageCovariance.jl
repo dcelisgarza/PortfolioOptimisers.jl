@@ -344,7 +344,7 @@ function assert_shrinkage_target(tgt::MatNum)::Nothing
                           "`tgt` is not symmetric. A covariance target is symmetric, and the shrinkage reads the upper triangle of the target alone, so an asymmetric matrix states two targets. State a symmetric matrix."))
     @argcheck(LinearAlgebra.isposdef(LinearAlgebra.Symmetric(tgt)),
               DomainError(tgt,
-                          "`tgt` is not positive definite. The shrinkage computes the geodesic from the target end, which exists only when that end is positive definite. State a positive definite matrix, or repair it with `posdef`."))
+                          "`tgt` is not positive definite. The shrinkage reads the inverse of the target, which exists only when the target is positive definite. State a positive definite matrix, or repair it with `posdef`."))
     return nothing
 end
 """

@@ -254,7 +254,7 @@ signs(W) = W ./ sqrt.(sum(abs2, W; dims = 2))
         X, = shrinkage_test_sample(StableRNG(5), 40, 60, 0)
         n, p = size(X)
         m0 = vec(median(X; dims = 1))
-        W = (X .- m0') ./ (POR.robust_variance.(eachcol(X .- m0'), nothing) .^ 0.5)'
+        W = (X .- m0') ./ POR.quantile_scale.(eachcol(X .- m0'), nothing)'
         V = POR.tyler_shape(POR.ShapeShrinkage(TraceNormalisedShrinkage(), 0.3), W, nothing)
         d2 = sqdist(W, zeros(p), V)
         B = 0.7 * p / n * W' * (W ./ d2) + 0.3 * I
@@ -273,7 +273,7 @@ signs(W) = W ./ sqrt.(sum(abs2, W; dims = 2))
             r = StatsAPI.fit(TylerCovariance(; me = MedianExpectedReturns(),
                                              shr = TylerShrinkage(; alg, intensity = 0.6)),
                              X)
-            v = POR.robust_variance.(eachcol(X .- m0'), nothing)
+            v = POR.quantile_scale.(eachcol(X .- m0'), nothing) .^ 2
             V = Diagonal(sqrt.(v)) *
                 POR.tyler_shape(POR.ShapeShrinkage(alg, 0.6), W, nothing) *
                 Diagonal(sqrt.(v))
@@ -287,7 +287,7 @@ signs(W) = W ./ sqrt.(sum(abs2, W; dims = 2))
         d = sqrt.(sqdist(X, r.mu, r.sigma))
         @test norm(sum((X .- r.mu') ./ d; dims = 1)) < 1e-4
         # A target that is not diagonal, and a fixed target, whose scale has no effect.
-        v = POR.robust_variance.(eachcol(X .- m0'), nothing)
+        v = POR.quantile_scale.(eachcol(X .- m0'), nothing) .^ 2
         R = cov2cor(signs(W)' * signs(W))
         cbar = (sum(R) - p) / (p * (p - 1))
         T = sqrt.(v) .* (cbar .+ (1 - cbar) * I(p)) .* sqrt.(v)'
@@ -309,7 +309,7 @@ signs(W) = W ./ sqrt.(sum(abs2, W; dims = 2))
             @test isapprox(cor(z, Y), cor(TylerCovariance(), Y); rtol = 1e-6)
         end
         # The scale of an asset that does not trade on most days.
-        @test POR.robust_variance([0.0, 0.0, 0.0, 1.0, -2.0], nothing) > 0
+        @test POR.quantile_scale([0.0, 0.0, 0.0, 1.0, -2.0], nothing) > 0
     end
     @testset "The rules of the Tyler intensity" begin
         X, = shrinkage_test_sample(StableRNG(8), 40, 60, 0)
@@ -399,7 +399,7 @@ signs(W) = W ./ sqrt.(sum(abs2, W; dims = 2))
         # The bound of the penalised form reads the largest share of the weight.
         @test POR.tyler_intensity_bound(X, nothing) ≈ 1 - 30 / 45
         @test POR.tyler_intensity_bound(X, ew) ≈ 1 - sum(ew) / (45 * maximum(ew))
-        @test iszero(POR.tyler_intensity_bound(randn(StableRNG(1), 20, 4), nothing))
+        @test POR.tyler_intensity_bound(randn(StableRNG(1), 20, 4), nothing) == -4
     end
     @testset "Outlier flags and composition" begin
         # The cut-off with no shrinkage is the chi-squared quantile.
@@ -435,6 +435,86 @@ signs(W) = W ./ sqrt.(sum(abs2, W; dims = 2))
             @test POR.factory(ce, eweights(1:40, 0.05)).shr === ce.shr
         end
         @test POR.port_opt_view(MCDCovariance(), 1:2).shr === nothing
+        tyler_rule = TylerShrinkage()
+        @test POR.port_opt_view(tyler_rule, 1:2) === tyler_rule
+    end
+    @testset "A scatter inside the bound of the condition number" begin
+        # The closed form of the intensity has the denominator `max_cond - 1 + a`, and a scatter
+        # inside the bound has a negative `a`. The denominator is then zero or negative.
+        Y = randn(StableRNG(3), 400, 3)
+        for s in (0.9, 1.0, 1.05, 1.2, 10.0)
+            @test iszero(POR.mcd_intensity(ConditionNumberIntensity(), s * Y, 1:400, 1.0,
+                                           false))
+        end
+        for seed in 1:40
+            r = StatsAPI.fit(MCDCovariance(; shr = MCDShrinkage()),
+                             randn(StableRNG(seed), 100, 2))
+            @test iszero(r.intensity)
+            @test isposdef(r.sigma)
+        end
+        wide = StatsAPI.fit(MCDCovariance(; shr = MCDShrinkage(; tgt = IdentityTarget())),
+                            10 * Y)
+        @test iszero(wide.intensity)
+        @test relerr(wide.sigma, cov(10 * Y)) < 0.2
+    end
+    @testset "One asset" begin
+        # A window of one asset, such as a cluster of one. Every rule gives an estimate.
+        x = 10 * randn(StableRNG(3), 400, 1)
+        for intensity in (ConditionNumberIntensity(), SphericityIntensity(), 0.3)
+            r = StatsAPI.fit(MCDCovariance(; shr = MCDShrinkage(; intensity)), x)
+            @test 0 <= r.intensity <= 1
+            @test 70 < only(r.sigma) < 130
+        end
+        for alg in (TraceNormalisedShrinkage(), PenalisedShrinkage()),
+            intensity in (OracleIntensity(), AsymptoticIntensity(), SphericityIntensity(),
+                          ConditionNumberIntensity(), 0.3)
+
+            r = StatsAPI.fit(TylerCovariance(; shr = TylerShrinkage(; alg, intensity)), x)
+            @test 0 <= r.intensity <= 1
+            @test only(r.sigma) ≈ POR.quantile_scale(vec(x) .- median(x), nothing)^2
+        end
+        @test isone(POR.tyler_intensity(OracleIntensity(), PenalisedShrinkage(), x,
+                                        nothing))
+    end
+    @testset "An asset that does not trade" begin
+        X = randn(StableRNG(1), 30, 40)
+        X[1:20, 3] .= 0
+        # Frequency weights repeat the observations, and a zero weight removes one.
+        k = rand(StableRNG(2), 0:3, 30)
+        Xr = reduce(vcat, [repeat(X[i:i, :], k[i]) for i in 1:30])
+        a = cov(TylerCovariance(; shr = TylerShrinkage(), w = fweights(k)), X)
+        b = cov(TylerCovariance(; shr = TylerShrinkage()), Xr)
+        @test isapprox(a, b; rtol = 1e-6)
+        @test POR.quantile_scale(X[:, 3], fweights(k)) ≈
+              POR.quantile_scale(Xr[:, 3], nothing)
+        # An asset with no robust scale has no variance in the pilot, so a target that reads its
+        # variance is refused. The estimate does not invent a variance for it.
+        X *= 0.01
+        X[:, 3] .= 0.001
+        @test iszero(POR.quantile_scale(zeros(10), nothing))
+        @test isone(POR.robust_column_scale(zeros(10)))
+        for tgt in (DiagonalTarget(), ConstantCorrelationTarget())
+            @test_throws "no robust variance" cov(TylerCovariance(;
+                                                                  shr = TylerShrinkage(;
+                                                                                       tgt)),
+                                                  X)
+        end
+        S = cov(TylerCovariance(; shr = TylerShrinkage(; tgt = ScaledIdentityTarget())), X)
+        @test isposdef(S)
+        @test 0 < S[3, 3] < 1.5 * 0.01^2
+        Y = randn(StableRNG(1), 400, 3)
+        Y[2:400, 3] .= 0
+        @test_throws "no robust variance" cov(MCDCovariance(; shr = MCDShrinkage()), Y)
+        near = MCDCovariance(;
+                             shr = MCDShrinkage(; tgt = Matrix(1.0I, 3, 3),
+                                                intensity = 0.1))
+        @test isposdef(cov(near, Y))
+    end
+    @testset "The starts of FastMCD about a fixed centre" begin
+        X, = shrinkage_test_sample(StableRNG(2), 50, 70, 5)
+        smp = POR.mcd_sample(MCDShrinkage(), X, vec(median(X; dims = 1)))
+        fm = FastMCD(; seed = 1, n_starts = 20)
+        @test length(unique(map(sort, POR.mcd_starts(fm, smp.Z, 26, true, 0.2)))) > 10
     end
     @testset "Refusals" begin
         rng = StableRNG(3)
@@ -460,7 +540,15 @@ signs(W) = W ./ sqrt.(sum(abs2, W; dims = 2))
         for alg in (TraceNormalisedShrinkage(), PenalisedShrinkage())
             ce = TylerCovariance(; shr = TylerShrinkage(; alg, intensity = 0))
             @test_throws DomainError cov(ce, X)
+            # With as many observations as assets, the shape with no shrinkage is not unique.
+            @test_throws DomainError cov(ce, randn(StableRNG(1), 20, 20))
         end
+        @test_throws "two observations" cov(TylerCovariance(; shr = TylerShrinkage()),
+                                            X[1:1, :])
+        @test_throws "two observations" cov(TylerCovariance(; shr = TylerShrinkage(),
+                                                            w = fweights([3;
+                                                                          zeros(Int, 19)])),
+                                            X)
         low = TylerCovariance(;
                               shr = TylerShrinkage(; alg = PenalisedShrinkage(),
                                                    intensity = 0.2))

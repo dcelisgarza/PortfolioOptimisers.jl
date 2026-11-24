@@ -23,34 +23,6 @@ function observation_weight_vector(::MatNum, w::StatsBase.AbstractWeights)
     return map(i -> w[i], 1:length(w))
 end
 """
-    robust_variance(x::VecNum, w::Option{<:StatsBase.AbstractWeights}) -> Number
-
-Returns the square of the weighted median absolute deviation of centred values, consistent at the normal model.
-
-More than half of the values can be at the centre, such as the returns of an asset that does not trade. The deviation is then zero, and the function returns the square of [`robust_column_scale`](@ref).
-
-# Arguments
-
-  - `x`: The centred values.
-  - `w`: The observation weights, or `nothing`.
-
-# Returns
-
-  - `v::Number`: The robust variance.
-
-# Related
-
-  - [`TylerShrinkage`](@ref)
-  - [`observation_median`](@ref)
-"""
-function robust_variance(x::VecNum, w::Option{<:StatsBase.AbstractWeights})
-    s = observation_median(abs.(x), w)
-    if iszero(s)
-        return abs2(robust_column_scale(x))
-    end
-    return abs2(s / oftype(s, Distributions.quantile(Distributions.Normal(), 0.75)))
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Holds the form and the intensity of the shrinkage of one Tyler shape.
@@ -142,9 +114,9 @@ end
 """
     tyler_intensity_bound(W::MatNum, w::Option{<:StatsBase.AbstractWeights}) -> Number
 
-Returns the intensity above which the shape of [`PenalisedShrinkage`](@ref) exists, zero when the shape exists with no shrinkage.
+Returns the intensity above which the shape of [`PenalisedShrinkage`](@ref) exists.
 
-In general position a subspace of dimension ``r`` holds at most ``r`` observations. Theorem 3 of [ollila2014](@cite) then needs ``(1 - \\rho) p`` times the largest share of the weight of one observation below one. With equal weights the bound is ``1 - n/p``.
+In general position a subspace of dimension ``r`` holds at most ``r`` observations. Theorem 3 of [ollila2014](@cite) then needs ``(1 - \\rho) p`` times the largest share of the weight of one observation below one. With equal weights the bound is ``1 - n/p``. A negative bound means that the shape exists with no shrinkage. With `n == p` the bound is zero, and the shape does not exist with no shrinkage.
 
 # Arguments
 
@@ -153,7 +125,7 @@ In general position a subspace of dimension ``r`` holds at most ``r`` observatio
 
 # Returns
 
-  - `lo::Number`: The bound, in `[0, 1)`.
+  - `lo::Number`: The bound, below one.
 
 # Related
 
@@ -166,8 +138,7 @@ In general position a subspace of dimension ``r`` holds at most ``r`` observatio
 """
 function tyler_intensity_bound(W::MatNum, w::Option{<:StatsBase.AbstractWeights})
     wt = observation_weight_vector(W, w)
-    lo = one(eltype(W)) - sum(wt) / (size(W, 2) * maximum(wt))
-    return max(lo, zero(lo))
+    return one(eltype(W)) - sum(wt) / (size(W, 2) * maximum(wt))
 end
 """
     assert_tyler_intensity(alg::TraceNormalisedShrinkage, rho::Number, lo::Number)
@@ -183,8 +154,8 @@ Refuses a shrinkage intensity at which the shape does not exist.
 
 # Validation
 
-  - [`TraceNormalisedShrinkage`](@ref): `rho > 0`, or `lo` is zero.
-  - [`PenalisedShrinkage`](@ref): `rho > lo`, or both are zero.
+  - [`TraceNormalisedShrinkage`](@ref): `rho > 0`, or `lo` is negative.
+  - [`PenalisedShrinkage`](@ref): `rho > lo`.
 
 Otherwise, the function raises a `DomainError`.
 
@@ -197,13 +168,13 @@ Otherwise, the function raises a `DomainError`.
   - [`tyler_intensity_bound`](@ref)
 """
 function assert_tyler_intensity(::TraceNormalisedShrinkage, rho::Number, lo::Number)
-    @argcheck(rho > zero(rho) || iszero(lo),
+    @argcheck(rho > zero(rho) || lo < zero(lo),
               DomainError(rho,
                           "the Tyler shape does not exist with no shrinkage on this sample. Use an intensity above zero, a longer window or fewer assets"))
     return nothing
 end
 function assert_tyler_intensity(::PenalisedShrinkage, rho::Number, lo::Number)
-    @argcheck(rho > lo || iszero(rho) && iszero(lo),
+    @argcheck(rho > lo,
               DomainError(rho,
                           "`PenalisedShrinkage` needs an intensity above $lo on this sample, got $rho. Use `TraceNormalisedShrinkage`, or a larger intensity"))
     return nothing
@@ -211,14 +182,14 @@ end
 """
     smallest_intensity(reaches, lo::Number) -> Number
 
-Returns the smallest intensity in `(lo, 1]` at which `reaches` is `true`, up to the width ``2^{-10}`` of the last interval.
+Returns the smallest intensity in `(max(lo, 0), 1]` at which `reaches` is `true`, up to the width ``2^{-10}`` of the last interval.
 
 The function bisects the interval ten times. `reaches(1)` must be `true`, and the function does not call it there. The returned intensity is an end of an interval at which `reaches` is `true`.
 
 # Arguments
 
   - `reaches`: A function of the intensity that returns a `Bool`.
-  - `lo`: The lower end of the interval.
+  - `lo`: The lower end of the interval. A negative value stands for zero.
 
 # Returns
 
@@ -229,6 +200,7 @@ The function bisects the interval ten times. `reaches(1)` must be `true`, and th
   - [`tyler_intensity`](@ref)
 """
 function smallest_intensity(reaches, lo::Number)
+    lo = max(lo, zero(lo))
     hi = one(lo)
     for _ in 1:10
         mid = (lo + hi) / 2
@@ -294,6 +266,8 @@ Returns the shrinkage intensity of a [`TylerShrinkage`](@ref).
 
 A number is the intensity. Each rule states its formula under `# Mathematical definition`. [`SphericityIntensity`](@ref) and [`AsymptoticIntensity`](@ref) give the weight of the target in the shape of trace `p`. For [`PenalisedShrinkage`](@ref), [`penalised_intensity`](@ref) turns that weight into the intensity.
 
+One asset has one shape, which every intensity gives. The formulas of [`SphericityIntensity`](@ref) and [`OracleIntensity`](@ref) are then zero over zero, and the two rules return one.
+
 # Arguments
 
   - `rule`: The rule, or the intensity.
@@ -324,11 +298,15 @@ function tyler_intensity(rule::ConditionNumberIntensity,
         vals = LinearAlgebra.eigvals!(LinearAlgebra.Symmetric(V))
         return last(vals) <= rule.max_cond * first(vals)
     end
-    return iszero(lo) && reaches(lo) ? lo : smallest_intensity(reaches, lo)
+    z = zero(lo)
+    return lo < z && reaches(z) ? z : smallest_intensity(reaches, lo)
 end
 function tyler_intensity(::SphericityIntensity, ::TraceNormalisedShrinkage, W::MatNum,
                          w::Option{<:StatsBase.AbstractWeights})
     n, p = observation_weight_count(w, size(W, 1)), size(W, 2)
+    if isone(p)
+        return one(eltype(W))
+    end
     g = sphericity(spatial_sign_scatter(W, observation_weight_vector(W, w)), n)
     b = n * (g - 1)
     return clamp(1 - b / (b * (1 - inv(n)) + (2 * g + p) * (p - 1) / (p + 2)), zero(g),
@@ -342,6 +320,9 @@ end
 function tyler_intensity(::OracleIntensity, ::TraceNormalisedShrinkage, W::MatNum,
                          w::Option{<:StatsBase.AbstractWeights})
     n, p = observation_weight_count(w, size(W, 1)), size(W, 2)
+    if isone(p)
+        return one(eltype(W))
+    end
     t = sum(abs2, spatial_sign_scatter(W, observation_weight_vector(W, w)))
     rho = (p^2 + (1 - 2 / p) * t) / (p^2 - n * p - 2 * n + (n + 1 + 2 * (n - 1) / p) * t)
     return clamp(rho, zero(rho), one(rho))
@@ -349,8 +330,11 @@ end
 function tyler_intensity(::OracleIntensity, ::PenalisedShrinkage, W::MatNum,
                          w::Option{<:StatsBase.AbstractWeights})
     n, p = observation_weight_count(w, size(W, 1)), size(W, 2)
+    if isone(p)
+        return one(eltype(W))
+    end
     lo = tyler_intensity_bound(W, w)
-    V = if iszero(lo)
+    V = if lo < zero(lo)
         tyler_shape(nothing, W, w)
     else
         tyler_shape(ShapeShrinkage(PenalisedShrinkage(), (1 + lo) / 2), W, w)
@@ -425,7 +409,7 @@ The `nothing` method refuses a sample with too few observations with [`assert_ro
 
 The [`TylerShrinkage`](@ref) method does these steps:
 
- 1. Take the pilot centre: the coordinatewise weighted median, or `centre`. Take the robust variance of each centred column with [`robust_variance`](@ref).
+ 1. Refuse fewer than two observations of positive weight. Take the pilot centre: the coordinatewise weighted median, or `centre`. Take the robust scale of each centred column with [`quantile_scale`](@ref), and its square as the robust variance. An asset with no robust scale has the variance zero.
  2. Build the pilot covariance from these variances and from the correlations of the [`spatial_sign_scatter`](@ref) of the scaled data. Build the target with [`robust_target`](@ref).
  3. Multiply the centred data by the inverse of the symmetric root of the target, so that the target is the identity matrix.
  4. Find the intensity with [`tyler_intensity`](@ref), and refuse it with [`assert_tyler_intensity`](@ref) when the shape does not exist.
@@ -453,8 +437,7 @@ The [`TylerShrinkage`](@ref) method does these steps:
 function tyler_fit(::Nothing, ve::Option{<:StatsBase.CovarianceEstimator}, X::MatNum,
                    w::Option{<:StatsBase.AbstractWeights}, centre::Option{<:VecNum};
                    kwargs...)
-    n, p = size(X)
-    assert_robust_rows(isnothing(w) ? n : count(>(zero(eltype(w))), w), p,
+    assert_robust_rows(count(!iszero, observation_weight_vector(X, w)), size(X, 2),
                        "the number n of observations of positive weight")
     mu, V = tyler_fixed_point(X, w, centre, nothing)
     return mu, tyler_scale(ve, X, mu, V, w, nothing; kwargs...), nothing
@@ -462,15 +445,19 @@ end
 function tyler_fit(shr::TylerShrinkage, ve::Option{<:StatsBase.CovarianceEstimator},
                    X::MatNum, w::Option{<:StatsBase.AbstractWeights},
                    centre::Option{<:VecNum}; kwargs...)
+    wt = observation_weight_vector(X, w)
+    @argcheck(count(!iszero, wt) > 1,
+              DomainError(size(X),
+                          "a shrunk Tyler shape needs two observations of positive weight or more"))
     m = if isnothing(centre)
         [observation_median(view(X, :, j), w) for j in axes(X, 2)]
     else
         centre
     end
     D = X .- transpose(m)
-    v = [robust_variance(view(D, :, j), w) for j in axes(D, 2)]
-    s = sqrt.(v)
-    R = spatial_sign_scatter(D ./ transpose(s), observation_weight_vector(X, w))
+    s = [quantile_scale(view(D, :, j), w) for j in axes(D, 2)]
+    v = abs2.(s)
+    R = spatial_sign_scatter(D ./ transpose(ifelse.(iszero.(s), one(eltype(s)), s)), wt)
     root = symmetric_root(robust_target(shr.tgt,
                                         StatsBase.cor2cov(StatsBase.cov2cor(R), s)))
     W = D / root

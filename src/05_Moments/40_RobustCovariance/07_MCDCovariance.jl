@@ -373,7 +373,9 @@ function mcd_sample(::Nothing, X::MatNum, centre::Option{<:VecNum})
 end
 function mcd_sample(shr::MCDShrinkage, X::MatNum, centre::Option{<:VecNum})
     Z, s = mcd_standardise(X, centre)
-    T = robust_target(shr.tgt, mcd_pilot(shr.tgt, X, s))
+    # A column with no robust scale has the scale one in `s`, so its variance in the pilot is zero.
+    ps = ifelse.(iszero.(quantile_scale.(eachcol(Z), nothing)), zero(eltype(s)), s)
+    T = robust_target(shr.tgt, mcd_pilot(shr.tgt, X, ps))
     D = LinearAlgebra.Diagonal(inv.(s))
     return MCDSample(X, Z / symmetric_root(D * T * D), T, shr.intensity, centre)
 end
@@ -390,7 +392,7 @@ A rule that reads the variances alone gets the diagonal matrix of the robust var
 
   - `tgt`: The target.
   - `X`: The data matrix, `observations × assets`.
-  - `s`: The robust scale of each column.
+  - `s`: The robust scale of each column, zero for a column with no robust scale.
 
 # Returns
 
@@ -479,7 +481,9 @@ function mcd_intensity(rule::ConditionNumberIntensity, W::MatNum,
     S = last(mcd_subset_fit(W, idx, fixed))
     vals = LinearAlgebra.eigvals!(LinearAlgebra.Symmetric(shrink_scatter!(S, c)))
     a = last(vals) - rule.max_cond * max(first(vals), zero(eltype(vals)))
-    return max(a / (rule.max_cond - 1 + a), zero(a))
+    # A scatter inside the bound has a negative `a`, which can also make the denominator negative.
+    a = max(a, zero(a))
+    return a / (rule.max_cond - 1 + a)
 end
 function mcd_intensity(::SphericityIntensity, W::MatNum, idx::AbstractVector{<:Integer},
                        ::Number, fixed::Bool)
@@ -626,8 +630,8 @@ function leave_one_out!(d2::VecNum, idx::AbstractVector{<:Integer}, reg::SubsetS
     return d2
 end
 """
-    mcd_fit_rows(X::MatNum, idx::AbstractVector{<:Integer}, centre::Option{<:VecNum})
-        -> Tuple{VecNum, MatNum}
+    mcd_fit_rows(X::MatNum, idx::AbstractVector{<:Integer}, centre::Nothing) -> Tuple{VecNum, MatNum}
+    mcd_fit_rows(X::MatNum, idx::AbstractVector{<:Integer}, centre::VecNum) -> Tuple{VecNum, MatNum}
 
 Returns the location and the scatter of the observations `idx` of `X`, in the units of the data.
 
@@ -648,10 +652,10 @@ With no fixed centre, these are the mean and the covariance with the divisor ``k
   - [`mcd_subset_fit`](@ref)
   - [`mcd_fit`](@ref)
 """
-function mcd_fit_rows(X::MatNum, idx::AbstractVector{<:Integer}, centre::Option{<:VecNum})
-    if isnothing(centre)
-        return mcd_subset_fit(X, idx, false)
-    end
+function mcd_fit_rows(X::MatNum, idx::AbstractVector{<:Integer}, ::Nothing)
+    return mcd_subset_fit(X, idx, false)
+end
+function mcd_fit_rows(X::MatNum, idx::AbstractVector{<:Integer}, centre::VecNum)
     return centre, last(mcd_subset_fit(X .- transpose(centre), idx, true))
 end
 """

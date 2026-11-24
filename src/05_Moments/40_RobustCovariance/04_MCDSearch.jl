@@ -716,7 +716,7 @@ Draws one start subset of [`FastMCD`](@ref).
 
 The method with no shrinkage draws ``p + 1`` observations with no repetition. While their covariance matrix is singular, it adds one more observation that it draws from the rest. Section 3.1 of [rousseeuw1999](@cite) gives this rule. The start is then the `h` observations nearest to the mean of the drawn observations in the metric of their covariance matrix.
 
-With a shrinkage, the scatter of the drawn observations is not necessary, because the target gives a metric. The method draws two observations, the fewest that have a spread, so a start with no outlier is likely. The start is the `h` observations nearest to their mean in the metric of the target. With a fixed centre, every start is the `h` observations nearest to the centre.
+With a shrinkage, the scatter of the drawn observations is not necessary, because the target gives a metric. The method draws two observations, the fewest that have a spread, so a start with no outlier is likely. The start is the `h` observations nearest to their mean in the metric of the target. With a fixed centre, that metric gives the same start for every draw. So the metric is then the sum of the target and of the covariance matrix of the two observations about the centre.
 
 # Arguments
 
@@ -756,12 +756,12 @@ end
 function fastmcd_random_start(rng::Random.AbstractRNG, Z::MatNum, h::Integer, fixed::Bool,
                               ::Union{Number, AbstractSubsetShrinkageIntensity})
     idx = StatsBase.sample(rng, axes(Z, 1), 2; replace = false)
-    m = if fixed
-        zeros(eltype(Z), size(Z, 2))
-    else
-        vec(Statistics.mean(view(Z, idx, :); dims = 1))
+    if fixed
+        m, S = mcd_subset_fit(Z, idx, true)
+        return nearest_positions(squared_distances(Z, m, S + LinearAlgebra.I), h)
     end
-    return nearest_positions(vec(sum(abs2, Z .- transpose(m); dims = 2)), h)
+    m = Statistics.mean(view(Z, idx, :); dims = 1)
+    return nearest_positions(vec(sum(abs2, Z .- m; dims = 2)), h)
 end
 
 export DetMCD, FastMCD
