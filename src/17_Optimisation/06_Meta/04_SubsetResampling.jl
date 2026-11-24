@@ -626,33 +626,32 @@ function non_investable_universe(sr::SubsetResampling, ni::VecStr)::SubsetResamp
     return rebuild_struct(sr, (; sets = non_investable_sets(sr.sets, ni)))
 end
 """
-    subset_resampling_retcode(ress::VecOpt, retcode::OptimisationReturnCode)
+    subset_resampling_retcode(resi_retcodes::VecOptRetCode, retcode::OptimisationReturnCode)
 
 Combine the return codes of the subset optimisations with the return code of the weight finaliser.
 
 # Algorithm
 
- 1. Read the return code of each subset result, giving `resi_retcodes`.
- 2. Return `retcode` unchanged when no entry of `resi_retcodes` and not `retcode` is an [`OptimisationFailure`](@ref).
- 3. Otherwise build `msg`, with the line `opti failed.` when a subset failed, and then the line `weight bounds finalisation failed.` when the finaliser failed.
- 4. Return an [`OptimisationFailure`](@ref) whose `res` is `(; msg, opti = resi_retcodes, wb = retcode)`. Each return code keeps its own diagnostics.
+ 1. Return `retcode` unchanged when no entry of `resi_retcodes` and not `retcode` is an [`OptimisationFailure`](@ref).
+ 2. Otherwise build `msg`, with the line `opti failed.` when a subset failed, and then the line `weight bounds finalisation failed.` when the finaliser failed.
+ 3. Return an [`OptimisationFailure`](@ref) whose `res` is `(; msg, opti = resi_retcodes, wb = retcode)`. Each return code keeps its own diagnostics.
 
 # Arguments
 
-  - `ress`: Results of the subset optimisations.
+  - `resi_retcodes`: Return codes of the subset optimisations. On an efficient frontier they are the codes of one point.
   - `retcode`: Return code of the weight finaliser.
 
 # Returns
 
-  - `retcode::OptimisationReturnCode`: `retcode`, or the failure of step 4.
+  - `retcode::OptimisationReturnCode`: `retcode`, or the failure of step 3.
 
 # Related
 
   - [`subset_resampling_finaliser`](@ref)
   - [`SubsetResampling`](@ref)
 """
-function subset_resampling_retcode(ress::VecOpt, retcode::OptimisationReturnCode)
-    resi_retcodes = getproperty.(ress, :retcode)
+function subset_resampling_retcode(resi_retcodes::VecOptRetCode,
+                                   retcode::OptimisationReturnCode)
     resi_flag = any(x -> isa(x, OptimisationFailure), resi_retcodes)
     wb_flag = isa(retcode, OptimisationFailure)
     return if resi_flag || wb_flag
@@ -671,21 +670,28 @@ end
 """
     subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
                                 wb::WeightBounds, wf::WeightFinaliser,
-                                ress::VecOpt, w::VecNum_VecVecNum)
+                                ress::VecOpt, j::Integer)
+    subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
+                                wb::WeightBounds, wf::WeightFinaliser,
+                                ress::VecOpt, ws::VecVecNum)
 
 Average the subset weights over all the assets, and finalise the average under the weight bounds.
 
 The method computes ``\\boldsymbol{w}^*`` of the `# Mathematical definition` of [`SubsetResampling`](@ref).
 
+On an efficient frontier, a subset whose every point failed can hold the one portfolio of its fallback. That portfolio and its return code stand at every point.
+
 # Algorithm
 
+The method for point `j` does these steps. One portfolio for each subset is the point `1`.
+
  1. Allocate `w`, a vector of ``N`` zeros with the element type of the weights of the first subset.
- 2. For each subset `i`, add `ress[i].w` into `w` at the asset indices `asset_idx[:, i]`.
+ 2. For each subset `i`, add the weights of point `j` of `ress[i]`, from [`member_vector`](@ref), into `w` at the asset indices `asset_idx[:, i]`.
  3. Divide `w` by `n_subsets`.
  4. Finalise `w` with `wf` under `wb` through [`finalise_weight_bounds`](@ref), giving `retcode` and the finalised `w`.
- 5. Combine `retcode` with the return codes of `ress` through [`subset_resampling_retcode`](@ref).
+ 5. Combine `retcode` with the return codes of point `j` of `ress`, from [`member_retcode`](@ref), through [`subset_resampling_retcode`](@ref).
 
-On an efficient frontier, the method runs the steps once for each point.
+The method for a vector of vectors runs the steps once for each point. Its point `j` fails only when a subset failed at `j`, or when the finaliser did.
 
 # Arguments
 
@@ -695,7 +701,12 @@ On an efficient frontier, the method runs the steps once for each point.
   - `wb::WeightBounds`: Weight bounds of the finaliser.
   - `wf::WeightFinaliser`: Weight finaliser that repairs a bounds violation.
   - `ress::VecOpt`: Subset optimisation results, in the column order of `asset_idx`.
-  - `w::VecNum_VecVecNum`: Weights of the first subset. The method reads only the type of `w`. A vector of vectors selects the efficient-frontier method.
+  - `j::Integer`: The point of the efficient frontier, `1` when no subset holds one.
+  - `ws::VecVecNum`: Weights of a subset that holds an efficient frontier. The method reads the number of points from it, and no weight.
+
+# Validation
+
+  - On an efficient frontier, every subset result that holds a frontier holds `length(ws)` points, `DimensionMismatch` otherwise.
 
 # Returns
 
@@ -707,36 +718,31 @@ On an efficient frontier, the method runs the steps once for each point.
   - [`SubsetResampling`](@ref)
   - [`subset_resampling_retcode`](@ref)
   - [`finalise_weight_bounds`](@ref)
+  - [`member_vector`](@ref)
+  - [`member_retcode`](@ref)
 """
 function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
                                      wb::WeightBounds, wf::WeightFinaliser, ress::VecOpt,
-                                     ::VecNum)
-    w = zeros(eltype(ress[1].w), N)
+                                     j::Integer)
+    w = zeros(eltype(member_vector(ress[1].w, j)), N)
     for i in 1:n_subsets
         idx = view(asset_idx, :, i)
-        w[idx] .+= ress[i].w
+        w[idx] .+= member_vector(ress[i].w, j)
     end
     w /= n_subsets
     retcode, w = finalise_weight_bounds(wf, wb, w)
-    return subset_resampling_retcode(ress, retcode), w
+    resi_retcodes = [member_retcode(res.retcode, j) for res in ress]
+    return subset_resampling_retcode(resi_retcodes, retcode), w
 end
 function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
                                      wb::WeightBounds, wf::WeightFinaliser, ress::VecOpt,
                                      ws::VecVecNum)
     M = length(ws)
-    w = [zeros(eltype(ress[1].w[i]), N) for i in 1:M]
-    for i in 1:n_subsets
-        idx = view(asset_idx, :, i)
-        for j in 1:M
-            w[j][idx] .+= ress[i].w[j]
-        end
-    end
-    for j in 1:M
-        w[j] /= n_subsets
-    end
-    retcode_w = [finalise_weight_bounds(wf, wb, wi) for wi in w]
-    return map(x -> subset_resampling_retcode(ress, x[1]), retcode_w),
-           map(x -> x[2], retcode_w)
+    @argcheck(all(res -> !isa(res.w, VecVecNum) || length(res.w) == M, ress),
+              DimensionMismatch("every subset that answers with an efficient frontier must have the same number of points.\nnumber of points of each subset => $([isa(res.w, VecVecNum) ? length(res.w) : 1 for res in ress])"))
+    retcode_w = [subset_resampling_finaliser(N, n_subsets, asset_idx, wb, wf, ress, j)
+                 for j in 1:M]
+    return map(x -> x[1], retcode_w), map(x -> x[2], retcode_w)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -755,7 +761,7 @@ Run the subset resampling optimisation, and return the averaged portfolio.
  6. Draw the subsets with [`sample_unique_assets`](@ref), giving `asset_idx`. When `binomial(N, subset_size)` is at most `max_comb`, the subsets are distinct. Otherwise the function draws each subset alone, and two subsets can be equal.
  7. For each column of `asset_idx`, view `sr.opt` and `rdr` on the subset with [`port_opt_view`](@ref) and optimise the view, giving `ress`. The loop runs on the executor `sr.ex`.
  8. Build the weight bounds `wb` over the ``N`` assets with [`weight_bounds_constraints`](@ref).
- 9. Average and finalise the subset weights with [`subset_resampling_finaliser`](@ref), giving `retcode` and `w`.
+ 9. Average and finalise the subset weights with [`subset_resampling_finaliser`](@ref), giving `retcode` and `w`. The first subset result that holds an efficient frontier selects its frontier method.
 10. Return a [`SubsetResamplingResult`](@ref). Its keyword constructor expands `w` onto the full asset universe.
 
 # Arguments
@@ -773,7 +779,7 @@ Run the subset resampling optimisation, and return the averaged portfolio.
 
 # Returns
 
-  - `res::SubsetResamplingResult`: The averaged portfolio. `retcode` is an [`OptimisationFailure`](@ref) when a subset optimisation fails, or when the weight finaliser fails.
+  - `res::SubsetResamplingResult`: The averaged portfolio. `retcode` is an [`OptimisationFailure`](@ref) when a subset optimisation fails, or when the weight finaliser fails. On an efficient frontier it holds one code for each point.
 
 # Related
 
@@ -823,8 +829,12 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; branchorder::Symbol 
     end
     wb = weight_bounds_constraints(sr.wb, sr.sets; rd = rdr, N = N, strict = sr.strict,
                                    datatype = Tf)
+    # A subset whose every point failed answers with the one portfolio of its fallback, so
+    # the first subset does not state whether the others hold a frontier.
+    i = findfirst(res -> isa(res.w, VecVecNum), ress)
+    points = isnothing(i) ? 1 : ress[i].w
     retcode, w = subset_resampling_finaliser(N, n_subsets, asset_idx, wb, sr.wf, ress,
-                                             ress[1].w)
+                                             points)
     return SubsetResamplingResult(; pr = pr, wb = wb, fees = fees, ress = ress,
                                   idx = asset_idx, retcode = retcode, w = w, imsk = imsk,
                                   fb = nothing)

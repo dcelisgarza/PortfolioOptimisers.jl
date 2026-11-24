@@ -1,5 +1,5 @@
 ```@meta
-Description = "Optimisation types, private API of PortfolioOptimisers.jl: VecOptRetCode, OptRetCode_VecOptRetCode, OptE_Opt, FbChain, OptE_Opt_FbChain, VecOpt, VecOptE, …"
+Description = "Optimisation types, private API of PortfolioOptimisers.jl: VecOptRetCode, OptRetCode_VecOptRetCode, any_solved, member_retcode, OptE_Opt, FbChain, …"
 ```
 
 # Optimisation types: private API
@@ -7,6 +7,8 @@ Description = "Optimisation types, private API of PortfolioOptimisers.jl: VecOpt
 ```@docs
 VecOptRetCode
 OptRetCode_VecOptRetCode
+any_solved
+member_retcode
 OptE_Opt
 FbChain
 OptE_Opt_FbChain

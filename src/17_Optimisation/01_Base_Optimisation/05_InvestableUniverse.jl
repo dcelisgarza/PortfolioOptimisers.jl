@@ -485,9 +485,9 @@ It is a batch fit, so [`assert_batch_entry`](@ref) refuses an [`Online`](@ref) a
  1. Refuse an [`Online`](@ref) in the tree of `opt` with [`assert_batch_entry`](@ref).
  2. Reset every time-dependent schedule of `opt` to its fold-less value with [`reset_time_dependent_estimator`](@ref), giving `current_opt`.
  3. Solve `current_opt` with [`shared_series_solve`](@ref), which drops the observations of a Shared Series gap that `current_opt` reads before [`_optimise`](@ref) runs, giving `res`. A precomputed result gives itself.
- 4. Return `res` when `res.retcode` is an [`OptimisationSuccess`](@ref) or when `current_opt.fb` is `nothing`. The chain `fb` does not exist yet, so this answer allocates no chain, and an estimator whose `fb` has the type `Nothing` has the return type of `res`.
+ 4. Return `res` when it gave an answer, or when `current_opt.fb` is `nothing`. [`any_solved`](@ref) reads `res.retcode`, so one code must be an [`OptimisationSuccess`](@ref), and a frontier sweep must hold one success among the codes of its points. The chain `fb` does not exist yet, so this answer allocates no chain, and an estimator whose `fb` has the type `Nothing` has the return type of `res`.
  5. Otherwise record `(current_opt, res)` in the chain `fb`, take `current_opt.fb` as the new `current_opt`, warn that the fallback runs, and solve it as in step 3.
- 6. Repeat step 5 until `res.retcode` is an [`OptimisationSuccess`](@ref), `current_opt` is a precomputed result, or `current_opt.fb` is `nothing`.
+ 6. Repeat step 5 until [`any_solved`](@ref) holds of `res.retcode`, `current_opt` is a precomputed result, or `current_opt.fb` is `nothing`.
  7. Return `res` rebuilt with `fb` through [`factory`](@ref).
 
 # Arguments
@@ -507,6 +507,7 @@ It is a batch fit, so [`assert_batch_entry`](@ref) refuses an [`Online`](@ref) a
 # Related
 
   - [`_optimise`](@ref)
+  - [`any_solved`](@ref)
   - [`FbChain`](@ref)
   - [`reset_time_dependent_estimator`](@ref)
   - [`assert_batch_entry`](@ref)
@@ -515,16 +516,16 @@ function optimise(opt::OptimisationEstimator, args...; kwargs...)
     assert_batch_entry(opt, "`optimise`")
     current_opt = reset_time_dependent_estimator(opt)
     res = shared_series_solve(current_opt, args...; kwargs...)
-    # A solve that succeeds, or an estimator with no fallback, is the answer. It returns
+    # A solve with a success, or an estimator with no fallback, is the answer. It returns
     # before the chain exists, so it allocates no chain, and for a `fb` of type `Nothing` the
     # compiler knows the type of the answer: the type of `res`.
-    if isa(res.retcode, OptimisationSuccess) || isnothing(current_opt.fb)
+    if any_solved(res.retcode) || isnothing(current_opt.fb)
         return res
     end
     fb = Tuple{OptimisationEstimator, OptimisationResult}[]
     # A precomputed result answers itself and ends the chain: its own `fb` records how it
     # was answered, and is not a fallback to walk on to.
-    while !isa(res.retcode, OptimisationSuccess) &&
+    while !any_solved(res.retcode) &&
           isa(current_opt, OptimisationEstimator) &&
           !isnothing(current_opt.fb)
         push!(fb, (current_opt, res))

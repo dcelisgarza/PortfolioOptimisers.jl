@@ -18,7 +18,7 @@ const NOCS_SLV = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                         settings = Dict("verbose" => false, "tol_gap_abs" => 1e-11,
                                         "tol_gap_rel" => 1e-11, "tol_feas" => 1e-11))
 nocs_opt(; kwargs...) = JuMPOptimiser(; pe = NOCS_PR, slv = NOCS_SLV, kwargs...)
-nocs_ok(res) = isa(res.retcode, OptimisationSuccess)
+nocs_ok(res) = PO.fold_solved(res.retcode)
 function nocs_anchors(opt)
     w_min = optimise(MeanRisk(; obj = MinimumRisk(), opt = opt)).w
     w_max = optimise(MeanRisk(; obj = MaximumReturn(), opt = opt)).w
@@ -191,6 +191,44 @@ end
                                            alg = ConstrainedNearOptimalCentering()))
         @test isapprox(st.w, res.w[j]; atol = 1e-5)
     end
+end
+
+@testset "NearOptimalCentering sweep: a point that fails fails alone" begin
+    # The top level is above the return of every asset, so its anchor is infeasible. The
+    # `NaN` of that anchor once entered the scale of the bounds, and every point failed.
+    top = maximum(NOCS_PR.mu)
+    floors(lb) = ArithmeticReturn(; settings = JuMPReturnsSettings(; lb = lb))
+    opt = nocs_opt(; ret = floors([0.0, 0.6 * top, 1.5 * top]))
+    for alg in (UnconstrainedNearOptimalCentering(), ConstrainedNearOptimalCentering())
+        res = optimise(NearOptimalCentering(; opt = opt, alg = alg, fb = EqualWeighted()))
+        @test isa(res, NearOptimalCenteringResult) && isnothing(res.fb)
+        @test PO.any_solved(res.retcode) && !PO.fold_solved(res.retcode)
+        @test isa.(res.retcode, OptimisationSuccess) == [true, true, false]
+        @test res.retcode[3].res.msg == "w_opt failed.\nnoc_opt failed."
+        @test res.retcode[3].res.w_opt === res.w_opt_retcode[3]
+        @test occursin("anchor did not solve", res.retcode[3].res.noc_opt.res)
+        @test all(isnan, res.w[3])
+        # The failed point does not move the points that it stands beside.
+        two = optimise(NearOptimalCentering(; alg = alg,
+                                            opt = nocs_opt(;
+                                                           ret = floors([0.0, 0.6 * top]))))
+        @test nocs_ok(two)
+        for j in 1:2
+            @test isapprox(res.w[j], two.w[j]; atol = 1e-5)
+        end
+    end
+    # Every point fails, so the fallback answers.
+    res = optimise(NearOptimalCentering(; opt = nocs_opt(; ret = floors([1.5, 2.0] .* top)),
+                                        fb = EqualWeighted()),
+                   ReturnsResult(; nx = string.(1:5), X = NOCS_X))
+    @test isa(res, NaiveOptimisationResult) && length(res.fb) == 1
+    # One code of an anchor stands for every point.
+    ok, bad = OptimisationSuccess(), OptimisationFailure(; res = "x")
+    rc = PO.get_overall_retcode(bad, ok, ok, [ok, bad])
+    @test [c.res.msg for c in rc] == ["w_min failed.\n", "w_min failed.\nnoc_opt failed."]
+    rc = PO.get_overall_retcode(ok, [bad, ok], bad, [ok, ok])
+    @test [c.res.msg for c in rc] == ["w_opt failed.\nw_max failed.\n", "w_max failed.\n"]
+    @test PO.get_overall_retcode(ok, ok, ok, [ok, ok]) == [ok, ok]
 end
 
 @testset "NearOptimalCentering sweep: the estimator and its result" begin

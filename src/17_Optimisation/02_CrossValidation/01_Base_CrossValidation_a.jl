@@ -558,7 +558,7 @@ end
 
 Rebuild a fold's optimisation result so that its ruined members carry a failure code.
 
-A failure code is enough to drop the member. The library reads a vector of return codes with `any(x -> isa(x, OptimisationFailure), …)`, and the cross-validation path keeps a path only when `isa(y.res.retcode, OptimisationSuccess)` holds, so a failed member takes its path out of the run.
+A failure code is enough to drop the member. A reader of one member reads the code of that member, and a fold is solved only when [`fold_solved`](@ref) holds of its codes, so the loop does not thread a fold with a failed member.
 
 # Algorithm
 
@@ -1102,10 +1102,12 @@ Concatenate the series of a field over the folds of a path.
 
 A field holds one series for a single portfolio, or one series per member for a population. The folds are concatenated in the order of `rd`.
 
+A path can hold both. A fold whose every point of a frontier sweep failed answers with the one portfolio of its fallback, and the other folds hold the sweep. The series of that fold then stands at every member.
+
 # Algorithm
 
  1. For one series per fold, concatenate the series of every fold with `vcat`.
- 2. For one series per member, concatenate the series of member `i` over every fold, for each member `i` of the first fold.
+ 2. Otherwise find the first fold with one series per member. For each member `j` of that fold, concatenate the series of member `j`, from [`member_vector`](@ref), over every fold. With no such fold, concatenate the series as in step 1.
 
 # Arguments
 
@@ -1115,19 +1117,23 @@ A field holds one series for a single portfolio, or one series per member for a 
 # Returns
 
   - The concatenated series, or one concatenated series per member.
+
+# Related
+
+  - [`member_vector`](@ref)
+  - [`MultiPeriodPredictionResult`](@ref)
 """
 function mapreduce_RetMtx(rd::AbstractVector{<:PredictionReturnsResult{<:Any, <:VecNum}},
                           sym = :X)
     return mapreduce(x -> getproperty(x, sym), vcat, rd)
 end
-function mapreduce_RetMtx(rd::AbstractVector{<:PredictionReturnsResult{<:Any, <:VecVecNum}},
-                          sym = :X)
-    N = length(getproperty(rd[1], sym))
-    X = [eltype(getproperty(rd[1], sym)[1])[] for _ in 1:N]
-    for i in 1:N
-        X[i] = mapreduce(x -> getproperty(x, sym)[i], vcat, rd)
+function mapreduce_RetMtx(rd::AbstractVector{<:PredictionReturnsResult}, sym = :X)
+    xs = [getproperty(x, sym) for x in rd]
+    i = findfirst(x -> isa(x, VecVecNum), xs)
+    if isnothing(i)
+        return reduce(vcat, xs)
     end
-    return X
+    return [mapreduce(x -> member_vector(x, j), vcat, xs) for j in eachindex(xs[i])]
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1231,10 +1237,13 @@ The constructor narrows `pred` to the concrete type of its folds with [`concrete
         ne = rd[1].ne
         E = isnothing(rd[1].E) ? nothing : mapreduce(x -> getproperty(x, :E), vcat, rd)
         ts = isnothing(rd[1].ts) ? nothing : mapreduce(x -> getproperty(x, :ts), vcat, rd)
-        iv = isnothing(rd[1].iv) ? nothing : mapreduce(x -> getproperty(x, :iv), vcat, rd)
+        iv = isnothing(rd[1].iv) ? nothing : mapreduce_RetMtx(rd, :iv)
         # Per-asset, so it cannot stack; reduced to the last fold to pair with the last
         # row of `iv`, which is what `predict_realised_vols` divides by it.
         ivpa = rd[end].ivpa
+        if isa(X, VecVecNum) && isa(ivpa, Number)
+            ivpa = fill(ivpa, length(X))
+        end
         mrd = PredictionReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B,
                                       ne = ne, E = E, ts = ts, iv = iv, ivpa = ivpa)
         # ADR 0067, amendment of 2026-11-02, measures the cost of `opt` as a type parameter.
@@ -1790,82 +1799,6 @@ function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsR
     return PredictionReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, nb = nb,
                                    B = B, ne = rd.ne, E = rd.E, ts = rd.ts, iv = iv,
                                    ivpa = ivpa)
-end
-"""
-    held_start_weights(retcode::OptimisationSuccess, w::VecNum_VecVecNum, w_prev)
-    held_start_weights(retcode::OptimisationFailure, w::VecNum_VecVecNum, w_prev::Nothing)
-    held_start_weights(retcode::OptimisationFailure, w::VecNum, w_prev::VecNum)
-    held_start_weights(retcode::OptimisationFailure, w::VecVecNum, w_prev::VecNum)
-    held_start_weights(retcode::OptimisationFailure, w::VecVecNum, w_prev::VecVecNum)
-    held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::Nothing)
-    held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::VecNum)
-    held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::VecVecNum)
-
-Name the weights a fold's drift starts from: its own on a solved fold, the previous weights on a failed one.
-
-A fold that could not rebalance holds what it held. So under a Weight Drift or a Previous-Weights Source, a failed fold drifts the weights it was handed and not its `NaN` target. The return code decides, read per member under a population, and the previous weights are one vector for every member or one vector per member. A population solved under one return code, such as the frontier of one [`JuMPOptimisationResult`](@ref), reads that code for every member. A failed fold or member with no previous weights keeps its `NaN` weights, and [`held_weights_result`](@ref) records `NaN` for it without a drift.
-
-# Algorithm
-
-The method that Julia selects is the algorithm. A population with one return code takes the same answer for every member, so its methods agree with the per-member methods under that code repeated once per member.
-
- 1. On an [`OptimisationSuccess`](@ref), give `w`, one vector or a population.
- 2. With no `w_prev`, give `w`.
- 3. On an [`OptimisationFailure`](@ref) over one vector, give `w_prev`.
- 4. On an [`OptimisationFailure`](@ref) over a population, give `w_prev` to each member: the one vector repeated once per member, or a copy of the vector of one `w_prev` per member.
- 5. Over a population with one return code per member, give each member its own vector on a success, and on a failure the one `w_prev` vector or its own entry of `w_prev`.
-
-# Arguments
-
-  - `retcode`: Return code of the fold, or one per member of the population.
-  - `w`: Target weights of the fold, on the universe the fold is scored on.
-  - `w_prev`: Previous weights the fold was handed, on the same universe, or `nothing`.
-
-# Validation
-
-  - A per-member `w_prev` that a failure reads has one entry per member of `w`, else a `DimensionMismatch` is raised. A success reads no `w_prev`, so it does not check it.
-  - A vector of return codes with one `w_prev` vector has one code per member of `w`, else a `DimensionMismatch` is raised.
-
-# Returns
-
-  - `VecNum_VecVecNum`: The start weights, `w0` of the fold's [`HeldWeightsResult`](@ref).
-
-# Related
-
-  - [`held_weights_result`](@ref)
-  - [`HeldWeightsResult`](@ref)
-  - [`previous_weights`](@ref)
-  - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
-"""
-function held_start_weights(::OptimisationSuccess, w::VecNum_VecVecNum, ::Any)
-    return w
-end
-function held_start_weights(::OptimisationFailure, w::VecNum_VecVecNum, ::Nothing)
-    return w
-end
-function held_start_weights(::OptimisationFailure, ::VecNum, w_prev::VecNum)
-    return w_prev
-end
-function held_start_weights(::OptimisationFailure, w::VecVecNum, w_prev::VecNum)
-    return fill(w_prev, length(w))
-end
-function held_start_weights(::OptimisationFailure, w::VecVecNum, w_prev::VecVecNum)
-    @argcheck(length(w_prev) == length(w),
-              DimensionMismatch("`length(w_prev) == length(w)` must hold.\nlength(w_prev) => $(length(w_prev))\nlength(w) => $(length(w))"))
-    return collect(w_prev)
-end
-function held_start_weights(::VecOptRetCode, w::VecVecNum, ::Nothing)
-    return w
-end
-function held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::VecNum)
-    return [isa(retcode[i], OptimisationSuccess) ? w[i] : w_prev
-            for i in eachindex(retcode, w)]
-end
-function held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::VecVecNum)
-    @argcheck(length(w_prev) == length(w),
-              DimensionMismatch("`length(w_prev) == length(w)` must hold.\nlength(w_prev) => $(length(w_prev))\nlength(w) => $(length(w))"))
-    return [isa(rc, OptimisationSuccess) ? wi : wp
-            for (rc, wi, wp) in zip(retcode, w, w_prev)]
 end
 
 export PredictionResult, MultiPeriodPredictionResult, PopulationPredictionResult,

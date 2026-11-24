@@ -712,7 +712,7 @@ The batch verb hands the returns data of the head to each fallback. A head that 
 
 # Algorithm
 
- 1. Return `res` when it succeeded or when `opt.fb` is `nothing`.
+ 1. Return `res` when [`any_solved`](@ref) holds of its return code, or when `opt.fb` is `nothing`.
  2. Otherwise warn, and read the fallback out with `optimise(opt.fb; kwargs...)`, giving `fbres`.
  3. Return `fbres` through [`factory`](@ref) with the chain of the failed pair of `opt` and `res`, followed by the chain of `fbres` when the fallback is an estimator that walked one. A precomputed result answers itself, and its own `fb` is not a chain that this function walked.
 
@@ -733,7 +733,7 @@ The batch verb hands the returns data of the head to each fallback. A head that 
   - [`FbChain`](@ref)
 """
 function read_out_fallback(opt::OptimisationEstimator, res::OptimisationResult; kwargs...)
-    if isa(res.retcode, OptimisationSuccess) || isnothing(opt.fb)
+    if any_solved(res.retcode) || isnothing(opt.fb)
         return res
     end
     fb = Tuple{OptimisationEstimator, OptimisationResult}[(opt, res)]
