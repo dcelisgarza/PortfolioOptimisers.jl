@@ -2218,6 +2218,14 @@
             @test CrossSectionalFactorPrior(; factors = ["market" => ConstantExposure()],
                                             ve = ve).ve === ve
         end
+        # The `ve` slot of the Gerber family takes an estimator of another package, and
+        # `StatsBase` has no `std` for it, so the library reads the diagonal of its matrix.
+        Xve = randn(StableRNG(2281), 60, 3) ./ 100
+        for T in (GerberCovariance, SmythBrobyCovariance, GerberIQCovariance)
+            sc = T(; ve = StatsBase.SimpleCovariance(; corrected = true))
+            @test cov(sc, Xve) ≈ cov(T(), Xve)
+            @test cor(sc, Xve) ≈ cor(T(), Xve)
+        end
         # A matrix and a covariance estimator still pass the `sigma` slot.
         @test Variance(; sigma = [1.0 0.0; 0.0 1.0]).sigma == [1.0 0.0; 0.0 1.0]
         @test Variance(; sigma = Covariance()).sigma isa Covariance
