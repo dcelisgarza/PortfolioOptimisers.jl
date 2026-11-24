@@ -9,7 +9,7 @@ The fee is two scalars on two clocks. [`calc_fees`](@ref) contracts the whole we
 
 The per asset returns sum to this series. `vec(sum(calc_net_asset_returns(w, X, fees); dims = 2))` reproduces `calc_net_returns(w, X, fees)`, because [`calc_asset_fees`](@ref) splits over the assets what [`calc_fees`](@ref) contracts into a scalar. The two sides add in a different order, so the identity holds to rounding and not to `==`.
 
-**This verb is the plain product, and a non-finite entry poisons its whole observation.** `0 * NaN` is `NaN`, so a zero weight does not save the row: one `NaN` in `X[t, i]` makes `val[t]` non-finite whatever `w[i]` holds. The verb takes no finiteness check, because the library calls it at many sites, and a scan here is paid at each of them on every evaluation. A gapped panel is scored through [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref), which reduces the window to the Investable Mask and filters the Held Gaps once with [`filter_held_gaps`](@ref) before it reaches this verb.
+**This verb is the plain product, and a non-finite entry poisons its whole observation.** `0 * NaN` is `NaN`, so a zero weight does not save the row: one `NaN` in `X[t, i]` makes `val[t]` non-finite whatever `w[i]` holds. The verb takes no finiteness check, because the library calls it at many sites, and a scan here is paid at each of them on every evaluation. A gapped panel is scored through [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref), which reduces the window to the Investable Mask and filters the Held Gaps once with [`filter_held_gaps`](@ref) before it reaches this verb. [`performance_summary`](@ref) and the plots of a net return series filter them too.
 
 # Mathematical definition
 
@@ -411,6 +411,10 @@ The weight argument's type is the picker, as it is for [`calc_net_returns`](@ref
   - `w`: Portfolio weights, a population of them, or a weight path (observations × assets).
   - `X`: Asset returns, `observations × assets`.
 
+# Validation
+
+  - Each weight vector has one entry for each column of `X`, and a weight path has the size of `X`. Otherwise the function raises a `DimensionMismatch`.
+
 # Returns
 
   - `held::Vector{Tuple{Int, Int}}`: The `(observation, asset)` pairs, empty when there are none.
@@ -422,14 +426,22 @@ The weight argument's type is the picker, as it is for [`calc_net_returns`](@ref
   - [`attribution_net_returns`](@ref)
 """
 function held_gap_pairs(w::VecNum, X::MatNum)
+    @argcheck(length(w) == size(X, 2),
+              DimensionMismatch("w must have one entry for each column of X: length(w) = $(length(w)), size(X, 2) = $(size(X, 2))"))
     return [(t, i) for i in axes(X, 2) if !iszero(w[i])
             for t in axes(X, 1) if !isfinite(X[t, i])]
 end
 function held_gap_pairs(w::VecVecNum, X::MatNum)
-    return [(t, i) for i in axes(X, 2) if any(wi -> !iszero(wi[i]), w)
+    for wi in w
+        @argcheck(length(wi) == size(X, 2),
+                  DimensionMismatch("each weight vector of w must have one entry for each column of X: length(wi) = $(length(wi)), size(X, 2) = $(size(X, 2))"))
+    end
+    return [(t, i) for i in axes(X, 2) if any(!iszero(wi[i]) for wi in w)
             for t in axes(X, 1) if !isfinite(X[t, i])]
 end
 function held_gap_pairs(W::MatNum, X::MatNum)
+    @argcheck(size(W) == size(X),
+              DimensionMismatch("a weight path must have the size of X: size(W) = $(size(W)), size(X) = $(size(X))"))
     return [(t, i) for i in axes(X, 2)
             for t in axes(X, 1) if !iszero(W[t, i]) && !isfinite(X[t, i])]
 end
@@ -439,7 +451,7 @@ end
 
 Return the window with every non-finite entry replaced by zero, and name the Held Gaps.
 
-A point-in-time panel carries a `NaN` at every `(observation, asset)` pair where the asset is inactive: before it lists, and after it delists. `0 * NaN` is `NaN`, so a zero weight does not save the product `X * w`, and one delisting poisons every observation after it. This is the one place a fold cleans the window it is about to score, and it runs **once**, over the investable columns alone, before the series is formed and before a Weight Drift compounds.
+A point-in-time panel carries a `NaN` at every `(observation, asset)` pair where the asset is inactive: before it lists, and after it delists. `0 * NaN` is `NaN`, so a zero weight does not save the product `X * w`, and one delisting poisons every observation after it. This is the one place a fold cleans the window it is about to score, and it runs **once**, over the investable columns alone, before the series is formed and before a Weight Drift compounds. [`performance_summary`](@ref) of weights or of a result, and each plot that forms a net return series from them, clean their returns with it too, so a report reads a gap as a fold does.
 
 A **Held Gap** takes the library's strictness policy through [`strict_diagnostic`](@ref): a warning names the pairs and the pair contributes zero, or an `ArgumentError` names them under `strict`. A zero weight at a gap is silent. Nothing is renormalised, so the missing weight sits in cash on that observation, which is the one reading that invents no trade the weights never stated.
 
@@ -462,6 +474,7 @@ A fold hands this verb the window **viewed at the Investable Mask**, so a column
 
 # Validation
 
+  - The rules of [`held_gap_pairs`](@ref), when `X` holds a gap.
   - Every held pair of `X` is finite, else a warning naming the pairs is emitted, or an `ArgumentError` naming them is raised under `strict`.
 
 # Returns
@@ -474,6 +487,7 @@ A fold hands this verb the window **viewed at the Investable Mask**, so a column
   - [`calc_net_returns`](@ref)
   - [`strict_diagnostic`](@ref)
   - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
+  - [`performance_summary`](@ref)
 """
 function filter_held_gaps(w::Union{VecNum, VecVecNum, MatNum}, X::MatNum, strict::Bool;
                           nx::Option{<:VecStr} = nothing)

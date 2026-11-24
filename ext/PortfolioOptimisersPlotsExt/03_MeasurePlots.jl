@@ -121,8 +121,9 @@ function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.BaseRM_
                                                   fees::Option{<:Fees} = nothing;
                                                   rolling::Integer = 0, kwargs...)
     ts = isnothing(rd.ts) ? (1:size(rd.X, 1)) : rd.ts
-    return PortfolioOptimisers.plot_rolling_measure(r, w, rd.X, fees; ts = ts,
-                                                    rolling = rolling, kwargs...)
+    ret = calc_net_returns(w, filter_held_gaps(w, rd.X, false; nx = rd.nx), fees)
+    return PortfolioOptimisers.plot_rolling_measure(r, ret; ts = ts, rolling = rolling,
+                                                    kwargs...)
 end
 function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.BaseRM_VecBaseRM,
                                                   res::OptimisationResult,
@@ -233,7 +234,7 @@ end
 # caller gives none, as its `performance_summary` method does (#1664), because the keyword
 # goes to the verb only when the caller gives it.
 const PERFORMANCE_SUMMARY_KEYWORDS = (:ppy, :alpha, :compound, :rf, :measures, :benchmark,
-                                      :names)
+                                      :names, :strict)
 function PortfolioOptimisers.plot_performance_summary(x::Union{AbstractArray,
                                                                OptimisationResult,
                                                                PortfolioOptimisers.AbstractPredictionResult},
@@ -252,8 +253,9 @@ function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.BaseRM_
                                                   fees::Option{<:Fees} = nothing;
                                                   ts::AbstractVector = 1:size(X, 1),
                                                   rolling::Integer = 0, kwargs...)
-    return PortfolioOptimisers.plot_rolling_measure(r, calc_net_returns(w, X, fees);
-                                                    ts = ts, rolling = rolling, kwargs...)
+    ret = calc_net_returns(w, filter_held_gaps(w, X, false), fees)
+    return PortfolioOptimisers.plot_rolling_measure(r, ret; ts = ts, rolling = rolling,
+                                                    kwargs...)
 end
 function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.BaseRM_VecBaseRM,
                                                   ret::VecNum; ts::AbstractVector,

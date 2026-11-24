@@ -1065,3 +1065,10 @@ A static `TensorPanelField` and a static feature matrix keep `assets × labels` 
 ### [Calls that now succeed](@id migration-0-34-3-success)
 
 - **`DependentVariableTracking` of a measure with a quadratic risk expression**, such as `Variance()` without a semidefinite phylogeny. v0.34.2 logged a warning at the construction of a `RiskTrackingRiskMeasure`, and the solver refused the model. v0.34.3 states the risk with a rotated second-order cone, and the constructor logs no warning.
+
+## From v0.34 to v0.35
+
+### [Results that move](@id migration-0-35-numbers)
+
+- **`performance_summary` of weights or of an optimisation result reads a gap in the returns as `predict` does.** v0.34 multiplied the returns by the weights as they are, and `0 * NaN` is `NaN`. So one asset with a gap made the figures `NaN`, also an asset with a zero weight, and the `cvar` was a finite wrong number. Each return that is not finite is now zero. A gap at a zero weight gives no message. A gap at a weight that is not zero gives a warning that names the asset, and an `ArgumentError` under the new keyword `strict = true`. So `performance_summary(res, rd)` gives the figures of `performance_summary(predict(res, rd))`. The figures of returns with no gap do not move. `plot_performance_summary` takes the same keyword.
+- **`plot_portfolio_cumulative_returns`, `plot_drawdowns`, `plot_histogram`, `plot_rolling_drawdowns`, `plot_rolling_measure` and `plot_benchmark` of weights or of an optimisation result** read a gap in the same way, with a warning for a gap at a weight that is not zero. `plot_histogram` dropped each row with a gap, and now it keeps the row. `plot_portfolio_cumulative_returns` of weights on a prior with a non-investable asset draws a finite curve. `plot_asset_cumulative_returns` does not change.

@@ -52,7 +52,7 @@ Plot the cumulative returns of a portfolio against time.
 
 The curve is [`cumulative_returns`](@ref) of the net portfolio returns that [`calc_net_returns`](@ref) forms from `w`, `X` and `fees`. A vector of weight vectors draws one curve per portfolio, labelled `Portfolio i`. The method that takes `net_ret` draws a return series the caller already formed. A population draws the curve of each member on one figure, labelled by the key of the member that [`portfolio_report`](@ref) uses. A member with many portfolios adds `Portfolio i` to its key. Each curve of a population takes `kwargs`, as the curve of a path does. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads after `using StatsPlots`.
 
-A gapped panel reaches this figure only through the returns that the caller gives it. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). A `w, X` or `w, pr` arity computes on the matrix that the caller holds and checks nothing, and `X * w` is `NaN` at a gap even where the weight is zero. Score a gapped panel through `predict(res, rd)` and plot the prediction.
+A gap in the returns does not make the figure `NaN`. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). Every arity that takes weights, or an optimisation result, reads a gap in the same way through [`filter_held_gaps`](@ref): a gap at a zero weight gives no message, and a Held Gap contributes zero with a warning.
 
 # Arguments
 
@@ -560,7 +560,7 @@ Plot the cumulative returns of a portfolio above its drawdown, in two panels tha
 
 The upper panel is [`cumulative_returns`](@ref) of the net portfolio returns. The lower panel is their [`drawdowns`](@ref) in percent, with one horizontal line for each of these measures of the returns, negated and in percent: [`AverageDrawdown`](@ref), [`UlcerIndex`](@ref), [`DrawdownatRisk`](@ref), [`ConditionalDrawdownatRisk`](@ref) and [`MaximumDrawdown`](@ref). With `slv`, [`EntropicDrawdownatRisk`](@ref) and [`RelativisticDrawdownatRisk`](@ref) add two more lines. Under `compound` each measure is its relative form, such as [`RelativeMaximumDrawdown`](@ref). A population draws the mean of the return series of its members, which must be of one length, on the time axis of the first member. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads after `using StatsPlots`.
 
-A gapped panel reaches this figure only through the returns that the caller gives it. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). A `w, X` or `w, rd` arity computes on the matrix that the caller holds and checks nothing, and `X * w` is `NaN` at a gap even where the weight is zero. Score a gapped panel through `predict(res, rd)` and plot the prediction.
+A gap in the returns does not make the figure `NaN`. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). Every arity that takes weights, or an optimisation result, reads a gap in the same way through [`filter_held_gaps`](@ref): a gap at a zero weight gives no message, and a Held Gap contributes zero with a warning.
 
 # Arguments
 
@@ -692,7 +692,7 @@ The histogram is normalised to a density. Vertical lines mark, in this order: th
 
 The figure reads only the finite returns, as [`plot_exposure_distribution`](@ref) does. A return that is `NaN` or infinite is absent: the bins, the mean, the moments, every vertical line and the fitted Normal law read the finite returns, and ``T`` counts them. A walk-forward fold that failed to solve has `NaN` weights, so its returns are absent, and the figure of a [`portfolio_report`](@ref) still draws. A series with no finite return, such as a path whose every fold failed, draws the axes alone, with no bin and no line.
 
-A gapped panel reaches this figure only through the returns that the caller gives it. A prediction arity is finite at a gap, because the fold set the Held Gap to zero once in [`predict`](@ref). A `w, X` or `w, rd` arity computes on the matrix that the caller holds, and `X * w` is `NaN` at a gap even where the weight is zero, so the figure drops each such row. Score a gapped panel through `predict(res, rd)` and plot the prediction.
+A gap in the returns does not make the figure `NaN`. A prediction arity is finite at a gap, because the fold set the Held Gap to zero once in [`predict`](@ref). Every arity that takes weights, or an optimisation result, reads a gap in the same way through [`filter_held_gaps`](@ref): a gap at a zero weight gives no message, and a Held Gap contributes zero with a warning. So a gap drops no row.
 
 # Mathematical definition
 
@@ -1153,7 +1153,7 @@ Plot a risk or return measure of the portfolio returns over a rolling window, ag
 
 [`rolling_window_measure`](@ref) scores each window of the net portfolio returns. Each window plots **one** number, so a vector of measures becomes its scalarised aggregate, not several lines. A population draws the mean of the return series of its members, on the time axis of the first member. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads after `using StatsPlots`.
 
-A gapped panel reaches this figure only through the returns that the caller gives it. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). A `w, X` or `w, rd` arity computes on the matrix that the caller holds and checks nothing, and `X * w` is `NaN` at a gap even where the weight is zero. Score a gapped panel through `predict(res, rd)` and plot the prediction.
+A gap in the returns does not make the figure `NaN`. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). Every arity that takes weights, or an optimisation result, reads a gap in the same way through [`filter_held_gaps`](@ref): a gap at a zero weight gives no message, and a Held Gap contributes zero with a warning.
 
 # Mathematical definition
 
@@ -1471,6 +1471,8 @@ function plot_factor_mu end
 Plot the cumulative returns of a portfolio beside those of one or more benchmarks.
 
 Each curve is [`cumulative_returns`](@ref) of its series: the net portfolio returns as a solid line, and each benchmark as a dashed line. A benchmark without a name in `nb` is labelled `Benchmark i`. A returns result carries its benchmark in `B`, and the figure reads it only when it is one series. A matrix `B` is a benchmark per asset, and this figure does not draw it. A prediction whose series is a vector of series draws the first of them. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads after `using StatsPlots`.
+
+A gap in the returns does not make the curve of the portfolio `NaN`. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). Every arity that takes weights, or an optimisation result, reads a gap in the same way through [`filter_held_gaps`](@ref): a gap at a zero weight gives no message, and a Held Gap contributes zero with a warning.
 
 # Arguments
 
@@ -1790,7 +1792,7 @@ function plot_efficient_frontier end
     plot_performance_summary(x::Union{AbstractArray, OptimisationResult,
                                       AbstractPredictionResult}, args...;
                              ppy, alpha, compound, rf, measures, benchmark, names,
-                             kwargs...) -> Plot
+                             strict, kwargs...) -> Plot
 
 Plot the performance statistics of one or more portfolios as bars, blue at a value of zero or more and red below it.
 
@@ -1798,7 +1800,7 @@ Every method but the first computes a [`PerformanceSummaryResult`](@ref) with [`
 
 A summary of one entry draws one bar chart, with the eleven bars below in order, seven of them in percent, and one bar more for each extra measure. A summary of many entries draws one panel for each figure, with one bar for each entry. The label of a bar names the keys of its entry that are not `nothing`: the candidate, the path and the member. The excess bars are `NaN`, drawn empty, when the summary has no benchmark, and the turnover bar is `NaN` on every arity that holds no path, which is every arity but a prediction.
 
-A gapped panel reaches this figure only through the returns that the caller gives it. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). A `w, X` or `w, rd` arity computes on the matrix that the caller holds and checks nothing, and `X * w` is `NaN` at a gap even where the weight is zero. Score a gapped panel through `predict(res, rd)` and plot the prediction.
+A gap in the returns does not make the figure `NaN`. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). Every arity that takes weights, or an optimisation result, reads a gap in the same way through [`filter_held_gaps`](@ref): a gap at a zero weight gives no message, and a Held Gap contributes zero with a warning.
 
 # Mathematical definition
 
@@ -1822,7 +1824,7 @@ Where:
 
   - `ps`: The summary to draw.
   - `x`, `args...`: The arguments of [`performance_summary`](@ref): a series, weights and returns, an optimisation result and its returns, a prediction, a population, or a vector of candidates.
-  - `ppy`, `alpha`, `compound`, `rf`, `measures`, `benchmark`, `names`: The keywords of [`performance_summary`](@ref).
+  - `ppy`, `alpha`, `compound`, `rf`, `measures`, `benchmark`, `names`, `strict`: The keywords of [`performance_summary`](@ref).
 
 # Validation
 
@@ -1863,7 +1865,7 @@ Plot the maximum drawdown of the portfolio over a rolling window, in percent, ag
 
 Each window is drawn down from its own entry value. The running peak starts at the capital at the start of the window, not at the capital at inception, so a window that only rises reads zero. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads after `using StatsPlots`.
 
-A gapped panel reaches this figure only through the returns that the caller gives it. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). A `w, X` or `w, rd` arity computes on the matrix that the caller holds and checks nothing, and `X * w` is `NaN` at a gap even where the weight is zero. Score a gapped panel through `predict(res, rd)` and plot the prediction.
+A gap in the returns does not make the figure `NaN`. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). Every arity that takes weights, or an optimisation result, reads a gap in the same way through [`filter_held_gaps`](@ref): a gap at a zero weight gives no message, and a Held Gap contributes zero with a warning.
 
 # Mathematical definition
 

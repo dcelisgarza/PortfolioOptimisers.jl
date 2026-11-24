@@ -417,3 +417,26 @@ graph reader does with that gap:
 So the notice of the fill names the dendrogram only for a graph reader that reads the prior. The
 entropy-pooling view resolvers and the meta-optimisers still read the fill. The rest of the decision
 of this ADR does not change.
+
+## Amendment (2026-11-24)
+
+([#1992](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1992)). The Decision above
+left a verb that forms its own series from weights and returns on the plain product, and its
+docstring sent a gapped panel to `predict(res, rd)`. So `performance_summary(res, rd)` gave `NaN`
+where `performance_summary(predict(res, rd))` gave a number. One late listing in the universe was
+enough, also at a zero weight. Two calls that a caller reads as the same must give one answer.
+
+- `performance_summary` of weights, of a result, or of a vector of results calls
+  `filter_held_gaps(w, X, strict; nx)` once for each input, before `calc_net_returns`. It takes the
+  `strict` keyword of `predict`. A population of weight vectors is filtered one time.
+- The six plots that form a net return series from weights or a result filter it in the same way:
+  `plot_portfolio_cumulative_returns`, `plot_drawdowns`, `plot_histogram`,
+  `plot_rolling_drawdowns`, `plot_rolling_measure` and `plot_benchmark`. They warn and never
+  refuse, because their other keywords go to the figure. This replaces the sentence that a series
+  plot reads the funnel. `plot_asset_cumulative_returns` keeps the gap of each line, as before.
+- `calc_net_returns`, `calc_net_asset_returns` and the value-level verbs, such as `expected_risk`,
+  do not change. The scan is paid one time for each report, and never inside a solve.
+- `held_gap_pairs` checks the size of the weights, so a wrong size on a gapped matrix still raises
+  a `DimensionMismatch`.
+
+A `performance_summary(ret)` of a bare series stays documented and not checked.
