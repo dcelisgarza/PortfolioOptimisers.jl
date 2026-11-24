@@ -1190,6 +1190,7 @@ end
                                    target::AbstractRealisedTarget = RealisedCovariance(),
                                    store_forecasts::Bool = false,
                                    x_src::Option{<:AbstractReturnsSource} = nothing) -> CovarianceForecastEvaluationResult
+    covariance_forecast_evaluation(est::StatsBase.CovarianceEstimator, rd::ReturnsResult, cv::WFCVER; kwargs...) -> CovarianceForecastEvaluationResult
 
 Evaluate a covariance forecast out of sample over a walk-forward, in batch or online.
 
@@ -1206,6 +1207,8 @@ The verb is the outermost reader of the returns in the evaluation, because no es
 
 The loop receives the estimator as a configuration only. Under an Online Scheme it warms up one estimator on the first training window and folds the new rows of each fold into it. So the loop refuses an estimator that enters with a state or that cannot fold, with an error that names it. An estimator that cannot fold but has a `cache` field can be wrapped in [`Online`](@ref), which folds it from a buffer. Each estimate made from the state is then a batch fit over the rows of the buffer. An estimator with no `cache` field has nowhere to carry a buffer, and `Online` refuses it.
 
+The verb reads a covariance estimator of another package as the [`GeneralCovariance`](@ref) that [`library_covariance_estimator`](@ref) wraps it in. A `GeneralCovariance` over any estimator but `StatsBase.SimpleCovariance` does not fold. So under an Online Scheme, wrap it as `Online(GeneralCovariance(; ce = ce))`.
+
 # Algorithm
 
  1. Check `x_src` and the source of `est`, check `rd.X`, and check that an [`Online`](@ref) at the root comes with an Online Scheme.
@@ -1218,7 +1221,7 @@ The loop receives the estimator as a configuration only. Under an Online Scheme 
 
 # Arguments
 
-  - `est`: The covariance estimator, or the prior estimator whose `sigma` is the forecast. Under an Online Scheme either can be wrapped in [`Online`](@ref), to fold from a buffer and, with `max_history`, over a rolling window.
+  - `est`: The covariance estimator, which can be one of another package, or the prior estimator whose `sigma` is the forecast. Under an Online Scheme either can be wrapped in [`Online`](@ref), to fold from a buffer and, with `max_history`, over a rolling window.
   - $(arg_dict[:rd])
   - `cv`: The walk-forward, in its index or date form, or its split.
   - `w`: The test portfolios on the full universe. `nothing` means inverse volatility recomputed from the forecast of each step, a vector is one static portfolio, and a vector of vectors is several.
@@ -1319,6 +1322,11 @@ function covariance_forecast_evaluation(est::Union{AbstractCovarianceEstimator,
                                               else
                                                   nothing
                                               end)
+end
+function covariance_forecast_evaluation(est::StatsBase.CovarianceEstimator,
+                                        rd::ReturnsResult, cv::WFCVER; kwargs...)
+    return covariance_forecast_evaluation(library_covariance_estimator(est), rd, cv;
+                                          kwargs...)
 end
 
 export RealisedCovariance, HorizonReturn, covariance_forecast_step,

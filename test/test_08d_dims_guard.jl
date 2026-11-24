@@ -90,8 +90,10 @@ end
     # which carry one, two and two verbs, so the number rose by five. The online portfolio
     # selection family added `PriceLevelExpectedReturns` and `PriorExpectedReturns` (one verb
     # each) and `RankOneCovariance` (two), so it rose by four. `GeodesicShrinkageCovariance`
-    # carries two verbs, so it rose by two.
-    @test checked == 56
+    # carries two verbs, so it rose by two. The robust covariance estimators added
+    # `MCDCovariance` and `TylerCovariance` (two verbs each) and `RobustExpectedReturns` (one),
+    # so it rose by five.
+    @test checked == 61
 end
 
 @testset "a panel arm answers the same at both orientations" begin

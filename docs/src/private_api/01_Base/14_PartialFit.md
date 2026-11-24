@@ -10,4 +10,5 @@ PortfolioOptimisers.assert_partial_fit_values
 PortfolioOptimisers.partial_fit_cache
 PortfolioOptimisers.observation_count
 PortfolioOptimisers.shared_series_member_rows
+PortfolioOptimisers.fold_rows
 ```

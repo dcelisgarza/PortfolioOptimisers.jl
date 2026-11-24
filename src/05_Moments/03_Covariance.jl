@@ -1719,18 +1719,19 @@ This method is the block arm of the [`partial_fit!`](@ref) interface. The Welfor
 
 # Algorithm
 
- 1. Orient `X` to `observations × assets`. Transpose it when `dims == 2`.
- 2. Fold each row in order with the single-observation arm of [`partial_fit!`](@ref). Rebind the estimator after each row.
+ 1. Fold each row in order with the single-observation arm of [`partial_fit!`](@ref), together with its row of the active mask, through [`fold_rows`](@ref).
 
 # Arguments
 
   - `ce`: The covariance estimator.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
+  - `active_mask`: The active mask of the Asset Panel, with the same size as `X`, or `nothing`.
 
 # Validation
 
   - $(val_dict[:dims])
+  - If `active_mask` is not `nothing`, its size is the size of `X` after the orientation. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
 
@@ -1742,12 +1743,9 @@ This method is the block arm of the [`partial_fit!`](@ref) interface. The Welfor
   - [`partial_fit!`](@ref)
 """
 function partial_fit!(ce::GeneralCovariance{<:Any, <:Any, <:Option{<:CovarianceState}},
-                      X::MatNum; dims::Int = 1)
-    X = dims_oriented(dims, X)
-    for i in axes(X, 1)
-        ce = partial_fit!(ce, view(X, i, :))
-    end
-    return ce
+                      X::MatNum; dims::Int = 1,
+                      active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing)
+    return fold_rows(ce, X, dims, active_mask)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1758,14 +1756,14 @@ The [`GeneralCovariance`](@ref) method of [`partial_fit!`](@ref) folds one obser
 
  1. Refuse an estimator that an incremental fit cannot reproduce, with [`partial_fit_corrected`](@ref).
  2. Seed a [`CovarianceState`](@ref) of zeros over `length(x)` assets when `ce.cache` holds `nothing`, with [`covariance_state_seed`](@ref).
- 3. Fold `x` into the state.
+ 3. Fold `x` into the state. An inactive asset of `active_mask` folds as a `NaN`, as [`inactive_as_nonfinite`](@ref) states.
  4. Rebuild the estimator with the new state in `cache` through [`rebuild_struct`](@ref), and return it.
 """
 function partial_fit!(ce::GeneralCovariance{<:Any, <:Any, <:Option{<:CovarianceState}},
-                      x::VecNum)
+                      x::VecNum; active_mask::Option{<:AbstractVector{<:Bool}} = nothing)
     partial_fit_corrected(ce)
-    return rebuild_struct(ce,
-                          (; cache = partial_fit!(covariance_state_seed(ce.cache, x), x)))
+    state = covariance_state_seed(ce.cache, x)
+    return rebuild_struct(ce, (; cache = partial_fit!(state, x, nothing, active_mask)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1776,8 +1774,7 @@ This method is the block arm of the [`partial_fit!`](@ref) interface. The Welfor
 
 # Algorithm
 
- 1. Orient `X` and `active_mask` to `observations × assets`. Transpose them when `dims == 2`.
- 2. Fold each row in order with the single-observation arm of [`partial_fit!`](@ref), together with its row of the active mask. Rebind the estimator after each row.
+ 1. Fold each row in order with the single-observation arm of [`partial_fit!`](@ref), together with its row of the active mask, through [`fold_rows`](@ref).
 
 # Arguments
 
@@ -1803,17 +1800,7 @@ This method is the block arm of the [`partial_fit!`](@ref) interface. The Welfor
 function partial_fit!(ce::Covariance{<:Any, <:Any, <:FullMoment, <:Any, <:Any,
                                      <:Option{<:CovarianceState}}, X::MatNum; dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing)
-    X = dims_oriented(dims, X)
-    amsk = isnothing(active_mask) ? nothing : dims_oriented(dims, active_mask)
-    if !isnothing(amsk)
-        @argcheck(size(amsk) == size(X),
-                  DimensionMismatch("size(X) ($(size(X))) must match size(active_mask) ($(size(amsk)))"))
-    end
-    for i in axes(X, 1)
-        ce = partial_fit!(ce, view(X, i, :);
-                          active_mask = isnothing(amsk) ? nothing : view(amsk, i, :))
-    end
-    return ce
+    return fold_rows(ce, X, dims, active_mask)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -2035,15 +2022,53 @@ function Statistics.cor(ce::Union{GeneralCovariance, Covariance}; strict::Bool =
     return Statistics.cor(ce, partial_fit_cache(ce); strict = strict)
 end
 
-# `GeneralCovariance` folds in every configuration. `Covariance` folds under `FullMoment`
-# alone: the `SemiMoment` clip is taken against the sample mean, so a past observation's
-# membership of the clipped set flips when the mean moves, and that arm falls back to the
-# default, which buffers wherever a wrapper gave it a buffer (see
-# [`supports_partial_fit`](@ref)).
-function supports_partial_fit(::GeneralCovariance)
+"""
+    welford_folds(ce::StatsBase.CovarianceEstimator) -> Bool
+    welford_folds(ce::StatsBase.SimpleCovariance) -> Bool
+    welford_folds(ce::Union{GeneralCovariance, Covariance{<:Any, <:Any, <:FullMoment}}) -> Bool
+
+Answers whether the Welford fold of a [`CovarianceState`](@ref) reproduces a covariance estimator.
+
+The accumulator gives the full-moment sample covariance of `StatsBase.SimpleCovariance` and no other estimator, as [`partial_fit_corrected`](@ref) states. That function refuses the other estimators at the fold. This function answers the same question without a throw, so [`supports_partial_fit`](@ref) sends them to the batch verb.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. On `StatsBase.SimpleCovariance`, return `true`.
+ 2. On a [`GeneralCovariance`](@ref), and on a [`Covariance`](@ref) whose algorithm is [`FullMoment`](@ref), return the answer of its `ce`.
+ 3. On every other estimator, return `false`.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+
+# Returns
+
+  - `folds::Bool`: `true` when the fold reproduces the estimator.
+
+# Related
+
+  - [`partial_fit_corrected`](@ref)
+  - [`supports_partial_fit`](@ref)
+  - [`CovarianceState`](@ref)
+"""
+function welford_folds(::StatsBase.CovarianceEstimator)
+    return false
+end
+function welford_folds(::StatsBase.SimpleCovariance)
     return true
 end
-function supports_partial_fit(::Covariance{<:Any, <:Any, <:FullMoment})
-    return true
+function welford_folds(ce::Union{GeneralCovariance, Covariance{<:Any, <:Any, <:FullMoment}})
+    return welford_folds(ce.ce)
+end
+# Both fold when their inner estimator is the sample covariance. `Covariance` folds under
+# `FullMoment` alone: the `SemiMoment` clip is taken against the sample mean, so a past
+# observation's membership of the clipped set flips when the mean moves, and that arm falls
+# back to the default, which buffers wherever a wrapper gave it a buffer (see
+# [`supports_partial_fit`](@ref)).
+function supports_partial_fit(ce::Union{GeneralCovariance,
+                                        Covariance{<:Any, <:Any, <:FullMoment}})
+    return isa(ce.cache, SampleBufferState) || welford_folds(ce)
 end
 export GeneralCovariance, Covariance, cov, cor
