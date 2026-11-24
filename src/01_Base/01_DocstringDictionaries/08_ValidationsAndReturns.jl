@@ -60,7 +60,7 @@ unique_key_dict!(val_dict, :val_dict, :oow => "If `w` is not `nothing`, `!isempt
                  :rf => "`isfinite(rf)`.",#
                  :bsr => "`isfinite(bsr)`.",#
                  :q_scorer => "`0 <= q <= 1`.",#
-                 :unit => "If `unit` is a [`LotUnitEstimator`](@ref), `sets` is not `nothing`, else an [`IsNothingError`](@ref). [`LotUnit`](@ref) checks that a stated lot unit is positive and finite. If `idx` is not `nothing`, `unit` is a [`LotUnitEstimator`](@ref), else an `ArgumentError`, and `idx` is not empty, else an [`IsEmptyError`](@ref).",#
+                 :unit => "If `unit` is a [`LotUnitEstimator`](@ref), `sets` is not `nothing`, else an [`IsNothingError`](@ref). [`LotUnit`](@ref) checks that a stated lot unit is positive and finite. If `idx` is not `nothing`, `unit` is a [`LotUnitEstimator`](@ref), else an `ArgumentError`, `idx` is not empty, else an [`IsEmptyError`](@ref), and `idx` indexes the universe that `unit.key` selects in `sets`, else a `DomainError`.",#
                  :katz_alpha => "`alpha > 0`.",#
                  :min_obs => "`min_obs > 0`.",#
                  :hac_lags => "If `hac_lags` is not `nothing`, `hac_lags > 0`.",#

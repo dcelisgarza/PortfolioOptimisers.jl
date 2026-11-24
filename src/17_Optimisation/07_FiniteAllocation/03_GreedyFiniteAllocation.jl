@@ -137,9 +137,9 @@ $(DocStringExtensions.FIELDS)
     GreedyAllocation(;
         unit::LuE_Lu = LotUnit(),
         sets::Option{<:UniverseSets} = nothing,
+        idx::Option{<:VecInt} = nothing,
         strict::Bool = false,
-        fb::Option{<:FOptE_FOpt} = nothing,
-        idx::Option{<:VecInt} = nothing
+        fb::Option{<:FOptE_FOpt} = nothing
     ) -> GreedyAllocation
 
 Keywords correspond to the struct's fields.
@@ -164,9 +164,9 @@ GreedyAllocation
     unit ┼ LotUnit
          │   val ┴ Int64: 1
     sets ┼ nothing
+     idx ┼ nothing
   strict ┼ Bool: false
-      fb ┼ nothing
-     idx ┴ nothing
+      fb ┴ nothing
 ```
 
 # Related
@@ -193,6 +193,10 @@ GreedyAllocation
     """
     sets
     """
+    $(field_dict[:idx_alloc])
+    """
+    idx
+    """
     $(field_dict[:strict_opt])
     """
     strict
@@ -200,26 +204,21 @@ GreedyAllocation
     $(field_dict[:fb])
     """
     fb
-    """
-    $(field_dict[:idx_alloc])
-    """
-    idx
-    function GreedyAllocation(unit::LuE_Lu, sets::Option{<:UniverseSets}, strict::Bool,
-                              fb::Option{<:FOptE_FOpt} = nothing,
-                              idx::Option{<:VecInt} = nothing)
+    function GreedyAllocation(unit::LuE_Lu, sets::Option{<:UniverseSets},
+                              idx::Option{<:VecInt}, strict::Bool, fb::Option{<:FOptE_FOpt})
         assert_allocation_unit(unit, sets, idx)
-        return new{typeof(unit), typeof(sets), typeof(strict), typeof(fb), typeof(idx)}(unit,
+        return new{typeof(unit), typeof(sets), typeof(idx), typeof(strict), typeof(fb)}(unit,
                                                                                         sets,
+                                                                                        idx,
                                                                                         strict,
-                                                                                        fb,
-                                                                                        idx)
+                                                                                        fb)
     end
 end
 function GreedyAllocation(; unit::LuE_Lu = LotUnit(),
-                          sets::Option{<:UniverseSets} = nothing, strict::Bool = false,
-                          fb::Option{<:FOptE_FOpt} = nothing,
-                          idx::Option{<:VecInt} = nothing)::GreedyAllocation
-    return GreedyAllocation(unit, sets, strict, fb, idx)
+                          sets::Option{<:UniverseSets} = nothing,
+                          idx::Option{<:VecInt} = nothing, strict::Bool = false,
+                          fb::Option{<:FOptE_FOpt} = nothing)::GreedyAllocation
+    return GreedyAllocation(unit, sets, idx, strict, fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

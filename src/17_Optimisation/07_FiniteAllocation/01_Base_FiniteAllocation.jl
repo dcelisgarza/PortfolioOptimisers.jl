@@ -1238,11 +1238,18 @@ end
 function assert_allocation_unit(::LotUnit, ::Option{<:UniverseSets}, ::VecInt)
     return throw(ArgumentError("idx must be nothing when unit is a LotUnit: idx selects the assets that a LotUnitEstimator keeps after it resolves, and a LotUnit states the lot unit of the assets of the input"))
 end
-function assert_allocation_unit(::LotUnitEstimator, sets::Option{<:UniverseSets},
+function assert_allocation_unit(unit::LotUnitEstimator, sets::Option{<:UniverseSets},
                                 idx::Option{<:VecInt})::Nothing
     @argcheck(!isnothing(sets),
               IsNothingError("sets cannot be nothing when unit is a LotUnitEstimator"))
-    @argcheck(isnothing(idx) || !isempty(idx), IsEmptyError("idx cannot be empty"))
+    if !isnothing(idx)
+        @argcheck(!isempty(idx), IsEmptyError("idx cannot be empty"))
+        key = ifelse(isnothing(unit.key), sets.xkey, unit.key)
+        N = length(sets.dict[key])
+        @argcheck(checkbounds(Bool, Base.OneTo(N), idx),
+                  DomainError(idx,
+                              "`idx` selects assets of the universe `$key`, which names $N assets. State positions from 1 to $N, or a mask of $N entries."))
+    end
     return nothing
 end
 """

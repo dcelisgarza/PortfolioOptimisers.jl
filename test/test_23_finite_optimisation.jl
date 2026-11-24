@@ -1426,11 +1426,19 @@ end
                                             cash = 1000.0))
         @test PO.port_opt_view(GreedyAllocation(; fb = rg), [2, 4]).fb === rg
 
-        # The constructors refuse an `idx` that no estimator reads, and an empty one.
+        # The constructors refuse an `idx` that no estimator reads, an empty one, and one
+        # that does not index the universe. A stated mask reads as its positions do.
         for f in (kw -> GreedyAllocation(; kw...),
                   kw -> DiscreteAllocation(; slv = mip_slv, kw...))
             @test_throws ArgumentError f((; unit = LotUnit(l), idx = [1, 2]))
             @test_throws PO.IsEmptyError f((; unit = u, sets = usets, idx = Int[]))
+            for i in ([2, 5], [0, 1], [true, false])
+                @test_throws DomainError f((; unit = u, sets = usets, idx = i))
+            end
+            mk = f((; unit = u, sets = usets, idx = BitVector([0, 1, 0, 1])))
+            @test optimise(mk, wc).shares ==
+                  optimise(f((; unit = u, sets = usets, idx = [2, 4])), wc).shares
+            @test PO.port_opt_view(mk, [2]).idx == [4]
         end
     end
 end

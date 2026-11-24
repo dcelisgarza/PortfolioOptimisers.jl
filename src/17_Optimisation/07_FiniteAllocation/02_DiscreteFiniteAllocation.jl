@@ -181,13 +181,13 @@ $(DocStringExtensions.FIELDS)
                                                  dev = AbsoluteWeightDeviation()),
         unit::LuE_Lu = LotUnit(),
         sets::Option{<:UniverseSets} = nothing,
-        strict::Bool = false,
         idx::Option{<:VecInt} = nothing,
-        fb::Option{<:FOptE_FOpt} = GreedyAllocation(; unit = unit, sets = sets,
-                                                    strict = strict, idx = idx)
+        strict::Bool = false,
+        fb::Option{<:FOptE_FOpt} = GreedyAllocation(; unit = unit, sets = sets, idx = idx,
+                                                    strict = strict)
     ) -> DiscreteAllocation
 
-Keywords correspond to the struct's fields. The default fallback reads the same `unit`, `sets`, `strict` and `idx`, so a failed solve falls back to the same lots.
+Keywords correspond to the struct's fields. The default fallback reads the same `unit`, `sets`, `idx` and `strict`, so a failed solve falls back to the same lots.
 
 ## Validation
 
@@ -223,15 +223,15 @@ DiscreteAllocation
     unit ┼ LotUnit
          │   val ┴ Int64: 1
     sets ┼ nothing
+     idx ┼ nothing
   strict ┼ Bool: false
       fb ┼ GreedyAllocation
          │     unit ┼ LotUnit
          │          │   val ┴ Int64: 1
          │     sets ┼ nothing
+         │      idx ┼ nothing
          │   strict ┼ Bool: false
-         │       fb ┼ nothing
-         │      idx ┴ nothing
-     idx ┴ nothing
+         │       fb ┴ nothing
 ```
 
 # Related
@@ -273,6 +273,10 @@ DiscreteAllocation
     """
     sets
     """
+    $(field_dict[:idx_alloc])
+    """
+    idx
+    """
     $(field_dict[:strict_opt])
     """
     strict
@@ -280,14 +284,10 @@ DiscreteAllocation
     $(field_dict[:fb])
     """
     fb
-    """
-    $(field_dict[:idx_alloc])
-    """
-    idx
     function DiscreteAllocation(slv::Slv_VecSlv, sc::Number, so::Number,
                                 wf::JuMPWeightFinaliserFormulation, unit::LuE_Lu,
-                                sets::Option{<:UniverseSets}, strict::Bool,
-                                fb::Option{<:FOptE_FOpt}, idx::Option{<:VecInt} = nothing)
+                                sets::Option{<:UniverseSets}, idx::Option{<:VecInt},
+                                strict::Bool, fb::Option{<:FOptE_FOpt})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -295,22 +295,22 @@ DiscreteAllocation
         @argcheck(so > zero(so), DomainError(so, "so must be > 0"))
         assert_allocation_unit(unit, sets, idx)
         return new{typeof(slv), typeof(sc), typeof(so), typeof(wf), typeof(unit),
-                   typeof(sets), typeof(strict), typeof(fb), typeof(idx)}(slv, sc, so, wf,
-                                                                          unit, sets,
-                                                                          strict, fb, idx)
+                   typeof(sets), typeof(idx), typeof(strict), typeof(fb)}(slv, sc, so, wf,
+                                                                          unit, sets, idx,
+                                                                          strict, fb)
     end
 end
 function DiscreteAllocation(; slv::Slv_VecSlv, sc::Number = 1, so::Number = 1,
                             wf::JuMPWeightFinaliserFormulation = ErrorWeightFinaliser(;
                                                                                       dev = AbsoluteWeightDeviation()),
                             unit::LuE_Lu = LotUnit(),
-                            sets::Option{<:UniverseSets} = nothing, strict::Bool = false,
-                            idx::Option{<:VecInt} = nothing,
+                            sets::Option{<:UniverseSets} = nothing,
+                            idx::Option{<:VecInt} = nothing, strict::Bool = false,
                             fb::Option{<:FOptE_FOpt} = GreedyAllocation(; unit = unit,
                                                                         sets = sets,
-                                                                        strict = strict,
-                                                                        idx = idx))::DiscreteAllocation
-    return DiscreteAllocation(slv, sc, so, wf, unit, sets, strict, fb, idx)
+                                                                        idx = idx,
+                                                                        strict = strict))::DiscreteAllocation
+    return DiscreteAllocation(slv, sc, so, wf, unit, sets, idx, strict, fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
