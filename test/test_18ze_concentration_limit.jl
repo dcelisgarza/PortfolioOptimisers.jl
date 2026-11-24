@@ -95,6 +95,22 @@
                                    sets = sets).x[1]
              for p in (GrossPosition(), NetPosition(), LongPosition())]
         @test x ≈ [0.16, 0.0, 0.08]
+        # The budgets pin the long part at 1.3, but the bounds let the book hold 1.1 long at
+        # most. With `xbgt` off, the long reading sees the pinned parts, and 19 positions at
+        # 6 % cannot hold them.
+        wbp = WeightBounds(; lb = [-0.1; zeros(N - 1)], ub = [0.0; fill(1.0, N - 1)])
+        function solve_pin(pos, xbgt, sbgt)
+            opt = JuMPOptimiser(; slv = hslv, wb = wbp, sbgt = sbgt, xbgt = xbgt,
+                                conc = ConcentrationLimit(; t = 0.02, c = 0.06, s = 1.2,
+                                                          pos = pos))
+            return optimise(MeanRisk(; r = ConditionalValueatRisk(), opt = opt), rd)
+        end
+        @test success(solve_pin(NetPosition(), false, 0.3))
+        @test !success(solve_pin(LongPosition(), false, 0.3))
+        # A range lets the parts fall to the parts of the weights.
+        rl = solve_pin(LongPosition(), false, BudgetRange(; lb = 0.0, ub = 0.3))
+        @test success(rl)
+        @test maximum(rl.w) <= 0.06 + tol
         # A short of -30 % counts as 30 % under the gross reading, and the other two
         # readings do not see it.
         w = [-0.3; zeros(N - 1)]
@@ -284,6 +300,10 @@
         @test PortfolioOptimisers.name_keyed(cle)
         @test !PortfolioOptimisers.name_keyed(ConcentrationLimitEstimator())
         @test_throws IsNothingError ConstraintBlock(; conc = cle)
+        # The check of a book states that the rule needs `sets`, also in a vector.
+        @test_throws IsNothingError concentration_margins(cle, fill(0.5, 2))
+        @test_throws IsNothingError concentration_margins([cle], fill(0.5, 2))
+        @test_throws IsNothingError concentration_limit_constraints(cle, nothing)
         @test_throws IsEmptyError ConstraintBlock(; conc = ConcentrationLimit[])
         # A mixed vector narrows, and the view keeps one rule for each entry.
         cbe = ConstraintBlock(;

@@ -14,7 +14,6 @@ LongShortIndicators
 SignIndicators
 get_mip_ss
 set_mip_ss_expr!
-mip_key
 mip_bit_space
 mip_wx!
 mip_bounds
@@ -32,7 +31,6 @@ short_gate
 long_bin
 short_bin
 mip_wb
-declare_mip_gate!
 short_mip_threshold_constraints
 mip_constraints
 sign_mip_constraints

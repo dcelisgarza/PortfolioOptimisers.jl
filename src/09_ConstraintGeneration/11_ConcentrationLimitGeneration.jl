@@ -64,7 +64,7 @@ struct NetPosition <: AbstractPositionReading end
 
 Reads a position as its long part, so the rule does not see a short position.
 
-The model reads the long part `lw` of the weights.
+The model reads the long part `lw` of the weights. It gives `lw >= max(w, 0)`, so the reading is never below the long position. When the budgets pin the sum of the long part and `xbgt` is off, `lw` can be larger than `max(w, 0)`, and then the rule is stricter than the long position.
 
 # Related
 
@@ -84,7 +84,7 @@ To make a new form, subtype `AbstractConcentrationAlgorithm` and implement the m
 
 ## Rows of the rule
 
-  - `PortfolioOptimisers.set_concentration_rows!(model::JuMP.Model, alg::AbstractConcentrationAlgorithm, sp::ConcentrationMIPSpace, x::AbstractVector, wb::WeightBounds, ss::Option{<:Number}) -> Nothing`: Add the rows of the rule `sp.cl` on the positions `x`. Register each entry with `state_set!(model, Symbol(""), mip_key(sp, name), val)`, so that two rules do not collide.
+  - `PortfolioOptimisers.set_concentration_rows!(model::JuMP.Model, alg::AbstractConcentrationAlgorithm, sp::ConcentrationMIPSpace, x::AbstractVector, wb::WeightBounds, ss::Option{<:Number}) -> Nothing`: Add the rows of the rule `sp.cl` on the positions `x`. Register each entry with `state_set!(model, Symbol(""), mip_key(sp, name), val)`, so that two rules do not collide. A form with a binary declares it and its gate with `declare_mip_gate!`, so that its rows hold under a ratio objective too.
 
 There is no fallback. [`concentration_margins`](@ref) reads the rule itself whatever the form, so a new form needs no method there.
 
@@ -543,6 +543,7 @@ The block resolves the rule at stage 1, [`resolve_constraint_block_names`](@ref)
 
 # Validation
 
+  - `sets` is not `nothing` when `cl.set` is an [`AssetSetsMatrixEstimator`](@ref). An [`IsNothingError`](@ref) is thrown otherwise.
   - The rules of [`asset_sets_matrix`](@ref) for an [`AssetSetsMatrixEstimator`](@ref) in `cl.set`.
 
 # Returns
@@ -577,6 +578,8 @@ end
 function concentration_limit_constraints(cl::ConcentrationLimitEstimator,
                                          sets::Option{<:UniverseSets}; strict::Bool = false,
                                          kwargs...)::ConcentrationLimit
+    @argcheck(!(isnothing(sets) && name_keyed(cl)),
+              IsNothingError("sets cannot be nothing when the `set` of a concentration rule is an `AssetSetsMatrixEstimator`: it names a key of `sets.dict`, and only a UniverseSets resolves it"))
     return ConcentrationLimit(; t = cl.t, c = cl.c, s = cl.s,
                               set = asset_sets_matrix(cl.set, sets; strict = strict),
                               pos = cl.pos, alg = cl.alg)

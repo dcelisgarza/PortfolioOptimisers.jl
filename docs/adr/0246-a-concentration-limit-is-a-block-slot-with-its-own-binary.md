@@ -76,5 +76,9 @@ in a grilling session on 2026-11-23 (#2147).
   new feature that reaches every slot of the block. It is #2257, with its decision #2258.
 - `asset_sets_matrix` on an estimator takes the keyword `strict`. The printout of a
   `ConstraintBlock` and of an `AssetSetsMatrixEstimator` gains one line.
-- The gross reading can be stricter than `|w|` when the short budget `sbgt` pins the sum of the
-  parts and `xbgt` is off. The docstring of `GrossPosition` states it.
+- The gross and the long reading can be stricter than `|w|` and `max(w, 0)` when the budgets pin
+  the sum of the parts and `xbgt` is off. The docstrings of `GrossPosition` and `LongPosition`
+  state it.
+- The section `# Interfaces` of `AbstractConcentrationAlgorithm` tells an implementer to call
+  `state_set!`, `mip_key` and `declare_mip_gate!` on a `ConcentrationMIPSpace`, so the four names
+  are `public` (ADR 0154).

@@ -1262,3 +1262,5 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
     set_gcard_constraints!(model, sp, ind, gcard)
     return nothing
 end
+
+public mip_key, declare_mip_gate!

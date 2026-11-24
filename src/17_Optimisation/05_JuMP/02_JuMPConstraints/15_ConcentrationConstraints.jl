@@ -205,4 +205,4 @@ function set_concentration_rows!(model::JuMP.Model, ::SumLargestConcentration,
     return nothing
 end
 
-public set_concentration_rows!
+public ConcentrationMIPSpace, set_concentration_rows!
