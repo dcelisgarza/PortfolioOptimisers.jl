@@ -15,6 +15,8 @@ The method on `tres = nothing` adds no row. A tracking error whose type or norm 
   - [`IndependentVariableTracking`](@ref): Substitutes `w - wb` for `w` and builds the chosen risk. `err` bounds the expression that the bound of that risk acts on, [`set_tracked_risk_constraints!`](@ref), which has degree one in the weights.
   - [`DependentVariableTracking`](@ref): Constrains the difference between portfolio risk and benchmark risk, with the portfolio risk stated at degree one, [`set_degree_one_tracked_risk!`](@ref). The inner build reads the lifted matrix of the head's weights, [`weights_prefix`](@ref). The bound holds from above only, ``R(\\boldsymbol{w}) \\leq R(\\boldsymbol{w}_b) + \\mathrm{err}``, for every inner measure whose model is an upper bound on the risk, as [`DependentVariableTracking`](@ref) states. A portfolio whose risk is below the benchmark risk by more than `err` also satisfies it.
 
+The bound row of each risk-based method divides by the [`bound_scale`](@ref) of its bound, as the row of [`set_risk_upper_bound!`](@ref) does, so a solver resolves a small bound.
+
 The collection method iterates over all tracking errors in `tres`.
 
 # Mathematical definition
@@ -59,6 +61,7 @@ Where:
   - [`RiskTrackingError`](@ref)
   - [`set_tracked_risk_constraints!`](@ref)
   - [`set_degree_one_tracked_risk!`](@ref)
+  - [`bound_scale`](@ref)
   - [`L1Norm`](@ref)
   - [`L2Norm`](@ref)
   - [`LpNorm`](@ref)
@@ -218,7 +221,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     _, expr, map = set_tracked_risk_constraints!(model, r, ask, opt, pr, pl, fees, args...;
                                                  kwargs...)
     ub = variance_risk_bounds_val(map, err)
-    state_set!(model, prefix, :cter_, i, JuMP.@constraint(model, sc * (expr - ub * k) <= 0))
+    state_set!(model, prefix, :cter_, i,
+               JuMP.@constraint(model, sc * (expr - ub * k) / bound_scale(ub) <= 0))
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,

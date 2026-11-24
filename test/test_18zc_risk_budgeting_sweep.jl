@@ -332,6 +332,8 @@ end
              (ratio, sql2, nothing, (ind, dep)), (ratio, nested(ind), nothing, (ind, dep)),
              (ratio, nested(dep), nothing, (ind,)),
              (budget, StandardDeviation(), nothing, (ind, dep)),
+             # Clarabel stops on an independent bound row that does not divide by its bound.
+             (budget, UlcerIndex(), nothing, (ind,)),
              (budget, Variance(), nothing, (ind, dep)), (budget, Variance(), plg, (ind,)),
              (budget, box, nothing, (ind, dep)), (budget, rsoc, nothing, (ind, dep)),
              (budget, even, nothing, (ind,)), (budget, kurt, nothing, (ind, dep)),

@@ -133,7 +133,8 @@ Item 5 gave one predicate to four sites. One of them, the choice of the gates of
 it wrongly (#2275). `effective_k` is `1` for the builder of a risk or of a penalty, because the
 objective of `RiskBudgeting` measures the scaled weights alone. A bound, a threshold, a target or
 the gate of a binary reads `get_k` under every head, because the head divides the weights by `k`
-after the solve. `is_unit_budget` then had one caller, so `effective_k` reads the record itself.
+after the solve. `is_unit_budget` stays the one predicate of the record. `effective_k` reads it, and
+so does a builder that gives one risk to the objective and to a bound (#2279).
 
 A risk expression that reads `effective_k` has a degree above one in the scaled weights, so it cannot
 also be the expression of the bound row `risk <= ub * k` (#2279). `set_risk_epigraphs!` builds such a

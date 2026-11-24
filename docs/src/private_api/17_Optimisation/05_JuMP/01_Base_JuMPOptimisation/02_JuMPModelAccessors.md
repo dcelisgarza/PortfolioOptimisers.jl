@@ -15,6 +15,7 @@ get_net_X
 get_objective_scale
 get_T
 set_unit_budget!
+is_unit_budget
 effective_k
 set_decomposition_contract!
 decomposition_contract

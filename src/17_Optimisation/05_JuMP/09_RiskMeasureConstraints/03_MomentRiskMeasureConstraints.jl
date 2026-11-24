@@ -464,7 +464,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     ub = r.settings.ub
     level, exact = risk_bound_level(ub)
     # A level of zero gives the model of the bound no unit.
-    if level > zero(level) && shared_has(model, :unit_budget)
+    if level > zero(level) && is_unit_budget(model)
         bound = if exact
             bp = nested_prefix(prefix, :bound_)
             scaled_moment = state_set!(model, bp, :even_moment_, i,
