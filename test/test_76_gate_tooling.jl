@@ -1333,6 +1333,8 @@ end
             body = ST.body_of(c, "abc")
             # A sweep ticket states its route of ADR 0240 when the job files it.
             @test startswith(body, "**Lands on:** dev\n")
+            @test startswith(ST.body_of(c, "abc"; landing = "dev after #7"),
+                             "**Lands on:** dev after #7\n")
             @test occursin("This file is not swept yet.", body)
             @test !occursin("This file is swept.", body)
             @test occursin(open ? "after that map was charted" : "after that map closed",
@@ -1346,6 +1348,95 @@ end
             @test occursin("`code_health/forward_survey.jl src/a.jl` reports no candidate " *
                            "without a ruling.", body)
         end
+    end
+    @testset "a sweep ticket of a file that only open work has waits for that work" begin
+        #=
+        Twelve sub-issues named `dev` for a file that `dev` did not have. The file was on the branch
+        of an open pull request, so a session that took the ticket found no file.
+        =#
+        ST = SweepTriageSeam
+        dir = mktempdir()
+        git(dir, "init", "-q", "-b", "main")
+        put(dir, "src/a.jl", "a = 1\n")
+        c0 = commit(dir, "c0")
+        # With no remote ref there is nothing to compare with.
+        @test ST.landing_of("src/new.jl", ""; root = dir) == "dev"
+        git(dir, "update-ref", "refs/remotes/origin/main", c0)
+        put(dir, "src/b.jl", "b = 1\n")
+        c1 = commit(dir, "c1")
+        git(dir, "update-ref", "refs/remotes/origin/dev", c1)
+        put(dir, "src/new.jl", "n = 1\n")
+        commit(dir, "c2")
+        @test ST.landing_of("src/a.jl", ""; root = dir) == "dev"
+        @test ST.landing_of("src/b.jl", "#7"; root = dir) == "dev"
+        @test ST.landing_of("src/new.jl", "#7"; root = dir) == "dev after #7"
+        @test ST.landing_of("src/new.jl", "dev-x"; root = dir) == "dev after dev-x"
+        @test_throws ErrorException ST.landing_of("src/new.jl", ""; root = dir)
+        @test ST.parse_options(["--fetch", "--after", "#7"]).after == "#7"
+        @test ST.parse_options(["--fetch"]).after == ""
+        @test_throws ErrorException ST.parse_options(["--fetch", "--after", "after #7"])
+    end
+    @testset "lands_on.sh reads one route of one line, and refuses free text" begin
+        #=
+        The line of ADR 0240 is the one fact that the session, the sweep job and the workflow
+        `Route` read, and eight spellings of `own branch` were in the tracker.
+        =#
+        script = joinpath(@__DIR__, "..", "code_health", "lands_on.sh")
+        function lands_on(body)
+            out = IOBuffer()
+            cmd = pipeline(ignorestatus(`bash $script parse`); stdin = IOBuffer(body),
+                           stdout = out, stderr = devnull)
+            return run(cmd).exitcode, String(take!(out))
+        end
+        line(x) = lands_on("text\n\n**Lands on:** $x\r\n\nThe reason is here.\n")
+        for (value, route, target) in
+            (("own branch", "own branch", ""), ("`own branch`", "own branch", ""),
+             ("own branch after `dev-a-b`", "own branch", "dev-a-b"), ("dev", "dev", ""),
+             ("dev after #12", "dev", "#12"), ("same branch #12", "same branch", "#12"),
+             ("stacked on #12", "stacked on", "#12"),
+             ("stacked on dev-a.b", "stacked on", "dev-a.b"), ("map #3", "map", "#3"),
+             ("one branch dev-a", "one branch", "dev-a"),
+             ("each ticket", "each ticket", ""), ("no code", "no code", ""))
+            @test line(value) == (0, "$route\t$target\n")
+        end
+        for value in ("", "#12", "own branch (dev-a)", "dev-a", "dev after the merge",
+                      "same branch dev-a", "stacked on main", "map", "dev, then main")
+            @test line(value) == (1, "")
+        end
+        @test lands_on("no line\n") == (3, "")
+        @test first(lands_on("**Lands on:** dev\n**Lands on:** own branch\n")) == 1
+    end
+    @testset "lands_on.sh checks a pull request against the route of its issue" begin
+        #=
+        The check reads the tracker through `target_state`, so the test sources the script and
+        gives the state of each target.
+        =#
+        script = joinpath(@__DIR__, "..", "code_health", "lands_on.sh")
+        bash = """
+               source "\$1"
+               target_state() { case "\$1" in
+                   "#1") echo "open dev-one" ;;
+                   "#2") echo "merged dev-two" ;;
+                   dev-gone) echo "gone dev-gone" ;;
+               esac; }
+               shift
+               pr_agrees "\$@" 2>/dev/null
+               """
+        agrees(args...) = success(`bash -c $bash _ $script $(collect(args))`)
+        @test agrees("9", "dev-x", "main", "own branch", "")
+        @test !agrees("9", "dev-x", "dev-one", "own branch", "")
+        @test !agrees("9", "dev-x", "main", "own branch", "#1")
+        @test agrees("9", "dev-x", "main", "own branch", "#2")
+        @test agrees("9", "dev-x", "dev-one", "stacked on", "#1")
+        @test !agrees("9", "dev-x", "main", "stacked on", "#1")
+        @test agrees("9", "dev-x", "main", "stacked on", "#2")
+        @test !agrees("9", "dev-x", "dev-two", "stacked on", "#2")
+        @test agrees("9", "dev-x", "main", "stacked on", "dev-gone")
+        @test agrees("9", "dev-x", "main", "same branch", "#9")
+        @test !agrees("9", "dev-x", "main", "same branch", "#1")
+        @test agrees("9", "dev", "main", "dev", "")
+        @test !agrees("9", "dev-x", "main", "dev", "")
+        @test agrees("9", "dev-x", "main", "map", "#3")
     end
     @testset "a sweep title that names no current path is reported and refused" begin
         #=
