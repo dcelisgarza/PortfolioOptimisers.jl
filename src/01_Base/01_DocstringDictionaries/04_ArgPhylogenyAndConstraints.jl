@@ -50,6 +50,13 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :walk_wgt => "`wgt`: The rule that reads the edge weights, a member of [`AbstractEdgeWeightRule`](@ref), or `nothing` to read the stored weights.",#
                  :walk_self => "`self`: Whether the profile of an asset holds the asset itself at the weight `w(0)`.",#
                  :walk_prefix => "`prefix`: The first part of the name of each Panel Field, or `nothing` for `\"walk\"`. Each field is `\"<prefix>_<dir>_<graph>\"`.",#
+                 ## Exogenous Network
+                 :xnet_ng => "`ng`: The Exogenous Graph that the network reads: `nothing` for the only graph of the returns data, one name, or a [`GraphUnion`](@ref).",#
+                 :xnet_dir => "`dir`: The direction along which the network reads the edges, a member of [`AbstractEdgeDirection`](@ref). A consumer refuses a direction that has no meaning for it.",#
+                 :xnet_scope => "`scope`: The nodes that the network holds, a member of [`AbstractNetworkScope`](@ref): [`AllNodes`](@ref) for every node of the graph, or [`AssetNodes`](@ref) for the assets of the fit.",#
+                 :xnet_nrm => "`nrm`: The normalisation of the edge weights before their lengths, a member of [`AbstractEdgeNormalisation`](@ref), or `nothing` for the stored weights.",#
+                 :xnet_len => "`len`: The length of an edge from its weight, a member of [`AbstractEdgeLength`](@ref), or `nothing` when the stored weights are lengths.",#
+                 :xnet_strict => "`strict`: Whether an asset that is not a node of the graph in force raises an error. With `false`, one warning names the assets and the graph, and each is an isolated vertex that stays investable.",#
                  ## Graph Union
                  :gu_gs => "`gs`: The parts of the union, each an [`ExogenousGraph`](@ref) or an [`ExogenousGraphSeries`](@ref).",#
                  :gu_ng => "`ng`: The names of the Exogenous Graphs of the returns data that the union sums, one part for each name.",#

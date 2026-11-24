@@ -5,10 +5,10 @@
 julia = "1.13.4"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "48591ae901"
+commit = "d58da120a2"
 
 [file]
-"ext/PortfolioOptimisersGraphRecipesExt.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 6, cog_sum = 4, arg_sum = 16, macros = [] }
+"ext/PortfolioOptimisersGraphRecipesExt.jl" = { cyc = 3, cog = 2, arg = 8, cyc_sum = 6, cog_sum = 4, arg_sum = 19, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 9, arg = 8, cyc_sum = 56, cog_sum = 65, arg_sum = 99, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/02_DrawdownAndHistogramPlots.jl" = { cyc = 10, cog = 15, arg = 10, cyc_sum = 59, cog_sum = 70, arg_sum = 148, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/03_MeasurePlots.jl" = { cyc = 7, cog = 14, arg = 10, cyc_sum = 47, cog_sum = 65, arg_sum = 79, macros = [] }
@@ -229,6 +229,8 @@ commit = "48591ae901"
 "src/08_Phylogeny/08_Network/02_NetworkEstimator.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 6, cog_sum = 2, arg_sum = 22, macros = ["@propagatable"] }
 "src/08_Phylogeny/08_Network/03_NetworkGraph.jl" = { cyc = 8, cog = 9, arg = 4, cyc_sum = 18, cog_sum = 11, arg_sum = 32, macros = [] }
 "src/08_Phylogeny/08_Network/04_Separation.jl" = { cyc = 5, cog = 6, arg = 5, cyc_sum = 28, cog_sum = 10, arg_sum = 27, macros = [] }
+"src/08_Phylogeny/08_Network/05_ExogenousNetwork.jl" = { cyc = 1, cog = 1, arg = 7, cyc_sum = 21, cog_sum = 2, arg_sum = 22, macros = [] }
+"src/08_Phylogeny/08_Network/06_ExogenousNetworkGraph.jl" = { cyc = 6, cog = 9, arg = 7, cyc_sum = 32, cog_sum = 20, arg_sum = 66, macros = [] }
 "src/08_Phylogeny/09_Centrality/01_Centrality.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 29, cog_sum = 10, arg_sum = 47, macros = [] }
 "src/08_Phylogeny/09_Centrality/02_CentralityPolarity.jl" = { cyc = 1, cog = 0, arg = 0, cyc_sum = 6, cog_sum = 0, arg_sum = 0, macros = [] }
 "src/08_Phylogeny/09_Centrality/03_CentralityEstimator.jl" = { cyc = 1, cog = 1, arg = 3, cyc_sum = 5, cog_sum = 1, arg_sum = 12, macros = [] }

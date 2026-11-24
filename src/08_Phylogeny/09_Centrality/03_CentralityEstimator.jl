@@ -56,6 +56,7 @@ Keywords correspond to the struct's fields.
 
   - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). The constructor throws an `ArgumentError` otherwise.
   - `returns_source(pl) === nothing`. The network or clustering estimator reads the matrix that this estimator selects, so it states no source of its own, see [`assert_inner_reader`](@ref). The constructor throws an `ArgumentError` otherwise.
+  - An [`ExogenousNetwork`](@ref) in `pl` reads one graph, see [`assert_single_network`](@ref). The constructor throws an `ArgumentError` otherwise.
 
 # Examples
 
@@ -123,6 +124,7 @@ CentralityEstimator
                                  x_src::Option{<:AbstractReturnsSource})
         assert_returns_source(x_src, ALL_RETURNS_SOURCES, :CentralityEstimator)
         assert_inner_reader(pl, :pl, :CentralityEstimator)
+        assert_single_network(pl)
         return new{typeof(pl), typeof(ct), typeof(x_src)}(pl, ct, x_src)
     end
 end
@@ -135,7 +137,7 @@ function returns_source(cte::CentralityEstimator)
     return cte.x_src
 end
 function reader_frames(cte::CentralityEstimator, path::AbstractString, ::Bool)
-    return source_frames(cte.x_src, path, true)
+    return source_frames(cte.x_src, path, reads_network_returns(cte.pl))
 end
 """
     obs_weights_view(cte::AbstractCentralityEstimator, i)

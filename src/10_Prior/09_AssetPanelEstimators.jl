@@ -143,9 +143,9 @@ Turn a graph source or a partition source into a square `assets × assets` featu
 
 This is the kernel of [`PhylogenyPanel`](@ref). Every method returns a matrix of element type `eltype(X)`, which is the element type of the returns. It is never the `Int` or `BitMatrix` that the phylogeny routines give, so [`ChordDist`](@ref) and [`AngularDist`](@ref) keep their BLAS `gemm` path and a `Float32` history gives a `Float32` matrix.
 
-`pl` is an estimator, a [`NetworkEstimator`](@ref) or a [`ClustersEstimator`](@ref). It is never a precomputed [`PhylogenyResult`](@ref) or [`Clusters`](@ref), because an Estimator does not hold a Result. So each call builds the structure from `X`, and the structure follows a cross-validation fold or the subproblem of a meta-optimiser.
+`pl` is an estimator, a [`NetworkEstimator`](@ref), an [`ExogenousNetwork`](@ref) or a [`ClustersEstimator`](@ref). It is never a precomputed [`PhylogenyResult`](@ref) or [`Clusters`](@ref), because an Estimator does not hold a Result. So each call builds the structure from `X`, and the structure follows a cross-validation fold or the subproblem of a meta-optimiser.
 
-A graph has separations, and `alg` decays them. A partition has none, because two assets are in one cluster or they are not. So every algorithm gives the same co-membership matrix of a partition, and `alg` has no effect there. `FeatureDistance` treats its collapse `alg` the same way on a static feature matrix. `sep` is a field of [`NetworkEstimator`](@ref) alone, so no other field loses its effect on a partition.
+A graph has separations, and `alg` decays them. A partition has none, because two assets are in one cluster or they are not. So every algorithm gives the same co-membership matrix of a partition, and `alg` has no effect there. `FeatureDistance` treats its collapse `alg` the same way on a static feature matrix. `sep` is a field of a network estimator alone, so no other field loses its effect on a partition.
 
 # Mathematical definition
 
@@ -478,7 +478,7 @@ It is the one producer whose label axis is the asset axis, and it needs no flag 
 
 !!! note "What the producer gives out of sample"
 
-    The graph of this producer comes from the correlation of the returns, so the producer derives from the returns-only distances. A walk-forward measurement on two data sets compared it with them, under [`Proximity`](@ref) with [`LinearDecay`](@ref) and with [`ExponentialDecay`](@ref). Under [`HierarchicalRiskParity`](@ref), [`HierarchicalEqualRiskContribution`](@ref), [`SchurComplementHierarchicalRiskParity`](@ref) and [`NestedClustered`](@ref), it gave no lower risk and no higher Sharpe ratio out of sample on both data sets. [`FeatureDistance`](@ref) states the whole measurement.
+    The graph of the default producer comes from the correlation of the returns, so the producer derives from the returns-only distances. A walk-forward measurement on two data sets compared it with them, under [`Proximity`](@ref) with [`LinearDecay`](@ref) and with [`ExponentialDecay`](@ref). Under [`HierarchicalRiskParity`](@ref), [`HierarchicalEqualRiskContribution`](@ref), [`SchurComplementHierarchicalRiskParity`](@ref) and [`NestedClustered`](@ref), it gave no lower risk and no higher Sharpe ratio out of sample on both data sets. [`FeatureDistance`](@ref) states the whole measurement.
 
 # Fields
 
@@ -528,7 +528,7 @@ The diagonal also keeps a subproblem well defined. A view of a spanning tree on 
 
 # A clustering source
 
-[`NwE_ClE`](@ref) bounds `pl`, so it is a graph ([`NetworkEstimator`](@ref)) or a partition ([`ClustersEstimator`](@ref)). Both are estimators, so both refit.
+[`NwE_ClE`](@ref) bounds `pl`, so it is a graph ([`NetworkEstimator`](@ref) or [`ExogenousNetwork`](@ref)) or a partition ([`ClustersEstimator`](@ref)). Both are estimators, so both refit.
 
 A partition holds less information than a graph. Its matrix is the co-membership indicator `P * transpose(P)`, where `P` is the `assets × clusters` membership matrix. Row `i` marks the assets in the cluster of asset `i`, so two rows are equal or disjoint. On seven assets in the clusters `[1, 1, 1, 2, 2, 3, 3]`, the distance matrix under the default [`ChordDist`](@ref) takes two values, `0.0` inside a cluster and `0.707` across clusters, whatever the sizes of the clusters. The raw output of [`phylogeny_matrix`](@ref) is `P * transpose(P) - I`, and it takes three values, `0.0`, `0.5` and `0.707`. In a cluster of two assets, the `- I` leaves each row with a single `1` at the other member, so the two rows are orthogonal, and the distance inside that cluster equals the distance across clusters. This producer adds `I` back, which repairs that case, but the matrix stays coarse.
 
@@ -536,7 +536,7 @@ A clustering of a feature matrix built from a clustering gives back much the sam
 
 # Provenance
 
-The source is a [`NetworkEstimator`](@ref) and never a precomputed [`PhylogenyResult`](@ref), because an Estimator does not hold a Result. The producer is therefore endogenous. It filters the graph from the correlation of the returns, so it measures the topology that the correlation implies and no structure outside it. It refits on every fold and on every subproblem.
+The source is an estimator and never a precomputed [`PhylogenyResult`](@ref), because an Estimator does not hold a Result. It refits on every fold and on every subproblem. A [`NetworkEstimator`](@ref) is endogenous. It filters the graph from the correlation of the returns, so it measures the topology that the correlation implies and no structure outside it. An [`ExogenousNetwork`](@ref) reads the graph in force from the returns data, so it measures a structure that the caller states. Under a direction that is not symmetric, row `i` of the matrix holds the separations from asset `i`, as a row of a [`WalkProfilePanel`](@ref) holds its walk.
 
 It reads no prior result, so it is the one producer that runs where no prior exists yet, for example in preselection.
 
@@ -646,7 +646,7 @@ A [`PhylogenyPanel`](@ref) takes three steps:
 
 A [`WalkProfilePanel`](@ref) takes four steps:
 
- 1. Read the returns data with [`walk_returns`](@ref), from `rd`, or from `pr` when `rd` is `nothing`.
+ 1. Read the returns data with [`consumer_returns`](@ref), from `rd`, or from `pr` when `rd` is `nothing`.
  2. Read the parts of the walk with [`walk_parts_of`](@ref), one for each graph and each single direction, and check that `X` has one column for each asset.
  3. Mark the assets with a zero profile in every field with [`walk_unwalked`](@ref), giving `zall`.
  4. Build the field of each part with [`walk_field`](@ref), and return the panel that holds them.
@@ -655,7 +655,7 @@ A [`WalkProfilePanel`](@ref) takes four steps:
 
   - `ape`: The producer.
   - $(arg_dict[:pr_rr])
-  - $(arg_dict[:rd]) [`RegressionPanel`](@ref) and [`PhylogenyPanel`](@ref) read it for the axis names alone. [`WalkProfilePanel`](@ref) reads its Exogenous Graphs and its asset names.
+  - $(arg_dict[:rd]) [`RegressionPanel`](@ref) reads it for the axis names alone. [`PhylogenyPanel`](@ref) reads it for the axis names, and passes it to the phylogeny routines of `pl` with `pr`. [`WalkProfilePanel`](@ref) reads its Exogenous Graphs and its asset names.
   - `X`: Returns matrix of the subproblem, observations × assets.
 
 # Validation
@@ -767,8 +767,8 @@ function expand_investable_loadings(L::MatNum, imsk::BitVector)
     omsk[imsk, :] .= true
     return vals, omsk
 end
-function asset_panel(ape::PhylogenyPanel, ::Any, rd, X::MatNum)
-    Zp = phylogeny_features(ape.alg, ape.pl, X)
+function asset_panel(ape::PhylogenyPanel, pr, rd, X::MatNum)
+    Zp = phylogeny_features(ape.alg, ape.pl, X; pr = pr, rd = rd)
     return AssetPanel(;
                       pf = [TensorPanelField(;
                                              name = resolve_panel_field_name(ape.name,
@@ -1032,72 +1032,6 @@ function graph_names(ape::WalkProfilePanel)
     return ape.ng
 end
 """
-    walk_returns(pr, rd::ReturnsResult) -> ReturnsResult
-    walk_returns(pr::ReturnsResult, rd::Nothing) -> ReturnsResult
-    walk_returns(pr, rd::Nothing) -> Union{}
-
-Return the returns data that a [`WalkProfilePanel`](@ref) reads, for the graphs and the asset names.
-
-`clusterise(cle, rd)` puts the returns data in the prior slot, so the function reads `pr` when `rd` is `nothing`.
-
-# Algorithm
-
-The method that Julia selects is the algorithm.
-
-# Arguments
-
-  - $(arg_dict[:pr_rr])
-  - $(arg_dict[:rd])
-
-# Validation
-
-  - `rd` or `pr` is a [`ReturnsResult`](@ref). Raises an [`IsNothingError`](@ref).
-
-# Returns
-
-  - `rd::ReturnsResult`: The returns data.
-
-# Related
-
-  - [`WalkProfilePanel`](@ref)
-  - [`feature_asset_names`](@ref)
-"""
-function walk_returns(::Any, rd::ReturnsResult)
-    return rd
-end
-function walk_returns(pr::ReturnsResult, ::Nothing)
-    return pr
-end
-function walk_returns(::Any, ::Nothing)
-    return throw(IsNothingError("WalkProfilePanel reads the Exogenous Graphs and the asset names of the returns data, and this call supplied no ReturnsResult. Pass the returns data as `rd`."))
-end
-"""
-    walk_asset_names(rd::ReturnsResult) -> VecStr
-
-Return the asset names that a [`WalkProfilePanel`](@ref) finds among the nodes of a graph.
-
-# Arguments
-
-  - $(arg_dict[:rd])
-
-# Validation
-
-  - `rd.nx` is not `nothing`. Raises an [`IsNothingError`](@ref).
-
-# Returns
-
-  - `nx::VecStr`: The asset names.
-
-# Related
-
-  - [`WalkProfilePanel`](@ref)
-"""
-function walk_asset_names(rd::ReturnsResult)
-    @argcheck(!isnothing(rd.nx),
-              IsNothingError("WalkProfilePanel finds each asset among the nodes of an Exogenous Graph by its name, and the returns data names no asset. Give the ReturnsResult the names `nx`."))
-    return rd.nx
-end
-"""
     walk_positions(nodes::VecStr, nx::VecStr) -> Vector{Int}
 
 Return the position of the node of each asset in a graph, or `0` for an asset that is not a node.
@@ -1158,7 +1092,7 @@ Each tuple holds the name of the graph, the single direction, the names of the n
 
 # Algorithm
 
- 1. Read the asset names with [`walk_asset_names`](@ref).
+ 1. Read the asset names with [`consumer_asset_names`](@ref).
  2. For each entry of [`graph_name_list`](@ref) of `ape.ng`, add its tuples with [`walk_entry_parts!`](@ref).
 
 # Arguments
@@ -1168,7 +1102,7 @@ Each tuple holds the name of the graph, the single direction, the names of the n
 
 # Validation
 
-  - The rules of [`walk_asset_names`](@ref) and [`walk_entry_parts!`](@ref).
+  - The rules of [`consumer_asset_names`](@ref) and [`walk_entry_parts!`](@ref).
 
 # Returns
 
@@ -1180,7 +1114,7 @@ Each tuple holds the name of the graph, the single direction, the names of the n
   - [`walk_field`](@ref)
 """
 function walk_parts_of(ape::WalkProfilePanel, rd::ReturnsResult)
-    nx = walk_asset_names(rd)
+    nx = consumer_asset_names(ape, rd)
     parts = Tuple{String, AbstractEdgeDirection, Vector{String}, MatNum, Vector{Int}}[]
     for entry in graph_name_list(ape.ng)
         walk_entry_parts!(parts, ape, rd, entry, nx)
@@ -1621,7 +1555,7 @@ function readable_assets(ape::WalkProfilePanel, rd::ReturnsResult)
     return keep
 end
 function asset_panel(ape::WalkProfilePanel, pr, rd, X::MatNum)
-    r = walk_returns(pr, rd)
+    r = consumer_returns(ape, pr, rd)
     parts = walk_parts_of(ape, r)
     N = length(r.nx)
     @argcheck(size(X, 2) == N,

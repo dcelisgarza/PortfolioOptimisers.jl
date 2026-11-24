@@ -306,7 +306,7 @@ Keywords correspond to the struct's fields.
   - When `scale` is a vector: `all(isfinite, scale)`, and `length(scale) == length(opti)` when `opti` is a vector. The constructor throws an `IsNonFiniteError` or a `DimensionMismatch` otherwise.
   - A schedule in `opto` or `fb` has `bind !== :nearest`. The constructor throws an `ArgumentError` otherwise.
   - `scorer` is `nothing` unless `cv` is a [`CombinatorialCrossValidation`](@ref). The constructor throws an `ArgumentError` otherwise, through [`assert_meta_scorer`](@ref).
-  - `opto` passes [`assert_external_optimiser`](@ref) and [`assert_outer_spaces`](@ref), and every element of `opti` passes it when `cv !== nothing`. The constructor throws an `ArgumentError` otherwise. Such an optimiser runs on the synthetic assets or on the training rows of a fold, which it does not know in advance. So it cannot hold a precomputed prior or a precomputed constraint.
+  - `opto` passes [`assert_external_optimiser`](@ref) and [`assert_outer_readers`](@ref), and every element of `opti` passes it when `cv !== nothing`. The constructor throws an `ArgumentError` otherwise. Such an optimiser runs on the synthetic assets or on the training rows of a fold, which it does not know in advance. So it cannot hold a precomputed prior or a precomputed constraint.
   - When `wb` is keyed by name ([`name_keyed`](@ref)) or `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`. The constructor throws an `IsNothingError` otherwise.
   - Each entry and the `default` of each schedule give a valid `Stacking`. [`assert_time_dependent_substitution`](@ref) runs the constructor on each of them.
   - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
@@ -449,7 +449,7 @@ Keywords correspond to the struct's fields.
         assert_no_nearest_bind_optimiser_schedule(opto, :opto, :Stacking)
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :Stacking)
         assert_external_optimiser(opto)
-        assert_outer_spaces(opto)
+        assert_outer_readers(opto)
         if !isnothing(cv)
             assert_external_optimiser(opti)
         end

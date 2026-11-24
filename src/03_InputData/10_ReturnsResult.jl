@@ -1378,6 +1378,126 @@ end
 function graph_manifest(rd::ReturnsResult)
     return graph_manifest(assert_graphs_supplied(rd.ng), rd.G)
 end
+"""
+    consumer_returns(consumer, pr, rd::ReturnsResult) -> ReturnsResult
+    consumer_returns(consumer, pr::ReturnsResult, rd::Nothing) -> ReturnsResult
+    consumer_returns(consumer, pr, rd::Nothing) -> Union{}
+
+Return the returns data that a consumer of an Exogenous Graph reads, for the graphs and the asset names.
+
+`clusterise(cle, rd)` and the other graph verbs over a [`ReturnsResult`](@ref) put the returns data in the prior slot. So the function reads `pr` when `rd` is `nothing`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `rd` is a [`ReturnsResult`](@ref): return `rd`.
+ 2. `rd` is `nothing` and `pr` is a [`ReturnsResult`](@ref): return `pr`.
+ 3. Neither: throw an [`IsNothingError`](@ref) that names the type of `consumer`.
+
+# Arguments
+
+  - `consumer`: The consumer, which the message names.
+  - $(arg_dict[:pr_rr])
+  - $(arg_dict[:rd])
+
+# Validation
+
+  - `rd` or `pr` is a [`ReturnsResult`](@ref). Raises an [`IsNothingError`](@ref).
+
+# Returns
+
+  - `rd::ReturnsResult`: The returns data.
+
+# Related
+
+  - [`WalkProfilePanel`](@ref)
+  - [`ExogenousNetwork`](@ref)
+  - [`consumer_asset_names`](@ref)
+"""
+function consumer_returns(::Any, ::Any, rd::ReturnsResult)
+    return rd
+end
+function consumer_returns(::Any, pr::ReturnsResult, ::Nothing)
+    return pr
+end
+function consumer_returns(consumer, ::Any, ::Nothing)
+    return throw(IsNothingError("$(nameof(typeof(consumer))) reads the Exogenous Graphs and the asset names of the returns data, and this call supplied no ReturnsResult. Pass the returns data as `rd`."))
+end
+"""
+    consumer_asset_names(consumer, rd::ReturnsResult) -> VecStr
+
+Return the asset names that a consumer of an Exogenous Graph finds among the nodes of the graph.
+
+# Arguments
+
+  - `consumer`: The consumer, which the message names.
+  - $(arg_dict[:rd])
+
+# Validation
+
+  - `rd.nx` is not `nothing`. Raises an [`IsNothingError`](@ref).
+
+# Returns
+
+  - `nx::VecStr`: The asset names.
+
+# Related
+
+  - [`WalkProfilePanel`](@ref)
+  - [`ExogenousNetwork`](@ref)
+  - [`consumer_returns`](@ref)
+"""
+function consumer_asset_names(consumer, rd::ReturnsResult)
+    @argcheck(!isnothing(rd.nx),
+              IsNothingError("$(nameof(typeof(consumer))) finds each asset among the nodes of an Exogenous Graph by its name, and the returns data names no asset. Give the ReturnsResult the names `nx`."))
+    return rd.nx
+end
+"""
+    consumer_graphs(consumer, rd::ReturnsResult, name::Option{<:AbstractString}, dir::AbstractEdgeDirection) -> Tuple{Tuple, String}
+    consumer_graphs(consumer, rd::ReturnsResult, gu::GraphUnion, dir::AbstractEdgeDirection) -> Tuple{Tuple, String}
+
+Return the graph of each part of a direction in force at the last row of the returns data, and the name of the graph.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A name, or `nothing` for the only graph: read the graph with [`consumer_graph`](@ref), and give it to each part of [`exposure_parts`](@ref).
+ 2. A [`GraphUnion`](@ref): build the union along each part with [`consumer_graph`](@ref).
+
+# Arguments
+
+  - `consumer`: The consumer of the graph.
+  - $(arg_dict[:rd])
+  - `name`, `gu`: The entry that names the graph.
+  - `dir`: The direction of the consumer.
+
+# Validation
+
+  - The rules of [`consumer_graph`](@ref).
+
+# Returns
+
+  - `gs::Tuple`: One [`ExogenousGraph`](@ref) for each part.
+  - `gname::String`: The name of the graph.
+
+# Related
+
+  - [`consumer_graph`](@ref)
+  - [`DependencySpace`](@ref)
+  - [`ExogenousNetwork`](@ref)
+"""
+function consumer_graphs(consumer, rd::ReturnsResult, name::Option{<:AbstractString},
+                         dir::AbstractEdgeDirection)
+    g = consumer_graph(consumer, rd, name)
+    return map(_ -> g, exposure_parts(dir)), String(rd.ng[graph_position(rd.ng, name)])
+end
+function consumer_graphs(consumer, rd::ReturnsResult, gu::GraphUnion,
+                         dir::AbstractEdgeDirection)
+    gs = map(d -> consumer_graph(consumer, rd, gu, d), exposure_parts(dir))
+    return gs, String(graph_entry_label(gu))
+end
 
 export ReturnsResult, benchmark_relative_returns
 public AbstractReturnsResult

@@ -1,9 +1,100 @@
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the graphs of an Exogenous Network with the vertices of the assets.
+
+A graph of an [`ExogenousNetwork`](@ref) can have more vertices than the assets. [`separation_graph`](@ref) returns this type for that network, and [`separation_matrix`](@ref), [`resolve_separation`](@ref), [`_phylogeny_matrix`](@ref) and [`calc_centrality`](@ref) read the assets of it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    AssetVertexGraph(
+        gs::Tuple,
+        va::VecInt,
+        sym::Bool
+    ) -> AssetVertexGraph
+
+# Related
+
+  - [`ExogenousNetwork`](@ref)
+  - [`separation_graph`](@ref)
+  - [`Gr_AVG`](@ref)
+"""
+@concrete struct AssetVertexGraph
+    """
+    The graph of each part of the direction, from [`exposure_parts`](@ref).
+    """
+    gs
+    """
+    The vertex of each asset in each graph.
+    """
+    va
+    """
+    Whether the separations of the assets are symmetric, from [`symmetric_direction`](@ref).
+    """
+    sym
+    function AssetVertexGraph(gs::Tuple, va::VecInt, sym::Bool)
+        return new{typeof(gs), typeof(va), typeof(sym)}(gs, va, sym)
+    end
+end
+"""
+    const Gr_AVG = Union{Graphs.AbstractGraph, AssetVertexGraph}
+
+Union of a graph whose vertices are the assets and a graph that holds the vertices of the assets.
+
+It is the bound of the `g` argument of [`resolve_separation`](@ref).
+
+# Related
+
+  - [`AssetVertexGraph`](@ref)
+  - [`resolve_separation`](@ref)
+"""
+const Gr_AVG = Union{Graphs.AbstractGraph, AssetVertexGraph}
+"""
+    budget_graph(g::Graphs.AbstractGraph) -> Graphs.AbstractGraph
+    budget_graph(ag::AssetVertexGraph) -> Graphs.AbstractGraph
+
+Return the graph that a budget rule receives.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A graph whose vertices are the assets: the graph itself.
+ 2. An [`AssetVertexGraph`](@ref): the whole graph of its first part, which is the graph of the out-edges under [`BothEdges`](@ref).
+
+# Arguments
+
+  - `g`, `ag`: The structure from [`separation_graph`](@ref).
+
+# Returns
+
+  - `g::Graphs.AbstractGraph`: The graph.
+
+# Related
+
+  - [`resolve_separation`](@ref)
+  - [`AssetVertexGraph`](@ref)
+"""
+function budget_graph(g::Graphs.AbstractGraph)
+    return g
+end
+function budget_graph(ag::AssetVertexGraph)
+    return first(ag.gs)
+end
+"""
     separation_graph(sep::HopCount, G::Graphs.AbstractGraph)
     separation_graph(sep::HopCount, nte::AbstractNetworkEstimator, X::MatNum;
                      dims::Int = 1, kwargs...)
     separation_graph(sep::PathLength, nte::AbstractNetworkEstimator, X::MatNum;
                      dims::Int = 1, kwargs...)
+    separation_graph(sep::HopCount, nte::ExogenousNetwork, X::MatNum; dims::Int = 1,
+                     kwargs...)
+    separation_graph(sep::PathLength, nte::ExogenousNetwork, X::MatNum; dims::Int = 1,
+                     kwargs...)
 
 Build the structure a separation measures over.
 
@@ -26,6 +117,7 @@ The methods that take `nte` build the structure from `X`. The method that takes 
 
       + [`HopCount`](@ref): the binary matrix of [`calc_adjacency`](@ref).
       + [`PathLength`](@ref): the structure of [`calc_distance_weighted_graph`](@ref), with distances as weights. It is the answer.
+      + An [`ExogenousNetwork`](@ref): the graphs of [`exogenous_network_graph`](@ref), with hops or with lengths, from the returns data in the `rd` keyword. They are the answer.
 
  2. Convert the structure of a [`HopCount`](@ref) to a `Graphs.SimpleGraph`, which removes the weights. The method that takes `G` receives it and starts here.
 
@@ -40,7 +132,7 @@ The methods that take `nte` build the structure from `X`. The method that takes 
 
 # Returns
 
-  - `g::Graphs.AbstractGraph`: The structure `sep` measures over.
+  - `g::Gr_AVG`: The structure `sep` measures over. It is an [`AssetVertexGraph`](@ref) for an [`ExogenousNetwork`](@ref).
 
 # Related
 
@@ -70,6 +162,7 @@ end
 """
     separation_matrix(sep::HopCount, g::Graphs.AbstractGraph)
     separation_matrix(sep::PathLength, g::Graphs.AbstractGraph)
+    separation_matrix(sep::AbstractSeparationAlgorithm, ag::AssetVertexGraph)
     separation_matrix(sep::AbstractSeparationAlgorithm, nte::AbstractNetworkEstimator,
                       X::MatNum; dims::Int = 1, kwargs...)
 
@@ -93,6 +186,10 @@ A consumer must also put the score of an entry inside a branch that short-circui
 
 [`HopCount`](@ref) counts the edges of the binary structure. [`PathLength`](@ref) sums the distances along them. [`separation_graph`](@ref) selects the structure that each member reads. One call to `floyd_warshall_shortest_paths` gives the shortest paths of all pairs, and the function does not run Dijkstra from each vertex. On this shape, the measured call is about 7 times faster than Dijkstra, and about `1.3` times slower than the breadth-first loop of the hop count.
 
+# An Exogenous Network is read at the assets
+
+The graph of an [`ExogenousNetwork`](@ref) can have more vertices than the assets. The method that takes an [`AssetVertexGraph`](@ref) runs one traversal from the vertex of each asset with [`vertex_separations`](@ref), and keeps the vertices of the assets. Row `i` holds the separations from asset `i` along the direction of the network.
+
 # Algorithm
 
  1. Build the structure with [`separation_graph`](@ref). The methods that take `g` receive it and start at step 2.
@@ -101,11 +198,12 @@ A consumer must also put the score of an entry inside a branch that short-circui
 
       + [`HopCount`](@ref): one breadth-first traversal with `Graphs.gdistances` from each vertex. Its answer is the column of that vertex in a dense `Matrix{Int}`.
       + [`PathLength`](@ref): one call to `Graphs.floyd_warshall_shortest_paths` over the whole graph. Its `dists` field is the matrix.
+      + An [`AssetVertexGraph`](@ref): the rows of the assets of each graph, one traversal for each asset. Two graphs give the smaller of their two entries. When the direction is symmetric, each entry is the smaller of itself and of its mirror entry. So the rounding of a sum cannot make the matrix asymmetric.
 
 # Arguments
 
   - `sep`: Separation algorithm. The function does not read its budget, so a member whose budget is a rule measures the same separations.
-  - `g`: Structure to measure over, from [`separation_graph`](@ref).
+  - `g`, `ag`: Structure to measure over, from [`separation_graph`](@ref).
   - `nte`: Network estimator. Only the wrapper takes it, and the wrapper builds the structure from `X` on every call.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
@@ -113,7 +211,7 @@ A consumer must also put the score of an entry inside a branch that short-circui
 
 # Returns
 
-  - `d::Matrix`: Square matrix of separations. `d[i, k]` is the separation between assets `i` and `k`, `d[i, i]` is zero, and an unreachable pair carries the sentinel above.
+  - `d::Matrix`: Square matrix of separations. `d[i, k]` is the separation from asset `i` to asset `k`, `d[i, i]` is zero, and an unreachable pair carries the sentinel above.
 
 # Related
 
@@ -269,15 +367,15 @@ function separation_quantile(sep::AbstractSeparationAlgorithm, d::MatNum, q::Num
 end
 """
     resolve_separation(sep::AbstractSeparationAlgorithm, nte::AbstractNetworkEstimator,
-                       X::MatNum, g::Graphs.AbstractGraph; dims::Int = 1, kwargs...)
+                       X::MatNum, g::Gr_AVG; dims::Int = 1, kwargs...)
     resolve_separation(sep::HopCount{<:HopCountRule}, nte::AbstractNetworkEstimator,
-                       X::MatNum, g::Graphs.AbstractGraph; dims::Int = 1, kwargs...)
+                       X::MatNum, g::Gr_AVG; dims::Int = 1, kwargs...)
     resolve_separation(sep::PathLength{<:PathLengthRule}, nte::AbstractNetworkEstimator,
-                       X::MatNum, g::Graphs.AbstractGraph; dims::Int = 1, kwargs...)
+                       X::MatNum, g::Gr_AVG; dims::Int = 1, kwargs...)
     resolve_separation(sep::HopCount{<:FractionOf}, nte::AbstractNetworkEstimator,
-                       X::MatNum, g::Graphs.AbstractGraph; kwargs...)
+                       X::MatNum, g::Gr_AVG; kwargs...)
     resolve_separation(sep::PathLength{<:FractionOf}, nte::AbstractNetworkEstimator,
-                       X::MatNum, g::Graphs.AbstractGraph; kwargs...)
+                       X::MatNum, g::Gr_AVG; kwargs...)
     resolve_separation(sep::AbstractSeparationAlgorithm, nte::AbstractNetworkEstimator,
                        X::MatNum; dims::Int = 1, kwargs...)
     resolve_separation(sep::Union{HopCount{<:Union{HopCountRule, FractionOf}},
@@ -310,7 +408,7 @@ Every shipped consumer of a network first resolves `nte.sep`. It then passes the
 
 # The rule receives the structure, and does not build one
 
-`g` is the structure of [`separation_graph`](@ref), and the methods that take `g` are the interface. A consumer builds the structure one time. It resolves the rule against that graph, and measures the separations over the same graph. The rule reads what it needs through `separation_matrix(sep, g)`.
+`g` is the structure of [`separation_graph`](@ref), and the methods that take `g` are the interface. A consumer builds the structure one time. It resolves the rule against that graph, and measures the separations over the same graph. The rule reads what it needs through `separation_matrix(sep, g)`. Over an [`ExogenousNetwork`](@ref), the rule receives the whole graph of the scope, through [`budget_graph`](@ref).
 
 The methods that take only `nte` and `X` are wrappers. The resolved case has a wrapper of its own, so that a stated budget builds no structure. The wrapper for a rule dispatches on the type parameter that holds the rule. One generic wrapper builds a structure before it finds that the method on the abstract type does not read it.
 
@@ -370,22 +468,20 @@ The kernel builds the resolved member through its usual constructor, which wraps
 """
 function resolve_separation end
 function resolve_separation(sep::AbstractSeparationAlgorithm, ::AbstractNetworkEstimator,
-                            ::MatNum, ::Graphs.AbstractGraph;
-                            kwargs...)::AbstractSeparationAlgorithm
+                            ::MatNum, ::Gr_AVG; kwargs...)::AbstractSeparationAlgorithm
     return sep
 end
 function resolve_separation(sep::HopCount{<:HopCountRule}, nte::AbstractNetworkEstimator,
-                            X::MatNum, g::Graphs.AbstractGraph; dims::Int = 1,
-                            kwargs...)::HopCount
-    n = sep.n(nte, X, g; dims = dims, kwargs...)
+                            X::MatNum, g::Gr_AVG; dims::Int = 1, kwargs...)::HopCount
+    n = sep.n(nte, X, budget_graph(g); dims = dims, kwargs...)
     @argcheck(isa(n, Integer),
               ArgumentError("a hop count rule must return an Integer, because three readers use `0:n` as a matrix-power count.\nGot $(n)::$(typeof(n)) from $(typeof(sep.n))."))
     return HopCount(n)
 end
 function resolve_separation(sep::PathLength{<:PathLengthRule},
-                            nte::AbstractNetworkEstimator, X::MatNum,
-                            g::Graphs.AbstractGraph; dims::Int = 1, kwargs...)::PathLength
-    dmax = sep.dmax(nte, X, g; dims = dims, kwargs...)
+                            nte::AbstractNetworkEstimator, X::MatNum, g::Gr_AVG;
+                            dims::Int = 1, kwargs...)::PathLength
+    dmax = sep.dmax(nte, X, budget_graph(g); dims = dims, kwargs...)
     # `nothing` is a stated budget rather than a computed one, so it is not an admissible
     # answer here -- see `PathLengthValue`.
     @argcheck(isa(dmax, Number),
@@ -396,12 +492,12 @@ end
 # itself, with its budget unresolved, measures the separations it is to be resolved over. `g`
 # is already the structure the member measures over, so nothing is rebuilt.
 function resolve_separation(sep::HopCount{<:FractionOf}, ::AbstractNetworkEstimator,
-                            ::MatNum, g::Graphs.AbstractGraph; kwargs...)::HopCount
+                            ::MatNum, g::Gr_AVG; kwargs...)::HopCount
     d = separation_matrix(sep, g)
     return HopCount(round(Int, separation_quantile(sep, d, sep.n.val)))
 end
 function resolve_separation(sep::PathLength{<:FractionOf}, ::AbstractNetworkEstimator,
-                            ::MatNum, g::Graphs.AbstractGraph; kwargs...)::PathLength
+                            ::MatNum, g::Gr_AVG; kwargs...)::PathLength
     d = separation_matrix(sep, g)
     return PathLength(separation_quantile(sep, d, sep.dmax.val))
 end

@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.4"
 julia_syntax = "1.0.2"
-commit = "48591ae901"
+commit = "d58da120a2"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { code = 35, doc = 0, comment = 5, blank = 4, total = 44 }
@@ -230,6 +230,8 @@ commit = "48591ae901"
 "src/08_Phylogeny/08_Network/02_NetworkEstimator.jl" = { code = 60, doc = 209, comment = 0, blank = 59, total = 328 }
 "src/08_Phylogeny/08_Network/03_NetworkGraph.jl" = { code = 87, doc = 166, comment = 5, blank = 83, total = 341 }
 "src/08_Phylogeny/08_Network/04_Separation.jl" = { code = 101, doc = 193, comment = 19, blank = 95, total = 408 }
+"src/08_Phylogeny/08_Network/05_ExogenousNetwork.jl" = { code = 106, doc = 326, comment = 1, blank = 155, total = 588 }
+"src/08_Phylogeny/08_Network/06_ExogenousNetworkGraph.jl" = { code = 111, doc = 216, comment = 5, blank = 118, total = 450 }
 "src/08_Phylogeny/09_Centrality/01_Centrality.jl" = { code = 150, doc = 638, comment = 3, blank = 298, total = 1089 }
 "src/08_Phylogeny/09_Centrality/02_CentralityPolarity.jl" = { code = 26, doc = 72, comment = 0, blank = 32, total = 130 }
 "src/08_Phylogeny/09_Centrality/03_CentralityEstimator.jl" = { code = 27, doc = 103, comment = 0, blank = 36, total = 166 }

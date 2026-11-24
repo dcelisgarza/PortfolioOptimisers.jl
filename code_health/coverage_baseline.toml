@@ -228,6 +228,8 @@ commit = "391be5e"
 "src/08_Phylogeny/08_Network/02_NetworkEstimator.jl" = { lines = 16, misses = 0 }
 "src/08_Phylogeny/08_Network/03_NetworkGraph.jl" = { lines = 53, misses = 0 }
 "src/08_Phylogeny/08_Network/04_Separation.jl" = { lines = 63, misses = 0 }
+"src/08_Phylogeny/08_Network/05_ExogenousNetwork.jl" = { lines = 43, misses = 0 }
+"src/08_Phylogeny/08_Network/06_ExogenousNetworkGraph.jl" = { lines = 63, misses = 0 }
 "src/08_Phylogeny/09_Centrality/01_Centrality.jl" = { lines = 62, misses = 0 }
 "src/08_Phylogeny/09_Centrality/02_CentralityPolarity.jl" = { lines = 12, misses = 0 }
 "src/08_Phylogeny/09_Centrality/03_CentralityEstimator.jl" = { lines = 10, misses = 0 }

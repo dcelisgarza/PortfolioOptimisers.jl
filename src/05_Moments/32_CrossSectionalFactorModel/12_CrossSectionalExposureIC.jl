@@ -95,7 +95,7 @@ A one-hot exposure, such as an industry, is a block of `0` and a block of `1`, s
 
 # Algorithm
 
- 1. Resolve the weight history with [`exposure_weights`](@ref).
+ 1. Resolve the weight history with [`cs_exposure_weights`](@ref).
  2. Build the forward mean return with [`exposure_forward_mean_return`](@ref).
  3. Correlate each exposure against it, one observation at a time, with [`cs_spearman_correlation`](@ref) when `rank` and [`cs_weighted_correlation`](@ref) otherwise.
 
@@ -136,7 +136,7 @@ A one-hot exposure, such as an industry, is a block of `0` and a block of `1`, s
 """
 function exposure_ic(B::Arr3Num, R::MatNum, w::Option{<:MatNum} = nothing;
                      horizon::Integer = 1, rank::Bool = true, ties::Symbol = :average)
-    u = exposure_weights(B, w)
+    u = cs_exposure_weights(B, w)
     N, K, T = size(B)
     @argcheck(size(R, 1) == T && size(R, 2) == N,
               DimensionMismatch("R ($(size(R, 1))×$(size(R, 2))) must match B ($N assets, $T observations)"))

@@ -4,7 +4,7 @@
 
 Return the cross-sectional weight history the Pearson information coefficient reads, after a check against the forecast.
 
-It is the counterpart of [`exposure_weights`](@ref) on the observation-by-asset axis. An absent weight history means equal weights. The function resolves the absent case once, into a history of ones, so the kernel reads one matrix and carries no branch.
+It is the counterpart of [`cs_exposure_weights`](@ref) on the observation-by-asset axis. An absent weight history means equal weights. The function resolves the absent case once, into a history of ones, so the kernel reads one matrix and carries no branch.
 
 A weight of zero excludes the asset from the observation, and so does a weight that is not finite, because [`cs_weighted_correlation`](@ref) reads only a finite positive weight. [`forecast_coverage`](@ref) reads the same rule. The function does not refuse an infinite weight, because [`InverseIdiosyncraticVarianceMetric`](@ref) gives one to an asset whose idiosyncratic variance is zero.
 
@@ -26,7 +26,7 @@ A weight of zero excludes the asset from the observation, and so does a weight t
 
   - [`forecast_ic`](@ref)
   - [`forecast_coverage`](@ref)
-  - [`exposure_weights`](@ref)
+  - [`cs_exposure_weights`](@ref)
 """
 function forecast_ic_weights(alpha::MatNum, ::Nothing)
     return ones(real(eltype(alpha)), size(alpha, 1), size(alpha, 2))

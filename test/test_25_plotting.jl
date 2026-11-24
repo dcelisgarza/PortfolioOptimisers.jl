@@ -1441,6 +1441,25 @@
               BitVector([1, 1, 0, 1, 1])
         @test is_plot(plot_network(ne_pv, res_pv))
         @test is_plot(plot_network(ne_pv, res_pv; rd = rd_pv))
+
+        # A network over an Exogenous Graph reads the returns data, which each arity passes
+        # (#2295). The prior arities read it on the Investable Mask of the prior.
+        g_xn = ExogenousGraph(; edges = [(a, b, 1.0) for a in nx_pv for b in ["hub"]])
+        rd_xn = ReturnsResult(; nx = nx_pv, X = X_pv, ng = ["g"], G = [g_xn])
+        en_xn = ExogenousNetwork(; sep = HopCount(; n = 2), strict = true)
+        @test is_plot(plot_network(en_xn, rd_xn))
+        @test is_plot(plot_network(en_xn, prn_pv, w_pv; rd = rd_xn))
+        @test is_plot(plot_network(en_xn, pr_pv; rd = rd_xn))
+        @test is_plot(plot_network(en_xn, res_pv; rd = rd_xn))
+        @test_throws PortfolioOptimisers.IsNothingError plot_network(en_xn, prn_pv)
+        cte_xn = CentralityEstimator(; pl = en_xn)
+        for p_xn in (plot_centrality(cte_xn, rd_xn),
+                     plot_centrality(cte_xn, prn_pv, nx_pv; rd = rd_xn),
+                     plot_centrality(cte_xn, res_pv, rd_xn))
+            @test is_plot(p_xn)
+        end
+        @test PortfolioOptimisers.plot_returns_data(prn_pv, rd_xn).nx == nx_pv[keep_pv]
+        @test PortfolioOptimisers.plot_returns_data(pr_pv, rd_xn) === rd_xn
     end
 
     @testset "Every result arity pairs the result's two universes (#884)" begin

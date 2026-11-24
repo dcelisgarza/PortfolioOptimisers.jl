@@ -755,9 +755,11 @@ function plot_histogram end
         nx::AbstractVector = 1:size(X, 2),
         w::Option{<:VecNum} = nothing;
         threshold::Number = 0,
+        pr = nothing,
+        rd::Option{<:ReturnsResult} = nothing,
         kwargs...
     ) -> Plot
-    plot_network(pl, pr::Pr_RR, w::Option{<:VecNum} = nothing; nx = 1:size(pr.X, 2), threshold, kwargs...) -> Plot
+    plot_network(pl, pr::Pr_RR, w::Option{<:VecNum} = nothing; nx = 1:size(pr.X, 2), rd::Option{<:ReturnsResult} = nothing, threshold, kwargs...) -> Plot
     plot_network(pl, res::OptimisationResult; rd::Option{<:Pr_RR} = nothing, nx = 1:length(res.w), threshold, kwargs...) -> Plot
 
 Plot the network of the assets as a graph, with `GraphRecipes.graphplot`.
@@ -775,7 +777,7 @@ A non-investable asset is **not drawn**. The figure fits a phylogeny matrix on `
   - `threshold`: Largest magnitude of an entry that draws no edge.
   - `pr`: Prior result or [`ReturnsResult`](@ref). The figure reads its `X`.
   - `res`: Optimisation result. The figure reads its weights, which size the nodes, on its investable universe.
-  - `rd`: Prior result or returns result, or `nothing` for the prior that `res` was fitted on.
+  - `rd`: With `res`, a prior result or a returns result, or `nothing` for the prior that `res` was fitted on. In the other methods, the returns data that `pl` reads beside `X`, such as the graph of an [`ExogenousNetwork`](@ref). A returns result in `pr`, or with `res`, gives it.
 
 # Validation
 
@@ -843,9 +845,11 @@ function plot_exogenous_graph end
         nx::AbstractVector = 1:size(X, 2);
         N::Option{<:Number} = nothing,
         percentage::Bool = true,
+        pr = nothing,
+        rd::Option{<:ReturnsResult} = nothing,
         kwargs...
     ) -> Plot
-    plot_centrality(cte, pr::AbstractPriorResult, nx = 1:size(pr.X, 2); N, percentage, kwargs...) -> Plot
+    plot_centrality(cte, pr::AbstractPriorResult, nx = 1:size(pr.X, 2); N, percentage, rd::Option{<:ReturnsResult} = nothing, kwargs...) -> Plot
     plot_centrality(cte, rd::ReturnsResult; N, percentage, kwargs...) -> Plot
     plot_centrality(cte, res::OptimisationResult, rd::ReturnsResult; N, percentage, kwargs...) -> Plot
 
@@ -863,7 +867,7 @@ A non-investable asset is **not drawn**. The figure fits a centrality vector on 
   - `N`: The count or the share of the bars to draw, or `nothing` for the effective number of the scores. [`relevant_assets`](@ref) states the rule.
   - `percentage`: Divide the scores by their sum over all assets when `true`.
   - `pr`: Prior result. The figure reads its `X`.
-  - `rd`: Returns result. The figure reads its `X` and its `nx`.
+  - `rd`: Returns result. The figure reads its `X` and its `nx`. As a keyword, the returns data that the source of `cte` reads beside `X`, such as the graph of an [`ExogenousNetwork`](@ref).
   - `res`: Optimisation result.
 
 # Validation
@@ -3227,6 +3231,47 @@ function investable_plot_view(pr::AbstractPriorResult,
                               imsk::BitVector = investable_mask(pr))
     return port_opt_view(pr, findall(imsk)), nothing_scalar_array_view(nx, imsk),
            nothing_scalar_array_view(w, imsk)
+end
+
+"""
+    plot_returns_data(pr::ReturnsResult, rd) -> ReturnsResult
+    plot_returns_data(pr::AbstractPriorResult, rd::Nothing) -> Nothing
+    plot_returns_data(pr::AbstractPriorResult, rd::ReturnsResult) -> ReturnsResult
+
+Return the returns data that a figure passes to its network, on the investable universe of the figure.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `pr` is a [`ReturnsResult`](@ref): return `pr`.
+ 2. `pr` is a prior result and `rd` is `nothing`: return `nothing`.
+ 3. `pr` is a prior result and `rd` is a [`ReturnsResult`](@ref): return the view of `rd` at the Investable Mask of `pr`, or `rd` when `pr` has no mask.
+
+# Arguments
+
+  - `pr`: Prior result or [`ReturnsResult`](@ref), before its view.
+  - `rd`: The returns data of the caller, or `nothing`.
+
+# Returns
+
+  - `rd::Option{<:ReturnsResult}`: The returns data.
+
+# Related
+
+  - [`investable_plot_view`](@ref)
+  - [`plot_network`](@ref)
+  - [`plot_centrality`](@ref)
+"""
+function plot_returns_data(pr::ReturnsResult, ::Any)
+    return pr
+end
+function plot_returns_data(::AbstractPriorResult, ::Nothing)
+    return nothing
+end
+function plot_returns_data(pr::AbstractPriorResult, rd::ReturnsResult)
+    imsk = investable_mask(pr)
+    return isnothing(imsk) ? rd : port_opt_view(rd, findall(imsk))
 end
 
 """

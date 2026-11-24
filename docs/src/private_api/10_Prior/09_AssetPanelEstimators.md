@@ -11,8 +11,6 @@ PortfolioOptimisers.returns_asset_names
 PortfolioOptimisers.regression_factor_names
 PortfolioOptimisers.expand_investable_loadings
 PortfolioOptimisers.assert_producer_prior
-PortfolioOptimisers.walk_returns
-PortfolioOptimisers.walk_asset_names
 PortfolioOptimisers.walk_positions
 PortfolioOptimisers.walk_operator
 PortfolioOptimisers.walk_parts_of

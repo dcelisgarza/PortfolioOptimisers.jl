@@ -8,7 +8,7 @@ jet = "0.13.3"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "48591ae901"
+commit = "d58da120a2"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -235,6 +235,8 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/08_Phylogeny/08_Network/02_NetworkEstimator.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/08_Network/03_NetworkGraph.jl" = { raw = 2, reviewed = 2 }
 "src/08_Phylogeny/08_Network/04_Separation.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/08_Network/05_ExogenousNetwork.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/08_Network/06_ExogenousNetworkGraph.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/09_Centrality/01_Centrality.jl" = { raw = 16, reviewed = 16 }
 "src/08_Phylogeny/09_Centrality/02_CentralityPolarity.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/09_Centrality/03_CentralityEstimator.jl" = { raw = 0, reviewed = 0 }
@@ -697,6 +699,8 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/08_Phylogeny/08_Network/02_NetworkEstimator.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/08_Network/03_NetworkGraph.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/08_Network/04_Separation.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/08_Network/05_ExogenousNetwork.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/08_Network/06_ExogenousNetworkGraph.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/09_Centrality/01_Centrality.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/09_Centrality/02_CentralityPolarity.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/09_Centrality/03_CentralityEstimator.jl" = { raw = 0, reviewed = 0 }
@@ -1159,6 +1163,8 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/08_Phylogeny/08_Network/02_NetworkEstimator.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/08_Network/03_NetworkGraph.jl" = { raw = 2, reviewed = 2 }
 "src/08_Phylogeny/08_Network/04_Separation.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/08_Network/05_ExogenousNetwork.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/08_Network/06_ExogenousNetworkGraph.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/09_Centrality/01_Centrality.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/09_Centrality/02_CentralityPolarity.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/09_Centrality/03_CentralityEstimator.jl" = { raw = 0, reviewed = 0 }

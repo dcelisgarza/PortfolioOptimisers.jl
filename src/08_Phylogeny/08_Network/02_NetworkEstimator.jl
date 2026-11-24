@@ -8,6 +8,7 @@ Every concrete or abstract type that builds a network of assets from data must s
 # Related
 
   - [`NetworkEstimator`](@ref)
+  - [`ExogenousNetwork`](@ref)
   - [`AbstractCentralityEstimator`](@ref)
 """
 abstract type AbstractNetworkEstimator <: AbstractPhylogenyEstimator end
@@ -220,6 +221,7 @@ Keywords correspond to the struct's fields.
 
   - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). The constructor throws an `ArgumentError` otherwise.
   - `returns_source(nte) === nothing`. The network estimator reads the matrix that this estimator selects, so it states no source of its own, see [`assert_inner_reader`](@ref). The constructor throws an `ArgumentError` otherwise.
+  - `nte` is not an [`ExogenousNetwork`](@ref), which has no similarity and no distance matrix of the returns, see [`assert_returns_network`](@ref). The constructor throws an `ArgumentError` otherwise.
 
 ## Propagated parameters
 
@@ -309,6 +311,7 @@ NetworkClustersEstimator
                                       x_src::Option{<:AbstractReturnsSource})
         assert_returns_source(x_src, ALL_RETURNS_SOURCES, :NetworkClustersEstimator)
         assert_inner_reader(nte, :nte, :NetworkClustersEstimator)
+        assert_returns_network(nte)
         return new{typeof(nte), typeof(alg), typeof(onc), typeof(x_src)}(nte, alg, onc,
                                                                          x_src)
     end

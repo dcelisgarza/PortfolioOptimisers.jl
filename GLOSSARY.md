@@ -684,16 +684,20 @@ The narrower similarity family that the PMFG path admits. Its members cannot be 
 The characterisation of asset relationships derived from a Distance Matrix. The biological metaphor is intentional. Related assets cluster like species on an evolutionary tree. It has three sub-concepts:
 
 - **Clustering**: groups related assets into a dendrogram. The estimator is `ClustersEstimator` with `HClustAlgorithm`, `DBHT` (PMFG-based, with the `LoGo` sparse inverse) or `KMeansAlgorithm`, and `OptimalNumberClusters` finds the cluster count.
-- **Network**: assets as graph nodes and edges. `NetworkEstimator` builds a minimum spanning tree with `KruskalTree`, `BoruvkaTree` or `PrimTree`.
+- **Network**: assets as graph nodes and edges. `NetworkEstimator` builds a minimum spanning tree with `KruskalTree`, `BoruvkaTree` or `PrimTree`. An Exogenous Network reads the edges from the returns data.
 - **Centrality**: measures which assets are the most influential. The algorithms are `BetweennessCentrality`, `ClosenessCentrality`, `DegreeCentrality`, `EigenvectorCentrality`, `KatzCentrality`, `Pagerank`, `RadialityCentrality` and `StressCentrality`.
 
 `PhylogenyResult` holds the resulting matrix or vector.
 
+**Exogenous Network**
+A named Exogenous Graph that the network readers read as a network of the assets, an `ExogenousNetwork`. It is a member of the network family beside `NetworkEstimator`, it reads the graph in force at the last row of the returns data, and it reads no returns. `dir` states how a path reads the edges, `scope` states whether a path goes through nodes that are not assets (`AllNodes`, `AssetNodes`), `nrm` normalises the weights, and `len` turns a weight into a length (`ReciprocalLength`, `NegativeLogLength`, or `nothing`). The separations are those of the assets, and a centrality is found in the whole graph of the scope. An asset that is not a node is an isolated vertex that stays investable. See ADR 0245.
+*Avoid*: the network of a `NetworkEstimator`, which the library fits to the returns. And a Walk Profile, which counts the walks of an asset and not the shortest path.
+
 **Phylogeny Features**
-The reverse direction. A phylogeny is reused as a Panel Field, not consumed as one, because an assets × assets proximity matrix is a tensor field whose labels are the assets. `PhylogenyPanel` is the Asset Panel Estimator that builds it.
+The reverse direction. A phylogeny is reused as a Panel Field, not consumed as one, because an assets × assets proximity matrix is a tensor field whose labels are the assets. `PhylogenyPanel` is the Asset Panel Estimator that builds it. Its source is a clustering, a fitted Network or an Exogenous Network.
 
 **Separation**
-How far apart two assets are in a Network, and how far is too far. It has two members. `HopCount` is the number of edges on the shortest path, and `PathLength` is the summed distance along it.
+How far apart two assets are in a Network, and how far is too far. It has two members. `HopCount` is the number of edges on the shortest path, and `PathLength` is the summed distance along it. Over an Exogenous Network, `PathLength` sums the lengths of `len`, and the separation from one asset to another can differ from the separation back.
 
 **Separation Budget Rule**
 A callable in the slot of the budget number of a Separation. It computes the number from the data, and does not state it in advance. The library ships no member. A `FractionOf` of the reachable pairs is the shipped budget that the data computes: `resolve_separation` takes that quantile of the observed separations (#2013). A rule is the extension point for a budget of another kind.

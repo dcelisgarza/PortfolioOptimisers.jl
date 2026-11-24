@@ -1037,11 +1037,11 @@ The type of `ct` selects one routine of [`Graphs.jl`](https://juliagraphs.org/Gr
       + `ct::RadialityCentrality`: `Graphs.radiality_centrality`.
       + `ct::StressCentrality`: `Graphs.stress_centrality`.
 
-  - `g`: Graph to score.
+  - `g`: Graph to score. For the [`AssetVertexGraph`](@ref) of an [`ExogenousNetwork`](@ref), the function scores the whole graph and keeps the scores of the assets.
 
 # Returns
 
-  - `scores::VecNum`: One centrality score for each vertex of the graph.
+  - `scores::VecNum`: One centrality score for each vertex of the graph, or for each asset of an [`AssetVertexGraph`](@ref).
 
 # Related
 

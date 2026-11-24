@@ -62,13 +62,13 @@ The checks against the returns data run when the library generates the constrain
   - A graph is in force at the last row. Raises an `ArgumentError`, because a fit cannot continue with no graph.
   - Each edge weight is non-negative, [`NonNegativeWeights`](@ref). Raises an `ArgumentError`. The entry of the user verb checks every snapshot, see [`assert_graph_entry`](@ref).
 
-An [`ExposureConstraintEstimator`](@ref) over this space refuses a precomputed [`LinearConstraint`](@ref), see [`assert_space_constraint`](@ref). The outer optimiser of a [`NestedClustered`](@ref) or a [`Stacking`](@ref) refuses the space, see [`assert_outer_spaces`](@ref).
+An [`ExposureConstraintEstimator`](@ref) over this space refuses a precomputed [`LinearConstraint`](@ref), see [`assert_space_constraint`](@ref). The outer optimiser of a [`NestedClustered`](@ref) or a [`Stacking`](@ref) refuses the space, see [`assert_outer_readers`](@ref).
 
 # Algorithm
 
 [`constraint_space_basis`](@ref) does these steps for this space:
 
- 1. Read the graph of each part of `dir` in force at the last row of `rd` with [`space_graphs`](@ref), after the checks above.
+ 1. Read the graph of each part of `dir` in force at the last row of `rd` with [`consumer_graphs`](@ref), after the checks above.
  2. Read the node names with [`space_nodes`](@ref), and the assets from `sets.dict[sets.xkey]`.
  3. Find the reach of every asset at every node with [`snapshot_reach`](@ref), and add its three parts.
  4. Return the transpose of the reach as a [`ConstraintBasis`](@ref) over the node names, and `nothing` as the key.
@@ -139,49 +139,6 @@ function graph_names(space::DependencySpace)
     return space.ng
 end
 """
-    space_graphs(space::DependencySpace, rd::ReturnsResult, name::Option{<:AbstractString}) -> Tuple{Tuple, String}
-    space_graphs(space::DependencySpace, rd::ReturnsResult, gu::GraphUnion) -> Tuple{Tuple, String}
-
-Return the graph of each part of the reach in force at the last row of the returns data, and the name of the graph.
-
-# Algorithm
-
-The method that Julia selects is the algorithm.
-
- 1. A name, or `nothing` for the only graph: read the graph with [`consumer_graph`](@ref), and give it to each part of [`exposure_parts`](@ref).
- 2. A [`GraphUnion`](@ref): build the union along each part with [`consumer_graph`](@ref).
-
-# Arguments
-
-  - `space`: The space.
-  - $(arg_dict[:rd])
-  - `name`, `gu`: The entry `space.ng`.
-
-# Validation
-
-  - The rules of [`consumer_graph`](@ref).
-
-# Returns
-
-  - `gs::Tuple`: One [`ExogenousGraph`](@ref) for each part.
-  - `gname::String`: The name of the graph.
-
-# Related
-
-  - [`DependencySpace`](@ref)
-  - [`consumer_graph`](@ref)
-"""
-function space_graphs(space::DependencySpace, rd::ReturnsResult,
-                      name::Option{<:AbstractString})
-    g = consumer_graph(space, rd, name)
-    gname = String(rd.ng[graph_position(rd.ng, name)])
-    return map(_ -> g, exposure_parts(space.dir)), gname
-end
-function space_graphs(space::DependencySpace, rd::ReturnsResult, gu::GraphUnion)
-    gs = map(d -> consumer_graph(space, rd, gu, d), exposure_parts(space.dir))
-    return gs, String(graph_entry_label(gu))
-end
-"""
     space_nodes(rd::ReturnsResult, ng::Option{<:Union{AbstractString, GraphUnion}}) -> Vector{String}
 
 Return the nodes of every snapshot of the graph in the returns data, or of each part of a union, in the order of their first use.
@@ -214,7 +171,7 @@ function constraint_space_basis(space::DependencySpace, sets::UniverseSets, ::An
                                 rd::Option{<:ReturnsResult} = nothing)
     @argcheck(!isnothing(rd),
               IsNothingError("a constraint over a `DependencySpace` is written in the nodes of an Exogenous Graph, and the graph is in the returns data. This route carries no returns data. Pass it, `linear_constraints(ece, sets; rd = rd)`, or generate the constraint through a `JuMPOptimiser` or a `Pipeline` step"))
-    gs, gname = space_graphs(space, rd, space.ng)
+    gs, gname = consumer_graphs(space, rd, space.ng, space.dir)
     nodes = space_nodes(rd, space.ng)
     nx = sets.dict[sets.xkey]
     R0, Rd, Ri = snapshot_reach(space.reach, space.dir, gs, nx, nodes, 0, trues(length(nx)))
@@ -226,7 +183,7 @@ end
 function assert_space_constraint(space::DependencySpace, lce::AbstractVector)::Nothing
     return foreach(x -> assert_space_constraint(space, x), lce)
 end
-function holds_outer_space(::DependencySpace)::Bool
+function holds_node_reader(::DependencySpace)::Bool
     return true
 end
 pipe_reads(::DependencySpace) = (:returns,)

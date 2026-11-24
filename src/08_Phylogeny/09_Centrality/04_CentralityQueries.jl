@@ -15,8 +15,13 @@ This function is the one place that holds both the source and the polarity of th
 | any source                                          | `nothing`                    | plain `Graphs.SimpleGraph` of [`phylogeny_matrix`](@ref)                               |
 | a clustering estimator or [`Clusters`](@ref)        | any                          | plain `Graphs.SimpleGraph` of [`phylogeny_matrix`](@ref)                               |
 | [`AbstractNetworkEstimator`](@ref) on a tree branch | [`SimilarityPolarity`](@ref) | plain `Graphs.SimpleGraph` of [`phylogeny_matrix`](@ref)                               |
+| [`ExogenousNetwork`](@ref)                          | [`DistancePolarity`](@ref)   | [`network_lengths`](@ref), over the whole graph of the scope                           |
+| [`ExogenousNetwork`](@ref) with a `len`             | [`SimilarityPolarity`](@ref) | [`network_strengths`](@ref), over the whole graph of the scope                         |
+| [`ExogenousNetwork`](@ref), in every other case     | any                          | [`closure_graph`](@ref), over the whole graph of the scope                             |
 
 The similarity route is narrower than the distance route on purpose. [`calc_distance_weighted_graph`](@ref) carries distances on both branches, but a similarity selects the edges of the similarity branch only. On a tree, [`calc_mst`](@ref) selects the edges by a minimised distance. A similarity made from that distance puts on the structure a quantity that did not select it.
+
+The centrality of an [`ExogenousNetwork`](@ref) is found in the whole graph of its scope. So the function returns an [`AssetVertexGraph`](@ref) for it, and [`calc_centrality`](@ref) keeps the entries of the assets. Under `len = nothing` the weights are lengths and state no strength, so a similarity reads the plain graph, as it does on a tree.
 
 # A partition carries no weights, and does not borrow any
 
@@ -40,6 +45,7 @@ The caller passes `centrality_polarity(ct)` in the first slot, as [`centrality_v
       + [`DistancePolarity`](@ref): the structure of [`calc_distance_weighted_graph`](@ref), with distances on either branch.
       + [`SimilarityPolarity`](@ref) on a similarity branch: the structure of [`calc_weighted_adjacency_graph`](@ref), with the similarities that selected its edges.
       + [`SimilarityPolarity`](@ref) on a tree branch: the plain graph, because a minimised distance selects a tree, and a tree holds no similarity to read.
+      + An [`ExogenousNetwork`](@ref): the graph of the table, after [`assert_single_network`](@ref), and after [`resolve_separation`](@ref) for the closure.
 
 # Arguments
 
@@ -49,9 +55,13 @@ The caller passes `centrality_polarity(ct)` in the first slot, as [`centrality_v
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
 
+# Validation
+
+  - An [`ExogenousNetwork`](@ref) reads one graph, see [`assert_single_network`](@ref). Raises an `ArgumentError`.
+
 # Returns
 
-  - `g::Graphs.AbstractGraph`: A `SimpleWeightedGraphs.SimpleWeightedGraph` on a weighted route, a `Graphs.SimpleGraph` otherwise.
+  - `g::Gr_AVG`: A `SimpleWeightedGraphs.SimpleWeightedGraph` on a weighted route, a `Graphs.SimpleGraph` otherwise, and an [`AssetVertexGraph`](@ref) for an [`ExogenousNetwork`](@ref).
 
 # Related
 
@@ -87,6 +97,33 @@ function centrality_graph(::SimilarityPolarity, nte::AbstractNetworkEstimator, X
     # A tree is selected by minimising a distance, so it carries no similarity to read.
     return Graphs.SimpleGraph(phylogeny_matrix(nte, X; dims = dims, kwargs...).X)
 end
+function centrality_graph(::Nothing, nte::ExogenousNetwork, X::MatNum; dims::Int = 1,
+                          kwargs...)
+    assert_single_network(nte)
+    ag = separation_graph(nte.sep, nte, X; dims = dims, kwargs...)
+    sep = resolve_separation(nte.sep, nte, X, ag; dims = dims, kwargs...)
+    return AssetVertexGraph((closure_graph(sep, nte, ag),), ag.va, ag.sym)
+end
+function centrality_graph(::DistancePolarity, nte::ExogenousNetwork, X::MatNum;
+                          dims::Int = 1, kwargs...)
+    assert_single_network(nte)
+    return exogenous_network_graph(network_lengths, nte, X; dims = dims, kwargs...)
+end
+function centrality_graph(::SimilarityPolarity, nte::ExogenousNetwork, X::MatNum;
+                          dims::Int = 1, kwargs...)
+    assert_single_network(nte)
+    return exogenous_network_graph(network_strengths, nte, X; dims = dims, kwargs...)
+end
+function centrality_graph(::SimilarityPolarity,
+                          nte::ExogenousNetwork{<:Any, <:Any, <:Any, <:Any, Nothing},
+                          X::MatNum; dims::Int = 1, kwargs...)
+    # The weights are lengths, so they state no strength to read.
+    return centrality_graph(nothing, nte, X; dims = dims, kwargs...)
+end
+# The docstring is on `calc_centrality`, in `01_Centrality.jl`.
+function calc_centrality(ct::AbstractCentralityAlgorithm, ag::AssetVertexGraph)
+    return calc_centrality(ct, only(ag.gs))[ag.va]
+end
 """
     centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm,
                       X::MatNum; dims::Int = 1, kwargs...)
@@ -94,6 +131,8 @@ end
 Compute the centrality vector of the structure that `pl` builds, with the algorithm `ct`.
 
 [`centrality_graph`](@ref) builds the graph, with the weights of the polarity that [`centrality_polarity`](@ref) returns for `ct` where the source can give them. [`calc_centrality`](@ref) then scores each asset.
+
+Over an [`ExogenousNetwork`](@ref), the score is found in the whole graph of the scope, and the result holds the scores of the assets.
 
 !!! warning
 

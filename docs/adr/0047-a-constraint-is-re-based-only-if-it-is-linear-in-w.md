@@ -442,7 +442,7 @@ nodes of two fits can differ in number and order.
 
 **The outer optimiser refuses the space.** The outer problem of `NestedClustered` and `Stacking`
 keeps the graphs of the returns data and replaces the asset names, so each row has zero coefficients
-and the constraint is silently absent. `assert_outer_spaces` walks `opto` at construction. The space
+and the constraint is silently absent. `assert_outer_readers` walks `opto` at construction. The space
 holds no asset index, so `port_opt_view` returns it unchanged and an inner solve takes it.
 
 **The reach marks every asset as held.** The fit does not know the weights, so a `FractionOf` budget

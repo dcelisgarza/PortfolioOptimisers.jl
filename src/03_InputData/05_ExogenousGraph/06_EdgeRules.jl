@@ -92,7 +92,7 @@ Walks each edge in both directions, so a path can change direction at each node.
 
 The reach of a [`DependencyExposure`](@ref) under this direction reads the undirected graph of the adjacency, ``\\mathbf{M} + \\mathbf{M}^{\\top}`` with the diagonal of ``\\mathbf{M}`` taken one time, because a self-loop is one edge. A shock that goes from a firm to its supplier and then to the other customers of that supplier is such a path, a model of contagion. [`BothEdges`](@ref) is different: it reads the two directed reaches apart, and a path does not mix them at an intermediate node.
 
-[`WalkProfilePanel`](@ref) does not take this direction, because the walk distance refuses a walk over the sum of the two directions. Its constructor raises a `MethodError`. A [`GraphUnion`](@ref) under a normalisation has no single direction along this member, so it raises a `MethodError` too.
+[`WalkProfilePanel`](@ref) does not take this direction, because the walk distance refuses a walk over the sum of the two directions. Its constructor raises a `MethodError`. A [`GraphUnion`](@ref) under a normalisation has no single direction along this member, so it raises a `MethodError` in a [`DependencyExposure`](@ref) too. An [`ExogenousNetwork`](@ref) takes this direction by default, and it normalises along the out-edges.
 
 # Related
 

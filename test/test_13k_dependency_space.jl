@@ -264,8 +264,8 @@ end
     @test_throws ArgumentError Stacking(; opti = [plain],
                                         opto = SubsetResampling(; subset_size = 0.8,
                                                                 opt = jo))
-    @test PO.holds_outer_space(("a" => ece, 1)) && !PO.holds_outer_space([1.0, 2.0])
-    @test !PO.holds_outer_space([1.0 2.0]) && !PO.holds_outer_space(plain)
+    @test PO.holds_node_reader(("a" => ece, 1)) && !PO.holds_node_reader([1.0, 2.0])
+    @test !PO.holds_node_reader([1.0 2.0]) && !PO.holds_node_reader(plain)
 end
 
 @testset "a pipeline step needs no prior" begin

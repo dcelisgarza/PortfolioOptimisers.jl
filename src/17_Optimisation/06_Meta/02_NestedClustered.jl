@@ -415,23 +415,25 @@ function assert_external_lcse(opt)::Nothing
     return nothing
 end
 """
-    holds_outer_space(est::Union{AbstractEstimator, AbstractAlgorithm, StatsBase.CovarianceEstimator}) -> Bool
-    holds_outer_space(space::DependencySpace) -> Bool
-    holds_outer_space(v::AbstractArray{<:Number}) -> Bool
-    holds_outer_space(v::AbstractVector{<:Number}) -> Bool
-    holds_outer_space(v::Union{AbstractVector, Tuple}) -> Bool
-    holds_outer_space(p::Pair) -> Bool
-    holds_outer_space(x) -> Bool
+    holds_node_reader(est::Union{AbstractEstimator, AbstractAlgorithm, StatsBase.CovarianceEstimator}) -> Bool
+    holds_node_reader(nte::ExogenousNetwork) -> Bool
+    holds_node_reader(ape::WalkProfilePanel) -> Bool
+    holds_node_reader(space::DependencySpace) -> Bool
+    holds_node_reader(v::AbstractArray{<:Number}) -> Bool
+    holds_node_reader(v::AbstractVector{<:Number}) -> Bool
+    holds_node_reader(v::Union{AbstractVector, Tuple}) -> Bool
+    holds_node_reader(p::Pair) -> Bool
+    holds_node_reader(x) -> Bool
 
-Tell whether an estimator tree holds a constraint space that reads the names of the assets, so that an outer optimiser can refuse it.
+Tell whether an estimator tree holds a reader that finds the assets among the nodes of an Exogenous Graph, so that a problem whose names are not assets can refuse it.
 
-A [`DependencySpace`](@ref) finds each asset among the nodes of a graph by its name. An outer solve replaces the assets with synthetic assets, whose names are not nodes. So every row has zero coefficients, and the constraint is silently absent.
+An [`ExogenousNetwork`](@ref), a [`WalkProfilePanel`](@ref) and a [`DependencySpace`](@ref) each find an asset among the nodes of a graph by its name. An outer solve replaces the assets with synthetic assets, whose names are not nodes. So the network has no edge, the walk reads no asset, and each row of the space has zero coefficients. A factor of [`FactorRiskContribution`](@ref) is not a node either.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. A [`DependencySpace`](@ref): `true`.
+ 1. An [`ExogenousNetwork`](@ref), a [`WalkProfilePanel`](@ref) or a [`DependencySpace`](@ref): `true`.
  2. An estimator, an algorithm or a covariance estimator: walk each field.
  3. An array of numbers: `false`.
  4. A vector or a tuple: walk each element.
@@ -440,47 +442,52 @@ The method that Julia selects is the algorithm.
 
 # Related
 
-  - [`assert_outer_spaces`](@ref)
+  - [`assert_outer_readers`](@ref)
+  - [`ExogenousNetwork`](@ref)
+  - [`WalkProfilePanel`](@ref)
   - [`DependencySpace`](@ref)
 """
-function holds_outer_space(est::Union{AbstractEstimator, AbstractAlgorithm,
+function holds_node_reader(est::Union{AbstractEstimator, AbstractAlgorithm,
                                       StatsBase.CovarianceEstimator})::Bool
-    return any(f -> holds_outer_space(getfield(est, f)), fieldnames(typeof(est)))
+    return any(f -> holds_node_reader(getfield(est, f)), fieldnames(typeof(est)))
 end
-function holds_outer_space(::AbstractArray{<:Number})::Bool
+function holds_node_reader(::Union{ExogenousNetwork, WalkProfilePanel})::Bool
+    return true
+end
+function holds_node_reader(::AbstractArray{<:Number})::Bool
     return false
 end
-function holds_outer_space(::AbstractVector{<:Number})::Bool
+function holds_node_reader(::AbstractVector{<:Number})::Bool
     return false
 end
-function holds_outer_space(v::Union{AbstractVector, Tuple})::Bool
-    return any(holds_outer_space, v)
+function holds_node_reader(v::Union{AbstractVector, Tuple})::Bool
+    return any(holds_node_reader, v)
 end
-function holds_outer_space(p::Pair)::Bool
-    return holds_outer_space(p.second)
+function holds_node_reader(p::Pair)::Bool
+    return holds_node_reader(p.second)
 end
-function holds_outer_space(::Any)::Bool
+function holds_node_reader(::Any)::Bool
     return false
 end
 """
-    assert_outer_spaces(opto) -> Nothing
+    assert_outer_readers(opto) -> Nothing
 
-Assert that an outer optimiser holds no constraint space that reads the names of the assets.
+Assert that an outer optimiser holds no reader that finds the assets among the nodes of an Exogenous Graph.
 
-[`NestedClustered`](@ref) and [`Stacking`](@ref) apply it to `opto`. An inner optimiser solves over the assets of its slice, so it takes the space.
+[`NestedClustered`](@ref) and [`Stacking`](@ref) apply it to `opto`. An inner optimiser solves over the assets of its slice, so it takes the reader.
 
 # Validation
 
-  - `holds_outer_space(opto)` is `false`. The function throws an `ArgumentError` otherwise.
+  - `holds_node_reader(opto)` is `false`. The function throws an `ArgumentError` otherwise.
 
 # Related
 
-  - [`holds_outer_space`](@ref)
+  - [`holds_node_reader`](@ref)
   - [`assert_external_optimiser`](@ref)
 """
-function assert_outer_spaces(opto)::Nothing
-    @argcheck(!holds_outer_space(opto),
-              ArgumentError("the outer optimiser `opto` holds a constraint over a `DependencySpace`. The outer problem replaces the assets with synthetic assets, which are not nodes of the graph, so no row of the constraint can bind. State the constraint on `opti`"))
+function assert_outer_readers(opto)::Nothing
+    @argcheck(!holds_node_reader(opto),
+              ArgumentError("the outer optimiser `opto` holds a `DependencySpace`, an `ExogenousNetwork` or a `WalkProfilePanel`. The outer problem replaces the assets with synthetic assets, which are not nodes of the graph, so the reader finds none of them. State it on `opti`"))
     return nothing
 end
 """
@@ -629,7 +636,7 @@ An entry of a schedule in `opti` or `opto` must be an estimator, as the static v
 
 ## Validation
 
-  - `opto` passes [`assert_external_optimiser`](@ref), [`assert_outer_spaces`](@ref) and [`assert_special_nco_requirements`](@ref). A schedule passes when its entries and its `default` pass.
+  - `opto` passes [`assert_external_optimiser`](@ref), [`assert_outer_readers`](@ref) and [`assert_special_nco_requirements`](@ref). A schedule passes when its entries and its `default` pass.
   - When `opti` is not `opto`, `opti` passes [`assert_internal_optimiser`](@ref) and `assert_special_nco_requirements`.
   - When `cv` is present, `opti` passes `assert_external_optimiser`.
   - `scorer` is `nothing` unless `cv` is a [`CombinatorialCrossValidation`](@ref). The constructor throws an `ArgumentError` otherwise, through [`assert_meta_scorer`](@ref).
@@ -762,7 +769,7 @@ An entry of a schedule in `opti` or `opto` must be an estimator, as the static v
         assert_no_nearest_bind_optimiser_schedule(opto, :opto, :NestedClustered)
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :NestedClustered)
         assert_external_optimiser(opto)
-        assert_outer_spaces(opto)
+        assert_outer_readers(opto)
         assert_special_nco_requirements(opto)
         if !(opti === opto)
             assert_internal_optimiser(opti)
