@@ -241,4 +241,36 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :x_src_re => "`x_src`: The source of the loadings that the factor regression gives, `nothing` or an [`AbstractReturnsSource`](@ref). `nothing` takes the loadings of the Prior Result when it holds them, and otherwise fits the regression on the asset returns `rd.X`. [`DataSource`](@ref) always fits on `rd.X`. [`ExcessSource`](@ref) always fits on the returns in excess of the benchmark, `rd.X - rd.B`, the Excess Frame. [`PriorSource`](@ref) takes the loadings of the Prior Result only, and refuses a Prior Result that holds none. A regression inside a prior keeps `nothing`, and the prior states the source.",#
                  # The factor attribution.
                  :unknown_att => "`unknown`: Rule for an entry the factor model does not state, and for the variance split of a Leverage-One Pair, a subtype of [`AbstractUnknownEntryRule`](@ref). [`EntrywiseUnknown`](@ref) gives `NaN` for every number that reads one, [`ZeroUnknown`](@ref) reads it as zero, and [`KindwiseUnknown`](@ref) applies one rule to each kind.",#
-                 :trim_att => "`trim`: Whether a static loadings matrix drops the first `lag` observations, as an exposure history with the same lag does. A static matrix reads every observation otherwise.")
+                 :trim_att => "`trim`: Whether a static loadings matrix drops the first `lag` observations, as an exposure history with the same lag does. A static matrix reads every observation otherwise.",#
+                 # The robust covariance estimators.
+                 :rob_me => "`me`: Optional expected returns estimator that fixes the centre of the robust fit. If `nothing`, the fit estimates its own robust location.",#
+                 :rob_q => "`q`: Probability of the cut-off of the squared distance above which an observation is an outlier, `0 < q < 1`. See [`robust_outliers`](@ref).",#
+                 :rob_ce => "`ce`: Robust covariance estimator whose location is the expected return.",#
+                 :mcd_alg => "`alg`: Search algorithm of the subset of the minimum covariance determinant, a subtype of [`AbstractMCDAlgorithm`](@ref).",#
+                 :mcd_alpha => "`alpha`: Subset fraction of the minimum covariance determinant, `1/2 <= alpha <= 1`. The subset holds `h` observations, `h = (n + p + 1) ÷ 2` at `alpha = 1/2` and `h = n` at `alpha = 1`. With a shrinkage, `h = ⌈alpha n⌉` and at least `n ÷ 2 + 1`.",#
+                 :mcd_ssc => "`ssc`: Optional small-sample correction of the covariance. If `nothing`, the covariance gets the consistency factor alone. It is `nothing` when the fit shrinks.",#
+                 :mcd_rw => "`rw`: Optional reweighting step that follows the raw fit, a subtype of [`AbstractRobustReweighting`](@ref). If `nothing`, the estimate is the raw fit.",#
+                 :rw_q => "`q`: Probability of the cut-off of the squared distance below which the reweighting step keeps an observation, `0 < q < 1`.",#
+                 :mcd_n_starts => "`n_starts`: Number of random start subsets.",#
+                 :mcd_n_csteps => "`n_csteps`: Number of concentration steps from each start before the search keeps the best starts.",#
+                 :mcd_n_best => "`n_best`: Number of the best starts that the search iterates until their subsets do not change.",#
+                 :tyler_ve => "`ve`: Optional variance estimator of the standard deviations of the covariance. If `nothing`, the scale of the shape matrix is the median of the squared distances in its metric, divided by the median of the ``\\chi^2_p`` distribution. The scale of a shrunk shape is then the sum of the robust variances of the assets.",#
+                 :max_cond => "`max_cond`: Bound of the condition number of the scatter, `max_cond > 1`.",#
+                 :rob_intensity => "`intensity`: Shrinkage intensity, the weight of the target. A number in `[0, 1]`, or a rule that finds it from the data.",#
+                 :tyler_shr_alg => "`alg`: Form of the fixed point of the shrunk shape, a subtype of [`AbstractTylerShrinkageAlgorithm`](@ref). It states the scale on which `intensity` is read.",#
+                 :mcd_shr => "`shr`: Optional shrinkage of the scatter of each subset, an [`MCDShrinkage`](@ref). If `nothing`, the scatter is not shrunk.",#
+                 :tyler_shr => "`shr`: Optional shrinkage of the shape, a [`TylerShrinkage`](@ref). If `nothing`, the shape is not shrunk.",#
+                 :rob_rho_fit => "`rho`: Shrinkage intensity of the fit, the weight of the target.",#
+                 :mcd_c => "`c`: Factor of the scatter of the subset.",#
+                 :mcd_tgt => "`tgt`: Target of the shrinkage, a positive definite matrix.",#
+                 :mcd_X => "`X`: Data matrix in its own units, `observations × assets`.",#
+                 :mcd_Z => "`Z`: Standardised data of the search, in the coordinates that turn the target into the identity matrix when the fit shrinks.",#
+                 :mcd_smp_tgt => "`tgt`: Target of the shrinkage in the units of the data, or `nothing`.",#
+                 :mcd_smp_intensity => "`intensity`: Shrinkage intensity or its rule, or `nothing`.",#
+                 :mcd_centre => "`centre`: Fixed centre of the fit, or `nothing` for a joint location.",#
+                 :rob_rho => "`intensity`: Shrinkage intensity of the fit, or `nothing` for a fit with no shrinkage.",#
+                 :rob_mu => "`mu`: Robust location vector `assets × 1`.",#
+                 :rob_sigma => "`sigma`: Robust covariance matrix `assets × assets`.",#
+                 :rob_d2 => "`d2`: Squared robust distance of each observation from `mu` in the metric of `sigma`, `observations × 1`. In a shrunk MCD fit, the distance of an observation of the subset comes from the fit that leaves it out.",#
+                 :rob_w => "`w`: Weight of each observation in the estimate of `sigma`, `observations × 1`.",#
+                 :rob_outlier => "`outlier`: Outlier flag of each observation, `observations × 1`. An observation is an outlier when its squared distance is above the cut-off of the estimator.")

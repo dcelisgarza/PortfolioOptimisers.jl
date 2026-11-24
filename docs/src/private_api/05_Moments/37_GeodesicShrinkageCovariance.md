@@ -1,5 +1,5 @@
 ```@meta
-Description = "Geodesic shrinkage covariance, private API of PortfolioOptimisers.jl: GeodesicShrinkageTarget, assert_shrinkage_target, geodesic_power, geodesic_point, …"
+Description = "Geodesic shrinkage covariance, private API of PortfolioOptimisers.jl: CovarianceShrinkageTarget, assert_shrinkage_target, geodesic_power, geodesic_point, …"
 ```
 
 # Geodesic shrinkage covariance: private API
@@ -7,7 +7,7 @@ Description = "Geodesic shrinkage covariance, private API of PortfolioOptimisers
 These are the helpers of [`GeodesicShrinkageCovariance`](@ref). `geodesic_point` computes the shrunk matrix, and `geodesic_shrinkage!` runs the repair and the shrinkage on the assets with a finite variance.
 
 ```@docs
-PortfolioOptimisers.GeodesicShrinkageTarget
+PortfolioOptimisers.CovarianceShrinkageTarget
 PortfolioOptimisers.assert_shrinkage_target
 PortfolioOptimisers.geodesic_power
 PortfolioOptimisers.geodesic_point

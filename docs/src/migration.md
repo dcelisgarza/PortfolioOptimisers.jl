@@ -1049,11 +1049,28 @@ A static `TensorPanelField` and a static feature matrix keep `assets × labels` 
 | `descriptor` of `SalesToPrice()`, `GrossProfitability()`, `AssetTurnover()` or `SalesToEnterpriseValue()` over a panel with a negative sales figure on an active, observed cell | Divided the negative sales figure, as for any other number. `GrossMargin()` already refused it. | Raises a `DomainError` that names the field and the cell, as `GrossMargin()` does. Each of the four constructors sets `nonneg = [num]`, or `nonneg = [sales]` for `GrossProfitability`, because a sales figure below zero is a data error. A zero sales figure stays valid. To read the sales figure without the guard, build `PanelFieldRatio` with the same `num`, `den` and `gt0`, and no `nonneg`. |
 | `descriptor` of `DebtToAssets()` over a panel with a negative debt on an active, observed cell | Divided the negative debt. `BookLeverage()` and `MarketLeverage()` already refused it. | Raises a `DomainError`, as `BookLeverage()` and `MarketLeverage()` do. `DebtToAssets` sets `nonneg = [num]`. To read the debt without the guard, build `PanelFieldRatio(; num = "total_debt", den = "total_assets", gt0 = ["total_assets"])`. |
 
-## From v0.34 to v0.35
+## From v0.34.2 to v0.34.3
 
-### [Calls that now answer](@id migration-0-35-answers)
+### [Results that move](@id migration-0-34-3-numbers)
 
-| Call | v0.34 | v0.35 |
+- **A `RiskBudgeting` whose mixed-integer rows use a long and a short bit for each asset.** A short threshold `st`, a fixed fee, or `xbgt` beside another mixed-integer row builds these bits, on a model that splits the weights into a long and a short part. v0.34.2 applied the weight bounds, the thresholds and the fixed fees to the unscaled weights, which sum to `k` and not to the budget. A bound of one then held each weight under `1 / k`, so a book could come out equal-weighted, and a threshold did not hold on the weights that the optimiser returned. v0.34.3 scales each of them with `k`, as the long-only bits always did. A model whose thresholds v0.34.2 could meet only in the unscaled weights can now be infeasible.
+- **A `RiskBudgeting` with `LowOrderMoment(; mu, alg = EvenMoment())` and a number or a `VecScalar` as `mu`.** v0.34.2 subtracted the target from the returns of the unscaled weights, so it read a target of `mu / k`. v0.34.3 scales the target with `k`, as the other algorithms of `LowOrderMoment` do.
+- **A `RiskBudgeting` with an upper bound, `settings.ub`, on one of five risk measures.** They are a `Variance` in the semidefinite form, an `UncertaintySetVariance` with a box, an ellipsoid or a norm ball, a `Kurtosis`, a `LowOrderMoment` with `EvenMoment`, and a `VarianceSkewKurtosis` with a bound of its own or of a child. v0.34.2 compared the risk of the unscaled weights with `ub * k`, so the bound was too tight by a power of `k`, and a bound that does not bind could make the model infeasible. v0.34.3 bounds the risk of the weights that the optimiser returns. A second model of the risk states the bound, so a solve with such a bound is larger. A measure with no bound, and every other optimiser, builds the same model as before.
+- **A `RiskTrackingError`, or a `RiskTrackingRiskMeasure` with an upper bound, on a tracked measure of degree two, under `MaximumRatio` or `RiskBudgeting`.** Such measures are a `Variance`, an `UncertaintySetVariance`, a `LowOrderMoment` with a second or an even moment, a `Kurtosis`, a `NegativeSkewness`, a `BrownianDistanceVariance`, a `VarianceSkewKurtosis` and a `TrackingRiskMeasure` with `SquaredL2Norm`. v0.34.2 compared the tracked risk of the unscaled weights with the bound times `k`, so the bound was too tight by a power of `k`. v0.34.3 bounds the tracked risk of the weights that the optimiser returns.
+- **A `RiskTrackingRiskMeasure` with `DependentVariableTracking` in the objective, and a tracked measure of degree two, under `MaximumRatio` or `RiskBudgeting`.** v0.34.2 subtracted the benchmark risk times `k` from a risk of degree two. v0.34.3 states both at degree one.
+- **A `RiskTrackingError` with a small `err`.** The row of the bound divides by its bound, as the other bound rows do, so a solver holds a bound that is smaller than its tolerance.
+- **A `Frontier` in the `settings.ub` of a `RiskTrackingRiskMeasure` with `IndependentVariableTracking`.** The levels are evenly spaced in the units of the expression that the bound of the tracked measure acts on, as they are for the tracked measure itself. For a `Variance` these are the units of the deviation, where v0.34.2 spaced the levels in the units of the variance. The two ends of the span do not move.
+- **A `FactorRiskContribution` with a `RiskTrackingError` or a `RiskTrackingRiskMeasure` of a `Variance` under `IndependentVariableTracking`.** v0.34.2 bounded the variance of the portfolio in place of the variance of the weight difference, so a bound could make the model infeasible. v0.34.3 reads the weight difference, and it refuses an `rc` on such a `Variance`.
+
+### [Calls that now succeed](@id migration-0-34-3-success)
+
+- **`DependentVariableTracking` of a measure with a quadratic risk expression**, such as `Variance()` without a semidefinite phylogeny. v0.34.2 logged a warning at the construction of a `RiskTrackingRiskMeasure`, and the solver refused the model. v0.34.3 states the risk with a rotated second-order cone, and the constructor logs no warning.
+
+## From v0.34.4 to v0.34.5
+
+### [Calls that now answer](@id migration-0-34-5-answers)
+
+| Call | v0.34.4 | v0.34.5 |
 | --- | --- | --- |
 | A covariance estimator of another package, such as `StatsBase.SimpleCovariance(; corrected = true)`, in a slot that reads the variances of a matrix: the `ve` of `KendallCovariance`, `SpearmanCovariance`, `MutualInfoCovariance`, `LowerTailDependenceCovariance`, `DimensionReductionRegression`, `ImpliedVolatilityRegression`, `ElasticNet`, `FactorPrior`, `FactorBlackLittermanPrior` and `CrossSectionalFactorPrior`, and the `ce` of `EWVolatility` | Refused by the constructor | Runs. The fit reads the variances of the estimator, the diagonal of its covariance matrix. A covariance estimator of the library runs in each of these slots too. The estimator of another package gets no observation weights. A slot that reads the variance of one vector, such as the `ve` of `SecondMoment`, `HighOrderMoment`, `ThirdCentralMoment` and `WindowedVariance`, still takes a variance estimator alone. |
 | `WindowedCovariance(; ce = StatsBase.SimpleCovariance())` in `cov`, `cor`, `var`, `std` or a variance series, and `PortfolioOptimisersCovariance(; ce = StatsBase.SimpleCovariance())` as the `ce` of `EWVolatility` or the `ve` of `CrossSectionalFactorPrior` | `MethodError` at the fit | Runs. |
@@ -1064,12 +1081,12 @@ A static `TensorPanelField` and a static feature matrix keep `assets × labels` 
 | `covariance_forecast_evaluation` of a covariance estimator of another package | `MethodError` | Runs, as for `GeneralCovariance(; ce = ce)`. |
 | `partial_fit!(ce::GeneralCovariance, X; active_mask)`, and the carry of an `EmpiricalPrior` with `ce = GeneralCovariance()` over an asset panel that varies in time | `MethodError` | Runs. An inactive cell folds as a `NaN`, as in a `Covariance`. |
 
-### [Results that move](@id migration-0-35-numbers)
+### [Results that move](@id migration-0-34-5-numbers)
 
-- **`DimensionReductionRegression` with `ve = SimpleVariance(; me = nothing)` and weights in `retgt`** takes the mean of the factors under those weights. v0.34 took the mean with no weights, so the intercept that it rebuilt was not the intercept of the fit.
-- **`var`, `std` and a variance series of a `GeodesicShrinkageCovariance` over an asset panel**, when its `ce` is mask-aware, such as `ExpWeightedCovariance()`, read the gaps of the sample, as its `cov` does. v0.34 removed each asset with a gap from the window and gave it `NaN`, where `cov` estimates it. An `EWResidualVolatility` now takes such an estimator as its `ce`.
+- **`DimensionReductionRegression` with `ve = SimpleVariance(; me = nothing)` and weights in `retgt`** takes the mean of the factors under those weights. v0.34.4 took the mean with no weights, so the intercept that it rebuilt was not the intercept of the fit.
+- **`var`, `std` and a variance series of a `GeodesicShrinkageCovariance` over an asset panel**, when its `ce` is mask-aware, such as `ExpWeightedCovariance()`, read the gaps of the sample, as its `cov` does. v0.34.4 removed each asset with a gap from the window and gave it `NaN`, where `cov` estimates it. An `EWResidualVolatility` now takes such an estimator as its `ce`.
 
-### [If you extend the library](@id migration-0-35-extending)
+### [If you extend the library](@id migration-0-34-5-extending)
 
 - **A variance estimator of your own in `DimensionReductionRegression`** that holds a mean estimator in a field `me` adds a method `PortfolioOptimisers.standardisation_mean(ve::MyVariance, w) = ve.me`. Without it the mean of the factors takes the weights of `retgt`.
 - **A variance estimator of your own that folds, in the `ve` of `CrossSectionalFactorPrior`**, gets the `active_mask` keyword alone in `partial_fit!`. Add a method of `PortfolioOptimisers.fold_mask_keywords` that gives the estimation mask too, if the fold reads it. A fold that reads the active mask adds a method of `PortfolioOptimisers.reads_active_mask` that returns `true`. Without it, a step with a gap raises an `IsNonFiniteError`.

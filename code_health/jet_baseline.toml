@@ -8,7 +8,7 @@ jet = "0.13.3"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "58c30eeea6"
+commit = "666cfa9753"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -200,6 +200,16 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/37_GeodesicShrinkageCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/38_ElasticNet.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/39_WeightedAvailableCase.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/01_Base_RobustCovariance.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/02_QnScale.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/03_RobustShrinkage.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/04_MCDSearch.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/05_DetMCDStarts.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/06_MCDFactors.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/07_MCDCovariance.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/08_TylerShrinkage.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/09_TylerCovariance.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/10_RobustExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
@@ -643,6 +653,16 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/37_GeodesicShrinkageCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/38_ElasticNet.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/39_WeightedAvailableCase.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/01_Base_RobustCovariance.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/02_QnScale.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/03_RobustShrinkage.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/04_MCDSearch.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/05_DetMCDStarts.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/06_MCDFactors.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/07_MCDCovariance.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/08_TylerShrinkage.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/09_TylerCovariance.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/10_RobustExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
@@ -1086,6 +1106,16 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/37_GeodesicShrinkageCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/38_ElasticNet.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/39_WeightedAvailableCase.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/01_Base_RobustCovariance.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/02_QnScale.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/03_RobustShrinkage.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/04_MCDSearch.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/05_DetMCDStarts.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/06_MCDFactors.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/07_MCDCovariance.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/08_TylerShrinkage.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/09_TylerCovariance.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/10_RobustExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
