@@ -882,12 +882,59 @@ function risk_budgeting_scale_floor(rb::RiskBudgeting, ::Nothing)
     return ifelse(iszero(bg), zero(kmin), kmin)
 end
 """
+    risk_budgeting_scale_ceiling(rb::RiskBudgeting, N::Integer) -> Number
+
+Return the ceiling ``\\bar{k}`` on the variable ``k`` that scales the weights of a [`RiskBudgeting`](@ref), which sizes the big-M constant of the mixed-integer rows in [`get_mip_ss`](@ref).
+
+The row of the logarithm binds at the solution, so ``k`` is the inverse of the geometric mean of the magnitudes of the weights, under the weights ``\\boldsymbol{b}`` of the budget. A book of ``N`` equal weights that sum to ``b_{g}^{+}`` has ``k = N / b_{g}^{+}``. The ceiling is an estimate with a margin, not a bound that the model holds. The factor ``10`` leaves room for a book whose weights are far from equal.
+
+With no budget, a budget with no upper bound, or a zero budget, no row ties ``k`` to the sum of the weights, so the function reads ``b_{g}^{+} = 1``.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\bar{k} &= \\begin{cases}
+10\\, N / \\lvert b_{g}^{+} \\rvert & \\text{if } 0 < \\lvert b_{g}^{+} \\rvert < \\infty\\,, \\\\
+10\\, N & \\text{otherwise}\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:k_ceil])
+  - $(math_dict[:N])
+  - ``b_{g}^{+}``: The upper bound of the budget `rb.opt.bgt`, from [`budget_upper_bound`](@ref).
+
+# Arguments
+
+  - `rb::RiskBudgeting`: The optimiser.
+  - `N::Integer`: The number of assets of the model. A factor budget reads the number of assets too.
+
+# Returns
+
+  - `kceil::Number`: The ceiling on ``k``.
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`get_mip_ss`](@ref)
+  - [`risk_budgeting_scale_floor`](@ref)
+  - [`set_maximum_ratio_scale_ceiling!`](@ref)
+  - [`budget_upper_bound`](@ref)
+"""
+function risk_budgeting_scale_ceiling(rb::RiskBudgeting, N::Integer)
+    bg = abs(budget_upper_bound(rb.opt.bgt))
+    return 10 * N / ifelse(iszero(bg) || isinf(bg), one(bg), bg)
+end
+"""
     _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
                                      w::VecJuMPScalar; strict::Bool = false) -> RiskBudget
 
 Add the row of the logarithm, ``\\boldsymbol{b}^\\intercal \\ln(\\boldsymbol{x}) \\geq 0``, and the variable ``k``, to the model of a [`RiskBudgeting`](@ref).
 
-Every method of [`set_risk_budgeting_constraints!`](@ref) calls it, with the vector ``\\boldsymbol{x}`` that its formulation reads. The row fixes the scale of the weights, so the function also records a unit budget with [`set_unit_budget!`](@ref). A builder that reads [`effective_k`](@ref) then uses `1` in place of ``k``, so it measures the unscaled weights whose risk the model minimises.
+Every method of [`set_risk_budgeting_constraints!`](@ref) calls it, with the vector ``\\boldsymbol{x}`` that its formulation reads. It also records `k_ceil`, the [`risk_budgeting_scale_ceiling`](@ref) that sizes the big-M constant of the mixed-integer rows. The row fixes the scale of the weights, so the function also records a unit budget with [`set_unit_budget!`](@ref). A builder that reads [`effective_k`](@ref) then uses `1` in place of ``k``, so it measures the unscaled weights whose risk the model minimises.
 
 # JuMP formulation
 
@@ -929,6 +976,7 @@ Where:
   - [`set_risk_budgeting_constraints!`](@ref)
   - [`risk_budget_constraints`](@ref)
   - [`risk_budget_universe_key`](@ref)
+  - [`risk_budgeting_scale_ceiling`](@ref)
   - [`set_unit_budget!`](@ref)
   - [`get_k`](@ref)
 """
@@ -949,6 +997,7 @@ function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
     # and not a row, as in `set_maximum_ratio_scale_floor!`. `get_k`'s error message names
     # both routes.
     JuMP.@variable(model, k >= risk_budgeting_scale_floor(rb))
+    shared_set!(model, :k_ceil, risk_budgeting_scale_ceiling(rb, length(get_w(model))))
     JuMP.@variable(model, log_w[1:N])
     JuMP.@constraint(model, clog_w[i = 1:N],
                      [sc * log_w[i], sc, sc * w[i]] in JuMP.MOI.ExponentialCone())

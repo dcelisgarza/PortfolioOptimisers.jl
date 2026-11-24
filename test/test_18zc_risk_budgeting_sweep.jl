@@ -170,6 +170,64 @@ end
               res.w)
 end
 
+@testset "RiskBudgeting sweep: the default big-M is above the scale of k (#2302)" begin
+    # A book of `N` assets solves at a `k` near `N / bgt`, and the gate rows keep `k` at or
+    # below the big-M. `1000` times a cap below `N / 1000` was smaller than `k`, so a
+    # feasible book failed.
+    N, cap, lt = 40, 0.035, 0.005
+    X = 0.01 .* randn(StableRNG(1), 200, N) .* range(0.5, 2.0; length = N)' .+ 0.0005
+    rdk = ReturnsResult(; nx = ["a$i" for i in 1:N], X = X)
+    slvk = Solver(; name = :pajarito,
+                  solver = optimizer_with_attributes(Pajarito.Optimizer, "verbose" => false,
+                                                     "oa_solver" =>
+                                                         optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                   JuMP.MOI.Silent() =>
+                                                                                       true),
+                                                     "conic_solver" =>
+                                                         optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                   "verbose" =>
+                                                                                       false,
+                                                                                   "max_step_fraction" =>
+                                                                                       0.9)),
+                  check_sol = (; allow_local = true, allow_almost = true))
+    function solve_k(; bgt = 1.0, kw...)
+        opt = JuMPOptimiser(; slv = slvk, so = 1e4, bgt = bgt,
+                            wb = WeightBounds(; lb = 0.0, ub = cap * bgt),
+                            lt = Threshold(; val = lt * bgt), kw...)
+        rba = AssetRiskBudgeting(; alg = MixedIntegerRiskBudgeting())
+        return optimise(RiskBudgeting(; r = StandardDeviation(), opt = opt, rba = rba), rdk)
+    end
+    res = solve_k()
+    @test isa(res.retcode, OptimisationSuccess)
+    @test res.model[:ss] == 400
+    k = value(res.model[:k])
+    @test 1000 * cap < k < 400
+    @test isapprox(sum(res.w), 1; atol = 1e-6)
+    @test all(x -> lt - 1e-6 <= x <= cap + 1e-6, res.w)
+    # A stated big-M far above `k` gives the same book, and the stated number stays.
+    res1 = solve_k(; ss = 1e4)
+    @test res1.model[:ss] == 1e4
+    @test isapprox(res.w, res1.w; rtol = 1e-3)
+    # The long and short bits read the same constant.
+    res1 = solve_k(; st = Threshold(; val = lt))
+    @test isa(res1.retcode, OptimisationSuccess)
+    @test PO.mip_indicators(res1.model) isa PO.LongShortIndicators
+    @test isapprox(res.w, res1.w; rtol = 1e-3)
+    # A small budget scales `k` up.
+    res1 = solve_k(; bgt = 0.1)
+    @test isa(res1.retcode, OptimisationSuccess)
+    @test isapprox(res1.model[:ss], 4000)
+    @test value(res1.model[:k]) > 400 - 1
+    @test isapprox(10 * res1.w, res.w; rtol = 1e-3)
+    # The formula: no ceiling on the sum of the weights reads a budget of one.
+    for (bgt, v) in ((1.0, 400), (2.0, 200), (-0.5, 800), (nothing, 400), (0.0, 400),
+                     (BudgetRange(; lb = 0.5, ub = 0.8), 500),
+                     (BudgetRange(; lb = 0.5, ub = nothing), 400))
+        rb = RiskBudgeting(; opt = JuMPOptimiser(; slv = slvk, bgt = bgt))
+        @test PO.risk_budgeting_scale_ceiling(rb, N) ≈ v
+    end
+end
+
 @testset "RiskBudgeting sweep: a number target of an even moment scales with the budget (#2275)" begin
     # `k` is the sum of the unscaled weights, so a target `mu` is the target zero on the
     # returns less `mu`.

@@ -1235,7 +1235,7 @@ end
 
 @testset "MIP indicator bundles and the big-M constant (#1912)" begin
     pe = PortfolioOptimisers
-    # The big-M constant of a free budget is the largest finite bound times 1000. A stated
+    # The big-M constant of these books is the largest finite bound times 1000. A stated
     # `ss` is used as it is. A bound that is absent adds no magnitude, and bounds that are
     # all absent give 1000. The model keeps the constant under `:ss`.
     Xm = 0.01 .* randn(StableRNG(1919), 60, 5) .+ 0.001
@@ -1256,6 +1256,50 @@ end
         @test isa(res.retcode, OptimisationSuccess)
         @test res.model[:ss] == expected
     end
+    # A stated `ohf` scales `k`, and the gate rows keep `k` at or below the constant, so the
+    # constant scales with it (#2302). A constant of 500 made this feasible book fail.
+    function solve_ohf(; cap = 0.5, ss = nothing, obj...)
+        return optimise(MeanRisk(; r = ConditionalValueatRisk(),
+                                 obj = MaximumRatio(; obj...),
+                                 opt = JuMPOptimiser(; pe = prm, slv = slvm, card = 3,
+                                                     ss = ss,
+                                                     wb = WeightBounds(; lb = 0.0,
+                                                                       ub = cap))))
+    end
+    base = solve_ohf()
+    @test isa(solve_ohf(; ohf = 5.0, ss = 500).retcode, OptimisationFailure)
+    for cap in (0.5, 2.0)
+        res = solve_ohf(; cap = cap, ohf = 5.0)
+        @test isa(res.retcode, OptimisationSuccess)
+        @test res.model[:ss] ≈ 10 * 5.0 / mean(max.(prm.mu, 0)) * max(cap, 1)
+        @test 500 < value(res.model[:k]) < res.model[:ss]
+        cap == 0.5 && @test isapprox(res.w, base.w; atol = 1e-4)
+    end
+    # A rate that one asset of five exceeds makes the excess return small, and `k` large.
+    ceil_k(obj, pr = prm) = begin
+        m = JuMP.Model()
+        pe.set_sdp_lift_corner!(m, obj, pr)
+        pe.set_maximum_ratio_scale_ceiling!(m, obj, pr)
+        m[:k_ceil]
+    end
+    ohf = clamp(mean(abs, prm.mu), 1e-3, 1e3)
+    @test ceil_k(MaximumRatio(; rf = 0.9 * maximum(prm.mu))) ≈
+          10 * ohf / (0.1 * maximum(prm.mu) / 5)
+    # No asset earns more than the rate, so the risk form sets `k`: the corner of a lifted
+    # variance is its size.
+    @test ceil_k(MaximumRatio(; rf = 1.0)) == 10
+    @test ceil_k(MaximumRatio(; rf = 1.0, ohf = 2.0)) ≈ 20 / ohf
+    # The ceiling takes the type of the data.
+    prq = pe.LowOrderPrior(; X = [1//100 -3//100; 2//100 1//100], mu = [1//100, -3//100],
+                           sigma = [1//1 0//1; 0//1 1//1])
+    @test ceil_k(MaximumRatio(; rf = 0//1), prq) === 40//1
+    # Any other objective has a constant `k`, so it records no ceiling, and a small bound
+    # keeps its constant.
+    mn = JuMP.Model()
+    @test isnothing(pe.set_maximum_ratio_scale_ceiling!(mn, MinimumRisk(), prm))
+    @test !haskey(mn, :k_ceil)
+    mn[:k] = 1
+    @test pe.get_mip_ss(nothing, WeightBounds(; lb = [0.0], ub = [0.01]), mn) == 10.0
     # No consumer reads the held indicator of a long-short bundle, so a wrong read fails
     # loudly and does not miscount. A held bundle has no binaries for the slack-closing
     # rows: the held builder pins the decomposition only for a `WeightsFromParts` head.

@@ -563,14 +563,56 @@ function set_maximum_ratio_factor_variables!(model::JuMP.Model, obj)
     return nothing
 end
 """
+    maximum_ratio_normalisation(obj::MaximumRatio, mu::Num_VecNum)
+
+Return the normalisation factor of the ratio problem: `obj.ohf` when the caller states it, and a size derived from `mu` otherwise.
+
+The size is a matter of numerics alone, because every ``\\mathrm{ohf} > 0`` gives the same
+weights.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{ohf} &= \\min\\left(10^{3},\\, \\max\\left(10^{-3},\\, \\frac{1}{N} \\sum_{j=1}^{N} \\lvert \\mu_j \\rvert\\right)\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:ohf_ratio]) A stated `obj.ohf` replaces the formula.
+  - ``\\mu_j``: Entry ``j`` of `mu`.
+  - $(math_dict[:N])
+
+# Arguments
+
+  - `obj::MaximumRatio`: The ratio objective.
+  - `mu`: The characteristic of the assets, such as their expected returns.
+
+# Returns
+
+  - `ohf::Number`: The normalisation factor.
+
+# Related
+
+  - [`set_maximum_ratio_normalisation!`](@ref)
+  - [`set_maximum_ratio_scale_ceiling!`](@ref)
+"""
+function maximum_ratio_normalisation(obj::MaximumRatio, mu::Num_VecNum)
+    if !isnothing(obj.ohf)
+        return obj.ohf
+    end
+    m = Statistics.mean(abs, mu)
+    return clamp(m, inv(oftype(m, 1000)), oftype(m, 1000))
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Register the ratio problem's normalisation factor `ohf`.
 
-The function sizes the factor from the resolved aggregate characteristic when it exists. When
-no term carries a per-asset quantity, it uses the prior's own vector. Thus the factor follows
-a term's own `mu` and the centre that a set carries. The size is a matter of
-numerics alone, because every ``\\mathrm{ohf} > 0`` gives the same weights.
+[`maximum_ratio_normalisation`](@ref) sizes the factor from the resolved aggregate
+characteristic when it exists. When no term carries a per-asset quantity, it reads the prior's
+own vector. Thus the factor follows a term's own `mu` and the centre that a set carries.
 
 # Mathematical definition
 
@@ -607,30 +649,20 @@ Where:
   - `mu`: The resolved aggregate characteristic, or `nothing`.
   - `pr`: Prior result, the fallback when `mu` is `nothing`.
 
-# Validation
-
-  - If `obj.ohf` is provided: `obj.ohf > 0`. Otherwise the function raises a `DomainError`.
-
 # Returns
 
   - `nothing`.
 
 # Related
 
+  - [`maximum_ratio_normalisation`](@ref)
   - [`set_maximum_ratio_factor_variables!`](@ref)
   - [`set_max_ratio_return_constraints!`](@ref)
   - [`set_maximum_ratio_scale_floor!`](@ref)
 """
 function set_maximum_ratio_normalisation!(model::JuMP.Model, obj::MaximumRatio,
                                           mu::Option{<:Num_VecNum}, pr::AbstractPriorResult)
-    ohf = if isnothing(obj.ohf)
-        mu = isnothing(mu) ? pr.mu : mu
-        m = Statistics.mean(abs, mu)
-        clamp(m, inv(oftype(m, 1000)), oftype(m, 1000))
-    else
-        @argcheck(obj.ohf > zero(obj.ohf), DomainError(obj.ohf, "obj.ohf must be > 0"))
-        obj.ohf
-    end
+    ohf = maximum_ratio_normalisation(obj, isnothing(mu) ? pr.mu : mu)
     JuMP.@expression(model, ohf, ohf)
     return nothing
 end
@@ -734,6 +766,65 @@ function set_maximum_ratio_scale_floor!(model::JuMP.Model, obj::MaximumRatio,
         obj.kmin
     end
     JuMP.set_lower_bound(get_k(model), kmin)
+    return nothing
+end
+"""
+    set_maximum_ratio_scale_ceiling!(model::JuMP.Model, obj::ObjectiveFunction, pr::AbstractPriorResult)
+
+Register `k_ceil`, the ceiling on ``k`` that sizes the big-M constant of the mixed-integer rows under [`MaximumRatio`](@ref).
+
+The head calls it after [`set_sdp_lift_corner!`](@ref) and before the mixed-integer rows, which [`get_mip_ss`](@ref) sizes from the entry. Every other objective registers nothing, because ``k`` is then the constant ``1``.
+
+The ceiling is an estimate with a margin, not a bound that the model holds. The solution sets ``k``: the return form fixes ``k = \\mathrm{ohf} / (\\mathrm{ret} - r_f)``. The function takes the mean of the positive excess returns of the assets as the excess return of the portfolio, the size that a broad book earns. The factor ``10`` leaves room for a portfolio that earns less. When no asset earns more than ``r_f``, the risk form sets ``k``, so the function reads the corner ``c`` of [`set_sdp_lift_corner!`](@ref), the size of ``k`` that the library takes for a lifted variance.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\bar{k} &= \\begin{cases}
+\\dfrac{10\\, \\mathrm{ohf}}{e} & \\text{if } e > 0\\,, \\\\
+10\\, c & \\text{otherwise}\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:k_ceil])
+  - $(math_dict[:ohf_ratio]) Here it is the [`maximum_ratio_normalisation`](@ref) of ``\\boldsymbol{\\mu}``.
+  - ``e``: The mean of the positive excess returns, ``\\frac{1}{N} \\sum_{i=1}^{N} \\max\\left(\\mu_i - r_f,\\, 0\\right)``.
+  - ``c``: The corner, the `sdp_corner` of the model.
+  - ``\\mu_i``: Entry ``i`` of the expected returns of the prior, `pr.mu`. The normalisation of the model reads the characteristic of the return terms, which the model resolves after the mixed-integer rows. The prior's vector is its value when a single term states no vector of its own.
+  - $(math_dict[:r_f_ratio])
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `obj`: The objective. Only a [`MaximumRatio`](@ref) registers the ceiling.
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`MaximumRatio`](@ref)
+  - [`get_mip_ss`](@ref)
+  - [`set_maximum_ratio_scale_floor!`](@ref)
+  - [`risk_budgeting_scale_ceiling`](@ref)
+  - [`set_sdp_lift_corner!`](@ref)
+"""
+function set_maximum_ratio_scale_ceiling!(::JuMP.Model, ::ObjectiveFunction,
+                                          ::AbstractPriorResult)
+    return nothing
+end
+function set_maximum_ratio_scale_ceiling!(model::JuMP.Model, obj::MaximumRatio,
+                                          pr::AbstractPriorResult)
+    ohf = maximum_ratio_normalisation(obj, pr.mu)
+    ex = Statistics.mean(m -> max(m - obj.rf, zero(m - obj.rf)), pr.mu)
+    k = ex > zero(ex) ? ohf / ex : shared_get(model, :sdp_corner)
+    shared_set!(model, :k_ceil, 10 * k)
     return nothing
 end
 """

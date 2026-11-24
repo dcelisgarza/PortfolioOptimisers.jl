@@ -78,3 +78,16 @@ as the gates under the unit budget of `RiskBudgeting`. That head solves for the 
 `k w`, so a bound or a threshold on an unscaled gate did not hold on the weights. In every space,
 the binary is the gate only when `k` is a number. The interface is `mip_wx!`, `mip_bounds` and
 `mip_key`.
+
+## Amendment (2026-11-24)
+
+`get_mip_ss` reads the scale of `k` as well as the weight bounds (#2302). When `k` is a variable,
+the rows of a gate keep `k` at or below the constant, and a small weight bound says nothing about
+`k`. So each producer of a variable `k` records a ceiling under `:k_ceil`, beside `k` itself:
+`set_maximum_ratio_scale_ceiling!` for a ratio and `risk_budgeting_scale_ceiling` for the risk
+budgeting head. The ceiling is an estimate with a margin, because the solution sets `k`, and a
+stated `ss` replaces the constant.
+
+A larger constant at every bound was refused, because a constant that is far above `k` loosens the
+relaxation, and the integrality tolerance of the solver leaves more of a gate open. A model with a
+constant `k` keeps its constant.

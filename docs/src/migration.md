@@ -1065,3 +1065,10 @@ A static `TensorPanelField` and a static feature matrix keep `assets × labels` 
 ### [Calls that now succeed](@id migration-0-34-3-success)
 
 - **`DependentVariableTracking` of a measure with a quadratic risk expression**, such as `Variance()` without a semidefinite phylogeny. v0.34.2 logged a warning at the construction of a `RiskTrackingRiskMeasure`, and the solver refused the model. v0.34.3 states the risk with a rotated second-order cone, and the constructor logs no warning.
+
+## From v0.34.4 to v0.34.5
+
+### [Results that move](@id migration-0-34-5-numbers)
+
+- **The default big-M constant of a mixed-integer model under `MaximumRatio` or `RiskBudgeting`, `ss = nothing`.** These models solve for the weights times a variable `k`, and their rows keep `k` at or below the constant. v0.34.4 read `1000` times the largest weight bound, so a small bound gave a constant below `k`. A book that met every constraint then failed, or the solve returned another book, with `k` at the constant. v0.34.5 also reads the scale of `k`: `10 N / abs(bgt)` for a `RiskBudgeting` of `N` assets, and `10 ohf / mean(max.(mu .- rf, 0))` for a `MaximumRatio`, each times the largest bound when that bound is above one. The constant is the larger of the two.
+  It grows when the largest bound is small, when `bgt` is small, when a `RiskBudgeting` has more than 100 assets, or when a stated `ohf` or a high `rf` makes `k` large. The solver can then take another path to the same book. A stated `ss` does not change, and neither does a model with a constant `k`. Write `ss = 1000 * maximum(abs, bounds)` for the constant of v0.34.4.

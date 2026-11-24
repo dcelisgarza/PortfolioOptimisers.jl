@@ -1,33 +1,65 @@
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    get_mip_ss(ss::Number, args...)
+    get_mip_ss(ss::Nothing, wb::WeightBounds, model::JuMP.Model)
 
-Return the big-M style scaling constant used by MIP constraints.
+Return the big-M constant of the MIP constraints.
 
-When `ss` is a number it is returned directly. When `nothing`, the value is derived from the largest finite bound magnitude in `wb` multiplied by 1000, defaulting to `1000.0` when all bounds are infinite. The optimiser expands an absent bound to a vector before the MIP builders run, so both sides of `wb` are vectors.
+A stated `ss` is returned as it is. A `nothing` takes a constant that the library derives from the weight bounds and from the scale of ``k``.
+
+A row on the weights of the model needs a constant at or above the size of ``\\boldsymbol{y} = k \\boldsymbol{w}``, and a row that makes a gate ``k b`` from a binary ``b`` needs one at or above ``k``. When ``k`` is a number, it is one, and the weight bounds alone size the constant. When ``k`` is a variable, a small weight bound says nothing about ``k``. The constant is then also at least the ceiling that the producer of ``k`` recorded.
+
+No ceiling is exact, because the solution sets ``k``. The gate rows keep ``k`` at or below the constant, so state a larger `ss` when ``k`` of the solution is near it, or when a book that meets every constraint fails.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+M &= \\begin{cases}
+1000\\, b & \\text{if } k \\text{ is a number}\\,, \\\\
+\\max\\left(1000\\, b,\\, \\bar{k} \\max\\left(1,\\, b\\right)\\right) & \\text{otherwise}\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``M``: Big-M constant.
+  - ``b``: The largest magnitude of a finite bound of `wb`, and ``1`` when no bound is finite or every finite bound is zero.
+  - $(math_dict[:k_budget])
+  - $(math_dict[:k_ceil])
 
 # Arguments
 
-  - `ss::Number`: Scaling constant. Returned as-is.
+  - $(arg_dict[:ss_arg])
+  - $(arg_dict[:wb_arg]) The optimiser expands an absent bound to a vector before the MIP builders run, so both sides are vectors.
+  - $(arg_dict[:model])
 
 # Returns
 
-  - `ss::Number`: The scaling constant.
+  - `ss::Number`: The big-M constant.
 
 # Related
 
   - [`mip_constraints`](@ref)
   - [`set_mip_ss_expr!`](@ref)
+  - [`set_maximum_ratio_scale_ceiling!`](@ref)
+  - [`risk_budgeting_scale_ceiling`](@ref)
   - [`WeightBounds`](@ref)
 """
 function get_mip_ss(ss::Number, args...)
     return ss
 end
-function get_mip_ss(::Nothing, wb::WeightBounds)
+function get_mip_ss(::Nothing, wb::WeightBounds, model::JuMP.Model)
     lbv = view(wb.lb, isfinite.(wb.lb))
     ubv = view(wb.ub, isfinite.(wb.ub))
     lb_mag = isempty(lbv) ? 0.0 : maximum(abs, lbv)
     ub_mag = isempty(ubv) ? 0.0 : maximum(abs, ubv)
-    return (iszero(lb_mag) && iszero(ub_mag)) ? 1000.0 : max(lb_mag, ub_mag) * 1000.0
+    b = max(lb_mag, ub_mag)
+    b = ifelse(iszero(b), one(b), b)
+    if isa(get_k(model), Number)
+        return 1000.0 * b
+    end
+    return max(1000.0 * b, shared_get(model, :k_ceil) * max(one(b), b))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -56,7 +88,7 @@ function set_mip_ss_expr!(model::JuMP.Model, ss::Option{<:Number}, wb::WeightBou
     if shared_has(model, :ss)
         return shared_get(model, :ss)
     end
-    return shared_set!(model, :ss, JuMP.@expression(model, get_mip_ss(ss, wb)))
+    return shared_set!(model, :ss, JuMP.@expression(model, get_mip_ss(ss, wb, model)))
 end
 """
 $(DocStringExtensions.TYPEDEF)
