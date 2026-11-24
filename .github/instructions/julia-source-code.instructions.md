@@ -26,11 +26,15 @@ reaches.
   maintainer's decision. Legacy and inertia are never a reason: a released spelling, a public
   name, the count of the callers or the size of the break does not keep a design that a better one
   replaces. A released number that moves is the same cost.
-- **Name the break.** State it in the commit and in `docs/src/migration.md`, where a user reads it.
+- **Name the break.** State it in the commit and in `docs/src/next_release/<feature>.md`, where a
+  user reads it. The page is one change: a `@meta` block with its `Description`, one H1 with the
+  label `(@id migration-next-<feature>)`, and the text. It says "before" and "now", and names no
+  version. A release folds the pages into `docs/src/migration.md`, and no other change edits that
+  guide.
   A docstring states the current behaviour alone.
 - **A bug fix is not a break.** A fix that makes the code do what its documentation states, such
   as an option that a path ignored or a number that was wrong, ships in a patch release. The
-  commit states it, and `docs/src/migration.md` does not list it.
+  commit states it, and no page of the next release lists it.
 - **An ADR binds by the reason that it states.** When that reason is a definition and not
   mathematics, correct the ADR in the fix, as `docs/adr/README.md` states. #1908 is the case:
   `RateRadius` and `RateSignificance` read the count of their siblings, against an amendment of
@@ -632,7 +636,7 @@ keep it:
 - **The name is public, or a hub that callers reach through one name.** Give the hub the
   methods: each form of the input is a method of the public function. When the wrapper itself
   is the public name, remove it all the same. The break is the cost of the better form, and
-  `docs/src/migration.md` names it, as § *A design is chosen by the standing test* states. A
+  `docs/src/next_release/<feature>.md` names it, as § *A design is chosen by the standing test* states. A
   released spelling is never a reason by itself.
 - **The target takes the slot as a keyword, by the precedent of its family.** Give the target a
   method for the form, and keep the keyword in that method.
@@ -960,7 +964,7 @@ is the workflow that applies them.
   reaches, mixed element types among them, compares every output with the base bit for bit. One
   cause of a difference is accepted: a change of the order of a sum, or a BLAS call that now
   takes a contiguous slice, which moves the last few bits. The commit, the ADR of the change and
-  `docs/src/migration.md` then state the largest relative change and its cause. Any other
+  `docs/src/next_release/<feature>.md` then state the largest relative change and its cause. Any other
   difference is a defect of the change.
 - **A claim of speed is a measurement of one run.** The base and the change run in the same
   process order, single-threaded, as the median of five fits after a warm-up. A comparison with

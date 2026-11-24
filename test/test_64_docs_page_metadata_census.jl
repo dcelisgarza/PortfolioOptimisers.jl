@@ -28,6 +28,10 @@ using Test
 const REPO_ROOT = normpath(joinpath(@__DIR__, ".."))
 include(joinpath(REPO_ROOT, "docs", "page_metadata.jl"))
 
+module FoldSeam
+include(joinpath(@__DIR__, "..", "docs", "fold_next_release.jl"))
+end
+
 #=
 The source of every page that states its own description, keyed by the path the page
 renders at under `docs/src`. The generated guide and example pages are read at their Literate
@@ -50,11 +54,14 @@ function described_page_sources(repo::AbstractString)
             sources[file] = path
         end
     end
-    for file in readdir(joinpath(docs_src, "contribute"))
+    # `next_release/` is absent after a release.
+    for dir in ("contribute", "next_release"),
+        file in (isdir(joinpath(docs_src, dir)) ? readdir(joinpath(docs_src, dir)) : [])
+
         if !(endswith(file, ".md"))
             continue
         end
-        sources[joinpath("contribute", file)] = joinpath(docs_src, "contribute", file)
+        sources[joinpath(dir, file)] = joinpath(docs_src, dir, file)
     end
     sources["capability_catalogue.md"] = joinpath(repo, "docs",
                                                   "generate_capability_catalogue.jl")
@@ -274,6 +281,55 @@ end
         @test count(p -> startswith(p, "contribute"), keys(sources)) >= 3
         @test count(p -> startswith(p, "user_guide"), keys(sources)) >= 10
         @test count(p -> startswith(p, "examples"), keys(sources)) >= 60
+    end
+
+    @testset "a fragment of the next release folds into the migration guide" begin
+        #=
+        Each change once added its section at the end of `migration.md`, so every two open pull
+        requests conflicted there. A fragment is a page of its own, and the release folds it.
+        =#
+        fragment = """
+        ```@meta
+        Description = "x"
+        ```
+
+        # [A cap](@id migration-next-cap)
+
+        Text.
+
+        ## Calls
+
+        ```julia
+        # not a heading
+        ```
+        """
+        @test FoldSeam.fold_fragment(fragment) == """
+        ### [A cap](@id migration-next-cap)
+
+        Text.
+
+        #### Calls
+
+        ```julia
+        # not a heading
+        ```"""
+        guide = "# [Migration guide](@id migration)\n\n## From v0.1.0 to v0.2.0\n\nOld.\n"
+        out = FoldSeam.fold(guide, ["# [B](@id b)\n\nB.\n", "# [C](@id c)\n\nC.\n"],
+                            "0.2.0", "0.3.0")
+        @test out ==
+              guide *
+              "\n## From v0.2.0 to v0.3.0\n\n### [B](@id b)\n\nB.\n\n### [C](@id c)\n\nC.\n"
+        @test_throws ErrorException FoldSeam.fold(out, ["# [D](@id d)\n"], "0.2.0", "0.3.0")
+        @test FoldSeam.fragment_paths(joinpath(mktempdir(), "absent")) == String[]
+        # Each fragment of the tree has the form that the script folds, and names no version. A
+        # fragment that names one is wrong as soon as another change takes that version.
+        for path in FoldSeam.fragment_paths()
+            text = read(path, String)
+            h1 = filter(startswith("# "), split(text, '\n'))
+            @test length(h1) == 1 &&
+                  occursin(r"\(@id migration-next-[a-z0-9-]+\)$", only(h1))
+            @test !occursin(r"^#+ .*\bv\d+\.\d+"m, text)
+        end
     end
 
     @testset "every page states a description" begin
