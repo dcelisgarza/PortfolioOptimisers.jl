@@ -23,8 +23,9 @@ function PortfolioOptimisers.plot_portfolio_cumulative_returns(w::VecNum_VecVecN
                                                                ts::AbstractVector = 1:size(X,
                                                                                            1),
                                                                compound::Bool = false,
+                                                               strict::Bool = false,
                                                                kwargs...)
-    ret = calc_net_returns(w, filter_held_gaps(w, X, false), fees)
+    ret = calc_net_returns(w, filter_held_gaps(w, X, strict), fees)
     return PortfolioOptimisers.plot_portfolio_cumulative_returns(ret; ts = ts,
                                                                  compound = compound,
                                                                  kwargs...)
@@ -35,13 +36,14 @@ function PortfolioOptimisers.plot_portfolio_cumulative_returns(w::VecNum_VecVecN
                                                                ts::AbstractVector = 1:size(pr.X,
                                                                                            1),
                                                                compound::Bool = false,
+                                                               strict::Bool = false,
                                                                kwargs...)
     nx = nothing
     if isa(pr, ReturnsResult)
         ts = isnothing(pr.ts) ? (1:size(pr.X, 1)) : pr.ts
         nx = pr.nx
     end
-    ret = calc_net_returns(w, filter_held_gaps(w, pr.X, false; nx = nx), fees)
+    ret = calc_net_returns(w, filter_held_gaps(w, pr.X, strict; nx = nx), fees)
     return PortfolioOptimisers.plot_portfolio_cumulative_returns(ret; ts = ts,
                                                                  compound = compound,
                                                                  kwargs...)
@@ -241,13 +243,14 @@ end
 ## plot_benchmark
 function PortfolioOptimisers.plot_benchmark(w::ArrNum, rd::ReturnsResult,
                                             fees::Option{<:Fees} = nothing;
-                                            compound::Bool = false, kwargs...)
+                                            compound::Bool = false, strict::Bool = false,
+                                            kwargs...)
     if isnothing(rd.B)
         throw(ArgumentError("returns data has no benchmark (`B` is `nothing`)"))
     end
     ts = isnothing(rd.ts) ? (1:size(rd.X, 1)) : rd.ts
     nb = rd.nb
-    ret = calc_net_returns(w, filter_held_gaps(w, rd.X, false; nx = rd.nx), fees)
+    ret = calc_net_returns(w, filter_held_gaps(w, rd.X, strict; nx = rd.nx), fees)
     return PortfolioOptimisers.plot_benchmark(ret, rd.B; ts = ts, nb = nb,
                                               compound = compound, kwargs...)
 end
@@ -277,8 +280,9 @@ function PortfolioOptimisers.plot_benchmark(w::ArrNum, X::MatNum, B::VecNum_VecV
                                             fees::Option{<:Fees} = nothing;
                                             ts::AbstractVector = 1:size(X, 1),
                                             nb::Option{<:AbstractVector} = nothing,
-                                            compound::Bool = false, kwargs...)
-    ret = calc_net_returns(w, filter_held_gaps(w, X, false), fees)
+                                            compound::Bool = false, strict::Bool = false,
+                                            kwargs...)
+    ret = calc_net_returns(w, filter_held_gaps(w, X, strict), fees)
     return PortfolioOptimisers.plot_benchmark(ret, B; ts = ts, nb = nb, compound = compound,
                                               kwargs...)
 end

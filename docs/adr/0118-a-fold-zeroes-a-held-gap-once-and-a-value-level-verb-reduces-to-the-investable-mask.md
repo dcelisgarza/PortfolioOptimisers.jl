@@ -431,9 +431,11 @@ enough, also at a zero weight. Two calls that a caller reads as the same must gi
   `strict` keyword of `predict`. A population of weight vectors is filtered one time.
 - The six plots that form a net return series from weights or a result filter it in the same way:
   `plot_portfolio_cumulative_returns`, `plot_drawdowns`, `plot_histogram`,
-  `plot_rolling_drawdowns`, `plot_rolling_measure` and `plot_benchmark`. They warn and never
-  refuse, because their other keywords go to the figure. This replaces the sentence that a series
+  `plot_rolling_drawdowns`, `plot_rolling_measure` and `plot_benchmark`. They take `strict` too,
+  because the message about a Held Gap names that keyword. This replaces the sentence that a series
   plot reads the funnel. `plot_asset_cumulative_returns` keeps the gap of each line, as before.
+- `plot_portfolio_dashboard` filters one time for its panels, on the view at the Investable Mask, and
+  passes the names of the view. So one message names the assets, and not the columns of the view.
 - `calc_net_returns`, `calc_net_asset_returns` and the value-level verbs, such as `expected_risk`,
   do not change. The scan is paid one time for each report, and never inside a solve.
 - `held_gap_pairs` checks the size of the weights, so a wrong size on a gapped matrix still raises

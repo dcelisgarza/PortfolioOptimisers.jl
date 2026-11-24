@@ -1,14 +1,12 @@
 ## plot_drawdowns
+# The series arity holds the keywords of the figure and their defaults, so the arities that
+# take weights forward them.
 function PortfolioOptimisers.plot_drawdowns(w::ArrNum, rd::ReturnsResult,
                                             fees::Option{<:Fees} = nothing;
-                                            slv::Option{<:Slv_VecSlv} = nothing,
-                                            compound::Bool = false, alpha::Number = 0.05,
-                                            kappa::Number = 0.3, rw = nothing, kwargs...)
+                                            strict::Bool = false, kwargs...)
     ts = isnothing(rd.ts) ? (1:size(rd.X, 1)) : rd.ts
-    ret = calc_net_returns(w, filter_held_gaps(w, rd.X, false; nx = rd.nx), fees)
-    return PortfolioOptimisers.plot_drawdowns(ret; slv = slv, ts = ts, compound = compound,
-                                              alpha = alpha, kappa = kappa, rw = rw,
-                                              kwargs...)
+    ret = calc_net_returns(w, filter_held_gaps(w, rd.X, strict; nx = rd.nx), fees)
+    return PortfolioOptimisers.plot_drawdowns(ret; ts = ts, kwargs...)
 end
 function PortfolioOptimisers.plot_drawdowns(res::OptimisationResult, rd::ReturnsResult;
                                             slv::Option{<:Slv_VecSlv} = nothing,
@@ -33,14 +31,9 @@ end
 ## plot_histogram
 function PortfolioOptimisers.plot_histogram(w::ArrNum, rd::ReturnsResult,
                                             fees::Option{<:Fees} = nothing;
-                                            slv::Option{<:Slv_VecSlv} = nothing,
-                                            alpha::Number = 0.05, kappa::Number = 0.3,
-                                            rw = nothing, points::Integer = 0,
-                                            reference::Bool = true, kwargs...)
-    ret = calc_net_returns(w, filter_held_gaps(w, rd.X, false; nx = rd.nx), fees)
-    return PortfolioOptimisers.plot_histogram(ret; slv = slv, alpha = alpha, kappa = kappa,
-                                              rw = rw, points = points,
-                                              reference = reference, kwargs...)
+                                            strict::Bool = false, kwargs...)
+    ret = calc_net_returns(w, filter_held_gaps(w, rd.X, strict; nx = rd.nx), fees)
+    return PortfolioOptimisers.plot_histogram(ret; kwargs...)
 end
 function PortfolioOptimisers.plot_histogram(res::OptimisationResult, rd::ReturnsResult;
                                             slv::Option{<:Slv_VecSlv} = nothing,
@@ -69,14 +62,10 @@ end
 
 function PortfolioOptimisers.plot_drawdowns(w::ArrNum, X::MatNum,
                                             fees::Option{<:Fees} = nothing;
-                                            slv::Option{<:Slv_VecSlv} = nothing,
                                             ts::AbstractVector = 1:size(X, 1),
-                                            compound::Bool = false, alpha::Number = 0.05,
-                                            kappa::Number = 0.3, rw = nothing, kwargs...)
-    ret = calc_net_returns(w, filter_held_gaps(w, X, false), fees)
-    return PortfolioOptimisers.plot_drawdowns(ret; slv = slv, ts = ts, compound = compound,
-                                              alpha = alpha, kappa = kappa, rw = rw,
-                                              kwargs...)
+                                            strict::Bool = false, kwargs...)
+    ret = calc_net_returns(w, filter_held_gaps(w, X, strict), fees)
+    return PortfolioOptimisers.plot_drawdowns(ret; ts = ts, kwargs...)
 end
 function PortfolioOptimisers.plot_drawdowns(ret::VecNum;
                                             slv::Option{<:Slv_VecSlv} = nothing,
@@ -150,14 +139,9 @@ end
 
 function PortfolioOptimisers.plot_histogram(w::ArrNum, X::MatNum,
                                             fees::Option{<:Fees} = nothing;
-                                            slv::Option{<:Slv_VecSlv} = nothing,
-                                            alpha::Number = 0.05, kappa::Number = 0.3,
-                                            rw = nothing, points::Integer = 0,
-                                            reference::Bool = true, kwargs...)
-    ret = calc_net_returns(w, filter_held_gaps(w, X, false), fees)
-    return PortfolioOptimisers.plot_histogram(ret; slv = slv, alpha = alpha, kappa = kappa,
-                                              rw = rw, points = points,
-                                              reference = reference, kwargs...)
+                                            strict::Bool = false, kwargs...)
+    ret = calc_net_returns(w, filter_held_gaps(w, X, strict), fees)
+    return PortfolioOptimisers.plot_histogram(ret; kwargs...)
 end
 function PortfolioOptimisers.plot_histogram(ret::VecNum;
                                             slv::Option{<:Slv_VecSlv} = nothing,
@@ -300,8 +284,9 @@ function PortfolioOptimisers.plot_rolling_drawdowns(w::ArrNum, X::MatNum,
                                                     fees::Option{<:Fees} = nothing;
                                                     ts::AbstractVector = 1:size(X, 1),
                                                     rolling::Integer = 0,
-                                                    compound::Bool = false, kwargs...)
-    ret = calc_net_returns(w, filter_held_gaps(w, X, false), fees)
+                                                    compound::Bool = false,
+                                                    strict::Bool = false, kwargs...)
+    ret = calc_net_returns(w, filter_held_gaps(w, X, strict), fees)
     return PortfolioOptimisers.plot_rolling_drawdowns(ret; ts = ts, rolling = rolling,
                                                       compound = compound, kwargs...)
 end
@@ -331,9 +316,10 @@ end
 function PortfolioOptimisers.plot_rolling_drawdowns(w::ArrNum, rd::ReturnsResult,
                                                     fees::Option{<:Fees} = nothing;
                                                     rolling::Integer = 0,
-                                                    compound::Bool = false, kwargs...)
+                                                    compound::Bool = false,
+                                                    strict::Bool = false, kwargs...)
     ts = isnothing(rd.ts) ? (1:size(rd.X, 1)) : rd.ts
-    ret = calc_net_returns(w, filter_held_gaps(w, rd.X, false; nx = rd.nx), fees)
+    ret = calc_net_returns(w, filter_held_gaps(w, rd.X, strict; nx = rd.nx), fees)
     return PortfolioOptimisers.plot_rolling_drawdowns(ret; ts = ts, rolling = rolling,
                                                       compound = compound, kwargs...)
 end

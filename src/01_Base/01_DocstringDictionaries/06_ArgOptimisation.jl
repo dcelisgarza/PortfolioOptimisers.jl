@@ -283,6 +283,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :ps_ppy => "`ppy`: Periods per year, the annualisation factor. 252 for daily, 52 for weekly, 12 for monthly returns, and 1 states each figure per period.",#
                  :ps_alpha => "`alpha`: Tail probability of the CVaR, ``\\alpha \\in (0, 1)``.",#
                  :ps_compound => "`compound`: `true` when the drawdown statistics read a compounded wealth path, and `false` when they read the cumulative sum of the returns.",#
+                 :strict_held_gap => "`strict`: Whether a Held Gap of the returns raises an `ArgumentError`. With `false`, it warns and contributes zero. Only the methods that take weights, or an [`OptimisationResult`](@ref), read it.",#
                  :ps_ann_return => "`ann_return`: Annualised arithmetic mean return.",#
                  :ps_ann_volatility => "`ann_volatility`: Annualised sample standard deviation.",#
                  :ps_sharpe => "`sharpe`: Annualised Sharpe ratio, the excess of the mean return over the risk-free rate `rf`, divided by the volatility. It is `NaN` when the volatility is zero.",#

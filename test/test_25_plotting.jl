@@ -1406,6 +1406,35 @@
         @test_throws ArgumentError plot_performance_summary(wh_gp, rd_gp; strict = true)
         @test isequal(ser_gp(plot_performance_summary(w0_gp, rd_gp; strict = true)),
                       ser_gp(plot_performance_summary(w0_gp, X_gp)))
+        # `strict` refuses a Held Gap in each plot, and it lets a gap at a zero weight pass.
+        for f in (plot_portfolio_cumulative_returns, plot_drawdowns, plot_histogram,
+                  plot_rolling_drawdowns,
+                  (w, x; kw...) -> plot_rolling_measure(r_gp, w, x; kw...))
+            for x in (Xg_gp, rd_gp)
+                @test_throws ArgumentError f(wh_gp, x; strict = true)
+                @test isequal(ser_gp(f(w0_gp, x; strict = true)), ser_gp(f(w0_gp, X_gp)))
+            end
+            @test_throws ArgumentError f(res_gp, rd_gp; strict = true)
+        end
+        @test_throws ArgumentError plot_benchmark(wh_gp, Xg_gp, B_gp; strict = true)
+        @test_throws ArgumentError plot_benchmark(wh_gp, rd_gp; strict = true)
+        @test_throws ArgumentError plot_benchmark(res_gp, rd_gp; strict = true)
+        # The dashboard filters once, and its message names the asset, not the column of the
+        # view at the Investable Mask, where "c" is the second column.
+        Xd_gp = copy(X_gp)
+        Xd_gp[:, 1] .= NaN
+        Xd_gp[1:20, 3] .= NaN
+        resd_gp = optimise(EqualWeighted(),
+                           ReturnsResult(; nx = ["a", "b", "c"], X = Xd_gp[21:60, :]))
+        rdd_gp = ReturnsResult(; nx = ["a", "b", "c"], X = Xd_gp)
+        dash_gp(x; kw...) = plot_portfolio_dashboard(resd_gp, x; r = r_gp, kw...)
+        got = @test_logs (:warn, r"Assets \[\"c\"\] carry") dash_gp(rdd_gp)
+        Xdz_gp = map(x -> isfinite(x) ? x : 0.0, Xd_gp)
+        want = dash_gp(ReturnsResult(; nx = ["a", "b", "c"], X = Xdz_gp))
+        @test length(got.series_list) == length(want.series_list)
+        @test all(isequal(g[:y], h[:y])
+                  for (g, h) in zip(got.series_list, want.series_list))
+        @test_throws ArgumentError dash_gp(rdd_gp; strict = true)
     end
 
     @testset "Every result arity pairs the result's two universes (#884)" begin

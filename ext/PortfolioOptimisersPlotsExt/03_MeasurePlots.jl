@@ -119,9 +119,10 @@ end
 function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.BaseRM_VecBaseRM,
                                                   w::VecNum, rd::ReturnsResult,
                                                   fees::Option{<:Fees} = nothing;
-                                                  rolling::Integer = 0, kwargs...)
+                                                  rolling::Integer = 0,
+                                                  strict::Bool = false, kwargs...)
     ts = isnothing(rd.ts) ? (1:size(rd.X, 1)) : rd.ts
-    ret = calc_net_returns(w, filter_held_gaps(w, rd.X, false; nx = rd.nx), fees)
+    ret = calc_net_returns(w, filter_held_gaps(w, rd.X, strict; nx = rd.nx), fees)
     return PortfolioOptimisers.plot_rolling_measure(r, ret; ts = ts, rolling = rolling,
                                                     kwargs...)
 end
@@ -252,8 +253,9 @@ function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.BaseRM_
                                                   w::VecNum, X::MatNum,
                                                   fees::Option{<:Fees} = nothing;
                                                   ts::AbstractVector = 1:size(X, 1),
-                                                  rolling::Integer = 0, kwargs...)
-    ret = calc_net_returns(w, filter_held_gaps(w, X, false), fees)
+                                                  rolling::Integer = 0,
+                                                  strict::Bool = false, kwargs...)
+    ret = calc_net_returns(w, filter_held_gaps(w, X, strict), fees)
     return PortfolioOptimisers.plot_rolling_measure(r, ret; ts = ts, rolling = rolling,
                                                     kwargs...)
 end

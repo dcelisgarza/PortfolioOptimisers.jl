@@ -479,7 +479,7 @@ Every method checks its keywords with [`SummaryOptions`](@ref) first, so no figu
   - `rf`: Risk-free rate for each period, at the frequency of the returns. It defaults to `0`.
   - `measures`: A vector or a tuple of pairs `name::Symbol => r::AbstractBaseRiskMeasure`, the extra risk measures. It defaults to none.
   - `benchmark`: Benchmark return series over the same periods as each entry, or `nothing` for no excess statistics. It defaults to `nothing`, and on a prediction to the benchmark of its rows.
-  - `strict`: Whether a Held Gap of the returns raises an `ArgumentError`. With `false`, it warns and contributes zero. Only the methods that take weights, or an [`OptimisationResult`](@ref), take this keyword.
+  - $(arg_dict[:strict_held_gap])
 
 Every keyword other than `names` is one value for the whole call, so the entries always agree on it.
 
