@@ -29,7 +29,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     KendallCovariance(;
-        ve::AbstractVarianceEstimator = SimpleVariance(),
+        ve::StatsBase.CovarianceEstimator = SimpleVariance(),
         cache::Option{<:AbstractPartialFitState} = nothing
     ) -> KendallCovariance
 
@@ -66,6 +66,7 @@ KendallCovariance
   - [`RankCovarianceEstimator`](@ref)
   - [`SpearmanCovariance`](@ref)
   - [`AbstractVarianceEstimator`](@ref)
+  - [`library_covariance_estimator`](@ref)
   - [`SimpleVariance`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
@@ -78,19 +79,19 @@ KendallCovariance
 """
 @propagatable @concrete struct KendallCovariance <: RankCovarianceEstimator
     """
-    $(field_dict[:ve])
+    $(field_dict[:ve_slot])
     """
     @fprop @vprop ve
     """
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
-    function KendallCovariance(ve::AbstractVarianceEstimator,
+    function KendallCovariance(ve::StatsBase.CovarianceEstimator,
                                cache::Option{<:AbstractPartialFitState})
         return new{typeof(ve), typeof(cache)}(ve, cache)
     end
 end
-function KendallCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
+function KendallCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
                            cache::Option{<:AbstractPartialFitState} = nothing)::KendallCovariance
     return KendallCovariance(ve, cache)
 end
@@ -182,7 +183,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     SpearmanCovariance(;
-        ve::AbstractVarianceEstimator = SimpleVariance(),
+        ve::StatsBase.CovarianceEstimator = SimpleVariance(),
         cache::Option{<:AbstractPartialFitState} = nothing
     ) -> SpearmanCovariance
 
@@ -219,6 +220,7 @@ SpearmanCovariance
   - [`RankCovarianceEstimator`](@ref)
   - [`KendallCovariance`](@ref)
   - [`AbstractVarianceEstimator`](@ref)
+  - [`library_covariance_estimator`](@ref)
   - [`SimpleVariance`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
@@ -229,19 +231,19 @@ SpearmanCovariance
 """
 @propagatable @concrete struct SpearmanCovariance <: RankCovarianceEstimator
     """
-    $(field_dict[:ve])
+    $(field_dict[:ve_slot])
     """
     @fprop @vprop ve
     """
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
-    function SpearmanCovariance(ve::AbstractVarianceEstimator,
+    function SpearmanCovariance(ve::StatsBase.CovarianceEstimator,
                                 cache::Option{<:AbstractPartialFitState})
         return new{typeof(ve), typeof(cache)}(ve, cache)
     end
 end
-function SpearmanCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
+function SpearmanCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
                             cache::Option{<:AbstractPartialFitState} = nothing)::SpearmanCovariance
     return SpearmanCovariance(ve, cache)
 end

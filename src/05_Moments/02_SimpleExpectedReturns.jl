@@ -687,8 +687,7 @@ This method is the block arm of the [`partial_fit!`](@ref) interface. The Welfor
 
 # Algorithm
 
- 1. Orient `X` and `active_mask` to `observations × assets`. Transpose them when `dims == 2`.
- 2. Fold each row in order with the single-observation arm of [`partial_fit!`](@ref), together with its row of the active mask. Rebind the estimator after each row.
+ 1. Fold each row in order with the single-observation arm of [`partial_fit!`](@ref), together with its row of the active mask, through [`fold_rows`](@ref).
 
 # Arguments
 
@@ -715,17 +714,7 @@ function partial_fit!(me::SimpleExpectedReturns{<:Any, <:Any,
                                                 <:Option{<:SimpleExpectedReturnsState}},
                       X::MatNum; dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing)
-    X = dims_oriented(dims, X)
-    amsk = isnothing(active_mask) ? nothing : dims_oriented(dims, active_mask)
-    if !isnothing(amsk)
-        @argcheck(size(amsk) == size(X),
-                  DimensionMismatch("size(X) ($(size(X))) must match size(active_mask) ($(size(amsk)))"))
-    end
-    for i in axes(X, 1)
-        me = partial_fit!(me, view(X, i, :);
-                          active_mask = isnothing(amsk) ? nothing : view(amsk, i, :))
-    end
-    return me
+    return fold_rows(me, X, dims, active_mask)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

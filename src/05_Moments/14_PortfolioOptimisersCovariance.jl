@@ -371,7 +371,7 @@ function covers_an_asset(ce::PortfolioOptimisersCovariance, X::MatNum,
     return covers_an_asset(ce.ce, X, pnl; kwargs...)
 end
 """
-    series_folds(ce::AbstractCovarianceEstimator) -> Bool
+    series_folds(ce::StatsBase.CovarianceEstimator) -> Bool
     series_folds(ce::Covariance{<:Any, <:Any, <:FullMoment, <:Any, <:CoveragePolicy}) -> Bool
     series_folds(ce::Union{ExpWeightedCovariance, RegimeAdjustedExpWeightedCovariance}) -> Bool
     series_folds(ce::PortfolioOptimisersCovariance) -> Bool
@@ -396,7 +396,7 @@ The fallback answers `false`. A mask-aware covariance estimator whose fold over 
   - [`partial_fit!`](@ref)
   - [`reads_active_mask`](@ref)
 """
-function series_folds(::AbstractCovarianceEstimator)
+function series_folds(::StatsBase.CovarianceEstimator)
     return false
 end
 function series_folds(ce::PortfolioOptimisersCovariance)
@@ -449,12 +449,20 @@ function fold_variance_series(ce::PortfolioOptimisersCovariance, X::MatNum,
     return val
 end
 """
-    fold_mask_keywords(ce::AbstractCovarianceEstimator, amsk, emsk) -> NamedTuple
-    fold_mask_keywords(ce::RegimeAdjustedExpWeightedCovariance, amsk, emsk) -> NamedTuple
+    fold_mask_keywords(ce::StatsBase.CovarianceEstimator, amsk, emsk) -> NamedTuple
+    fold_mask_keywords(ce::Union{RegimeAdjustedExpWeightedVariance,
+                                 RegimeAdjustedExpWeightedCovariance}, amsk, emsk)
+        -> NamedTuple
+    fold_mask_keywords(ce::Union{WindowedVariance, WindowedCovariance}, amsk, emsk)
+        -> NamedTuple
+    fold_mask_keywords(ce::PortfolioOptimisersCovariance, amsk, emsk) -> NamedTuple
+    fold_mask_keywords(ce::GeodesicShrinkageCovariance, amsk, emsk) -> NamedTuple
 
-Give the mask keywords of one fold of `ce`, the masks that the panel method of its `cov` reads.
+Give the mask keywords of one fold of `ce`, the masks that its batch fit reads.
 
-The panel method of `cov` of most mask-aware estimators reads the active mask alone, and the fold of [`Covariance`](@ref) takes no other keyword. The regime-adjusted estimator reads the estimation mask too. So [`fold_variance_series`](@ref) gives each fold the masks of its batch fit.
+The fold of every estimator of the library takes the active mask, and the fold of a [`SimpleVariance`](@ref) or a [`Covariance`](@ref) takes no other keyword. The regime-adjusted family reads the estimation mask too, in the batch fit and in the fold. A windowed estimator, a [`PortfolioOptimisersCovariance`](@ref) and a [`GeodesicShrinkageCovariance`](@ref) give their keywords to the fold of their inner estimator, so they answer for it. So [`fold_variance_series`](@ref) and [`cross_sectional_fold_variance`](@ref) give each fold the masks of its batch fit.
+
+A variance estimator of your own gets the active mask alone. If its batch fit and its [`partial_fit!`](@ref) read other masks, it adds a method that gives them.
 
 # Arguments
 
@@ -469,9 +477,13 @@ The panel method of `cov` of most mask-aware estimators reads the active mask al
 # Related
 
   - [`fold_variance_series`](@ref)
+  - [`cross_sectional_fold_variance`](@ref)
 """
-function fold_mask_keywords(::AbstractCovarianceEstimator, amsk, ::Any)
+function fold_mask_keywords(::StatsBase.CovarianceEstimator, amsk, ::Any)
     return (; active_mask = amsk)
+end
+function fold_mask_keywords(ce::PortfolioOptimisersCovariance, amsk, emsk)
+    return fold_mask_keywords(ce.ce, amsk, emsk)
 end
 """
     variance_series(ce::PortfolioOptimisersCovariance, X::MatNum; dims::Int = 1, kwargs...)
@@ -932,3 +944,4 @@ function variance_count(ce::PortfolioOptimisersCovariance{<:Any, <:MatrixProcess
 end
 
 export PortfolioOptimisersCovariance
+public fold_mask_keywords

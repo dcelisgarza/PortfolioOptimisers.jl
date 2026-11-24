@@ -436,7 +436,7 @@ $(DocStringExtensions.FIELDS)
         theta::Real = 0.99,
         strength::AbstractPenaltyStrength = MiddleOfPath(),
         sdiv::Option{<:AbstractStrengthDivergence} = nothing,
-        ve::Option{<:AbstractVarianceEstimator} = nothing,
+        ve::Option{<:StatsBase.CovarianceEstimator} = nothing,
         iters::Integer = 10_000,
         tol::Real = 1e-10,
         w::Option{<:ObsWeights} = nothing,
@@ -516,7 +516,7 @@ true
     """
     sdiv
     """
-    $(field_dict[:ve]) It standardises each penalised column, or `nothing` to fit the columns as they are.
+    $(field_dict[:ve_slot]) It standardises each penalised column, or `nothing` to fit the columns as they are.
     """
     ve
     """
@@ -537,8 +537,8 @@ true
     ic
     function ElasticNet(theta::Real, strength::AbstractPenaltyStrength,
                         sdiv::Option{<:AbstractStrengthDivergence},
-                        ve::Option{<:AbstractVarianceEstimator}, iters::Integer, tol::Real,
-                        w::Option{<:ObsWeights}, ic::Option{<:Integer})
+                        ve::Option{<:StatsBase.CovarianceEstimator}, iters::Integer,
+                        tol::Real, w::Option{<:ObsWeights}, ic::Option{<:Integer})
         @argcheck(zero(theta) <= theta <= one(theta),
                   DomainError(theta, "theta must be in [0, 1]"))
         @argcheck(!(iszero(theta) && isa(strength, MiddleOfPath)),
@@ -559,7 +559,7 @@ end
 function ElasticNet(; theta::Real = 0.99,
                     strength::AbstractPenaltyStrength = MiddleOfPath(),
                     sdiv::Option{<:AbstractStrengthDivergence} = nothing,
-                    ve::Option{<:AbstractVarianceEstimator} = nothing,
+                    ve::Option{<:StatsBase.CovarianceEstimator} = nothing,
                     iters::Integer = 10_000, tol::Real = 1e-10,
                     w::Option{<:ObsWeights} = nothing,
                     ic::Option{<:Integer} = nothing)::ElasticNet
@@ -924,7 +924,7 @@ Return the standardised design of an [`ElasticNet`](@ref), the design with each 
 
 # Algorithm
 
- 1. When `tgt.ve` is `nothing`, set the scale `s` to `nothing`. Otherwise take the standard deviation of each column of `X` under `tgt.ve`, and put one in place of a zero and in place of the intercept column `tgt.ic`. That is `s`.
+ 1. When `tgt.ve` is `nothing`, set the scale `s` to `nothing`. Otherwise take the standard deviation of each column of `X` under `tgt.ve`, through [`library_covariance_estimator`](@ref), and put one in place of a zero and in place of the intercept column `tgt.ic`. That is `s`.
  2. Divide each column of `X` by its entry of `s`, which gives `P`. When `s` is `nothing`, `P` is `X`.
  3. Resolve `tgt.w` against `X` with [`get_observation_weights`](@ref), and scale it with [`glm_weights`](@ref), which gives `v`. When `v` is `nothing`, `Q` is `P`. Otherwise multiply each row of `P` by its entry of `v`, which gives `Q`.
 
@@ -946,7 +946,8 @@ function elastic_net_design(tgt::ElasticNet, X::MatNum)
     s = if isnothing(tgt.ve)
         nothing
     else
-        sd = map(v -> iszero(v) ? one(v) : v, vec(Statistics.std(tgt.ve, X; dims = 1)))
+        sd = map(v -> iszero(v) ? one(v) : v,
+                 vec(Statistics.std(library_covariance_estimator(tgt.ve), X; dims = 1)))
         if !isnothing(tgt.ic)
             sd[tgt.ic] = one(eltype(sd))
         end
