@@ -47,7 +47,7 @@ const SquaredRiskMeasures = Union{Variance, BrownianDistanceVariance,
 
 Union of the risk measures whose risk expression in a JuMP model is quadratic in the weights.
 
-The tracking constraint of a dependent variable and the near-optimal centering read the union, because a quadratic expression needs a different encoding there than an affine one.
+The near-optimal centering reads the union, because a quadratic expression needs a different encoding there than an affine one.
 
 # Related
 

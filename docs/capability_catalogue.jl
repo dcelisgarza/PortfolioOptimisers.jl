@@ -175,6 +175,11 @@ const NOT_A_CHOICE = Dict{Symbol, Symbol}(
                                           # drawdown measure.
                                           :NetReturnsRiskSeries => :internal,
                                           :DrawdownRiskSeries => :internal,
+                                          # The request that a tracking builder puts into the
+                                          # bound slot of the measure that it tracks (#2283).
+                                          # The capability is the tracking measure, and a caller
+                                          # never holds the request.
+                                          :TrackedRiskBound => :internal,
                                           # The geometry token that `AdaptiveSubgradient`
                                           # constructs at every step from the gradient mass
                                           # it has accrued (ADR 0168). The capability is
@@ -508,7 +513,8 @@ const CATALOGUE = [Section("Core abstractions",
                                                   [Cap(:PairwiseSlopeSum),
                                                    Cap(:RegressionSlope)]),
                                             Cap(:CompositeTrend), Cap(:KernelTrendPattern)]),
-                                     Cap(:PriorExpectedReturns)]),
+                                     Cap(:PriorExpectedReturns),
+                                     Cap(:RobustExpectedReturns)]),
                             Section("Variance and standard deviation",
                                     [Prose("Overloads `Statistics.var` and `Statistics.std`."),
                                      Cap(:SimpleVariance), Cap(:WindowedVariance)]),
@@ -538,6 +544,21 @@ const CATALOGUE = [Section("Core abstractions",
                                            [Cap(:KendallCovariance),
                                             Cap(:SpearmanCovariance)]),
                                      Cap(:RankOneCovariance),
+                                     Group("Robust covariances",
+                                           [Group(Cap(:MCDCovariance),
+                                                  [Cap(:DetMCD), Cap(:FastMCD),
+                                                   Cap(:MCDReweighting),
+                                                   Cap(:MCDSmallSampleCorrection),
+                                                   Cap(:MCDShrinkage)]),
+                                            Group(Cap(:TylerCovariance),
+                                                  [Group(Cap(:TylerShrinkage),
+                                                         [Cap(:TraceNormalisedShrinkage),
+                                                          Cap(:PenalisedShrinkage)])]),
+                                            Group("Shrinkage intensities",
+                                                  [Cap(:ConditionNumberIntensity),
+                                                   Cap(:SphericityIntensity),
+                                                   Cap(:OracleIntensity),
+                                                   Cap(:AsymptoticIntensity)])]),
                                      Group(Cap(:MutualInfoCovariance),
                                            [Group(Cap(:BinWidthBins),
                                                   [Cap(:Knuth;

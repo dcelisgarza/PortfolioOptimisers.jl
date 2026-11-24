@@ -285,12 +285,13 @@ Convert an upper-bound value to the appropriate scale for the second-moment boun
 
 Scales `ub` by `inv(factor)` and, when the formulation is not `SOCRiskExpr`, applies a
 square-root transformation to convert from variance to standard-deviation units. Returns
-`nothing` when `ub` is `nothing`.
+`nothing` when `ub` is `nothing`. A `Frontier` and a [`TrackedRiskBound`](@ref) take the
+scale and the transformation as their `factor` and their `bound`.
 
 # Arguments
 
   - `alg::SecondMomentFormulation`: Second-moment risk formulation (e.g. `SOCRiskExpr`).
-  - `ub`: Upper bound value (scalar, vector, `Frontier`, or `nothing`).
+  - `ub`: Upper bound value (scalar, vector, `Frontier`, [`TrackedRiskBound`](@ref), or `nothing`).
   - `factor::Number`: Variance correction factor.
 
 # Returns
@@ -306,6 +307,13 @@ function second_moment_bound_val(::SecondMomentFormulation, ub::Frontier, factor
 end
 function second_moment_bound_val(::SOCRiskExpr, ub::Frontier, factor::Number)
     return Frontier(ub.N, inv(factor), LinearBound())
+end
+function second_moment_bound_val(::SecondMomentFormulation, ub::TrackedRiskBound,
+                                 factor::Number)
+    return TrackedRiskBound(ub, inv(factor), SquareRootBound())
+end
+function second_moment_bound_val(::SOCRiskExpr, ub::TrackedRiskBound, factor::Number)
+    return TrackedRiskBound(ub, inv(factor), LinearBound())
 end
 function second_moment_bound_val(::SecondMomentFormulation, ub::VecNum, factor::Number)
     return inv(factor) * sqrt.(ub)
@@ -400,9 +408,162 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add even-moment risk constraints to `model` for [`LowOrderMoment`](@ref) with [`EvenMoment`](@ref).
+Add an even moment to `model`, bound it by `settings.ub`, and add it to the risk that the objective reads.
 
-Introduces auxiliary variables `even_moment_u`, `even_moment_t`, and `even_moment_risk`, and adds a chain of power cone constraints encoding the ``2p``-th central (full) or lower (semi) even moment of portfolio returns relative to the target. Registers the risk expression and upper-bound constraint.
+[`set_even_moment_risk!`](@ref) adds the epigraph of the ``2p``-th central (full) or lower (semi) even moment, which the objective reads.
+
+The target scales with ``k``, because the model subtracts it from the returns of the unscaled weights.
+
+Under a unit budget the moment has degree two in the unscaled weights, and the row of [`set_risk_upper_bound!`](@ref) needs degree one. [`set_even_moment_bound!`](@ref) then adds the model that the bound acts on, with ``k`` in its cones. That model is exact at the level of the bound alone. A [`TrackedRiskBound`](@ref) that has to hold at every level adds a second epigraph, with ``k`` in its cones and in units of the level. A bound whose [`risk_bound_level`](@ref) is zero has no unit, and [`set_risk_epigraphs!`](@ref) then adds a second epigraph in the units of the moment. A measure that no objective reads adds the model of its bound alone. A measure without a bound, and every measure under another head, adds one model.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::LowOrderMoment{<:Any, <:Any, <:Any, <:EvenMoment}`: The even-moment risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `risk`: The epigraph variable of the even moment, the risk expression. Under a unit budget it is the expression that the bound acts on when the measure is only a bound.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`EvenMoment`](@ref)
+  - [`set_risk_constraints!`](@ref)
+  - [`set_even_moment_risk!`](@ref)
+  - [`set_even_moment_bound!`](@ref)
+  - [`even_moment_bound_val`](@ref)
+  - [`calc_risk_constraint_target`](@ref)
+  - [`set_variance_risk_bounds_and_expression!`](@ref)
+"""
+function set_risk_constraints!(model::JuMP.Model, i::Any,
+                               r::LowOrderMoment{<:Any, <:Any, <:Any, <:EvenMoment},
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
+    w = get_w(model, prefix)
+    # The target is subtracted from the returns of the unscaled weights, so it scales with
+    # the variable.
+    tgt = calc_risk_constraint_target(model, r, w, pr.mu, get_k(model))
+    net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
+    T = length(net_X)
+    ow = checked_observation_weights(nothing_scalar_array_selector(r.w, pr.w), net_X)
+    # A row of weight zero does not change the moment, but the power cone row of a large loss
+    # can stop the solver far from the optimum, as in the EVaR and power-norm programmes.
+    rows = positive_weight_rows(ow, T)
+    even_moment = state_set!(model, prefix, :even_moment_, i,
+                             JuMP.@expression(model, net_X .- tgt))
+    # Each name is assigned once, because the closure below captures it.
+    Td, wi = if isnothing(ow)
+        T - r.alg.ddof, nothing
+    else
+        (T - r.alg.ddof) / T * sum(ow), view(ow, rows)
+    end
+    ub = r.settings.ub
+    level, exact = risk_bound_level(ub)
+    # A level of zero gives the model of the bound no unit.
+    if level > zero(level) && is_unit_budget(model)
+        bound = if exact
+            bp = nested_prefix(prefix, :bound_)
+            scaled_moment = state_set!(model, bp, :even_moment_, i,
+                                       JuMP.@expression(model, even_moment ./ sqrt(level)))
+            set_even_moment_risk!(model, i, r.alg, scaled_moment, rows, wi, Td,
+                                  get_k(model); prefix = bp)
+        else
+            set_even_moment_bound!(model, i, r.alg, even_moment, rows, wi, Td, level;
+                                   prefix = prefix)
+        end
+        ub = even_moment_bound_val(ub)
+        # A measure that is only a bound has no term to build.
+        risk = if reads_risk_term(r.settings)
+            set_even_moment_risk!(model, i, r.alg, even_moment, rows, wi, Td,
+                                  effective_k(model); prefix = prefix)
+        else
+            bound
+        end
+    else
+        risk, bound = set_risk_epigraphs!(model, reads_risk_term(r.settings),
+                                          !isnothing(ub); prefix = prefix) do k, p
+            return set_even_moment_risk!(model, i, r.alg, even_moment, rows, wi, Td, k;
+                                         prefix = p)
+        end
+    end
+    set_variance_risk_bounds_and_expression!(model, opt, bound, ub, :even_moment_risk_, i,
+                                             risk, r.settings; prefix = prefix)
+    return risk
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the deviations that an even moment reads, over the observations in `rows`.
+
+  - [`FullMoment`](@ref) reads the deviations from the target.
+  - [`SemiMoment`](@ref) reads the lower deviations. The method adds them as variables on the first call for the measure, and a later call returns them.
+
+# JuMP formulation
+
+## Variables
+
+  - `even_lower_moment_`: created by the semi method, ``\\boldsymbol{l} \\geq \\boldsymbol{0}``.
+
+## Constraints
+
+  - `ceven_lower_moment_mar_`: ``s_c \\left(d_t + l_t\\right) \\geq 0``, registered by the semi method.
+
+Where:
+
+  - ``d_t``: Entry ``t`` of the deviations, `even_moment`.
+  - ``l_t``: Lower deviation of observation ``t``.
+  - $(math_dict[:sc_scale])
+
+Each name carries the index `i` of the measure, and the namespace `prefix`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `alg`: The moment algorithm, [`FullMoment`](@ref) or [`SemiMoment`](@ref).
+  - `even_moment::VecJuMPScalar`: The deviations from the target, one for each observation.
+  - `rows`: The observations of positive weight.
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace of the build (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `dev`: The deviations, a vector of JuMP scalars.
+
+# Related
+
+  - [`EvenMoment`](@ref)
+  - [`set_even_moment_risk!`](@ref)
+  - [`set_even_moment_bound!`](@ref)
+"""
+function set_even_moment_deviations!(::JuMP.Model, ::Any, ::FullMoment,
+                                     even_moment::VecJuMPScalar, rows;
+                                     prefix::Symbol = Symbol(""))
+    return view(even_moment, rows)
+end
+function set_even_moment_deviations!(model::JuMP.Model, i::Any, ::SemiMoment,
+                                     even_moment::VecJuMPScalar, rows;
+                                     prefix::Symbol = Symbol(""))
+    return state_build!(model, prefix, :even_lower_moment_, i) do
+        sc = get_constraint_scale(model)
+        dev = JuMP.@variable(model, [1:length(rows)], lower_bound = 0)
+        state_set!(model, prefix, :ceven_lower_moment_mar_, i,
+                   JuMP.@constraint(model, sc * (view(even_moment, rows) + dev) >= 0))
+        return dev
+    end
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add the epigraph of an even moment, the risk that the objective reads, and return its variable.
+
+The method adds the variables `even_moment_u_`, `even_moment_t_` and `even_moment_risk_`, and a chain of power cone rows.
 
 # Mathematical definition
 
@@ -429,7 +590,7 @@ Where:
   - $(math_dict[:I_pos_obs])
   - ``T_d = T - \\mathrm{ddof}``: Effective sample size.
   - $(math_dict[:T])
-  - ``k``: Budget-scaling / homogenisation variable.
+  - ``k``: Budget-scaling / homogenisation variable, the `k` argument. The objective reads ``1`` in its place under a unit budget, [`effective_k`](@ref), so the model minimises the moment of the unscaled weights. The target ``\\mu`` always scales with the variable.
   - ``p``: Order parameter; the moment order is ``2p``.
   - ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal\\boldsymbol{w}``: Portfolio return at time ``t``.
   - ``\\mu``: Target return.
@@ -439,80 +600,181 @@ Where:
 
   - $(arg_dict[:model])
   - $(arg_dict[:ci])
-  - `r::LowOrderMoment{<:Any, <:Any, <:Any, <:EvenMoment}`: The even-moment risk measure.
-  - $(arg_dict[:opt_rjumpe])
-  - $(arg_dict[:pr])
+  - `alg::EvenMoment`: The algorithm of the measure, read for its order and its moment.
+  - `even_moment::VecJuMPScalar`: The deviations from the target, one for each observation.
+  - `rows`: The observations of positive weight.
+  - `wi`: The positive observation weights, or `nothing`.
+  - `Td::Number`: The effective sample size.
+  - `k`: The scale that the cones divide by, [`effective_k`](@ref) or [`get_k`](@ref).
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace of the build (default: empty, i.e. the bare key).
 
 # Returns
 
-  - `even_moment_risk`: The epigraph variable of the even moment, the risk expression.
+  - `even_moment_risk`: The epigraph variable of the even moment.
 
 # Related
 
-  - [`LowOrderMoment`](@ref)
   - [`EvenMoment`](@ref)
   - [`set_risk_constraints!`](@ref)
-  - [`calc_risk_constraint_target`](@ref)
-  - [`set_risk_bounds_and_expression!`](@ref)
+  - [`set_even_moment_deviations!`](@ref)
+  - [`effective_k`](@ref)
 """
-function set_risk_constraints!(model::JuMP.Model, i::Any,
-                               r::LowOrderMoment{<:Any, <:Any, <:Any, <:EvenMoment},
-                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
-                               prefix::Symbol = Symbol(""), kwargs...)
-    w = get_w(model, prefix)
-    k = effective_k(model)
+function set_even_moment_risk!(model::JuMP.Model, i::Any, alg::EvenMoment,
+                               even_moment::VecJuMPScalar, rows, wi::Option{<:VecNum},
+                               Td::Number, k; prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
-    tgt = calc_risk_constraint_target(model, r, w, pr.mu, k)
-    net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
-    T = length(net_X)
-    p = r.alg.p
-    Td = T - r.alg.ddof
-    wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = checked_observation_weights(wi, net_X)
-    # A row of weight zero does not change the moment, but the power cone row of a large loss
-    # can stop the solver far from the optimum, as in the EVaR and power-norm programmes.
-    rows = positive_weight_rows(wi, T)
     N = length(rows)
-    even_moment_u = state_set!(model, prefix, :even_moment_u_, i,
-                               JuMP.@variable(model, [1:N]))
-    even_moment_t = state_set!(model, prefix, :even_moment_t_, i,
-                               JuMP.@variable(model, [1:N]))
+    u = state_set!(model, prefix, :even_moment_u_, i, JuMP.@variable(model, [1:N]))
+    t = state_set!(model, prefix, :even_moment_t_, i, JuMP.@variable(model, [1:N]))
     even_moment_risk = state_set!(model, prefix, :even_moment_risk_, i,
                                   JuMP.@variable(model, lower_bound = 0))
-    even_moment = state_set!(model, prefix, :even_moment_, i,
-                             JuMP.@expression(model, net_X .- tgt))
     state_set!(model, prefix, :ceven_moment_s_, i,
                if isnothing(wi)
-                   JuMP.@constraint(model,
-                                    sc * (sum(even_moment_u) - even_moment_risk) <= 0)
+                   JuMP.@constraint(model, sc * (sum(u) - even_moment_risk) <= 0)
                else
-                   Td = Td / T * sum(wi)
                    JuMP.@constraint(model,
-                                    sc *
-                                    (LinearAlgebra.dot(even_moment_u, view(wi, rows)) -
-                                     even_moment_risk) <= 0)
+                                    sc * (LinearAlgebra.dot(u, wi) - even_moment_risk) <= 0)
                end)
     state_set!(model, prefix, :cpoweven_moment_p_, i,
                JuMP.@constraint(model, [j = 1:N],
-                                [sc * even_moment_u[j] * Td, sc * even_moment_risk,
-                                 sc * even_moment_t[j]] in JuMP.MOI.PowerCone(inv(p))))
-    if isa(r.alg.alg, FullMoment)
-        state_set!(model, prefix, :cpoweven_moment_, i,
-                   JuMP.@constraint(model, [j = 1:N],
-                                    [sc * even_moment_t[j], sc * k,
-                                     sc * even_moment[rows[j]]] in JuMP.MOI.PowerCone(0.5)))
-    else
-        even_lower_moment = state_set!(model, prefix, :even_lower_moment_, i,
-                                       JuMP.@variable(model, [1:N], (lower_bound = 0)))
-        state_set!(model, prefix, :ceven_lower_moment_mar_, i,
-                   JuMP.@constraint(model,
-                                    sc * (view(even_moment, rows) + even_lower_moment) >= 0))
-        state_set!(model, prefix, :cpoweven_moment_, i,
-                   JuMP.@constraint(model, [j = 1:N],
-                                    [sc * even_moment_t[j], sc * k,
-                                     sc * even_lower_moment[j]] in JuMP.MOI.PowerCone(0.5)))
-    end
-    set_risk_bounds_and_expression!(model, opt, even_moment_risk, r.settings,
-                                    :even_moment_risk_, i; prefix = prefix)
+                                [sc * u[j] * Td, sc * even_moment_risk, sc * t[j]] in
+                                JuMP.MOI.PowerCone(inv(alg.p))))
+    dev = set_even_moment_deviations!(model, i, alg.alg, even_moment, rows; prefix = prefix)
+    state_set!(model, prefix, :cpoweven_moment_, i,
+               JuMP.@constraint(model, [j = 1:N],
+                                [sc * t[j], sc * k, sc * dev[j]] in JuMP.MOI.PowerCone(0.5)))
     return even_moment_risk
+end
+"""
+    even_moment_bound_val(ub::Number)
+    even_moment_bound_val(ub::TrackedRiskBound)
+
+Converts a bound into the units of the expression of [`set_even_moment_bound!`](@ref).
+
+The expression is in units of the bound, so a bound of one number is `1`. A [`TrackedRiskBound`](@ref) takes the inverse of its `level` as its `factor`. Away from the level the expression of [`set_even_moment_bound!`](@ref) is a power of the risk, so the conversion holds at the level alone. The scaled epigraph of a request with `exact = true` is the risk in units of the level, so the conversion holds at every level.
+
+# Arguments
+
+  - `ub`: The bound, whose [`risk_bound_level`](@ref) is positive.
+
+# Returns
+
+  - `ub`: The converted bound.
+
+# Related
+
+  - [`set_even_moment_bound!`](@ref)
+  - [`risk_bound_level`](@ref)
+"""
+function even_moment_bound_val(ub::Number)
+    return one(ub)
+end
+function even_moment_bound_val(ub::TrackedRiskBound)
+    return TrackedRiskBound(ub, inv(ub.level), LinearBound())
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add the model that the bound `ub` of an even moment acts on under a unit budget, and return its expression.
+
+The expression has degree one in the unscaled weights and ``k``, and it is in units of the bound. So the bound row of [`set_risk_upper_bound!`](@ref) holds it under ``1 \\cdot k``. Each entry of the cones has the size of ``k`` when the bound binds. A copy of the epigraph of the objective with ``k`` in its cones has entries of the size of the moment, about ``10^{-5}`` for daily returns, and an interior point solver can stop on it.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+b(\\boldsymbol{y}, k) &= \\frac{1}{T_d} \\sum_{t \\in \\mathcal{I}} u_t\\,, \\quad u_t \\geq \\frac{s_t^{p}}{k^{p - 1}}\\,, \\quad s_t \\geq \\frac{q_t^{1/p} d_t^{2}}{u_b k}\\,, \\\\
+b(\\boldsymbol{y}, k) \\leq k &\\quad\\Leftrightarrow\\quad \\left(\\frac{1}{T_d} \\sum_{t \\in \\mathcal{I}} q_t \\left\\lvert \\frac{d_t}{k} \\right\\rvert^{2p}\\right)^{1/p} \\leq u_b\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``b``: The expression.
+  - ``d_t``: Deviation ``t`` of the unscaled weights, from [`set_even_moment_deviations!`](@ref).
+  - ``u_t``, ``s_t``: Auxiliary variables.
+  - ``u_b``: The bound, `ub`.
+  - ``q_t``: Weight of observation ``t``, ``1`` without observation weights.
+  - ``T_d``: Effective sample size, `Td`.
+  - ``p``: Order parameter; the moment order is ``2p``.
+  - $(math_dict[:y_homog])
+  - $(math_dict[:k_budget])
+  - $(math_dict[:I_pos_obs])
+
+# JuMP formulation
+
+## Variables
+
+  - `bound_even_moment_u_`: created, ``\\boldsymbol{u}``.
+  - `bound_even_moment_t_`: created, ``\\boldsymbol{s}``.
+
+## Expressions
+
+  - `bound_even_moment_risk_`: ``b``.
+
+## Constraints
+
+  - `bound_cpoweven_moment_p_`: ``\\left(s_c u_t, s_c k, s_c s_t\\right) \\in \\mathcal{K}_{\\mathrm{pow}}(1 / p)``.
+  - `bound_cpoweven_moment_`: ``\\left(s_c s_t, s_c k, s_c q_t^{1/(2p)} d_t / \\sqrt{u_b}\\right) \\in \\mathcal{K}_{\\mathrm{pow}}(1 / 2)``.
+
+Where:
+
+  - ``\\mathcal{K}_{\\mathrm{pow}}(\\alpha)``: Power cone ``\\{(a, b, c) : a^{\\alpha}\\,b^{1-\\alpha} \\geq |c|,\\; a, b \\geq 0\\}``.
+  - $(math_dict[:sc_scale])
+
+Each name carries the index `i` of the measure, and the namespace `prefix`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `alg::EvenMoment`: The algorithm of the measure, read for its order and its moment.
+  - `even_moment::VecJuMPScalar`: The deviations from the target, one for each observation.
+  - `rows`: The observations of positive weight.
+  - `wi`: The positive observation weights, or `nothing`.
+  - `Td::Number`: The effective sample size.
+  - `ub::Number`: The bound.
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace of the build (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `bound`: The expression ``b``.
+
+# Related
+
+  - [`EvenMoment`](@ref)
+  - [`set_risk_constraints!`](@ref)
+  - [`set_even_moment_deviations!`](@ref)
+  - [`set_risk_upper_bound!`](@ref)
+"""
+function set_even_moment_bound!(model::JuMP.Model, i::Any, alg::EvenMoment,
+                                even_moment::VecJuMPScalar, rows, wi::Option{<:VecNum},
+                                Td::Number, ub::Number; prefix::Symbol = Symbol(""))
+    sc = get_constraint_scale(model)
+    k = get_k(model)
+    bp = nested_prefix(prefix, :bound_)
+    N = length(rows)
+    # The weight of an observation enters through its deviation, so every budget coefficient
+    # is equal.
+    iub = inv(sqrt(ub))
+    c = isnothing(wi) ? fill(iub, N) : iub .* wi .^ inv(2 * alg.p)
+    dev = set_even_moment_deviations!(model, i, alg.alg, even_moment, rows; prefix = prefix)
+    u = state_set!(model, bp, :even_moment_u_, i, JuMP.@variable(model, [1:N]))
+    t = state_set!(model, bp, :even_moment_t_, i, JuMP.@variable(model, [1:N]))
+    state_set!(model, bp, :cpoweven_moment_p_, i,
+               JuMP.@constraint(model, [j = 1:N],
+                                [sc * u[j], sc * k, sc * t[j]] in
+                                JuMP.MOI.PowerCone(inv(alg.p))))
+    state_set!(model, bp, :cpoweven_moment_, i,
+               JuMP.@constraint(model, [j = 1:N],
+                                [sc * t[j], sc * k, sc * c[j] * dev[j]] in
+                                JuMP.MOI.PowerCone(0.5)))
+    return state_set!(model, bp, :even_moment_risk_, i,
+                      JuMP.@expression(model, sum(u) / Td))
 end

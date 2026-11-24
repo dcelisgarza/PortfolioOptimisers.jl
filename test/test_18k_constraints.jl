@@ -852,13 +852,14 @@ end
 
     tr = RiskTrackingError(; err = 0.5, tr = WeightsTracking(; w = w0),
                            alg = IndependentVariableTracking())
-    opt = JuMPOptimiser(; pe = pr, slv = slv, tr = tr)
+    # At the default scale the solver leaves each book about 1e-3 from the optimum.
+    opt = JuMPOptimiser(; pe = pr, slv = slv, tr = tr, so = 1e3)
     mre = MeanRisk(; obj = MaximumRatio(), opt = opt)
     res = optimise(mre)
     @test isapprox(res.w,
                    optimise(MeanRisk(; obj = MaximumRatio(),
-                                     opt = JuMPOptimiser(; pe = pr, slv = slv))).w,
-                   rtol = 5e-4)
+                                     opt = JuMPOptimiser(; pe = pr, slv = slv, so = 1e3))).w,
+                   rtol = 1e-4)
 
     tr = RiskTrackingError(; err = 0, tr = WeightsTracking(; w = w0),
                            alg = IndependentVariableTracking())

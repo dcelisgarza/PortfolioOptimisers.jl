@@ -18,7 +18,6 @@ mip_key
 mip_bit_space
 mip_wx!
 mip_bounds
-use_direct_mip_indicators
 held
 held_bin
 set_mip_indicators!

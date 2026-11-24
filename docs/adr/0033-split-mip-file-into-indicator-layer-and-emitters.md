@@ -126,3 +126,29 @@ for the feature.**
 Item 5 calls `k` free. Since #1844 and #1845 the `k` of `RiskBudgeting` is a variable bounded by
 `k >= kmin >= 0` (ADR 0126), so "free" means only that `k` is not the number `1`. The log barrier still fixes the scale of the
 unscaled weights, and `effective_k` still answers `1` under a unit budget.
+
+## Amendment (2026-11-23)
+
+Item 5 gave one predicate to four sites. One of them, the choice of the gates of the asset space, read
+it wrongly (#2275). `effective_k` is `1` for the builder of a risk or of a penalty, because the
+objective of `RiskBudgeting` measures the scaled weights alone. A bound, a threshold, a target or
+the gate of a binary reads `get_k` under every head, because the head divides the weights by `k`
+after the solve. `is_unit_budget` stays the one predicate of the record. `effective_k` reads it, and
+so does a builder that gives one risk to the objective and to a bound (#2279).
+
+A risk expression that reads `effective_k` has a degree above one in the scaled weights, so it cannot
+also be the expression of the bound row `risk <= ub * k` (#2279). `set_risk_epigraphs!` builds such a
+risk once with each scale when a measure has a bound under a unit budget, and once in every other
+case. The bound of a semidefinite variance takes the second-order cone of the deviation, which is
+exact on the weights and needs no second lift. The bound of an even moment takes the model
+of `set_even_moment_bound!`, in units of the bound. On 96 small models Clarabel solved all of them in
+that form, and 32 with the norm of order `2p` or with a copy of the epigraph with `k` in its
+cones.
+
+A tracking builder has the same need for a tracked measure of any degree (#2283), and it cannot call
+`set_risk_epigraphs!` for it. It puts a `TrackedRiskBound` into the bound slot of the tracked measure.
+The builder of the measure converts this request as it converts a bound, and `set_risk_upper_bound!`
+registers the expression of degree one in place of a row. The tracking builder then writes its own row,
+so the keys of the rows do not move, and every head honours the bound. The rejected form gave the
+tracked measure the bound as its own `settings.ub`. A `FactorRiskContribution` ignores that bound, and the
+dependent mode needs an expression and not a row.
