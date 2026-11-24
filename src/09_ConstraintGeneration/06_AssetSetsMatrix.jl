@@ -251,7 +251,7 @@ function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::UniverseSets)
 end
 """
     asset_sets_matrix(smtx::VecMatNum_ASetMatE,
-                      sets::UniverseSets)
+                      sets::Option{<:UniverseSets})
 
 Apply [`asset_sets_matrix`](@ref) to each entry of the vector.
 
@@ -260,7 +260,7 @@ Each entry dispatches to its own method, so one vector can hold estimators and p
 # Arguments
 
   - `smtx`: A vector whose entries are each an [`AssetSetsMatrixEstimator`](@ref) or a precomputed numeric matrix.
-  - `sets`: A [`UniverseSets`](@ref) that holds the asset universe and the groups.
+  - `sets`: A [`UniverseSets`](@ref) that holds the asset universe and the groups, or `nothing` when no entry is an estimator.
 
 # Validation
 
@@ -276,7 +276,7 @@ Each entry dispatches to its own method, so one vector can hold estimators and p
   - [`VecMatNum_ASetMatE`](@ref)
   - [`UniverseSets`](@ref)
 """
-function asset_sets_matrix(smtx::VecMatNum_ASetMatE, sets::UniverseSets)
+function asset_sets_matrix(smtx::VecMatNum_ASetMatE, sets::Option{<:UniverseSets})
     return [asset_sets_matrix(smtxi, sets) for smtxi in smtx]
 end
 """

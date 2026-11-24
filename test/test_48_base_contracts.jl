@@ -732,6 +732,48 @@ end
     @test_throws MethodError pe.count_or_fraction("3")
     @test_throws MethodError pe.count_or_fraction([1, 2])
 end
+@testset "A cardinality cap reads a count or a fraction of its set (#2305)" begin
+    pe = PortfolioOptimisers
+    # A plain `Integer` is the resolved cap, so the slot holds it unchanged.
+    ints = [2, 1]
+    @test pe.cardinality_cap(3) === 3 && pe.cardinality_cap(ints) === ints
+    @test isnothing(pe.cardinality_cap(nothing))
+    @test pe.cardinality_cap(CountOf(2)) === CountOf(2)
+    @test pe.cardinality_cap(0.25) === FractionOf(0.25)
+    @test_throws DomainError pe.cardinality_cap(1.0)
+    @test_throws DomainError pe.cardinality_cap(3.0)
+    mixed = pe.cardinality_cap(pe.Real_CountFraction[2, FractionOf(0.5), 0.25])
+    @test mixed == [2, FractionOf(0.5), FractionOf(0.25)]
+    @test eltype(mixed) === Union{Int, FractionOf{Float64}}
+    # The floor is exact where the product of the fraction and the size is not.
+    @test 0.29 * 100 < 29
+    @test all(k -> pe.fraction_floor(FractionOf(k / 100), 100) == k, 1:100)
+    @test pe.fraction_floor(FractionOf(0.5), 7) == 3
+    @test pe.fraction_floor(FractionOf(0.5), 1) == 0
+    @test pe.fraction_floor(FractionOf(0.5), 0) == 0
+    # The cap is at least one, and a count above the set does not bind.
+    @test pe.resolve_cardinality_cap(FractionOf(0.2), 18) == 3
+    @test pe.resolve_cardinality_cap(FractionOf(0.2), 3) == 1
+    @test pe.resolve_cardinality_cap(CountOf(30), 18) == 30
+    @test pe.resolve_cardinality_cap(7, nothing) == 7
+    @test pe.resolve_cardinality_cap(CountOf(7), nothing) == 7
+    @test isnothing(pe.resolve_cardinality_cap(nothing, 3))
+    @test_throws pe.IsNothingError pe.resolve_cardinality_cap(FractionOf(0.5), nothing)
+    @test pe.resolve_cardinality_cap(ints, nothing) === ints
+    @test pe.resolve_cardinality_cap(mixed, [9, 5, 8]) == [2, 2, 2]
+    @test pe.resolve_cardinality_cap(FractionOf(0.5), [1, 3, 4]) == [1, 1, 2]
+    # A sub-group that selects no asset is not a member of the set.
+    S = [1 1 0 0; 0 0 1 1; 0 0 0 0; 0 0 0 0]
+    @test pe.resolve_cardinality_cap(FractionOf(0.5), S) == 1
+    @test pe.resolve_cardinality_cap([FractionOf(1), CountOf(4)], [S, S]) == [2, 4]
+    # The check of a slot goes entry by entry, and an empty vector is refused.
+    gt0 = pe.assert_nonempty_gt0_finite_val
+    @test isnothing(pe.assert_cardinality_cap(gt0, mixed, :scard))
+    @test isnothing(pe.assert_cardinality_cap(gt0, FractionOf(0.5), :scard))
+    @test_throws DomainError pe.assert_cardinality_cap(gt0, 0, :scard)
+    @test_throws DomainError pe.assert_cardinality_cap(gt0, [0, FractionOf(0.5)], :scard)
+    @test_throws pe.IsEmptyError pe.assert_cardinality_cap(gt0, Int[], :scard)
+end
 @testset "norm_factor and norm_error carry the units of the alg" begin
     pe = PortfolioOptimisers
     a, b = [0.5, 0.5], [0.2, 0.9]

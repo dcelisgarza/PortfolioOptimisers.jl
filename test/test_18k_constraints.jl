@@ -21,6 +21,18 @@ include(joinpath(@__DIR__, "test18_setup.jl"))
     w = res.w
     @test count(abs.(w) .> 1e-10) <= 7
 
+    # A fraction of the assets rounds down, 0.17 of 20 to three, so it is the same model as the
+    # integer, and a plain fraction reads as a `FractionOf` (#2305).
+    opt = JuMPOptimiser(; pe = pr, slv = mip_slv, card = FractionOf(0.17))
+    @test opt.card === FractionOf(0.17)
+    @test JuMPOptimiser(; slv = mip_slv, card = 0.17).card === FractionOf(0.17)
+    @test size(pr.X, 2) == 20
+    res = optimise(MeanRisk(; opt = opt))
+    @test res.jor.cbr.card == 3
+    @test count(res.w .> 1e-10) <= 3
+    @test_throws DomainError JuMPOptimiser(; slv = mip_slv, card = 1.0)
+    @test_throws DomainError JuMPOptimiser(; slv = mip_slv, card = 3.0)
+
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
                         gcarde = LinearConstraintEstimator(;
                                                            val = [:(XOM + MRK + WMT <= 2),
@@ -371,6 +383,15 @@ end
                   sgcarde = [one_of_three, lc_eq([1.0 1.0], [1.0])])
     @test card_rows(res) == [:scard_1_, :scard_2_, :sgcard_eq_2_, :sgcard_ineq_1_]
     @test held(S3 * res.w) == 1 && held(S2 * res.w) == 1
+
+    # A fraction of the sub-groups resolves against its own matrix: 0.67 of three is two, and
+    # 0.5 of two is one. A count above the number of sub-groups does not bind (#2305).
+    res = solve_c(; scard = [FractionOf(0.67), FractionOf(0.5)], smtx = mv)
+    @test res.jor.cbr.scard == [2, 1]
+    @test held(S3 * res.w) <= 2 && held(S2 * res.w) == 1
+    @test solve_c(; scard = [1, CountOf(9)], smtx = mv).jor.cbr.scard == [1, 9]
+    res = solve_c(; scard = FractionOf(0.4), smtx = S3)
+    @test res.jor.cbr.scard == 1 && held(S3 * res.w) == 1
 
     # A sub-grouped threshold that is not the object of the sub-group threshold gets its own
     # builder, so the model reads it on a shared matrix as it does on a copy.
