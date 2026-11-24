@@ -79,7 +79,7 @@ as the gates under the unit budget of `RiskBudgeting`. That head solves for the 
 the binary is the gate only when `k` is a number. The interface is `mip_wx!`, `mip_bounds` and
 `mip_key`.
 
-The concentration limit (#2018, ADR 0245) gates a binary of its own, and it would have been the
+The concentration limit (#2018, ADR 0246) gates a binary of its own, and it would have been the
 fifth copy of the rows that link a binary to a free budget `k`. The held bit, the long bit, the
 short bit and the exact cost budget held the other four.
 

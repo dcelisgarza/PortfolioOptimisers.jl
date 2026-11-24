@@ -100,7 +100,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :cbe => "`cbe`: Constraint Block that holds the feasible set of the weights and the terms of the Objective Penalty, see [`ConstraintBlock`](@ref). Its slots are flat keywords and properties of the owner.",#
                  :sc => "`sc`: Constraint scale factor.",#
                  :so => "`so`: Objective scale factor.",#
-                 :ss => "`ss`: Optional scalar shrinkage parameter.",#
+                 :ss => "`ss`: Big-M constant of the mixed-integer rows. `nothing` computes it from the weight bounds, see [`get_mip_ss`](@ref).",#
                  :card => "`card`: Global cardinality constraint.",#
                  :scard => "`scard`: Sub-group cardinality constraint(s).",#
                  :l2c => "`l2c`: 2-norm ceiling on the weights. It bounds `norm(w, 2) <= l2c * k`, where `k` is the homogenisation variable, so the ceiling holds on the weights the result reports and the budget does not scale it. Smaller `l2c` forces a more evenly spread portfolio. Used as a diversification floor via the reciprocal: `l2c = 1 / sqrt(m)` requires at least `m` effective assets (`inv(norm(w, 2)^2) >= m`). Norm-constraint family with `lpc` and `linfc`. The bound is [`Num_NormCeilCal`](@ref) under the time-dependent wrapper, so the slot takes the ceiling itself, an [`AbstractNormCeilingCalibrationAlgorithm`](@ref) that computes it from the prior result, or a plain function of the same five arguments.",#

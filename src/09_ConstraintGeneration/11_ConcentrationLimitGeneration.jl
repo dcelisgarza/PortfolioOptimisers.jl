@@ -102,6 +102,13 @@ States a [`ConcentrationLimit`](@ref) exactly, with one binary for each position
 
 The binary says that the position is over the threshold `t`. The feasible set is the rule itself, see the mathematical definition of [`ConcentrationLimit`](@ref). It is the default form. It needs a solver that takes integer variables.
 
+The rule holds to the tolerance of the solver. A solver takes a binary at ``\\epsilon`` as zero when ``\\epsilon`` is under its integrality tolerance. Under a constant budget, a position with such a binary can be at ``t + (c - t) \\epsilon``. Under a ratio objective or a [`RiskBudgeting`](@ref) head, the gate multiplies ``\\epsilon`` by the big-M constant `ss` of the block, see [`declare_mip_gate!`](@ref). So the position can be at ``t + (c - t) M_s \\epsilon / k``. With ``M_s = 1000``, ``\\epsilon = 10^{-6}`` and ``k = 1``, the excess is 0.005 % of the book under 5/10/40. The sum of the rule is a step, so a check with no tolerance then counts the whole position. Use one of these remedies:
+
+  - A smaller constant, such as `ss = 10` in the block. It must stay above the `k` of the solution.
+  - A smaller integrality tolerance in the settings of the solver.
+  - A threshold `t` a little under the limit of the mandate.
+  - A `tol` at the size of the excess in [`concentration_margins`](@ref), for a check that accepts the excess.
+
 # Related
 
   - [`AbstractConcentrationAlgorithm`](@ref)
@@ -583,7 +590,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the margins of a weight vector against one concentration rule.
 
-[`concentration_margins`](@ref) makes it. A margin `<= 0` passes, so a book meets the rule when every entry of `cap` is `<= 0` and `total <= 0`. A positive margin is the excess over the rule. A position counts towards the sum only when it is over the threshold by more than the tolerance of [`weights_bound_tolerance`](@ref). The check reads the rule itself, the form of [`ExactConcentration`](@ref), whatever the field `alg` of the rule holds.
+[`concentration_margins`](@ref) makes it. A margin `<= 0` passes, so a book meets the rule when every entry of `cap` is `<= 0` and `total <= 0`. A positive margin is the excess over the rule. A position counts towards the sum only when it is over the threshold by more than the keyword `tol` of that function. The check reads the rule itself, the form of [`ExactConcentration`](@ref), whatever the field `alg` of the rule holds.
 
 # Fields
 
@@ -703,9 +710,11 @@ function concentration_positions(set::MatNum, v::AbstractVector)
     return set * v
 end
 """
-    concentration_margins(cl::ConcentrationLimit, w::VecNum; kwargs...)
+    concentration_margins(cl::ConcentrationLimit, w::VecNum;
+                          tol::Number = weights_bound_tolerance(eltype(w)), kwargs...)
     concentration_margins(cl::ConcentrationLimitEstimator, w::VecNum;
-                          sets::Option{<:UniverseSets} = nothing, strict::Bool = false)
+                          sets::Option{<:UniverseSets} = nothing, strict::Bool = false,
+                          kwargs...)
     concentration_margins(cl::VecCnlE_Cnl, w::VecNum; kwargs...)
 
 Check a weight vector against a concentration rule, and return its margins.
@@ -725,7 +734,9 @@ Where:
 
   - ``x_j``: Position ``j``, row ``j`` of `set` times the reading of the weights that [`position_reading`](@ref) gives for `pos`.
   - ``t``, ``c``, ``s``: The threshold, the cap and the limit of the sum.
-  - $(math_dict[:tau_wb_tol]) A solver puts a position at the threshold to within this tolerance, so a position at ``t + 10^{-10}`` does not count towards the sum.
+  - ``\\tau``: The tolerance `tol`.
+
+The sum is a step: a position that passes ``t + \\tau`` adds its whole size, and not its excess over ``t``. So the check of a book of a solver needs a `tol` at the size of the tolerance of the solver. [`ExactConcentration`](@ref) states the excess that a mixed-integer solver can give, and how to lower it. `tol` does not move the margins of the cap and of the sum, so compare them with a tolerance too.
 
 # Algorithm
 
@@ -737,9 +748,10 @@ Where:
 
   - `cl`: The rule, or a vector of rules.
   - `w`: The weights, one for each asset of the universe of the rule.
+  - `tol`: The excess over `t` up to which a position does not count towards the sum. The default is the tolerance of [`weights_bound_tolerance`](@ref).
   - `sets`: A [`UniverseSets`](@ref) against which an estimator resolves, or `nothing`.
   - $(arg_dict[:strict])
-  - `kwargs...`: The method for a resolved rule ignores them, and the method for a vector gives them to each entry.
+  - `kwargs...`: The method for a resolved rule ignores them. The method for an estimator gives them to the method for its resolved rule, and the method for a vector gives them to each entry.
 
 # Validation
 
@@ -771,19 +783,19 @@ julia> maximum(cm.cap) <= 0, round(cm.total; digits = 10)
   - [`weights_meet_bounds`](@ref)
 """
 function concentration_margins(cl::ConcentrationLimit, w::VecNum;
+                               tol::Number = weights_bound_tolerance(eltype(w)),
                                kwargs...)::ConcentrationMargins
     z = zero(eltype(w))
     v = position_reading(cl.pos, w, max.(w, z), max.(-w, z))
     x = concentration_positions(cl.set, v)
-    tol = weights_bound_tolerance(eltype(x))
     total = sum(xi for xi in x if xi > cl.t + tol; init = zero(eltype(x))) - cl.s
     return ConcentrationMargins(; x = x, cap = x .- cl.c, total = total)
 end
 function concentration_margins(cl::ConcentrationLimitEstimator, w::VecNum;
-                               sets::Option{<:UniverseSets} = nothing,
-                               strict::Bool = false)::ConcentrationMargins
+                               sets::Option{<:UniverseSets} = nothing, strict::Bool = false,
+                               kwargs...)::ConcentrationMargins
     return concentration_margins(concentration_limit_constraints(cl, sets; strict = strict),
-                                 w)
+                                 w; kwargs...)
 end
 function concentration_margins(cl::VecCnlE_Cnl, w::VecNum; kwargs...)
     return [concentration_margins(cli, w; kwargs...) for cli in cl]

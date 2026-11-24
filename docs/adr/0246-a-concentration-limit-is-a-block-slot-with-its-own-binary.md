@@ -59,10 +59,16 @@ in a grilling session on 2026-11-23 (#2147).
    positions at 9 % meet it with a sum of 72 % over 5 %.
 8. **A check on any book.** `concentration_margins(cl, w; sets = nothing)` returns a
    `ConcentrationMargins` of the cap margin of each position and the sum margin. A margin `<= 0`
-   passes. It serves the mandate check of a book from any optimiser.
-9. **NCO.** `assert_internal_optimiser` refuses a rule whose `set` is a matrix in an inner
-   optimiser, as it refuses a precomputed `lcse` and `gcarde`, because the columns of the matrix
-   belong to the full universe.
+   passes. It serves the mandate check of a book from any optimiser. The keyword `tol` is the
+   excess over `t` up to which a position does not count. The sum is a step, so a position that a
+   solver puts over `t` by its tolerance would add its whole size. The measured case is HiGHS
+   under `MaximumRatio`: a binary of `4e-7` and the big-M constant 1000 put a position at
+   5.0024 %, and the strict check gave a sum margin of 4 %.
+9. **NCO.** An inner optimiser takes a rule whose `set` is a matrix, as it takes a matrix in
+   `smtx`. The view of a rule at a cluster keeps the columns of the cluster, so the book is the
+   book of the estimator. #2147 gave a refusal, with the reason of `lcse` and `gcarde`. That
+   reason does not hold here, because no view narrows a `LinearConstraint`, and the view of a
+   matrix does.
 
 ## Consequences
 

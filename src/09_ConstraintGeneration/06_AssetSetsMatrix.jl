@@ -242,23 +242,29 @@ function asset_sets_matrix(smtx::Option{<:MatNum}, args...; kwargs...)
     return smtx
 end
 """
+    asset_sets_matrix(smtx::AssetSetsMatrixEstimator{<:Any, Nothing}, sets::UniverseSets;
+                      kwargs...)
     asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::UniverseSets;
                       strict::Bool = false)
 
 Build the membership matrix from the group name key that `smtx` holds, over the assets that `smtx.on` names.
 
+The method for `on = nothing` returns the matrix of every asset, `asset_sets_matrix(smtx.val, sets)`. The other method reads the names in `on`.
+
 # Algorithm
 
+The method that reads the names in `on`:
+
  1. Build the matrix of the key, `asset_sets_matrix(smtx.val, sets)`.
- 2. When `smtx.on` is `nothing`, return it.
- 3. Otherwise make the mask of the assets that `smtx.on` names, with [`asset_name_mask`](@ref).
- 4. Clear each column of the matrix whose asset is not in the mask. Then drop each row that holds no asset, and return the rows that remain as a `BitMatrix`.
+ 2. Make the mask of the assets that `smtx.on` names, with [`asset_name_mask`](@ref).
+ 3. Clear each column of the matrix whose asset is not in the mask. Then drop each row that holds no asset, and return the rows that remain as a `BitMatrix`.
 
 # Arguments
 
   - `smtx`: An [`AssetSetsMatrixEstimator`](@ref) that holds the group name key to read.
   - `sets`: A [`UniverseSets`](@ref) that holds the asset universe and the groups.
   - $(arg_dict[:strict])
+  - `kwargs...`: The keywords of a caller, which the method for `on = nothing` ignores.
 
 # Validation
 
@@ -276,12 +282,13 @@ Build the membership matrix from the group name key that `smtx` holds, over the 
   - [`asset_name_mask`](@ref)
   - [`UniverseSets`](@ref)
 """
+function asset_sets_matrix(smtx::AssetSetsMatrixEstimator{<:Any, Nothing},
+                           sets::UniverseSets; kwargs...)
+    return asset_sets_matrix(smtx.val, sets)
+end
 function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::UniverseSets;
                            strict::Bool = false)
     A = asset_sets_matrix(smtx.val, sets)
-    if isnothing(smtx.on)
-        return A
-    end
     B = A .& transpose(asset_name_mask(smtx.on, sets, strict))
     return B[vec(any(B; dims = 2)), :]
 end

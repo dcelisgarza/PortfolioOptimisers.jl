@@ -316,7 +316,7 @@ rationale = "keyword-constructor-arity"
 
 # The Constraint Block of ADR 0237 takes the 32 slots that `JuMPOptimiser` held before it, so its
 # constructor carries the arity that the constructor of `JuMPOptimiser` carried. The slot `conc`
-# of ADR 0245 makes it 33 (#2018).
+# of ADR 0246 makes it 33 (#2018).
 [[exemption]]
 path = "src/17_Optimisation/05_JuMP/02_JuMPConstraints/14_ConstraintBlock.jl"
 definition = "ConstraintBlock"

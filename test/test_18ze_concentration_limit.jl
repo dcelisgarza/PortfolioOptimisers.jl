@@ -289,19 +289,113 @@
         @test opt.conc === cl
     end
 
-    @testset "NCO refuses a precomputed matrix in its inner optimiser" begin
-        inner(conc) = MeanRisk(; opt = JuMPOptimiser(; slv = hslv, conc = conc))
-        @test_throws ArgumentError NestedClustered(;
-                                                   opti = inner(ConcentrationLimit(;
-                                                                                   set = ones(1,
-                                                                                              N))),
-                                                   opto = EqualWeighted())
-        @test_throws ArgumentError NestedClustered(;
-                                                   opti = inner([ConcentrationLimitEstimator(;
-                                                                                             set = ones(1,
-                                                                                                        N))]),
-                                                   opto = EqualWeighted())
-        @test isa(NestedClustered(; opti = inner(ConcentrationLimit()),
-                                  opto = EqualWeighted()), NestedClustered)
+    @testset "The tolerance of the check" begin
+        # A solver can put a position over `t` by its tolerance. The sum is a step, so a
+        # strict check then counts the whole position.
+        w = [fill(0.1, 4); fill(0.05 + 5e-5, 12)]
+        cl = ConcentrationLimit()
+        @test concentration_margins(cl, w).total ≈ 12 * (0.05 + 5e-5)
+        @test abs(concentration_margins(cl, w; tol = 1e-4).total) <= tol
+        # The estimator and the vector give `tol` to each rule.
+        cms = concentration_margins([ConcentrationLimitEstimator(),
+                                     ConcentrationLimitEstimator(; c = 0.2)], w; tol = 1e-4)
+        @test all(cm -> abs(cm.total) <= tol, cms)
+        # An integer and a rational type do not round, so their tolerance is zero.
+        @test PortfolioOptimisers.weights_bound_tolerance(Int) == 0
+        @test concentration_margins(cl, [1, 0]).total ≈ 0.6
+        clr = ConcentrationLimit(; t = 1 // 20, c = 1 // 10, s = 2 // 5)
+        @test concentration_margins(clr, [1 // 2, 1 // 2]).total === 3 // 5
+        #=
+        HiGHS takes a binary of 4e-7 as zero in this model. The big-M constant of 1000 lets
+        its position rise to 5.0024 %. A smaller constant closes the leak.
+        =#
+        Xs = 0.01 .* randn(StableRNG(18), 120, 30) .+ range(0.002, 0.0002; length = 30)'
+        rds = ReturnsResult(; nx = ["a$i" for i in 1:30], X = Xs)
+        res = optimise(MeanRisk(; r = ConditionalValueatRisk(),
+                                obj = MaximumRatio(; rf = 0.0),
+                                opt = JuMPOptimiser(; slv = hslv, ss = 10, conc = cl)), rds)
+        @test success(res)
+        @test concentration_margins(cl, res.w).total <= tol
+        @test concentration_margins(cl, res.w; tol = 1e-5).total <= tol
+    end
+
+    @testset "A rule with no position adds no limit" begin
+        # Each name of `on` can be on the Non-Investable Axis, so the matrix has no row.
+        for alg in (ExactConcentration(), SumLargestConcentration()),
+            obj in (MaximumReturn(), MaximumRatio(; rf = 0.0))
+
+            res = solve(; obj = obj,
+                        conc = ConcentrationLimit(; set = falses(0, N), alg = alg))
+            @test success(res)
+            @test isapprox(res.w, solve(; obj = obj).w; atol = 1e-5)
+        end
+        @test concentration_margins(ConcentrationLimit(; set = falses(0, N)),
+                                    fill(1 / N, N)).total == -0.4
+        # The width of the matrix must be the count of the assets.
+        @test_throws DimensionMismatch solve(;
+                                             conc = ConcentrationLimit(;
+                                                                       set = ones(1, N - 1)))
+    end
+
+    @testset "A block of an allocation set" begin
+        cslv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                      settings = "verbose" => false,
+                      check_sol = (; allow_local = true, allow_almost = true))
+        # The three largest positions sum to at most 0.6.
+        cl = ConcentrationLimit(; t = 0.2, c = 0.5, s = 0.6,
+                                alg = SumLargestConcentration())
+        top3(x) = sum(sort(x; rev = true)[1:3])
+        function resolve(set)
+            return PortfolioOptimisers.resolve_allocation_set(set, 6, false, Float64)
+        end
+        q = [0.5, 0.3, 0.1, 0.1, 0.0, 0.0]
+        wh = fill(1 / 6, 6)
+        set = ProgrammeAllocationSet(; slv = cslv)
+        setc = ProgrammeAllocationSet(; slv = cslv, conc = cl)
+        p0 = PortfolioOptimisers.project(EuclideanProjection(), resolve(set), q, wh)
+        @test isapprox(p0, q; atol = 1e-5)
+        p1 = PortfolioOptimisers.project(EuclideanProjection(), resolve(setc), q, wh)
+        @test isapprox(sum(p1), 1; atol = tol)
+        @test isapprox(top3(p1), 0.6; atol = 1e-5)
+        @test concentration_margins(cl, p1; tol = 1e-5).total <= 1e-5
+        # The block of the leader and the block of the set each state a rule in one model.
+        rd6 = ReturnsResult(; nx = nx[1:6], X = X[:, 1:6])
+        lcl = ConcentrationLimit(; t = 0.2, c = 0.45, s = 0.9,
+                                 alg = SumLargestConcentration())
+        lead = MeanRisk(; r = StandardDeviation(), obj = MaximumReturn(),
+                        opt = JuMPOptimiser(; slv = cslv, conc = lcl))
+        function ftl(s)
+            alg = FollowTheLeader(; opt = lead)
+            return optimise(PortfolioOptimisers.OnlinePortfolioSelection(; alg = alg,
+                                                                         set = s), rd6).w
+        end
+        wl = ftl(set)
+        @test isapprox(maximum(wl), 0.45; atol = 1e-5)
+        @test top3(wl) > 0.65
+        wb = ftl(setc)
+        @test isapprox(top3(wb), 0.6; atol = 1e-5)
+        @test sum(sort(wb; rev = true)[1:5]) <= 0.9 + 1e-5
+    end
+
+    @testset "NCO views the matrix of a rule at each cluster" begin
+        issuer = ["i$(cld(i, 2))" for i in 1:N]
+        sets = UniverseSets(; dict = Dict("nx" => nx, "nx_issuer" => issuer))
+        est = AssetSetsMatrixEstimator(; val = "nx_issuer")
+        A = Matrix(asset_sets_matrix(est, sets))
+        function nco(conc, s = nothing)
+            opti = MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumReturn(),
+                            opt = JuMPOptimiser(; slv = hslv, sets = s, conc = conc))
+            return optimise(NestedClustered(; opti = opti, opto = EqualWeighted()), rd)
+        end
+        numbers = (; t = 0.2, c = 0.6, s = 0.6)
+        re = nco(ConcentrationLimitEstimator(; numbers..., set = est), sets)
+        @test success(re)
+        # The view keeps the columns of the cluster, so each form gives the book of the
+        # estimator.
+        @test isapprox(nco(ConcentrationLimit(; numbers..., set = A)).w, re.w; atol = tol)
+        @test isapprox(nco([ConcentrationLimitEstimator(; numbers..., set = A)]).w, re.w;
+                       atol = tol)
+        # The rule binds.
+        @test !isapprox(nco(nothing).w, re.w; atol = 1e-2)
     end
 end
