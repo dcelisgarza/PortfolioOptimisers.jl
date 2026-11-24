@@ -1066,13 +1066,38 @@ A static `TensorPanelField` and a static feature matrix keep `assets × labels` 
 
 - **`DependentVariableTracking` of a measure with a quadratic risk expression**, such as `Variance()` without a semidefinite phylogeny. v0.34.2 logged a warning at the construction of a `RiskTrackingRiskMeasure`, and the solver refused the model. v0.34.3 states the risk with a rotated second-order cone, and the constructor logs no warning.
 
+## From v0.34.4 to v0.34.5
+
+### [Calls that now answer](@id migration-0-34-5-answers)
+
+| Call | v0.34.4 | v0.34.5 |
+| --- | --- | --- |
+| A covariance estimator of another package, such as `StatsBase.SimpleCovariance(; corrected = true)`, in a slot that reads the variances of a matrix: the `ve` of `KendallCovariance`, `SpearmanCovariance`, `MutualInfoCovariance`, `LowerTailDependenceCovariance`, `DimensionReductionRegression`, `ImpliedVolatilityRegression`, `ElasticNet`, `FactorPrior`, `FactorBlackLittermanPrior` and `CrossSectionalFactorPrior`, and the `ce` of `EWVolatility` | Refused by the constructor | Runs. The fit reads the variances of the estimator, the diagonal of its covariance matrix. A covariance estimator of the library runs in each of these slots too. The estimator of another package gets no observation weights. A slot that reads the variance of one vector, such as the `ve` of `SecondMoment`, `HighOrderMoment`, `ThirdCentralMoment` and `WindowedVariance`, still takes a variance estimator alone. |
+| `WindowedCovariance(; ce = StatsBase.SimpleCovariance())` in `cov`, `cor`, `var`, `std` or a variance series, and `PortfolioOptimisersCovariance(; ce = StatsBase.SimpleCovariance())` as the `ce` of `EWVolatility` or the `ve` of `CrossSectionalFactorPrior` | `MethodError` at the fit | Runs. |
+| `DimensionReductionRegression(; ve = ExpWeightedVariance())`, or another `ve` with no field `me` | `FieldError` at the fit | Runs. The mean of the factors takes the weights of `retgt`. |
+| `partial_fit!` of a `CrossSectionalFactorPrior` whose `ve` folds and is not an `ExpWeightedVariance` or a `RegimeAdjustedExpWeightedVariance`, such as `SimpleVariance()`, `Covariance()`, `GeneralCovariance()` or `ExpWeightedCovariance()` | `MethodError` at the first fit | Runs, and the call with no data equals the batch fit. A `ve` that is not mask-aware refuses a step with a gap with an `IsNonFiniteError`, as the batch fit does. |
+| `var(ce)` and `std(ce)` with no data, for a covariance estimator that holds a partial-fit state | `MethodError` | The diagonal of `cov(ce)`, and its square root. |
+| `partial_fit!` of a prior whose covariance is a `GeneralCovariance` or a `Covariance` over an estimator other than `StatsBase.SimpleCovariance`, such as `EmpiricalPrior(; ce = Covariance(; ce = MyCovariance()))` | `ArgumentError` at the fold | Runs. `supports_partial_fit` answers `false` for such an estimator, so the prior runs the batch verb over its own rows, as it does for the bare estimator. `partial_fit!` of the estimator itself still raises the `ArgumentError`. |
+| `covariance_forecast_evaluation` of a covariance estimator of another package | `MethodError` | Runs, as for `GeneralCovariance(; ce = ce)`. |
+| `partial_fit!(ce::GeneralCovariance, X; active_mask)`, and the carry of an `EmpiricalPrior` with `ce = GeneralCovariance()` over an asset panel that varies in time | `MethodError` | Runs. An inactive cell folds as a `NaN`, as in a `Covariance`. |
+
+### [Results that move](@id migration-0-34-5-numbers)
+
+- **`DimensionReductionRegression` with `ve = SimpleVariance(; me = nothing)` and weights in `retgt`** takes the mean of the factors under those weights. v0.34.4 took the mean with no weights, so the intercept that it rebuilt was not the intercept of the fit.
+- **`var`, `std` and a variance series of a `GeodesicShrinkageCovariance` over an asset panel**, when its `ce` is mask-aware, such as `ExpWeightedCovariance()`, read the gaps of the sample, as its `cov` does. v0.34.4 removed each asset with a gap from the window and gave it `NaN`, where `cov` estimates it. An `EWResidualVolatility` now takes such an estimator as its `ce`.
+
+### [If you extend the library](@id migration-0-34-5-extending)
+
+- **A variance estimator of your own in `DimensionReductionRegression`** that holds a mean estimator in a field `me` adds a method `PortfolioOptimisers.standardisation_mean(ve::MyVariance, w) = ve.me`. Without it the mean of the factors takes the weights of `retgt`.
+- **A variance estimator of your own that folds, in the `ve` of `CrossSectionalFactorPrior`**, gets the `active_mask` keyword alone in `partial_fit!`. Add a method of `PortfolioOptimisers.fold_mask_keywords` that gives the estimation mask too, if the fold reads it. A fold that reads the active mask adds a method of `PortfolioOptimisers.reads_active_mask` that returns `true`. Without it, a step with a gap raises an `IsNonFiniteError`.
+
 ## From v0.34 to v0.35
 
 ### [Cardinality caps as a count or a fraction](@id migration-0-35-cardinality-caps)
 
 The cardinality caps `card` and `scard` of `ConstraintBlock`, `JuMPOptimiser` and `ProgrammeAllocationSet`, and the `B` of `IntegerPhylogenyEstimator` and `IntegerPhylogeny`, take a `CountOf` or a `FractionOf`. A fraction resolves against the set that the fit sees, so `card = FractionOf(0.2)` keeps its meaning when a view or a resample reduces the universe, or when an asset leaves it. A plain `Integer` keeps its meaning, and the slot holds the same integer. A fraction rounds down, to at least one member.
 
-| Call | v0.34.3 | v0.35 |
+| Call | v0.34.5 | v0.35 |
 | --- | --- | --- |
 | `JuMPOptimiser(; card = 0.2)`, and a plain real number between zero and one in `scard` or in `B` | A `TypeError` | Reads `FractionOf(0.2)`. |
 | `JuMPOptimiser(; card = 3.0)` or `card = 1.0`, and the same in `scard` and `B` | A `TypeError` | Raises a `DomainError`. Write `3`, `CountOf(3)` or `FractionOf(1)`. |

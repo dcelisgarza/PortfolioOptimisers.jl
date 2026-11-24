@@ -13,6 +13,7 @@ PortfolioOptimisers.geodesic_power
 PortfolioOptimisers.geodesic_point
 PortfolioOptimisers.geodesic_shrinkage!
 gap_fill_value(::GeodesicShrinkageCovariance)
+PortfolioOptimisers.variance_series(ce::GeodesicShrinkageCovariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 PortfolioOptimisers.show_fields(::GeodesicShrinkageCovariance)
 PortfolioOptimisers.observation_count(ce::GeodesicShrinkageCovariance{<:Any, <:Any, <:Any, <:Any, Nothing})
 ```

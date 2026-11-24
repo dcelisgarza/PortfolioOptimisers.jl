@@ -180,7 +180,7 @@ SecondMoment
 """
 @propagatable @concrete struct SecondMoment <: LowOrderMomentMeasureAlgorithm
     """
-    $(field_dict[:ve])
+    $(field_dict[:ve]) A covariance estimator has no variance of one vector of returns, so the slot takes an [`AbstractVarianceEstimator`](@ref) alone.
     """
     @fprop ve
     """
@@ -701,7 +701,7 @@ The two values differ in the divisor of the lower second moment alone, ``T - 1``
     """
     alg
     """
-    Variance estimator of the second moment that divides the moment, or `nothing` for the moment as it is. The estimator reads the same deviations as `alg`: the deviations below the Moment Target for a lower moment, [`ThirdLowerMoment`](@ref) or a [`FourthMoment`](@ref) of a [`SemiMoment`](@ref), and all the deviations for a full moment. It reads them about zero, so its own `me` does not enter.
+    Variance estimator of the second moment that divides the moment, or `nothing` for the moment as it is. The estimator reads the same deviations as `alg`: the deviations below the Moment Target for a lower moment, [`ThirdLowerMoment`](@ref) or a [`FourthMoment`](@ref) of a [`SemiMoment`](@ref), and all the deviations for a full moment. It reads them about zero, so its own `me` does not enter. A covariance estimator has no variance of one vector of returns, so the slot takes an [`AbstractVarianceEstimator`](@ref) alone.
     """
     ve
     function HighOrderMoment(settings::RiskMeasureSettings, w::Option{<:ObsWeights},
