@@ -46,7 +46,9 @@ Every public method takes one risk measure or a vector of them, which is the bou
 
 A prior result and a bare returns matrix give different answers for one measure. The prior route puts the measure through [`factory`](@ref), so the figure is the one that the optimiser optimises. A Deferred Quantity resolves against the prior, and a slot that the measure leaves unstated takes the field of the prior. The matrix route has no prior to read, so it leaves every slot as the measure holds it. To fill one, it would have to pick an estimator that the caller never named. It refuses a Deferred Quantity with an error that names it, through [`assert_resolved_slots`](@ref), and an empty slot that the functor reads through [`functor_slots`](@ref). `Variance()` holds `sigma = nothing` and its functor is `dot(w, r.sigma, w)`, so the matrix route refuses it with an error that names it, and `LinearAlgebra` never raises a `MethodError`. [`assert_calibrated_slots`](@ref) refuses a Calibration Rule on the same terms, because a rule reads the sample size, the moments and the observation weights of a prior result.
 
-The prior route reduces to the Investable Mask. A prior result holds every asset of the universe, and an asset that it could not estimate carries `NaN` in `mu`, on the diagonal of `sigma` and down its column of `pr.X`. On the whole universe, `dot(w, pr.sigma, w)` and `pr.X * w` are `NaN` at every weight, a zero weight included. The prior route therefore reduces the prior, the weights and the fees before it evaluates the measure. A bare matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask exists and they pass through unchanged.
+The prior route reduces to the Investable Mask. A prior result holds every asset of the universe, and an asset that it could not estimate carries `NaN` in `mu`, on the diagonal of `sigma` and down its column of `pr.X`. On the whole universe, `dot(w, pr.sigma, w)` and `pr.X * w` are `NaN` at every weight, a zero weight included. The prior route therefore reduces the prior, the weights and the fees before it evaluates the measure. A bare matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask exists.
+
+A [`ReturnsResult`](@ref) can hold a gap, a return that is not finite. The method sets each gap to zero once, through [`filter_held_gaps`](@ref), so the figure is the one that [`predict`](@ref) and [`performance_summary`](@ref) read. A gap at a zero weight gives no message. A Held Gap gives a warning, or an error under `strict`. A bare matrix is the plain product, with no filter, because the solves call that method at every evaluation. On a matrix with a gap, a moment measure is `NaN`, and a tail measure is a **finite wrong number**, because `partialsort` puts a `NaN` after every real number. So give a gapped sample as a `ReturnsResult`, or call `PortfolioOptimisers.filter_held_gaps(w, X, strict)` before the call.
 
 # Algorithm
 
@@ -58,7 +60,7 @@ The generic entry, `expected_risk(r, w, args...)`:
 
 The prior route, `expected_risk(r, w, pr, fees)`:
 
- 1. Reduce `pr`, `w` and `fees` to the Investable Mask with [`investable_reduction`](@ref).
+ 1. Reduce `pr`, `w` and `fees` to the Investable Mask with [`investable_reduction`](@ref), which sets the gaps of a [`ReturnsResult`](@ref) to zero.
  2. Resolve `r` against the reduced prior with [`resolve_risk_inputs`](@ref), which gives the resolved measure `r` and the returns matrix `X`.
  3. Evaluate `expected_risk(r, w, X, fees)` through the generic entry.
 
@@ -74,14 +76,14 @@ The prior route, `expected_risk(r, w, pr, fees)`:
 # Keyword Arguments
 
   - `sca::Option{<:Scalariser} = nothing`: Scalariser that combines a vector of measures, in the keyword form. A single measure ignores it.
-  - `strict::Bool = false`: Whether a held non-investable asset raises an error. When it is `false`, the asset warns and its weight is dropped. Only the methods that take a prior read it.
+  - `strict::Bool = false`: Whether a held non-investable asset of a prior result, or a Held Gap of a [`ReturnsResult`](@ref), raises an error. When it is `false`, each gives a warning. The weight of the asset is then dropped, and the gap contributes zero. The methods that take a matrix do not read it.
 
 # Validation
 
   - A measure that reads a return series and gets no returns data, `X = nothing`, raises an [`IsNothingError`](@ref). The message names the measure and the four calls that pass the returns data. A caller meets it when it scores a result that holds no returns data of its own, which is every optimiser whose fit keeps no returns.
   - A Deferred Quantity that is not resolved raises through [`assert_resolved_slots`](@ref), and an empty slot that the functor reads raises through [`functor_slots`](@ref).
   - A Calibration Rule that is not calibrated raises through [`assert_calibrated_slots`](@ref).
-  - Under `strict = true`, a held non-investable asset raises through [`investable_reduction`](@ref).
+  - Under `strict = true`, a held non-investable asset or a Held Gap raises through [`investable_reduction`](@ref).
 
 # Returns
 
@@ -90,6 +92,7 @@ The prior route, `expected_risk(r, w, pr, fees)`:
 # Related
 
   - [`investable_reduction`](@ref)
+  - [`filter_held_gaps`](@ref)
   - [`risk_input_kind`](@ref)
   - [`RiskInputKind`](@ref)
   - [`RkRatioRM`](@ref)
@@ -326,7 +329,10 @@ function original_returns(rd::ReturnsResult)
     return rd.X
 end
 """
-    resolve_factor_risk_inputs(r::BaseRM_VecBaseRM, X::MatNum_Pr)
+    resolve_factor_risk_inputs(r::BaseRM_VecBaseRM, X::Union{MatNum, ReturnsResult}, w::VecNum,
+                               imsk::Nothing, strict::Bool)
+    resolve_factor_risk_inputs(r::BaseRM_VecBaseRM, pr::AbstractPriorResult, w::VecNum,
+                               imsk::Option{<:BitVector}, strict::Bool)
 
 Turn the data argument of a factor attribution into the measure to evaluate and the returns matrix to evaluate it on.
 
@@ -334,10 +340,20 @@ The measure resolves as in [`resolve_risk_inputs`](@ref), so a Deferred Quantity
 
 The two functions are separate because each answer is correct for its caller. A factor attribution needs the residual that the caller's returns carry, and every other caller of [`resolve_risk_inputs`](@ref) needs the distribution that the prior states.
 
+A prior fills no gap of its original returns. A [`CrossSectionalFactorPrior`](@ref) keeps there the gap of an asset that lists inside the window. So the prior method sets the gaps to zero once, with [`filter_held_gaps`](@ref). The gaps of a [`ReturnsResult`](@ref) are zero already, because [`investable_reduction`](@ref) filters them, and a bare matrix keeps its gaps.
+
 # Arguments
 
   - $(arg_dict[:r])
-  - `X::MatNum_Pr`: Returns matrix, prior result or returns result.
+  - `X`: Returns matrix or returns result.
+  - `pr`: Prior result, on the Investable Mask.
+  - `w`: Portfolio weights, on the Investable Mask.
+  - `imsk`: The Investable Mask that the caller reduced to, or `nothing`. The message of the filter names the positions of the caller by it.
+  - `strict`: Whether a Held Gap of the original returns of a prior raises rather than warns.
+
+# Validation
+
+  - The rules of [`filter_held_gaps`](@ref), for a prior.
 
 # Returns
 
@@ -347,10 +363,18 @@ The two functions are separate because each answer is correct for its caller. A 
 
   - [`resolve_risk_inputs`](@ref)
   - [`original_returns`](@ref)
+  - [`filter_held_gaps`](@ref)
   - [`factor_risk_contribution`](@ref)
 """
-function resolve_factor_risk_inputs(r::BaseRM_VecBaseRM, X::MatNum_Pr)
+function resolve_factor_risk_inputs(r::BaseRM_VecBaseRM, X::Union{MatNum, ReturnsResult},
+                                    ::VecNum, ::Nothing, ::Bool)
     return first(resolve_risk_inputs(r, X)), original_returns(X)
+end
+function resolve_factor_risk_inputs(r::BaseRM_VecBaseRM, pr::AbstractPriorResult, w::VecNum,
+                                    imsk::Option{<:BitVector}, strict::Bool)
+    nx = isnothing(imsk) ? nothing : string.(findall(imsk))
+    X = filter_held_gaps(w, original_returns(pr), strict; nx = nx)
+    return first(resolve_risk_inputs(r, pr)), X
 end
 """
     source_loadings(x_src::Option{<:AbstractReturnsSource},
@@ -508,7 +532,7 @@ end
 # at any weight, the optimiser's own zero included. `investable_reduction` reduces the
 # prior, the weights and the fees once here, which is ADR 0115's rule at the entry point
 # that a caller calls by hand. A bare matrix and a `ReturnsResult` carry no moments, so the
-# same call passes them through.
+# same call drops no asset of theirs, and it sets the gaps of a `ReturnsResult` to zero.
 function expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, pr::Pr_RR,
                        fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
@@ -549,7 +573,7 @@ The library can score a measure that refuses a path under a drift. The question 
 
 # Algorithm
 
- 1. On the prior route, reduce the prior, the path and the fees to the Investable Mask with [`investable_reduction`](@ref). The mask selects the columns of the path, and each row keeps its observation. Then resolve `r` against the reduced prior with [`resolve_risk_inputs`](@ref).
+ 1. On the prior route, reduce the prior, the path and the fees to the Investable Mask with [`investable_reduction`](@ref). The mask selects the columns of the path, and each row keeps its observation. A [`ReturnsResult`](@ref) keeps every column, and its gaps become zero. Then resolve `r` against the reduced prior with [`resolve_risk_inputs`](@ref).
  2. Refuse a Deferred Quantity that is not resolved, and a Calibration Rule that is not calibrated, as the [`VecNum`](@ref) entry does.
  3. Read the input kind of `r`, and call the method of that kind.
 
@@ -564,7 +588,7 @@ The library can score a measure that refuses a path under a drift. The question 
 
 # Keyword Arguments
 
-  - `strict::Bool = false`: Whether a held non-investable asset raises an error. Only the methods that take a prior read it.
+  - `strict::Bool = false`: Whether a held non-investable asset of a prior result, or a Held Gap of a [`ReturnsResult`](@ref), raises an error. The methods that take a matrix do not read it.
 
 # Validation
 
@@ -1019,7 +1043,7 @@ Compute the contribution of each asset to the risk of a portfolio with a finite 
 
 The contributions sum to the risk that [`expected_risk`](@ref) reports, because the function divides the gradient of each measure by its degree of homogeneity. [`homogeneity_degree`](@ref) gives that degree. The sum holds only for a measure that is homogeneous of a degree other than zero. The contributions of a measure of degree 0, such as [`EqualRisk`](@ref) or [`Skewness`](@ref), sum to zero. The contributions of a measure that is not homogeneous in the weights, such as a tracking error or a turnover against a target that is not zero, or a relative drawdown, do not sum to its risk. Such a measure has no degree, so its contributions are the plain marginal contributions. A fee that does not scale with the weights, such as a turnover fee against previous weights that are not zero or a fixed fee, also takes the degree from a measure that reads the net returns, unless the fee cancels from its risk. [`has_fixed_fee`](@ref) states the rule. A vector of measures decomposes its aggregate. The function corrects each element before the scalariser combines them, through [`adjusted_risk`](@ref), so the contributions sum to the aggregate when the elements have different degrees. Under [`MaxScalariser`](@ref) and [`MinScalariser`](@ref), the contributions are those of the element that the scalariser picks at `w`, and at a tie they are those of the earliest such element. Under [`LogSumExpScalariser`](@ref), the contributions sum to the softmax-weighted mean of the scaled risks, which is below the aggregate.
 
-A prior result reduces to the Investable Mask before the finite difference, so no perturbed weight meets a `NaN` moment, and a non-investable asset reports exactly `0`. The prior also resolves the measure once, so a Deferred Quantity is fitted once and not once for each finite difference.
+A prior result reduces to the Investable Mask before the finite difference, so no perturbed weight meets a `NaN` moment, and a non-investable asset reports exactly `0`. The prior also resolves the measure once, so a Deferred Quantity is fitted once and not once for each finite difference. The gaps of a [`ReturnsResult`](@ref) become zero once before the finite difference, as in [`expected_risk`](@ref), and a bare matrix keeps them.
 
 A measure whose value is a solve, of the entropic, the relativistic or the power norm family, solves its programme once at `w`, and the function takes the finite difference of the expected loss under the Worst-Case Distribution of that solve, from [`worst_case_distribution`](@ref). By the envelope theorem, that expected loss has the gradient of the measure at `w`. A finite difference of the measure itself differences two solves, and the noise of the solver is as large as the change that the step makes, so its contributions can miss the risk by several percent. The contributions of the distribution sum to the risk to the tolerance of the solver, and the function solves one programme for each measure, not `2N`. When no solver gives the distribution, the function takes the finite difference of the measure itself.
 
@@ -1066,12 +1090,12 @@ Where:
   - `delta::Number = 1e-6`: Step of the finite difference.
   - `marginal::Bool = false`: Whether to return the marginal risks, without the factor ``w_i``.
   - `sca::Option{<:Scalariser} = nothing`: Scalariser that combines a vector of measures. A single measure ignores it.
-  - `strict::Bool = false`: Whether a held non-investable asset raises an error. Only a prior result reads it.
+  - `strict::Bool = false`: Whether a held non-investable asset of a prior result, or a Held Gap of a [`ReturnsResult`](@ref), raises an error. A matrix does not read it.
 
 # Validation
 
   - On a bare matrix, a Deferred Quantity that is not resolved, and an empty slot that the functor reads, raise through [`assert_resolved_slots`](@ref), as they do in [`expected_risk`](@ref).
-  - Under `strict = true`, a held non-investable asset raises through [`investable_reduction`](@ref).
+  - Under `strict = true`, a held non-investable asset or a Held Gap raises through [`investable_reduction`](@ref).
 
 # Returns
 
@@ -1222,7 +1246,7 @@ The vector route, `risk_gradient(rs::VecBaseRM, w, X, fees)`:
  2. Set the gradient `g` to zero.
  3. For each element `r` whose weight `p` is not zero, add `p * r.settings.scale` times the gradient of `r` to `g`.
 
-The prior route reduces the prior, the weights and the fees to the Investable Mask with [`investable_reduction`](@ref), resolves the measure once with [`resolve_risk_inputs`](@ref), and expands the gradient back to the full universe, as [`risk_contribution`](@ref) does.
+The prior route reduces the prior, the weights and the fees to the Investable Mask with [`investable_reduction`](@ref), which sets the gaps of a [`ReturnsResult`](@ref) to zero, resolves the measure once with [`resolve_risk_inputs`](@ref), and expands the gradient back to the full universe, as [`risk_contribution`](@ref) does.
 
 # Arguments
 
@@ -1235,13 +1259,13 @@ The prior route reduces the prior, the weights and the fees to the Investable Ma
 
   - `delta::Number = 1e-6`: Step of the finite difference.
   - `sca::Option{<:Scalariser} = nothing`: Scalariser that combines a vector of measures. A single measure ignores it.
-  - `strict::Bool = false`: Whether a held non-investable asset raises an error. Only a prior result reads it.
+  - `strict::Bool = false`: Whether a held non-investable asset of a prior result, or a Held Gap of a [`ReturnsResult`](@ref), raises an error. A matrix does not read it.
 
 # Validation
 
   - On a bare matrix, a Deferred Quantity that is not resolved, and an empty slot that the functor reads, raise through [`assert_resolved_slots`](@ref), as they do in [`expected_risk`](@ref).
   - A Calibration Rule that is not calibrated raises through [`assert_calibrated_slots`](@ref).
-  - Under `strict = true`, a held non-investable asset raises through [`investable_reduction`](@ref).
+  - Under `strict = true`, a held non-investable asset or a Held Gap raises through [`investable_reduction`](@ref).
 
 # Returns
 
@@ -1462,6 +1486,8 @@ The function splits the Euler decomposition of the risk between the factor expos
 
 A prior result reduces to the Investable Mask at the entry, through [`investable_reduction`](@ref), and the function reduces `rd` with it, so the regression fits the loadings over the investable assets alone. A held non-investable asset warns and its weight is dropped, or it raises under `strict`. The result has one entry for each factor and not one for each asset, so nothing expands.
 
+The gaps of a [`ReturnsResult`](@ref) become zero once before the finite difference, as in [`expected_risk`](@ref), and a bare matrix keeps them. The gaps of the original returns of a prior become zero in the same way. A [`CrossSectionalFactorPrior`](@ref) keeps in `original_X` the gap of an asset that lists inside the window. The regression that fits the loadings reads `rd` as the caller gives it.
+
 The gradient is taken on [`original_returns`](@ref), the returns that the caller supplied, and not on `pr.X`. The two differ under a factor prior, where `pr.X` is the reconstruction `F * transpose(M) .+ transpose(b)`. That matrix has the rank of `F` and no residual, so on it the off-factor part of a measure that reads the series reports the share of the intercept and not the idiosyncratic risk, and it can be negative. So under a factor prior the entries sum to the risk on the returns of the caller, and not to `expected_risk(r, w, pr)`. A measure whose kernel reads a moment and not the series, such as [`Variance`](@ref), [`StandardDeviation`](@ref) or [`DistributionValueatRisk`](@ref), gives the same answer on both matrices.
 
 The loadings come from [`resolve_factor_regression`](@ref), which takes the loadings of the prior before it fits `re`. So a regression estimator in `re` has no effect when the prior carries a factor block.
@@ -1500,7 +1526,7 @@ Where:
 
  1. Reduce `X`, `w` and `fees` to the Investable Mask with [`investable_reduction`](@ref), which gives the mask `imsk`, and reduce `rd` to the same assets with [`investable_returns_view`](@ref).
  2. Pick the loadings `rr` with [`resolve_factor_regression`](@ref).
- 3. Resolve `r` and the returns that the caller supplied with [`resolve_factor_risk_inputs`](@ref).
+ 3. Resolve `r` and the returns that the caller supplied with [`resolve_factor_risk_inputs`](@ref), which sets the gaps of the original returns of a prior to zero.
  4. Form `Bt`, the transpose of the loadings, `b2t`, the basis of the null space of `Bt`, and `b3t`, the transpose of the pseudoinverse of `b2t`.
  5. Compute the marginal risks `mr` with [`risk_contribution`](@ref) and `marginal = true`.
  6. Compute the factor contributions `rc_f` and the off-factor contribution `rc_of`, and return `[rc_f; rc_of]`.
@@ -1518,12 +1544,12 @@ Where:
   - `rd::ReturnsResult = ReturnsResult()`: Returns result that carries the factor returns `F`, which a regression estimator reads.
   - `delta::Number = 1e-6`: Step of the finite difference.
   - `sca::Option{<:Scalariser} = nothing`: Scalariser that combines a vector of measures. A single measure ignores it.
-  - `strict::Bool = false`: Whether a held non-investable asset raises an error. Only a prior result reads it.
+  - `strict::Bool = false`: Whether a held non-investable asset of a prior result, or a Held Gap of a [`ReturnsResult`](@ref), raises an error. A matrix does not read it.
 
 # Validation
 
   - When none of `re`, `X` and `rd` supplies the loadings, [`resolve_factor_regression`](@ref) raises an [`IsNothingError`](@ref).
-  - Under `strict = true`, a held non-investable asset raises through [`investable_reduction`](@ref).
+  - Under `strict = true`, a held non-investable asset or a Held Gap raises through [`investable_reduction`](@ref).
 
 # Returns
 
@@ -1555,7 +1581,7 @@ function factor_risk_contribution(r::BaseRM_VecBaseRM, w::VecNum, X::MatNum_Pr,
     imsk, X, w, fees = investable_reduction(X, w, fees, strict)
     rd = investable_returns_view(imsk, rd)
     rr = resolve_factor_regression(re, rd, isa(X, AbstractPriorResult) ? X : nothing)
-    r, X = resolve_factor_risk_inputs(r, X)
+    r, X = resolve_factor_risk_inputs(r, X, w, imsk, strict)
     Bt = transpose(rr.L)
     b2t = transpose(LinearAlgebra.pinv(transpose(LinearAlgebra.nullspace(Bt))))
     b3t = transpose(LinearAlgebra.pinv(b2t))

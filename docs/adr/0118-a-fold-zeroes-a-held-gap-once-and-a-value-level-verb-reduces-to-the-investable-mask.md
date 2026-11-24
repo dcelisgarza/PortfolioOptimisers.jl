@@ -442,3 +442,31 @@ enough, also at a zero weight. Two calls that a caller reads as the same must gi
   a `DimensionMismatch`.
 
 A `performance_summary(ret)` of a bare series stays documented and not checked.
+
+## Amendment (2026-11-24, second)
+
+([#2313](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/2313)). The Decision above
+left the `ReturnsResult` arities of the value-level verbs unchanged, for the cost of a scan in a hot
+path. That reason holds for the bare matrix arity alone. No solve calls a value-level verb with a
+`ReturnsResult`. The old rule also made `expected_risk(r, res, rd)` differ from
+`performance_summary(res, rd)` and from `expected_risk(r, predict(res, rd))`. A tail measure gave a
+finite wrong number, with no message.
+
+- `investable_reduction(rd, w, fees, strict)` is the one entry that each of these verbs calls once:
+  `expected_risk`, `risk_contribution`, `risk_gradient` and `factor_risk_contribution`. It now sets
+  the gaps of `rd.X` to zero with `filter_held_gaps`, and it names the assets by `rd.nx`. It returns
+  `rd` itself when `rd.X` holds no gap. The filter runs before the scalariser, the population and
+  the finite differences, so each verb scans the returns one time.
+- `expected_risk(r, res, X)` of a matrix filters before the view at the Investable Mask, so the
+  message names the columns of the caller.
+- `factor_risk_contribution` of a prior filters `original_X`. A prior that rebuilds its scenarios
+  fills no gap of that matrix, and the attribution reads it.
+- The bare matrix arity of each verb stays the plain product, and its docstring names the filter.
+  The hierarchical solves and the finite differences call it at every evaluation.
+- The filter runs also for a measure that reads the weights alone. A test of the input kind would
+  put the rule in each composite measure, and it would save one scan of a report.
+- The plots `plot_risk_contribution`, `plot_factor_risk_contribution`, `plot_measures` and
+  `plot_efficient_frontier` take `strict`, and they filter a matrix too. The last two call
+  `investable_reduction` one time, before they bind the measures. So one message covers all the
+  axes, and a measure binds to the reduced prior. Before, a default measure on a prior with a
+  non-investable asset bound to the full `sigma` and then met the reduced weights.

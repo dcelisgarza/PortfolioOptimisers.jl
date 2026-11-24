@@ -9,17 +9,21 @@ function PortfolioOptimisers.plot_measures(w::VecNum_VecVecNum, pr::Pr_RR,
                                                                                                              rt = ArithmeticReturn(),
                                                                                                              rf = 0),
                                            slv::Option{<:Slv_VecSlv} = nothing,
-                                           factory::Bool = true, kwargs...)
+                                           factory::Bool = true, strict::Bool = false,
+                                           kwargs...)
+    # One reduction for every axis, so one message names a held asset or a Held Gap.
+    _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     if factory
         x = PortfolioOptimisers.factory(x, pr, slv)
         y = PortfolioOptimisers.factory(y, pr, slv)
         z = isnothing(z) ? nothing : PortfolioOptimisers.factory(z, pr, slv)
         c = PortfolioOptimisers.factory(c, pr, slv)
     end
-    xr = expected_risk(x, w, pr, fees)
-    yr = expected_risk(y, w, pr, fees)
-    zr = isnothing(z) ? nothing : expected_risk(z, w, pr, fees)
-    cr = expected_risk(c, w, pr, fees)
+    # One weight vector scores to one number, so `vcat` gives the scatter a vector either way.
+    xr = vcat(expected_risk(x, w, pr, fees))
+    yr = vcat(expected_risk(y, w, pr, fees))
+    zr = isnothing(z) ? nothing : vcat(expected_risk(z, w, pr, fees))
+    cr = vcat(expected_risk(c, w, pr, fees))
     return if isnothing(zr)
         scatter(xr, yr; zcolor = cr, title = "Pareto Front", xlabel = "X", ylabel = "Y",
                 colorbar_title = "C", label = nothing, legend = true, kwargs...)
@@ -40,10 +44,20 @@ function PortfolioOptimisers.plot_measures(res_vec::AbstractVector{<:Optimisatio
                                                                                                              rf = 0),
                                            slv::Option{<:Slv_VecSlv} = nothing,
                                            fees::Option{<:Fees} = nothing,
-                                           factory::Bool = true, kwargs...)
-    views = [result_investable_view(res, pr, fees) for res in res_vec]
-    w = getindex.(views, 2)
-    pr = getindex.(views, 3)
+                                           factory::Bool = true, strict::Bool = false,
+                                           kwargs...)
+    # One reduction for each result, so every axis reads the same prior or filtered returns.
+    views = map(res_vec) do res
+        imsk, wi, pri, fi = result_investable_view(res, pr, fees)
+        # A result with no prior of its own leaves the refusal to the measure.
+        return if isnothing(pri)
+            (imsk, pri, wi, fi)
+        else
+            investable_reduction(pri, wi, fi, strict)
+        end
+    end
+    pr = getindex.(views, 2)
+    w = getindex.(views, 3)
     fees = getindex.(views, 4)
     # Each axis becomes one measure **per result**, so the broadcasts below zip correctly.
     # `Ref` is what makes that safe: a single measure is not iterable and broadcasts as a

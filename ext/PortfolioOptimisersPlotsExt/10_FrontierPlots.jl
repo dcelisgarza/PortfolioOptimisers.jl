@@ -55,13 +55,15 @@ function PortfolioOptimisers.plot_efficient_frontier(res_vec::AbstractVector{<:O
                                                      fees::Option{<:Fees} = nothing,
                                                      min_risk::Bool = true,
                                                      max_score::Bool = true,
-                                                     factory::Bool = true, kwargs...)
+                                                     factory::Bool = true,
+                                                     strict::Bool = false, kwargs...)
+    # One reduction for every axis, so one message names a held asset.
+    _, pr, w, fees = investable_reduction(pr, getproperty.(res_vec, :w), fees, strict)
     if factory
         x = PortfolioOptimisers.factory(x, pr, slv)
         y = PortfolioOptimisers.factory(y, pr, slv)
         c = PortfolioOptimisers.factory(c, pr, slv)
     end
-    w = getproperty.(res_vec, :w)
     xr = expected_risk(x, w, pr, fees)
     yr = expected_risk(y, w, pr, fees)
     cr = expected_risk(c, w, pr, fees)
@@ -133,7 +135,10 @@ function PortfolioOptimisers.plot_efficient_frontier(w::VecVecNum, pr::Pr_RR;
                                                      fees::Option{<:Fees} = nothing,
                                                      min_risk::Bool = true,
                                                      max_score::Bool = true,
-                                                     factory::Bool = true, kwargs...)
+                                                     factory::Bool = true,
+                                                     strict::Bool = false, kwargs...)
+    # One reduction for every axis, so one message names a held asset or a Held Gap.
+    _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     if factory
         x = PortfolioOptimisers.factory(x, pr, slv)
         y = PortfolioOptimisers.factory(y, pr, slv)
