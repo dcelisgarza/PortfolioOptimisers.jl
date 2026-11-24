@@ -1066,15 +1066,15 @@ A static `TensorPanelField` and a static feature matrix keep `assets × labels` 
 
 - **`DependentVariableTracking` of a measure with a quadratic risk expression**, such as `Variance()` without a semidefinite phylogeny. v0.34.2 logged a warning at the construction of a `RiskTrackingRiskMeasure`, and the solver refused the model. v0.34.3 states the risk with a rotated second-order cone, and the constructor logs no warning.
 
-## From v0.34 to v0.35
+## From v0.34.5 to v0.34.6
 
-### [Concentration limits](@id migration-0-35-concentration)
+### [Concentration limits](@id migration-0-34-6-concentration)
 
 A `ConstraintBlock` holds concentration rules, such as the UCITS 5/10/40 rule, in the new slot `conc`. Code that builds the block, its Result or an asset sets matrix estimator by keyword does not change.
 
-- **`ConstraintBlock`** has the field `conc` after `sgst`, so its positional constructor takes 33 arguments, where v0.34 took 32. Pass `nothing` after `sgst`, or use the keyword constructor. The type parameters gain one entry after the one of `sgst`.
-- **`ResolvedConstraintBlock`** has the field `conc` after `sgst`, so its positional constructor takes 33 arguments, where v0.34 took 32. The type parameters gain one entry after the one of `sgst`.
+- **`ConstraintBlock`** has the field `conc` after `sgst`, so its positional constructor takes 33 arguments, where v0.34.5 took 32. Pass `nothing` after `sgst`, or use the keyword constructor. The type parameters gain one entry after the one of `sgst`.
+- **`ResolvedConstraintBlock`** has the field `conc` after `sgst`, so its positional constructor takes 33 arguments, where v0.34.5 took 32. The type parameters gain one entry after the one of `sgst`.
 - **The show** of a `ConstraintBlock`, and of every optimiser that holds one, prints the row `conc ┼ nothing` after `sgst`. A doctest of your own that prints a `JuMPOptimiser` gains the row.
-- **`AssetSetsMatrixEstimator`** has the field `on` after `val`, with the default `nothing`, so its type gains a second parameter. `AssetSetsMatrixEstimator(val)` still gives the v0.34 estimator. Its show prints the row `on ┴ nothing` last.
+- **`AssetSetsMatrixEstimator`** has the field `on` after `val`, with the default `nothing`, so its type gains a second parameter. `AssetSetsMatrixEstimator(val)` still gives the v0.34.5 estimator. Its show prints the row `on ┴ nothing` last.
 - **`asset_sets_matrix`** of an estimator takes the keyword `strict`, with the default `false`, and gives it to the names of `on`. A method of your own for a precomputed matrix that `asset_sets_matrix` reads must take keywords.
-- **The exact cost budget**, a `BudgetCosts` with `xbgt = true`, names two rows of its model `cost_bgt_gd_ub` and `cost_bgt_gd_lb`, where v0.34 named them `cost_bgt_gz_ub` and `cost_bgt_gz_lb`. Under an objective that is not a ratio, the model holds no entry `cost_bgt_g`. Read the binaries from `cost_bgt_z` there.
+- **The exact cost budget**, a `BudgetCosts` with `xbgt = true`, names two rows of its model `cost_bgt_gd_ub` and `cost_bgt_gd_lb`, where v0.34.5 named them `cost_bgt_gz_ub` and `cost_bgt_gz_lb`. Under an objective that is not a ratio, the model holds no entry `cost_bgt_g`. Read the binaries from `cost_bgt_z` there.
