@@ -887,6 +887,61 @@ scenario mean.
             @test isapprox(po.mu, pb.mu; rtol = 1e-9)
         end
     end
+    @testset "The carry fold takes every ve that folds, and refuses a gap of a plain one (#2285)" begin
+        # The fold gave both masks to each `ve` and read `var(ve)` with no data, and each
+        # raised a `MethodError` outside the variance estimators of the exponential family.
+        PO = PortfolioOptimisers
+        csv(ve; kw...) = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(),
+                                                   minra = 5, ve = ve, kw...)
+        function stream(pe, r)
+            for i in (1:40, 41:50, 51:60)
+                pe = partial_fit!(pe, PO.port_opt_view(r, i, :))
+            end
+            return pe
+        end
+        function same(pe, r)
+            po = prior(stream(pe, r))
+            pb = prior(pe, r)
+            return isapprox(po.rr.vs, pb.rr.vs; rtol = 1e-10, nans = true) &&
+                   isapprox(po.sigma, pb.sigma; rtol = 1e-10, nans = true) &&
+                   isapprox(po.mu, pb.mu; rtol = 1e-10, nans = true)
+        end
+        two = BlendedInverseVarianceWeights(; lambda = 0.5)
+        cvg = CoveragePolicy()
+        for ve in
+            (SimpleVariance(), Covariance(), GeneralCovariance(), ExpWeightedCovariance(),
+             SimpleVariance(; cvg = cvg), Covariance(; cvg = cvg)),
+            wa in (MarketCapWeights(), two)
+
+            @test same(csv(ve; wa = wa), rd)
+        end
+        # A wrapper gives the masks to the fold of its inner estimator.
+        rc = RegimeAdjustedExpWeightedCovariance(; min_obs = 5)
+        nopd = PortfolioOptimisersCovariance(; ce = rc,
+                                             mp = MatrixProcessing(; pdm = nothing))
+        wc = WindowedCovariance(; ce = rc, rule = SeedWindow())
+        wv = WindowedVariance(; ve = SimpleVariance(), rule = SeedWindow())
+        for ve in (wv, GeodesicShrinkageCovariance())
+            @test same(csv(ve; wa = two), rd)
+        end
+        # A mask-aware `ve` reads the gaps of a panel, in the step as in the batch fit.
+        rg = csfp_panel(; n_assets = 20, n_observations = 60, n_industries = 3,
+                        seed = 782_001, late_listing_proba = 0.3, delisting_proba = 0.2).rd
+        ge = GeodesicShrinkageCovariance(; ce = ExpWeightedCovariance(; min_obs = 5))
+        for ve in (rc, nopd, wc, ge, SimpleVariance(; cvg = cvg))
+            @test same(csv(ve), rg)
+        end
+        # A plain `ve` refuses a gap that arrives at a step, as its batch fit refuses it.
+        X = copy(rd.X)
+        X[45, 3] = NaN
+        rn = ReturnsResult(; nx = rd.nx, X = X, pnl = rd.pnl)
+        for ve in (SimpleVariance(), GeneralCovariance(), GeodesicShrinkageCovariance())
+            pe = csv(ve)
+            @test_throws IsNonFiniteError prior(pe, rn)
+            p1 = partial_fit!(pe, PO.port_opt_view(rn, 1:40, :))
+            @test_throws IsNonFiniteError partial_fit!(p1, PO.port_opt_view(rn, 41:60, :))
+        end
+    end
 end
 
 @testset "A constrained Factor Family re-bases the fit" begin

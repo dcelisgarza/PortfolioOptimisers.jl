@@ -453,6 +453,9 @@ end
 function reads_active_mask(est::Union{WindowedVariance, WindowedCovariance})
     return reads_active_mask(getfield(est, 1))
 end
+function fold_mask_keywords(est::Union{WindowedVariance, WindowedCovariance}, amsk, emsk)
+    return fold_mask_keywords(getfield(est, 1), amsk, emsk)
+end
 """
     reduces_each_window(est::StatsBase.CovarianceEstimator) -> Bool
     reduces_each_window(est::Union{WindowedVariance, WindowedCovariance}) -> Bool

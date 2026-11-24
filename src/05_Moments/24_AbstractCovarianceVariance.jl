@@ -301,12 +301,13 @@ end
                                 RegimeAdjustedExpWeightedCovariance}) -> Bool
     reads_active_mask(ce::Union{WindowedVariance, WindowedCovariance}) -> Bool
     reads_active_mask(ce::PortfolioOptimisersCovariance) -> Bool
+    reads_active_mask(ce::GeodesicShrinkageCovariance) -> Bool
 
 Answer whether `ce` is a mask-aware estimator: whether the Asset Panel method of its variance reads the active mask itself, and not the Coverage Universe of the window.
 
-A plain estimator takes the reduce-and-expand root of [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref), so it answers `false`, which is the fallback. Each mask-aware family overrides the panel method and answers `true` with a method in its own file: a [`Covariance`](@ref) or a [`SimpleVariance`](@ref) with a [`CoveragePolicy`](@ref), the exponentially weighted family and the regime-adjusted family. A windowed estimator and a [`PortfolioOptimisersCovariance`](@ref) give the panel to their inner estimator, so they answer for it.
+A plain estimator takes the reduce-and-expand root of [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref), so it answers `false`, which is the fallback. Each mask-aware family overrides the panel method and answers `true` with a method in its own file: a [`Covariance`](@ref) or a [`SimpleVariance`](@ref) with a [`CoveragePolicy`](@ref), the exponentially weighted family and the regime-adjusted family. A windowed estimator, a [`PortfolioOptimisersCovariance`](@ref) and a [`GeodesicShrinkageCovariance`](@ref) give the panel to their inner estimator, so they answer for it.
 
-[`panel_series_row`](@ref), [`covers_an_asset`](@ref) and [`assert_mask_aware_variance`](@ref) read the answer. A variance estimator of your own whose panel method of `var` and whose [`variance_series`](@ref) over an Asset Panel read the active mask adds a method that returns `true`. Then an [`EWResidualVolatility`](@ref) admits it as its `ce`, and a windowed series and a [`PortfolioOptimisersCovariance`](@ref) give it the whole window.
+[`panel_series_row`](@ref), [`covers_an_asset`](@ref), [`assert_mask_aware_variance`](@ref) and [`cross_sectional_fold_variance`](@ref) read the answer. A variance estimator of your own whose panel method of `var` and whose [`variance_series`](@ref) over an Asset Panel read the active mask adds a method that returns `true`. Then an [`EWResidualVolatility`](@ref) admits it as its `ce`, and a windowed series and a [`PortfolioOptimisersCovariance`](@ref) give it the whole window.
 
 # Arguments
 
@@ -320,6 +321,7 @@ A plain estimator takes the reduce-and-expand root of [`Statistics.cov(ce::Abstr
 
   - [`covers_an_asset`](@ref)
   - [`assert_mask_aware_variance`](@ref)
+  - [`cross_sectional_fold_variance`](@ref)
   - [`CoveragePolicy`](@ref)
 """
 function reads_active_mask(::StatsBase.CovarianceEstimator)
@@ -569,12 +571,16 @@ end
 """
     Statistics.cov(ce::AbstractCovarianceEstimator; kwargs...)
     Statistics.cor(ce::AbstractCovarianceEstimator; kwargs...)
+    Statistics.var(ce::AbstractCovarianceEstimator; kwargs...)
+    Statistics.std(ce::AbstractCovarianceEstimator; kwargs...)
     Statistics.var(ve::AbstractVarianceEstimator)
     Statistics.std(ve::AbstractVarianceEstimator)
 
 Reads a moment from the partial-fit state that a covariance or variance estimator holds.
 
 This method is the call with no data for an estimator that has no such call of its own. It reads the state from the `cache` field with [`partial_fit_cache`](@ref). Then it gives the state to the method of the same verb that takes a state. For a [`SampleBufferState`](@ref), which [`Online`](@ref) seeds, that method runs the batch verb over the rows of the buffer. A family that folds exactly has its own call with no data, so this method serves the estimators that fold only through a buffer, for example [`GerberCovariance`](@ref) and [`WindowedCovariance`](@ref).
+
+The variance of a covariance estimator is the diagonal of its covariance, as the matrix method of `var` states. So `var(ce)` and `std(ce)` read the call `cov(ce)` with no data of the family.
 
 # Arguments
 
@@ -603,6 +609,12 @@ function Statistics.cov(ce::AbstractCovarianceEstimator; kwargs...)
 end
 function Statistics.cor(ce::AbstractCovarianceEstimator; kwargs...)
     return Statistics.cor(ce, partial_fit_cache(ce); kwargs...)
+end
+function Statistics.var(ce::AbstractCovarianceEstimator; kwargs...)
+    return LinearAlgebra.diag(Statistics.cov(ce; kwargs...))
+end
+function Statistics.std(ce::AbstractCovarianceEstimator; kwargs...)
+    return sqrt.(Statistics.var(ce; kwargs...))
 end
 function Statistics.var(ve::AbstractVarianceEstimator)
     return Statistics.var(ve, partial_fit_cache(ve))

@@ -1719,18 +1719,19 @@ This method is the block arm of the [`partial_fit!`](@ref) interface. The Welfor
 
 # Algorithm
 
- 1. Orient `X` to `observations × assets`. Transpose it when `dims == 2`.
- 2. Fold each row in order with the single-observation arm of [`partial_fit!`](@ref). Rebind the estimator after each row.
+ 1. Fold each row in order with the single-observation arm of [`partial_fit!`](@ref), together with its row of the active mask, through [`fold_rows`](@ref).
 
 # Arguments
 
   - `ce`: The covariance estimator.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
+  - `active_mask`: The active mask of the Asset Panel, with the same size as `X`, or `nothing`.
 
 # Validation
 
   - $(val_dict[:dims])
+  - If `active_mask` is not `nothing`, its size is the size of `X` after the orientation. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
 
@@ -1742,12 +1743,9 @@ This method is the block arm of the [`partial_fit!`](@ref) interface. The Welfor
   - [`partial_fit!`](@ref)
 """
 function partial_fit!(ce::GeneralCovariance{<:Any, <:Any, <:Option{<:CovarianceState}},
-                      X::MatNum; dims::Int = 1)
-    X = dims_oriented(dims, X)
-    for i in axes(X, 1)
-        ce = partial_fit!(ce, view(X, i, :))
-    end
-    return ce
+                      X::MatNum; dims::Int = 1,
+                      active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing)
+    return fold_rows(ce, X, dims, active_mask)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1758,14 +1756,14 @@ The [`GeneralCovariance`](@ref) method of [`partial_fit!`](@ref) folds one obser
 
  1. Refuse an estimator that an incremental fit cannot reproduce, with [`partial_fit_corrected`](@ref).
  2. Seed a [`CovarianceState`](@ref) of zeros over `length(x)` assets when `ce.cache` holds `nothing`, with [`covariance_state_seed`](@ref).
- 3. Fold `x` into the state.
+ 3. Fold `x` into the state. An inactive asset of `active_mask` folds as a `NaN`, as [`inactive_as_nonfinite`](@ref) states.
  4. Rebuild the estimator with the new state in `cache` through [`rebuild_struct`](@ref), and return it.
 """
 function partial_fit!(ce::GeneralCovariance{<:Any, <:Any, <:Option{<:CovarianceState}},
-                      x::VecNum)
+                      x::VecNum; active_mask::Option{<:AbstractVector{<:Bool}} = nothing)
     partial_fit_corrected(ce)
-    return rebuild_struct(ce,
-                          (; cache = partial_fit!(covariance_state_seed(ce.cache, x), x)))
+    state = covariance_state_seed(ce.cache, x)
+    return rebuild_struct(ce, (; cache = partial_fit!(state, x, nothing, active_mask)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1776,8 +1774,7 @@ This method is the block arm of the [`partial_fit!`](@ref) interface. The Welfor
 
 # Algorithm
 
- 1. Orient `X` and `active_mask` to `observations × assets`. Transpose them when `dims == 2`.
- 2. Fold each row in order with the single-observation arm of [`partial_fit!`](@ref), together with its row of the active mask. Rebind the estimator after each row.
+ 1. Fold each row in order with the single-observation arm of [`partial_fit!`](@ref), together with its row of the active mask, through [`fold_rows`](@ref).
 
 # Arguments
 
@@ -1803,17 +1800,7 @@ This method is the block arm of the [`partial_fit!`](@ref) interface. The Welfor
 function partial_fit!(ce::Covariance{<:Any, <:Any, <:FullMoment, <:Any, <:Any,
                                      <:Option{<:CovarianceState}}, X::MatNum; dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing)
-    X = dims_oriented(dims, X)
-    amsk = isnothing(active_mask) ? nothing : dims_oriented(dims, active_mask)
-    if !isnothing(amsk)
-        @argcheck(size(amsk) == size(X),
-                  DimensionMismatch("size(X) ($(size(X))) must match size(active_mask) ($(size(amsk)))"))
-    end
-    for i in axes(X, 1)
-        ce = partial_fit!(ce, view(X, i, :);
-                          active_mask = isnothing(amsk) ? nothing : view(amsk, i, :))
-    end
-    return ce
+    return fold_rows(ce, X, dims, active_mask)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
