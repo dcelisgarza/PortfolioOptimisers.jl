@@ -1095,6 +1095,10 @@ that is not in `paths`, with the tokens that name no file.
 names a file by its bare name, hides its file from both sweep jobs. The check then reports the file
 as unfiled and the triage files a duplicate (#1755). A move of the tree makes every such title
 stale at once, so the jobs refuse a stale title rather than read past it.
+
+Both jobs call it twice. The first call finds the tokens that the manifest of the checkout does not
+hold, and `rows_elsewhere` finds which of them are rows of work that did not land here yet. The
+second call adds those rows to `paths`, so it returns the titles that are stale everywhere (#2261).
 """
 function stale_titles(issues, paths)
     out = Tuple{Int, String, Vector{String}}[]
@@ -1147,6 +1151,121 @@ function git_short_commit(; root = REPO_ROOT)
     catch
         return "unknown"
     end
+end
+
+# --- the rows of the work that did not land here ---------------------------
+
+"""
+    git_output(args; root = REPO_ROOT) -> Union{String, Nothing}
+
+What `git` printed for `args` in `root`, or `nothing` when it failed. A ref that holds no manifest
+and a root that is not a repository both fail, and neither is an error of the caller.
+"""
+function git_output(args; root = REPO_ROOT)
+    io = IOBuffer()
+    cmd = pipeline(ignorestatus(Cmd(`git $args`; dir = root)); stdout = io,
+                   stderr = devnull)
+    return success(run(cmd)) ? String(take!(io)) : nothing
+end
+
+"""
+    manifest_paths(text) -> Set{String}
+
+The paths of the `[file]` table of a sweep manifest. A text that does not parse gives an empty set,
+because the manifest of another worktree can be in the middle of an edit or a rebase.
+"""
+function manifest_paths(text::AbstractString)
+    manifest = TOML.tryparse(text)
+    if manifest isa TOML.ParserError
+        return Set{String}()
+    end
+    return Set{String}(keys(get(manifest, "file", Dict{String, Any}())))
+end
+
+"""
+    other_manifests(; root = REPO_ROOT) -> Vector{Pair{String, Set{String}}}
+
+The name and the paths of each sweep manifest that stands beside the one of `root`: the manifest of
+each branch of `origin` that this clone fetched, and the one in the working tree of each other
+worktree of the clone.
+
+A worktree is read from the disk, not from its branch, because a session files the sweep issue of a
+new file before it commits that file. Nothing is fetched, so a branch that another machine pushed
+is read after `git fetch origin`.
+"""
+function other_manifests(; root = REPO_ROOT)
+    out = Pair{String, Set{String}}[]
+    refs = something(git_output(["for-each-ref", "--format=%(refname:lstrip=2)",
+                                 "refs/remotes/origin"]; root), "")
+    for ref in eachsplit(refs, '\n'; keepempty = false)
+        # `origin/HEAD` is a second name of the default branch.
+        if ref == "origin/HEAD"
+            continue
+        end
+        text = git_output(["show", "$ref:code_health/sweep_manifest.toml"]; root)
+        if text !== nothing
+            push!(out, "branch `$ref`" => manifest_paths(text))
+        end
+    end
+    trees = something(git_output(["worktree", "list", "--porcelain"]; root), "")
+    for line in eachsplit(trees, '\n'; keepempty = false)
+        if !(startswith(line, "worktree "))
+            continue
+        end
+        dir = chopprefix(line, "worktree ")
+        path = joinpath(dir, "code_health", "sweep_manifest.toml")
+        if isfile(path) && !(samefile(dir, root))
+            push!(out, "worktree `$(basename(dir))`" => manifest_paths(read(path, String)))
+        end
+    end
+    return out
+end
+
+"""
+    rows_elsewhere(issues, paths; root = REPO_ROOT) -> Dict{String, String}
+
+Each path that an open issue of `issues` names, that is not in `paths`, and that is a row of work
+that did not land in `root` yet, with the branch or the worktree that holds the row.
+
+A branch from `main` is older than `dev`, and each of two branches is older than the other, so an
+issue that one branch filed for its new file names no row of the other branch. Such a title is
+correct, and a refusal of it stopped every session but one (#2261).
+
+**A path that the history of `HEAD` held is not returned.** The file moved or left here, so the
+title is stale, and the row of an older branch or a forgotten worktree does not make it current.
+The check needs the history, so in a shallow clone this returns nothing and every title that names
+no row stays refused.
+"""
+function rows_elsewhere(issues, paths; root = REPO_ROOT)
+    out = Dict{String, String}()
+    missed = unique!(String[t for (_, _, bad) in stale_titles(issues, paths) for t in bad])
+    if isempty(missed) ||
+       !(git_output(["rev-parse", "--is-shallow-repository"]; root) == "false\n")
+        return out
+    end
+    for (place, held) in other_manifests(; root), path in missed
+        if haskey(out, path) || !(path in held)
+            continue
+        end
+        if git_output(["log", "-1", "--format=%h", "HEAD", "--", path]; root) == ""
+            out[path] = place
+        end
+    end
+    return out
+end
+
+"""
+    by_place(elsewhere) -> Vector{Pair{String, Vector{String}}}
+
+The paths of `rows_elsewhere`, grouped by the branch or the worktree that holds their rows. Both
+sweep jobs print one note for each group.
+"""
+function by_place(elsewhere)
+    groups = Dict{String, Vector{String}}()
+    for (path, place) in elsewhere
+        push!(get!(Vector{String}, groups, place), path)
+    end
+    return sort!([place => sort!(paths) for (place, paths) in groups]; by = first)
 end
 
 # --- the sweep manifest ----------------------------------------------------

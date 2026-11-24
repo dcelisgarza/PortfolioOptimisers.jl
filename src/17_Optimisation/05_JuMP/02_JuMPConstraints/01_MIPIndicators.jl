@@ -201,23 +201,6 @@ function mip_bounds(sp::SubsetMIPSpace, b::VecNum)
     return sp.smtx * b
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Whether the binary indicators can gate the weights directly, without the continuous big-M relaxation of `indicator * k`.
-
-True when the budget `k` is a constant, in every space. The asset space additionally accepts a unit budget ([`is_unit_budget`](@ref)): the head has normalised the scale, so the indicators may gate the weights directly even though `k` is still a free variable.
-
-# Related
-
-  - [`short_mip_threshold_constraints`](@ref)
-"""
-function use_direct_mip_indicators(model::JuMP.Model, ::AssetMIPSpace, k)
-    return isa(k, Number) || is_unit_budget(model)
-end
-function use_direct_mip_indicators(::JuMP.Model, ::AbstractMIPSpace, k)
-    return isa(k, Number)
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for a declared set of MIP binary indicators.
@@ -746,7 +729,7 @@ function declare_mip_indicators!(model::JuMP.Model, sp::AbstractMIPSpace,
     ilb = model[mip_key(sp, :ilb)] = JuMP.@variable(model, [1:N], binary = true)
     isb = model[mip_key(sp, :isb)] = JuMP.@variable(model, [1:N], binary = true)
     i_mip = model[mip_key(sp, :i_mip)] = JuMP.@expression(model, ilb + isb)
-    if use_direct_mip_indicators(model, sp, k)
+    if isa(k, Number)
         il = model[mip_key(sp, :il)] = JuMP.@expression(model, ilb)
         is = model[mip_key(sp, :is)] = JuMP.@expression(model, isb)
     else

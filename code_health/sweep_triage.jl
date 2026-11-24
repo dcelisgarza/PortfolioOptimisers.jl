@@ -123,7 +123,7 @@ end
 # --- reconciliation --------------------------------------------------------
 
 """
-    reconcile(rows, map_names, maps, existing) -> nothing
+    reconcile(rows, map_names, maps, existing, elsewhere) -> nothing
 
 The manifest and the tracker must agree before a single issue is planned. Four ways they can
 disagree, and each one throws:
@@ -136,12 +136,14 @@ disagree, and each one throws:
     build on this, so reaching it here means the census was bypassed.
  4. An open sweep issue names a `.jl` file that has no row, which `CodeHealth.stale_titles` finds.
     The file moved, or the title names it by its bare name. `already_filed` cannot see that issue,
-    so the job would file a duplicate of it (#1755).
+    so the job would file a duplicate of it (#1755). A path of `elsewhere`, which
+    `CodeHealth.rows_elsewhere` finds, is a row of a branch or a worktree that did not land here,
+    so it is no disagreement (#2261).
 
 A loud refusal is the right outcome for all four. This job writes to a tracker, and a wrong parent
 or a wrong title is work a person must undo by hand.
 """
-function reconcile(rows, map_names, maps, existing)
+function reconcile(rows, map_names, maps, existing, elsewhere = Dict{String, String}())
     bad = String[]
     for (key, name) in sort(collect(map_names); by = first)
         m = get(maps, key, nothing)
@@ -158,10 +160,12 @@ function reconcile(rows, map_names, maps, existing)
             push!(bad, "`$path` names map $(row["map"]), which `[map]` does not list")
         end
     end
-    for (n, title, tokens) in CodeHealth.stale_titles(existing, keys(rows))
+    known = union(keys(rows), keys(elsewhere))
+    for (n, title, tokens) in CodeHealth.stale_titles(existing, known)
         push!(bad,
               "issue #$n names $(join(("`$t`" for t in tokens), ", ")), which has no row. " *
-              "Retitle it to name the current path of every file it sweeps: $(repr(title))")
+              "Retitle it to name the current path of every file it sweeps, or run " *
+              "`git fetch origin` if another branch added the file: $(repr(title))")
     end
     if !(isempty(bad))
         error("The sweep manifest and the tracker disagree, so nothing is planned:\n  " *
@@ -529,12 +533,21 @@ function main(args)
     maps, umbrella_open = read_maps(opts.maps)
     existing = read_existing(opts.existing)
 
-    reconcile(rows, map_names, maps, existing)
+    elsewhere = CodeHealth.rows_elsewhere(existing, keys(rows))
+    reconcile(rows, map_names, maps, existing, elsewhere)
     chosen, skipped = candidates(rows, maps, coverage, existing, Set(opts.files))
     write_plan(opts.out, chosen, umbrella_open, CodeHealth.git_short_commit())
 
     println(length(rows), " file(s) in the manifest, ", count(m -> !(m.open), values(maps)),
             " child map(s) closed, ", length(chosen), " sub-issue(s) to open.")
+    for (place, paths) in CodeHealth.by_place(elsewhere)
+        println("  note: the open `$LABEL` issues name ", length(paths), " row(s) of the ",
+                place, ". If one is the new path of a file of this checkout, ",
+                "file no second issue.")
+        for path in paths
+            println("    ", path)
+        end
+    end
     for c in chosen
         println("  ", c.path, " — child map ", c.map.number, ", issue #", c.map.issue,
                 reopens(c) ? " (closed, so it is reopened)" : " (already open)")

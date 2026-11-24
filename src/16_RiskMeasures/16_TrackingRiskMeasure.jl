@@ -6,7 +6,7 @@ Bounds how far the risk of a portfolio can move from the risk of a benchmark por
 
 [`RiskTrackingRiskMeasure`](@ref) measures the same quantity in the same two modes, and this type bounds it. Put it in the `tr` slot of a `JuMPOptimiser`. The distance is a difference of risks, not a norm of the difference of the return series, and that is how it differs from [`TrackingError`](@ref).
 
-In an optimisation the independent bound is exact, and the dependent bound holds from above only. The model states the portfolio risk through an upper bound that the solver can raise. So a portfolio whose risk is below the benchmark risk by more than `err` also satisfies the dependent bound. This is true of every measure whose model is an upper bound, among them [`ConditionalValueatRisk`](@ref), [`StandardDeviation`](@ref) and a [`Variance`](@ref) in the semidefinite form. A [`Variance`](@ref) outside the semidefinite form does not solve in the dependent mode.
+In an optimisation the independent bound is exact, and the dependent bound holds from above only. The model states the portfolio risk through an upper bound that the solver can raise. So a portfolio whose risk is below the benchmark risk by more than `err` also satisfies the dependent bound. This is true of every measure whose model is an upper bound, among them [`ConditionalValueatRisk`](@ref), [`StandardDeviation`](@ref) and [`Variance`](@ref).
 
 The model charges the fee of the portfolio on the returns that the tracked measure reads, in both modes, and it never reads `tr.fees`. The functor of [`RiskTrackingRiskMeasure`](@ref) charges the same fee, so it reads back the value that the model bounds. In the independent mode the tracked series is ``\\mathbf{X}(\\boldsymbol{w} - \\boldsymbol{w}_b) - F(\\boldsymbol{w})``, the net return of the portfolio minus the gross return of the benchmark.
 
@@ -430,7 +430,7 @@ Measures how far the risk of a portfolio is from the risk of a benchmark portfol
 
 The `alg` field selects the mode. The independent mode, [`IndependentVariableTracking`](@ref), takes the risk of the weight difference. The dependent mode, [`DependentVariableTracking`](@ref), takes the absolute difference of the two risks. [`RiskTrackingError`](@ref) bounds the same quantity in an optimisation, and [`TrackingRiskMeasure`](@ref) measures a norm of the gap between two return series in its place.
 
-In an optimisation the independent mode is exact, and the dependent mode holds from one side only. The model states the portfolio risk through an upper bound that the solver can raise. So the model penalises a portfolio that is riskier than the benchmark, and it can report zero for a portfolio that is less risky. This is true of every measure whose model is an upper bound, among them [`ConditionalValueatRisk`](@ref), [`StandardDeviation`](@ref) and a [`Variance`](@ref) in the semidefinite form. The constructor warns for a measure whose model is a quadratic expression, and a [`Variance`](@ref) outside the semidefinite form does not solve in the dependent mode.
+In an optimisation the independent mode is exact, and the dependent mode holds from one side only. The model states the portfolio risk through an upper bound that the solver can raise. So the model penalises a portfolio that is riskier than the benchmark, and it can report zero for a portfolio that is less risky. This is true of every measure whose model is an upper bound, among them [`ConditionalValueatRisk`](@ref), [`StandardDeviation`](@ref) and [`Variance`](@ref).
 
 The functor never reads `tr.fees`, and it charges the fee of the portfolio as the model does. In the independent mode the tracked measure reads the series ``\\mathbf{X}(\\boldsymbol{w} - \\boldsymbol{w}_b) - F(\\boldsymbol{w})``, the net return of the portfolio minus the gross return of the benchmark. [`difference_risk`](@ref) computes it. The benchmark pays no fee there, because the difference ``\\boldsymbol{w} - \\boldsymbol{w}_b`` is not a portfolio that anyone holds. In the dependent mode each weight vector pays its own fee on its own risk, in the functor and in the model.
 
@@ -469,7 +469,7 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
-The constructor passes `r` through [`no_bounds_no_risk_expr_risk_measure`](@ref), which drops the `settings.ub` and the `settings.rke` of the tracked measure. The tracked measure only measures the distance, and `settings` of this measure holds its bound and its objective flag. In the dependent mode, the constructor logs a warning when `r` is a measure whose model is a quadratic expression, such as a [`Variance`](@ref).
+The constructor passes `r` through [`no_bounds_no_risk_expr_risk_measure`](@ref), which drops the `settings.ub` and the `settings.rke` of the tracked measure. The tracked measure only measures the distance, and `settings` of this measure holds its bound and its objective flag.
 
 ## View parameters
 
@@ -554,10 +554,6 @@ RiskTrackingRiskMeasure
     alg
     function RiskTrackingRiskMeasure(settings::RiskMeasureSettings, tr::WeightsTracking,
                                      r::AbstractBaseRiskMeasure, alg::VariableTracking)
-        if isa(alg, DependentVariableTracking) && isa(r, QuadExpressionRiskMeasures)
-            @warn("Risk measures that produce JuMP.QuadExpr risk expressions are not guaranteed to work. The variance with SDP constraints works because the risk measure is the trace of a matrix, an affine expression.",
-                  maxlog = log_limit(:warn), _id = @log_id(typeof(r)))
-        end
         r = no_bounds_no_risk_expr_risk_measure(r)
         return new{typeof(settings), typeof(tr), typeof(r), typeof(alg)}(settings, tr, r,
                                                                          alg)

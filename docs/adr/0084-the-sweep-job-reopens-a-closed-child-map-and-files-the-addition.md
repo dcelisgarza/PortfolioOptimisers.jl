@@ -326,3 +326,32 @@ its map, opens the rest of the plan, and then prints one command per orphan that
 and exits with status 1. **An orphan does not stop the plan**, because the plan cannot open it again.
 The next dump reports the orphan as an existing sweep issue, so a re-run skips its path, and the
 orphan is attached only by the printed command. A red step in `Sweep.yml` shows the orphan.
+
+## Amendment (2026-11-23) — from [#2261](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/2261)
+
+A title that names a row of work that did not land here yet is a note, not a refusal.
+
+The amendment of 2026-10-19 compared each title with the manifest of the checkout alone. With the
+routes of ADR 0240, that manifest is not the whole library. A branch from `main` is older than
+`dev`, and each of two branches is older than the other. A session files the sweep issue of a new
+file before it commits the file. On 2026-11-23 twelve correct issues stopped `sweep_triage.jl` in
+each worktree from `main`, and the issues of three unpushed worktrees stopped it everywhere else.
+
+`CodeHealth.rows_elsewhere` now reads the manifest of each fetched branch of `origin`, and the
+manifest on the disk of each other worktree of the clone. A path with a row in one of them is a
+note in both jobs. Two kinds of title stay refused:
+
+- **A path that no manifest holds.** It is a bare name, an error, or a file of a branch that this
+  clone did not fetch. The message names `git fetch origin`. The jobs fetch nothing themselves,
+  because a fetch moves the refs that the gates of every other worktree read.
+- **A path that the history of `HEAD` held.** The file moved or left here. An older branch or a
+  forgotten worktree still holds its row, and that row does not make the title current.
+
+The second rule needs the history, so `Sweep.yml` checks out with `fetch-depth: 0`, which also
+fetches each branch. A shallow clone refuses as before. The weekly job cannot see a file that its
+session did not push yet, so it refuses the issue of that file until the push.
+
+One gap stays. When another branch moves a file of this checkout, its issue names the new path. A
+plan for the old path, with `--file` or under a closed map, then finds no open issue. The note
+names the new path and says not to file a second issue. A read of the renames of every branch was
+rejected, because it costs more than the note and the case is rare.

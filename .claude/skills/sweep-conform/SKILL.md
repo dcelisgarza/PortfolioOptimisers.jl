@@ -132,8 +132,9 @@ that is current. GitHub shows the conflict on the pull request.
 
 **The landing base.** The `**Lands on:**` line of the issue names the route (ADR 0240). A sweep
 sub-issue lands on `dev` unless its line names another route. `<base>` below is the landing
-base: `origin/main` for a branch of your own, and `origin/dev` or `origin/agents/<map>-<slug>`
-for a shared branch. On a shared branch, run
+base: `origin/main` for a branch of your own, and `origin/dev` or `origin/dev-<feature>` for a
+shared branch. A line that names `#<pr>` makes the head branch of that pull request a shared
+branch. On a shared branch, run
 `bash code_health/gate_stamp.sh base origin/<branch>` once, before the first gate. Every gate,
 stamp and check then measures against it.
 
@@ -218,7 +219,7 @@ of cost, the fast ones first, and the slow ones once, on the tree you will push:
    neither.
 8. Commit and fetch. Run `gate_stamp.sh check` again.
    - **Own branch.** Rebase only if the check names a stamp. Push with
-     `git push origin HEAD:agents/<issue>-<slug>`. Open one pull request into `main`, with the
+     `git push origin HEAD:dev-<feature>`. Open one pull request into `main`, with the
      body that the `pr` skill writes and `Closes #<issue>` in it. Turn on auto-merge with
      `gh pr merge <number> --auto --squash`. GitHub merges it when the required checks pass.
    - **Shared branch.** Rebase onto `<base>` if it moved, and push with

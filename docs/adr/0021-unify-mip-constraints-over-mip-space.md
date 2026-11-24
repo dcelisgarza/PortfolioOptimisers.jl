@@ -70,3 +70,11 @@ constraint builders once against it.**
   (`run_mip_builder!`), which this ADR left space-specific — folding the sub-group cardinality
   path onto the seam. It also splits the unified file into an indicator layer plus topical
   emitter files (`05_MIPConstraints.jl` → `01_MIPIndicators.jl` + siblings).
+
+## Amendment (2026-11-23)
+
+The shortcut `use_direct_mip_indicators` is gone (#2275). It let the asset space use the binaries
+as the gates under the unit budget of `RiskBudgeting`. That head solves for the scaled weights
+`k w`, so a bound or a threshold on an unscaled gate did not hold on the weights. In every space,
+the binary is the gate only when `k` is a number. The interface is `mip_wx!`, `mip_bounds` and
+`mip_key`.

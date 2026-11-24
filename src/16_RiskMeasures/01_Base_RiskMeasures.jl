@@ -643,9 +643,9 @@ To implement a new risk measure, subtype `RiskMeasure` with a `settings::RiskMea
 
 ## `set_risk_constraints!`
 
-  - `set_risk_constraints!(model::JuMP.Model, i, r::MyRiskMeasure, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)`: Builds the measure into the model of a `JuMP` optimiser, or of a programme Allocation Set. There is no fallback.
+  - `set_risk_constraints!(model::JuMP.Model, i, r::MyRiskMeasure, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)`: Builds the measure into the model of a `JuMP` optimiser, or of a programme Allocation Set, and returns its risk expression. There is no fallback.
 
-The method builds the risk expression from the model's weights, then registers it with [`set_risk_bounds_and_expression!`](@ref), which reads the bound and the contribution to the aggregate risk expression off `r.settings`. Scale every constraint by [`get_constraint_scale`](@ref), and multiply any constant bound by [`get_k`](@ref), so the bound is compared against unrescaled weights under a ratio objective.
+The method builds the risk expression from the model's weights, then registers it with [`set_risk_bounds_and_expression!`](@ref), which reads the bound and the contribution to the aggregate risk expression off `r.settings`. A tracking measure reads the bounded expression from that call, so the call is mandatory. Scale every constraint by [`get_constraint_scale`](@ref), and multiply any constant bound by [`get_k`](@ref), so the bound is compared against unrescaled weights under a ratio objective.
 
 ## Optional methods
 
@@ -1104,19 +1104,106 @@ function Frontier(; N::Integer = 20,
     return Frontier(N, 1, bound)
 end
 """
-    const RkRtBounds = Union{Num_VecNum, Frontier}
+$(DocStringExtensions.TYPEDEF)
 
-Union type for risk-measure upper bound specifications.
+Asks the builder of a tracked measure for the expression that its bound acts on.
 
-Accepts either a scalar/vector numeric bound or a [`Frontier`](@ref) sweep configuration. Used in [`RiskMeasureSettings`](@ref) to set the upper bound field.
+[`RiskTrackingRiskMeasure`](@ref) and [`RiskTrackingError`](@ref) build the measure that they track, and they state the bound themselves. The bound row multiplies the bound by ``k``, so it needs an expression of degree one in the weights and ``k``, and only the builder of the measure knows that expression. The tracking builder puts this request into the bound slot of the tracked measure. The builder of the measure converts the request with the conversion that it uses for a bound, and [`set_risk_upper_bound!`](@ref) registers the expression and the converted request in place of a row.
+
+# Mathematical definition
+
+The converted request states the bounded expression as a function of the risk.
+
+```math
+\\begin{align}
+e &= k \\, f \\, \\beta\\left(R(\\boldsymbol{w})\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``e``: The expression of degree one.
+  - $(math_dict[:k_budget])
+  - ``f``: The `factor` field.
+  - ``\\beta``: The conversion that the `bound` field names, ``x`` for [`LinearBound`](@ref) and ``\\sqrt{x}`` for [`SquareRootBound`](@ref).
+  - ``R``: The risk measure.
+  - $(math_dict[:w_port])
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    TrackedRiskBound(prefix::Symbol, rke::Bool, level::Number, exact::Bool) -> TrackedRiskBound
+
+Creates the request of a tracking builder, with a `factor` of `1` and a [`LinearBound`](@ref).
+
+    TrackedRiskBound(ub::TrackedRiskBound, factor::Number,
+                     bound::FrontierBoundEstimator) -> TrackedRiskBound
+
+Creates the request that a builder converted.
 
 # Related
 
   - [`Frontier`](@ref)
+  - [`RkRtBounds`](@ref)
+  - [`set_tracked_risk_constraints!`](@ref)
+  - [`variance_risk_bounds_val`](@ref)
+"""
+@concrete struct TrackedRiskBound <: AbstractAlgorithm
+    """
+    `prefix`: The Model State namespace of the tracked build, which the expression is registered under.
+    """
+    prefix
+    """
+    `rke`: Whether the objective reads the risk expression that the builder returns.
+    """
+    rke
+    """
+    `level`: The size of the risk that the tracking builder states its rows at, or zero when it states none. It is the bound of the independent mode, and the risk of the benchmark in the dependent mode. The model of the bound of an even moment takes its units from it.
+    """
+    level
+    """
+    `exact`: Whether the conversion has to hold at every level. Otherwise it has to hold at `level` alone.
+    """
+    exact
+    """
+    $(field_dict[:factor_fr])
+    """
+    factor
+    """
+    `bound`: The conversion from the units of the risk to the units of the expression, a [`FrontierBoundEstimator`](@ref).
+    """
+    bound
+    function TrackedRiskBound(prefix::Symbol, rke::Bool, level::Number, exact::Bool,
+                              factor::Number, bound::FrontierBoundEstimator)
+        return new{typeof(prefix), typeof(rke), typeof(level), typeof(exact),
+                   typeof(factor), typeof(bound)}(prefix, rke, level, exact, factor, bound)
+    end
+end
+function TrackedRiskBound(prefix::Symbol, rke::Bool, level::Number, exact::Bool)
+    return TrackedRiskBound(prefix, rke, level, exact, 1, LinearBound())
+end
+function TrackedRiskBound(ub::TrackedRiskBound, factor::Number,
+                          bound::FrontierBoundEstimator)
+    return TrackedRiskBound(ub.prefix, ub.rke, ub.level, ub.exact, factor, bound)
+end
+"""
+    const RkRtBounds = Union{Num_VecNum, Frontier, TrackedRiskBound}
+
+Union type for risk-measure upper bound specifications.
+
+A caller gives a number, a vector of numbers, or a [`Frontier`](@ref) sweep. A tracking builder gives a [`TrackedRiskBound`](@ref) to the measure that it tracks. [`RiskMeasureSettings`](@ref) holds the bound in its `ub` field.
+
+# Related
+
+  - [`Frontier`](@ref)
+  - [`TrackedRiskBound`](@ref)
   - [`Num_VecNum`](@ref)
   - [`RiskMeasureSettings`](@ref)
 """
-const RkRtBounds = Union{Num_VecNum, Frontier}
+const RkRtBounds = Union{Num_VecNum, Frontier, TrackedRiskBound}
 """
     const Front_NumVec = Union{VecNum, Frontier}
 

@@ -10,14 +10,15 @@ Any prior result is accepted. Both tensors must resolve, on their child or on th
 # Algorithm
 
  1. Check that `r.sk.sk` or `pr` holds a coskewness matrix, and that `r.kt.kt` or `pr` holds a cokurtosis matrix, with [`assert_high_order_quantity`](@ref).
- 2. Read `w`, the weights, `sc`, the constraint scale, and `k`, the homogenisation variable.
+ 2. Read `w`, the weights, and `sc`, the constraint scale.
  3. Select `sigma`, `sk` and `kt`, the matrix of each child, else the matrix of the prior.
  4. Read `D2`, `L2` and `S2` for the `N` assets with [`dup_elim_sum_selector`](@ref).
- 5. Build `W1`, `W2`, `W3`, `L2W1` and the block `M` once for the namespace, and register the cone row below.
- 6. Register `vr_risk`, `sk_risk` and `kt_risk`, the three traces.
- 7. Compute the bound of each term with [`variance_risk_bounds_val`](@ref). The bound of `kt` is the square of `kt.settings.ub` under [`SOCRiskExpr`](@ref), because that `ub` is in the units of ``\\sqrt{m_4}``.
- 8. Bound each term with [`set_variance_risk_bounds_and_expression!`](@ref). The skewness bound is a floor, so its row has the opposite sign. The children hold `rke = false`, so no term enters `risk_vec` alone. Record `r.vr`, `r.sk` and `r.kt` as the owners of the frontier entries of their terms with [`set_risk_frontier_owner!`](@ref), so that a sweep on a term takes its span from that term. [`expected_risk`](@ref) values `r.sk` as the third moment of the coskewness matrix, the units of `sk.settings.lb`, because that is the value of the functor of [`Skewness`](@ref).
- 9. Register `vr_sk_kt_risk`, the weighted sum, bound it and add it to `risk_vec` with [`set_risk_bounds_and_expression!`](@ref), and return it.
+ 5. Compute the bound of each term with [`variance_risk_bounds_val`](@ref). The bound of `kt` is the square of `kt.settings.ub` under [`SOCRiskExpr`](@ref), because that `ub` is in the units of ``\\sqrt{m_4}``.
+ 6. Build the block with [`set_risk_epigraphs!`](@ref): build `W1`, `W2`, `W3`, `L2W1` and the block `M` once for the namespace, register the cone row below, and register the three traces and `vr_sk_kt_risk`, their weighted sum.
+ 7. Bound each term with [`set_variance_risk_bounds_and_expression!`](@ref). The skewness bound is a floor, so its row has the opposite sign. The children hold `rke = false`, so no term enters `risk_vec` alone. Record `r.vr`, `r.sk` and `r.kt` as the owners of the frontier entries of their terms with [`set_risk_frontier_owner!`](@ref), so that a sweep on a term takes its span from that term. [`expected_risk`](@ref) values `r.sk` as the third moment of the coskewness matrix, the units of `sk.settings.lb`, because that is the value of the functor of [`Skewness`](@ref).
+ 8. Bound `vr_sk_kt_risk` and add it to `risk_vec` with [`set_variance_risk_bounds_and_expression!`](@ref), and return it.
+
+Under a unit budget, the block of the objective has the corner `1`. When the measure or one of its children has a bound, [`set_risk_epigraphs!`](@ref) builds a second block with the corner ``k``, under the namespace `bound_`, and every bound acts on that block.
 
 # JuMP formulation
 
@@ -54,7 +55,7 @@ Any prior result is accepted. Both tensors must resolve, on their child or on th
   - `vr_risk_<i>_ub`: ``s_c \\left(\\mathrm{Tr}(\\mathbf{\\Sigma} \\mathbf{W}_1) - u_{\\sigma^2} k\\right) / |u_{\\sigma^2}| \\leq 0``, when `vr.settings.ub` is a number.
   - `sk_risk_<i>_ub`: ``-s_c \\left(\\mathrm{Tr}(\\mathbf{M}_3 \\mathbf{D}_2 \\mathbf{W}_2) - l_{\\mathrm{sk}} k\\right) / |l_{\\mathrm{sk}}| \\leq 0``, when `sk.settings.lb` is a number.
   - `kt_risk_<i>_ub`: ``s_c \\left(\\mathrm{Tr}(\\mathbf{S}_2 \\mathbf{K} \\mathbf{S}_2^\\intercal \\mathbf{W}_3) - u_{\\kappa} k\\right) / |u_{\\kappa}| \\leq 0``, when `kt.settings.ub` is a number.
-  - `vr_sk_kt_risk_<i>_ub`: the bound of `settings.ub` on `vr_sk_kt_risk_`, from [`set_risk_bounds_and_expression!`](@ref).
+  - `vr_sk_kt_risk_<i>_ub`: the bound of `settings.ub` on `vr_sk_kt_risk_`, from [`set_variance_risk_bounds_and_expression!`](@ref).
 
 [`set_risk_upper_bound!`](@ref) registers the four bound rows. It divides each row by the [`bound_scale`](@ref) of its bound, the absolute value of the bound, or one for a zero bound, so the trace of the cokurtosis keeps coefficients of order one. A frontier in a bound replaces its row with the frontier variable of that function. Each name except those of the block carries the index `i` of the measure, and every name carries the namespace `prefix`.
 
@@ -85,6 +86,7 @@ $(val_dict[:relax])
   - So `vr_sk_kt_risk_` bounds the value of the functor in neither direction. All four terms are exact when ``\\mathbf{M}`` has rank one, and Section 3 of [sdpmom](@cite) states that the relaxation is tight over a range of skewness values only.
   - The ceilings on `vr_risk_` and `kt_risk_` hold the weights, because each term lies at or above its moment. The floor on `sk_risk_` holds the relaxation and not the weights, so the returned weights can have a third moment below `sk.settings.lb`.
   - A [`Frontier`](@ref) sweep binds the relaxation in the same way. The span of a sweep on `sk.settings.lb` is ``m_3`` at the two corner portfolios, and the span of a sweep on `settings.ub` is the value of the functor at the two corners. Each level is a correct value, but the floor on `sk_risk_` binds no weight, so a sweep on it can return one portfolio at every level. A sweep on `settings.ub` meets each level while the relaxation is tight. When a large ``s_{\\mathrm{sk}}`` opens the gap, the levels can return one portfolio, whose value of the functor lies far from its level.
+  - Under a unit budget the bounds act on a block that no term of the objective holds down. The ceilings hold the weights as above. The floor on `sk_risk_` then binds nothing, unless a ceiling of the measure bounds the same block.
 
 # Arguments
 
@@ -109,8 +111,8 @@ $(val_dict[:relax])
 # Related
 
   - [`VarianceSkewKurtosis`](@ref)
+  - [`set_risk_epigraphs!`](@ref)
   - [`set_variance_risk_bounds_and_expression!`](@ref)
-  - [`set_risk_bounds_and_expression!`](@ref)
   - [`set_risk_upper_bound!`](@ref)
   - [`variance_risk_bounds_val`](@ref)
   - [`assert_high_order_quantity`](@ref)
@@ -129,49 +131,59 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::VarianceSkewKurtosi
                                :CokurtosisEstimator)
     w = get_w(model, prefix)
     sc = get_constraint_scale(model)
-    k = effective_k(model)
     sigma = nothing_scalar_array_selector(r.vr.sigma, pr.sigma)
     sk = nothing_scalar_array_selector(r.sk.sk, prior_high_order_quantity(pr, :sk))
     kt = nothing_scalar_array_selector(r.kt.kt, prior_high_order_quantity(pr, :kt))
     N = size(pr.X, 2)
     D2, L2, S2 = dup_elim_sum_selector(pr, N)
     M = div(N * (N + 1), 2)
-    W1 = state_build!(model, prefix, :W1_vr_sk_kt) do
-        W1_vr_sk_kt = JuMP.@variable(model, [1:N, 1:N], Symmetric)
-        W2_vr_sk_kt = state_set!(model, prefix, :W2_vr_sk_kt,
-                                 JuMP.@variable(model, [1:M, 1:N]))
-        W3_vr_sk_kt = state_set!(model, prefix, :W3_vr_sk_kt,
-                                 JuMP.@variable(model, [1:M, 1:M], Symmetric))
-        L2W1_vr_sk_kt = state_set!(model, prefix, :L2W1_vr_sk_kt,
-                                   JuMP.@expression(model, L2 * vec(W1_vr_sk_kt)))
-        M_vr_sk_kt = state_set!(model, prefix, :M_vr_sk_kt,
-                                JuMP.@expression(model,
-                                                 vcat(hcat(k, transpose(w),
-                                                           transpose(L2W1_vr_sk_kt)),
-                                                      hcat(w, W1_vr_sk_kt,
-                                                           transpose(W2_vr_sk_kt)),
-                                                      hcat(L2W1_vr_sk_kt, W2_vr_sk_kt,
-                                                           W3_vr_sk_kt))))
-        state_set!(model, prefix, :M_vr_sk_kt_PSD,
-                   JuMP.@constraint(model, sc * M_vr_sk_kt in JuMP.PSDCone()))
-        return W1_vr_sk_kt
-    end
-    W2 = state_get(model, prefix, :W2_vr_sk_kt)
-    W3 = state_get(model, prefix, :W3_vr_sk_kt)
-    vr_risk = state_set!(model, prefix, :vr_risk_, i,
-                         JuMP.@expression(model, LinearAlgebra.dot(transpose(sigma), W1)))
-    sk_risk = state_set!(model, prefix, :sk_risk_, i,
-                         JuMP.@expression(model, LinearAlgebra.dot(transpose(sk * D2), W2)))
-    kt_risk = state_set!(model, prefix, :kt_risk_, i,
-                         JuMP.@expression(model,
-                                          LinearAlgebra.dot(transpose(S2 *
-                                                                      kt *
-                                                                      transpose(S2)), W3)))
+    SD2 = transpose(sk * D2)
+    S2kt = transpose(S2 * kt * transpose(S2))
     vr_bound = variance_risk_bounds_val(LinearBound(), r.vr.settings.ub)
     sk_bound = variance_risk_bounds_val(LinearBound(), r.sk.settings.lb)
     kt_bound = variance_risk_bounds_val(ifelse(isa(r.kt.alg, QuadSecondMomentFormulations),
                                                LinearBound(), SquaredBound()),
                                         r.kt.settings.ub)
+    bounded = !all(isnothing, (vr_bound, sk_bound, kt_bound, r.settings.ub))
+    objective, bounds = set_risk_epigraphs!(model, reads_risk_term(r.settings), bounded;
+                                            prefix = prefix) do k, p
+        W1 = state_build!(model, p, :W1_vr_sk_kt) do
+            W1_vr_sk_kt = JuMP.@variable(model, [1:N, 1:N], Symmetric)
+            W2_vr_sk_kt = state_set!(model, p, :W2_vr_sk_kt,
+                                     JuMP.@variable(model, [1:M, 1:N]))
+            W3_vr_sk_kt = state_set!(model, p, :W3_vr_sk_kt,
+                                     JuMP.@variable(model, [1:M, 1:M], Symmetric))
+            L2W1_vr_sk_kt = state_set!(model, p, :L2W1_vr_sk_kt,
+                                       JuMP.@expression(model, L2 * vec(W1_vr_sk_kt)))
+            M_vr_sk_kt = state_set!(model, p, :M_vr_sk_kt,
+                                    JuMP.@expression(model,
+                                                     vcat(hcat(k, transpose(w),
+                                                               transpose(L2W1_vr_sk_kt)),
+                                                          hcat(w, W1_vr_sk_kt,
+                                                               transpose(W2_vr_sk_kt)),
+                                                          hcat(L2W1_vr_sk_kt, W2_vr_sk_kt,
+                                                               W3_vr_sk_kt))))
+            state_set!(model, p, :M_vr_sk_kt_PSD,
+                       JuMP.@constraint(model, sc * M_vr_sk_kt in JuMP.PSDCone()))
+            return W1_vr_sk_kt
+        end
+        W2 = state_get(model, p, :W2_vr_sk_kt)
+        W3 = state_get(model, p, :W3_vr_sk_kt)
+        vrt = state_set!(model, p, :vr_risk_, i,
+                         JuMP.@expression(model, LinearAlgebra.dot(transpose(sigma), W1)))
+        skt = state_set!(model, p, :sk_risk_, i,
+                         JuMP.@expression(model, LinearAlgebra.dot(SD2, W2)))
+        ktt = state_set!(model, p, :kt_risk_, i,
+                         JuMP.@expression(model, LinearAlgebra.dot(S2kt, W3)))
+        risk = state_set!(model, p, :vr_sk_kt_risk_, i,
+                          JuMP.@expression(model,
+                                           r.vr.settings.scale * vrt -
+                                           r.sk.settings.scale * skt +
+                                           r.kt.settings.scale * ktt))
+        return risk, vrt, skt, ktt
+    end
+    vr_sk_kt_risk = objective[1]
+    vr_sk_kt_bound, vr_risk, sk_risk, kt_risk = bounds
     # A sweep on a term takes its span from the measure of that term, so each term records
     # its own measure as the owner of its entry before the whole measure claims the rest.
     first = risk_frontier_length(model)
@@ -187,12 +199,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::VarianceSkewKurtosi
     set_variance_risk_bounds_and_expression!(model, opt, kt_risk, kt_bound, :kt_risk_, i,
                                              kt_risk, r.kt.settings; prefix = prefix)
     set_risk_frontier_owner!(model, first, r.kt)
-    vr_sk_kt_risk = state_set!(model, prefix, :vr_sk_kt_risk_, i,
-                               JuMP.@expression(model,
-                                                r.vr.settings.scale * vr_risk -
-                                                r.sk.settings.scale * sk_risk +
-                                                r.kt.settings.scale * kt_risk))
-    set_risk_bounds_and_expression!(model, opt, vr_sk_kt_risk, r.settings, :vr_sk_kt_risk_,
-                                    i; prefix = prefix)
+    set_variance_risk_bounds_and_expression!(model, opt, vr_sk_kt_bound, r.settings.ub,
+                                             :vr_sk_kt_risk_, i, vr_sk_kt_risk, r.settings;
+                                             prefix = prefix)
     return vr_sk_kt_risk
 end
