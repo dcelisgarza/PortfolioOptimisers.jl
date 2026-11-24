@@ -3199,3 +3199,38 @@ different posterior. A loop with one kind of collection alone gave no difference
         @test n_diff == 0
     end
 end
+
+@testset "A dual solve meets its views when a prior probability is zero" begin
+    #=
+    `LogEntropyPooling` read `log(0) - log(0)`, which is `NaN`, so its objective was `NaN` at
+    every point. The solve stopped at its start, reported success, and missed the view.
+    `ExpEntropyPooling` read `0 * exp(z)`, which is `NaN` when a scenario off the support is
+    so far out that the exponential overflows. The reference is the solve on the support
+    alone, which holds no zero.
+    =#
+    rng = StableRNG(1)
+    X = 0.01 .* randn(rng, 100, 1)
+    v = vcat(zeros(20), ones(80))
+    q = StatsBase.pweights(v ./ sum(v))
+    sup = 21:100
+    mk(A, b) = Dict{Symbol,
+                    Tuple{<:PortfolioOptimisers.MatNum, <:PortfolioOptimisers.VecNum}}(:eq =>
+                                                                                           (A,
+                                                                                            b))
+    for alg in (ExpEntropyPooling(), LogEntropyPooling()), tgt in (0.002, -0.002),
+        out in (0.0, 50.0, -50.0)
+
+        opt = OptimEntropyPooling(; alg = alg)
+        Xo = copy(X)
+        Xo[1:2, 1] .+= out
+        A = permutedims(Xo)
+        p = PortfolioOptimisers.entropy_pooling(q, mk(A, [tgt]), opt)
+        r = PortfolioOptimisers.entropy_pooling(StatsBase.pweights(q[sup]),
+                                                mk(A[:, sup], [tgt]), opt)
+        @test isa(p, StatsBase.ProbabilityWeights)
+        @test all(iszero, p[1:20])
+        @test isapprox(dot(p, view(Xo, :, 1)), tgt; rtol = 1e-5)
+        @test isapprox(sum(p), 1; rtol = 1e-6)
+        @test isapprox(p[sup], collect(r); rtol = 1e-5)
+    end
+end

@@ -283,6 +283,8 @@ Solve the dual of the entropy pooling problem with Optim.jl.
 
 The two optimisation algorithms minimise the same objective and return the same posterior. They differ only in the arithmetic of the evaluation.
 
+The posterior gives a zero probability to each observation whose prior probability is zero, whatever value that observation holds.
+
 The dual problem has one variable for each row, not one for each observation. It cannot hold an auxiliary variable, so it expresses no tail view. It also has no slack variable. The method relaxes the fixed equality rows of the `:feq` key with the box ``[-s_{c2},\\, s_{c2}]`` on their dual variables. This box is the dual of a penalty of weight ``s_{c2}`` on the norm of the slack of the primal problem.
 
 !!! warning
@@ -422,9 +424,12 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     last_x = similar(x0)
     grad = similar(x0)
     y = similar(w)
+    #! A posterior puts no mass where the prior puts none. An extreme scenario off the support
+    #! can overflow the exponential, and `0 * Inf` is `NaN`, so its exponent is zero.
+    tilt(q, z) = q * exp(ifelse(iszero(q), zero(z), z))
     function update!(x)
         copy!(last_x, x)
-        y .= w .* exp.(-transpose(A) * x .- one(eltype(w)))
+        y .= tilt.(w, .-(transpose(A) * x) .- one(eltype(w)))
         grad .= B - A * y
         return nothing
     end
@@ -469,7 +474,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     @argcheck(Optim.converged(result),
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     x = Optim.minimizer(result)
-    return scenario_probabilities(w, w .* exp.(-transpose(A) * x .- one(eltype(w))))
+    return scenario_probabilities(w, tilt.(w, .-(transpose(A) * x) .- one(eltype(w))))
 end
 function entropy_pooling(w::VecNum, epc::AbstractDict,
                          opt::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any,
@@ -512,6 +517,10 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
         push!(wbs, repeat([lo hi], s))
     end
     A, B, wb = reduce(vcat, first.(blocks)), reduce(vcat, last.(blocks)), reduce(vcat, wbs)
+    #! A zero prior probability gives a `log_p` of `-Inf` and a `y` of zero. The objective
+    #! reads `log_r`, the logarithm of the ratio of the posterior to the prior, which is
+    #! finite there. The difference `log(y) - log_p` is `NaN` there, and the solve then
+    #! stopped at its start and reported success.
     log_p = log.(w)
     #! `wb` bounds a `:feq` dual variable by `sc2`, and the constructor admits any
     #! `sc2 >= 0`. An unclamped start of `factor` therefore sits outside the box whenever
@@ -521,12 +530,12 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     x0 = clamp.(fill(factor, size(A, 1)), view(wb, :, 1) / 2, view(wb, :, 2) / 2)
     last_x = similar(x0)
     grad = similar(x0)
-    log_x = similar(log_p)
+    log_r = similar(log_p)
     y = similar(log_p)
     function update!(x)
         copy!(last_x, x)
-        log_x .= log_p .- (one(eltype(log_p)) .+ transpose(A) * x)
-        y .= exp.(log_x)
+        log_r .= .-(one(eltype(log_p)) .+ transpose(A) * x)
+        y .= exp.(log_p .+ log_r)
         grad .= B - A * y
         return nothing
     end
@@ -540,7 +549,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     end
     function f(x)
         common_op(x)
-        return opt.sc1 * (LinearAlgebra.dot(x, grad) - LinearAlgebra.dot(y, log_x - log_p))
+        return opt.sc1 * (LinearAlgebra.dot(x, grad) - LinearAlgebra.dot(y, log_r))
     end
     function g!(G, x)
         common_op(x)

@@ -1080,11 +1080,16 @@ A static `TensorPanelField` and a static feature matrix keep `assets × labels` 
 | `partial_fit!` of a prior whose covariance is a `GeneralCovariance` or a `Covariance` over an estimator other than `StatsBase.SimpleCovariance`, such as `EmpiricalPrior(; ce = Covariance(; ce = MyCovariance()))` | `ArgumentError` at the fold | Runs. `supports_partial_fit` answers `false` for such an estimator, so the prior runs the batch verb over its own rows, as it does for the bare estimator. `partial_fit!` of the estimator itself still raises the `ArgumentError`. |
 | `covariance_forecast_evaluation` of a covariance estimator of another package | `MethodError` | Runs, as for `GeneralCovariance(; ce = ce)`. |
 | `partial_fit!(ce::GeneralCovariance, X; active_mask)`, and the carry of an `EmpiricalPrior` with `ce = GeneralCovariance()` over an asset panel that varies in time | `MethodError` | Runs. An inactive cell folds as a `NaN`, as in a `Covariance`. |
+| `prior` of an `OpinionPoolingPrior` with `alg = LogarithmicOpinionPooling()`, when an opinion of zero probability gives an observation a zero weight | `ArgumentError` | Runs. The opinion does not change the pool. |
+| `prior` of an `OpinionPoolingPrior` with a large `p`, when the penalty takes the probability of every opinion below the smallest number | `ArgumentError` | Runs. The opinions nearest the consensus keep the probability. |
 
 ### [Results that move](@id migration-0-34-5-numbers)
 
 - **`DimensionReductionRegression` with `ve = SimpleVariance(; me = nothing)` and weights in `retgt`** takes the mean of the factors under those weights. v0.34.4 took the mean with no weights, so the intercept that it rebuilt was not the intercept of the fit.
 - **`var`, `std` and a variance series of a `GeodesicShrinkageCovariance` over an asset panel**, when its `ce` is mask-aware, such as `ExpWeightedCovariance()`, read the gaps of the sample, as its `cov` does. v0.34.4 removed each asset with a gap from the window and gave it `NaN`, where `cov` estimates it. An `EWResidualVolatility` now takes such an estimator as its `ce`.
+
+- **An entropy pooling prior with `OptimEntropyPooling`, the default optimiser, and a prior probability of zero** meets its views. With `alg = LogEntropyPooling()`, v0.34.4 stopped at the start of the solve and reported success, and the posterior missed the views. With `alg = ExpEntropyPooling()`, v0.34.4 could miss a view when an observation of zero prior probability held an extreme value. `JuMPEntropyPooling` gave the right posterior and does not move.
+- **`OpinionPoolingPrior(; p = Inf)`** raises a `DomainError` at the construction. v0.34.4 raised an `ArgumentError` in `prior`.
 
 ### [If you extend the library](@id migration-0-34-5-extending)
 
