@@ -1,0 +1,47 @@
+name: Sync dev
+
+# Sessions start in a checkout of `dev` and read `CLAUDE.md` and the skills there. `dev` stood five
+# commits behind `main`, and issues were filed by rules that `main` had replaced. So each push to
+# `main` merges `main` into `dev` (ADR 0240).
+#
+# A conflict turns the run red. A session then merges `main` into `dev` by hand. A merge by
+# `GITHUB_TOKEN` starts no workflow, so the head of `dev` gets its checks at the next push of a
+# session. The ruleset of `main` waits for them.
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Merge main into dev
+    if: github.repository == 'dcelisgarza/PortfolioOptimisers.jl'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge main into dev
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          found="$(gh api "repos/$GH_REPO/git/matching-refs/heads/dev" \
+            --jq '.[] | select(.ref == "refs/heads/dev") | .ref')"
+          if [ -z "$found" ]; then
+            echo "origin has no dev."
+            exit 0
+          fi
+          # The server makes the merge, and it answers 204 when dev holds main, and 409 on a conflict.
+          if ! gh api "repos/$GH_REPO/merges" -f base=dev -f head=main \
+            -f commit_message="Merge main into dev"; then
+            echo "::error::main does not merge into dev. Merge origin/main into a worktree of origin/dev."
+            exit 1
+          fi

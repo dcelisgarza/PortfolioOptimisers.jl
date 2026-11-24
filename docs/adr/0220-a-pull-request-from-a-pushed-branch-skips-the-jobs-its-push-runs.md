@@ -126,3 +126,26 @@ the merge writes.
 - A new workflow that triggers on both `push` and `pull_request` takes the same condition on each of
   its jobs. A new job that a merge into `main` must wait for carries the event in its name, and its
   `- push` name joins the `required_status_checks` rule of the ruleset.
+
+## Amendment (2026-11-24)
+
+The queue held 31 runs, and the runs of three merged branches and of an old head held slots.
+
+1. **A newer push to a `dev-` branch cancels the runs of the old head.** The merge reads the checks of
+   the new head alone. `Test.yml` and `Aqua.yml` had no concurrency group. They have one for each
+   `dev-` branch now, and a group of its own for each other run, so each commit of `main`, `dev` and a
+   tag keeps its run. The other workflows cancel on `refs/heads/dev-` as on `refs/pull/`.
+2. **The close of a pull request cancels the push runs of its branch** (`ClosedBranch.yml`), unless
+   the branch has another open pull request. The push to `main` tests the tree of the merge.
+3. **The ruleset has a file.** `.github/rulesets/protect-main.json` holds the rules, and
+   `Ruleset.yml` compares the live ruleset with it each day. On 2026-11-24 the live ruleset asked for a
+   current base, which this ADR and ADR 0240 refuse, and it had the admin role as a bypass actor. The
+   last seven merges landed before their `Test` check ended. The API shows the bypass actors to an
+   admin alone, so the job does not compare them. The decision stays: no bypass actor.
+4. **Each review thread is resolved before a merge, and a merge is a squash.** Both are in the file.
+5. **`dev` follows `main`.** Sessions start in a checkout of `dev`, which stood five commits behind
+   `main`, and they filed issues by rules that `main` had replaced. `SyncDev.yml` merges `main` into
+   `dev` after each push to `main`, and a conflict turns it red. A merge by `GITHUB_TOKEN` starts no
+   workflow, so that head gets its checks at the next push of a session.
+
+Item 1 replaces the sentence of ADR 0240, § *Own branch*, that each commit of a branch keeps a run.

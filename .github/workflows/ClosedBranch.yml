@@ -1,0 +1,39 @@
+name: Closed branch
+
+# A pull request that closes leaves the push runs of its branch in the queue. A run of `Test` takes
+# about three hours, and the runs of three merged branches held slots while 31 runs waited. The push
+# to `main` tests the tree of the merge, so the runs of the branch tell nothing more.
+#
+# `dev` is not a branch of one pull request, and its runs stay.
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  actions: write
+
+jobs:
+  cancel:
+    name: Cancel the runs of the closed branch
+    if: github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.head_ref, 'dev-')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel each push run that is queued or in progress
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          # A layer of a stack can be open on the same branch, or the branch can have a new pull
+          # request. Its runs then stay.
+          open="$(gh pr list --head "$BRANCH" --state open --json number --jq length)"
+          [ "$open" -eq 0 ] || exit 0
+          for status in queued in_progress pending waiting; do
+            for id in $(gh run list --branch "$BRANCH" --event push --status "$status" \
+                --limit 100 --json databaseId --jq '.[].databaseId'); do
+              # A run can end between the list and the cancel.
+              gh run cancel "$id" || true
+            done
+          done

@@ -13,6 +13,13 @@ on:
 permissions:
   contents: read
 
+# A push to a `dev-` branch cancels the run of its old head, because a merge reads the new head alone.
+# Every other run has a group of its own, so no run of `main`, `dev` or a tag replaces another.
+# ADR 0220.
+concurrency:
+  group: ${{ github.workflow }}-${{ startsWith(github.ref, 'refs/heads/dev-') && github.ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   test:
     uses: ./.github/workflows/ReusableTest.yml

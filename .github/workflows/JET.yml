@@ -34,12 +34,13 @@ permissions:
 
 concurrency:
   # Skip intermediate builds: always.
-  # Cancel intermediate builds: only if it is a pull request build.
+  # Cancel intermediate builds: only of a pull request or of a `dev-` branch, whose new head
+  # has runs of its own. ADR 0220.
   #
   # Five pushes to a pull request in ten minutes would otherwise mean five full JET runs, four of
   # them already obsolete when they finish.
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') || startsWith(github.ref, 'refs/heads/dev-') }}
 
 jobs:
   build:
