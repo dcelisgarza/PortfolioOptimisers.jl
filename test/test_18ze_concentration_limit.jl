@@ -151,6 +151,11 @@
         bad = AssetSetsMatrixEstimator(; val = "nx_issuer", on = "ucits_standrad")
         @test_throws ArgumentError asset_sets_matrix(bad, sets; strict = true)
         @test (@test_logs (:warn,) asset_sets_matrix(bad, sets)) == falses(0, 4)
+        # The method for a vector gives `strict` to each entry.
+        @test_throws ArgumentError asset_sets_matrix([bad], sets; strict = true)
+        @test asset_sets_matrix([AssetSetsMatrixEstimator(; val = "nx_issuer", on = "K1"),
+                                 AssetSetsMatrixEstimator(; val = "nx_issuer", on = "G1")],
+                                sets) == [Bool[0 0 1 0], Bool[0 0 0 1]]
         # Stage 1 of the block gives `strict` to the rule.
         cbe = ConstraintBlock(; sets = sets,
                               conc = ConcentrationLimitEstimator(; set = bad))
