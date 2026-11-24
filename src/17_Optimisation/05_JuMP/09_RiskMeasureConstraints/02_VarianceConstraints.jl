@@ -805,9 +805,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance, opt::Risk
                                         kwargs...)
     # Under a unit budget the trace has degree two in the weights and degree zero in `k`, so
     # the bound acts on the deviation, which has degree one.
-    if isa(sdp_flag, LinearBound) &&
-       !isnothing(r.settings.ub) &&
-       shared_has(model, :unit_budget)
+    if isa(sdp_flag, LinearBound) && !isnothing(r.settings.ub) && is_unit_budget(model)
         set_variance_deviation!(model, i, r, pr; prefix = prefix)
         sdp_flag = SquareRootBound()
     end

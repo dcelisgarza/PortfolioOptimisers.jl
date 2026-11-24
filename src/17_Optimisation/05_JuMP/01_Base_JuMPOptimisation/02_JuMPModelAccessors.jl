@@ -198,11 +198,28 @@ A head calls it when its own constraints fix the scale of the unscaled weights `
 
 # Related
 
+  - [`is_unit_budget`](@ref)
   - [`effective_k`](@ref)
 """
 function set_unit_budget!(model::JuMP.Model)
     model[:unit_budget] = true
     return nothing
+end
+"""
+    is_unit_budget(model::JuMP.Model)
+
+Return `true` when the head fixed the budget scale to one through [`set_unit_budget!`](@ref).
+
+A builder that gives one risk to the objective and to a bound reads it, because only there do the two need different scales. The gate of a binary does not read it, [`get_k`](@ref).
+
+# Related
+
+  - [`set_unit_budget!`](@ref)
+  - [`effective_k`](@ref)
+  - [`set_risk_epigraphs!`](@ref)
+"""
+function is_unit_budget(model::JuMP.Model)
+    return haskey(model, :unit_budget)
 end
 """
     effective_k(model::JuMP.Model)
@@ -218,11 +235,12 @@ A risk such as ``\\lVert \\boldsymbol{y} \\rVert_2^2 / k`` has degree one in the
 # Related
 
   - [`set_unit_budget!`](@ref)
+  - [`is_unit_budget`](@ref)
   - [`get_k`](@ref)
   - [`set_risk_epigraphs!`](@ref)
 """
 function effective_k(model::JuMP.Model)
-    return ifelse(haskey(model, :unit_budget), 1, get_k(model))
+    return ifelse(is_unit_budget(model), 1, get_k(model))
 end
 """
 $(DocStringExtensions.TYPEDEF)

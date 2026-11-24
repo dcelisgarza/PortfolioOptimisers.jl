@@ -408,7 +408,7 @@ $(val_dict[:relax])
 function set_degree_one_tracked_risk!(model::JuMP.Model, ::LinearBound, expr,
                                       map::TrackedRiskBound, ::Number; prefix::Symbol)
     # Under a unit budget the expression of an even moment is in units of its level.
-    m = shared_has(model, :unit_budget) ? inv(map.factor) : one(map.factor)
+    m = is_unit_budget(model) ? inv(map.factor) : one(map.factor)
     return state_set!(model, prefix, :tracked_risk,
                       JuMP.@expression(model, expr / map.factor)), m
 end

@@ -905,6 +905,7 @@ Where:
 # Related
 
   - [`set_unit_budget!`](@ref)
+  - [`is_unit_budget`](@ref)
   - [`effective_k`](@ref)
   - [`get_k`](@ref)
   - [`reads_risk_term`](@ref)
@@ -915,7 +916,7 @@ Where:
 """
 function set_risk_epigraphs!(build, model::JuMP.Model, rke::Bool, bounded::Bool;
                              prefix::Symbol = Symbol(""))
-    if !bounded || !shared_has(model, :unit_budget)
+    if !bounded || !is_unit_budget(model)
         risk = build(effective_k(model), prefix)
         return risk, risk
     end
