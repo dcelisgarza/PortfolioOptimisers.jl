@@ -1308,7 +1308,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add the worst-case variance of an uncertainty set to `model`, bound it by `settings.ub`, and add it to the risk that the objective reads.
 
-The set is the measure's own `ucs`, fitted with [`sigma_ucs`](@ref) when it is an estimator. The fit reads the optimisation's returns `rd` and its prior, because an `AbstractPriorUncertaintySetEstimator` fits from the prior result, and an estimator that carries its own `pe` drops it. The centre falls back to the measure's `sigma` and then to the prior's. The bound `settings.ub` is in the units of a variance, and [`ucs_variance_risk_bounds!`](@ref) names the expression of degree one that it acts on.
+The set is the measure's own `ucs`. A head and an Allocation Set fit an estimator before the build with [`ucs_risk_measure`](@ref), so the owner of a [`Frontier`](@ref) and the benchmark risk of a tracker read the set that the rows state. An estimator that another caller gives is fitted here with [`sigma_ucs`](@ref), for the rows alone. The fit reads the optimisation's returns `rd` and its prior, because an `AbstractPriorUncertaintySetEstimator` fits from the prior result, and an estimator that carries its own `pe` drops it. The centre falls back to the measure's `sigma` and then to the prior's. The bound `settings.ub` is in the units of a variance, and [`ucs_variance_risk_bounds!`](@ref) names the expression of degree one that it acts on.
 
 When [`sdp_lifted_set`](@ref) and [`sdp_objective_lift_flag`](@ref) are both `true`, the objective term of the box, the ellipsoid or the norm ball reads the lift with a constant corner of [`set_sdp_objective_lift!`](@ref), so it has degree two under [`MaximumRatio`](@ref). [`set_ucs_variance_risk!`](@ref) then builds the term on that lift, with its own names under the namespace `lift_`, and builds the worst case on the lift of [`set_sdp_constraints!`](@ref) for the bound only when `settings.ub` holds one.
 
@@ -1338,6 +1338,7 @@ Under a unit budget the lift of the objective has the corner `1`, so its worst c
   - [`set_ucs_variance_risk!`](@ref)
   - [`ucs_variance_risk_bounds!`](@ref)
   - [`set_risk_epigraphs!`](@ref)
+  - [`ucs_risk_measure`](@ref)
   - [`sigma_ucs`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVariance,

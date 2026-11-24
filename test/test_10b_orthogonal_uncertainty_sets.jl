@@ -503,15 +503,15 @@ struct ProbeMatrixProcessing1955 <: PortfolioOptimisers.AbstractMatrixProcessing
                             pr777), CompactCovarianceUncertaintySet)
     end
 
-    @testset "The pre-fit, the three-argument form and a Pipeline step reach the same set" begin
+    @testset "The fit of a head, the three-argument form and a Pipeline step reach the same set" begin
         ue = OrthogonalUncertaintySet()
         rd777 = ReturnsResult(; X = zeros(T777, N777), nx = string.("A", 1:N777))
         base = mu_ucs(ue, pr777)
 
-        # The near-optimal head pre-fits from the returns alone, so the estimator travels
-        # unchanged and each corner solve fits it in its own builder.
+        # A head fits after its prior, and the estimator reads that prior (#2318).
         r = UncertaintySetVariance(; ucs = ue)
-        @test PortfolioOptimisers.ucs_risk_measure(r, rd777) === r
+        @test isapprox(collect(PortfolioOptimisers.ucs_risk_measure(r, rd777, pr777).ucs.C),
+                       collect(sigma_ucs(ue, pr777).C))
 
         # The three-argument form drops the returns and reads the prior.
         @test isapprox(mu_ucs(ue, rd777, pr777).L, base.L)

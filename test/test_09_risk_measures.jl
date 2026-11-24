@@ -3017,13 +3017,43 @@ end
     end
 
     @testset "ucs_risk_measure fits the set on the returns" begin
-        r = PO.ucs_risk_measure(UncertaintySetVariance(; sigma = S), rd)
+        r = PO.ucs_risk_measure(UncertaintySetVariance(; sigma = S), rd, pr)
         @test r.ucs isa BoxUncertaintySet && r.sigma === S
-        # A set that reads a prior result has nothing to fit before the prior exists.
-        est = NormalUncertaintySet(; pe = nothing)
-        @test PO.ucs_risk_measure(UncertaintySetVariance(; ucs = est), rd).ucs === est
-        rs = PO.ucs_risk_measure([UncertaintySetVariance(; ucs = box), Variance()], rd)
-        @test rs[1].ucs === box && rs[2] isa Variance
+        # A set that reads a prior result fits on the prior of the optimisation.
+        est = DeltaUncertaintySet(; pe = nothing)
+        usv = UncertaintySetVariance(; ucs = est)
+        @test PO.ucs_risk_measure(usv, rd, pr).ucs.ub == sigma_ucs(est, pr).ub
+        # Nothing to fit gives the argument itself, in a vector too.
+        ubox = UncertaintySetVariance(; ucs = box)
+        unone = UncertaintySetVariance(; ucs = nothing)
+        for x in (ubox, unone, Variance(), nothing, [ubox, Variance()])
+            @test PO.ucs_risk_measure(x, rd, pr) === x
+        end
+        # An Allocation Set that reads no rows has no rows and no prior.
+        @test PO.ucs_risk_measure(Variance(; sigma = S), nothing, nothing).sigma === S
+        rs = PO.ucs_risk_measure([usv, Variance()], rd, pr)
+        @test rs[1].ucs isa BoxUncertaintySet && rs[2] isa Variance
+        # A tracker fits the measure that it tracks, and an optimiser its tracking errors.
+        wt = WeightsTracking(; w = w)
+        rtr = RiskTrackingRiskMeasure(; tr = wt, r = usv)
+        rte = RiskTrackingError(; tr = wt, r = usv, err = 0.01)
+        for x in (rtr, rte)
+            @test PO.ucs_risk_measure(x, rd, pr).r.ucs isa BoxUncertaintySet
+        end
+        slv = Solver(; solver = nothing)
+        opt = JuMPOptimiser(; slv = slv, tr = [TrackingError(; tr = wt), rte])
+        fopt = PO.ucs_risk_measure(opt, rd, pr)
+        @test fopt.tr[1] === opt.tr[1] && fopt.tr[2].r.ucs isa BoxUncertaintySet
+        # A head fits its risk measures and its optimiser, and returns itself otherwise.
+        fmr = PO.ucs_risk_measure(MeanRisk(; r = [usv, rtr], opt = opt), rd, pr)
+        @test fmr.r[1].ucs isa BoxUncertaintySet && fmr.r[2].r.ucs isa BoxUncertaintySet
+        @test fmr.opt.tr[2].r.ucs isa BoxUncertaintySet
+        mr = MeanRisk(; r = ubox, opt = JuMPOptimiser(; slv = slv))
+        @test PO.ucs_risk_measure(mr, rd, pr) === mr
+        rrb = RelaxedRiskBudgeting(; opt = opt)
+        @test PO.ucs_risk_measure(rrb, rd, pr).opt.tr[2].r.ucs isa BoxUncertaintySet
+        rrb = RelaxedRiskBudgeting(; opt = JuMPOptimiser(; slv = slv))
+        @test PO.ucs_risk_measure(rrb, rd, pr) === rrb
     end
 
     @testset "An uncertainty set reads the source of its own prior (#1700)" begin
@@ -3038,11 +3068,11 @@ end
         @test ucs(ux, rdb)[2].ub == sigma_ucs(ux, rdb).ub
         @test sigma_ucs(ud, rdb).ub == sigma_ucs(un, rdb).ub == sigma_ucs(un, X).ub
         @test sigma_ucs(ux, rdb).ub != sigma_ucs(un, rdb).ub
-        # The three-argument form and the pre-fit of the measure read the same source.
+        # The three-argument form and the fit of the measure read the same source.
         @test sigma_ucs(ux, rdb, pr).ub == sigma_ucs(ux, rdb).ub
         @test mu_ucs(ux, rdb, pr).ub == mu_ucs(ux, rdb).ub
         @test ucs(ux, rdb, pr)[1].ub == mu_ucs(ux, rdb).ub
-        @test PO.ucs_risk_measure(UncertaintySetVariance(; ucs = ux), rdb).ucs.ub ==
+        @test PO.ucs_risk_measure(UncertaintySetVariance(; ucs = ux), rdb, pr).ucs.ub ==
               sigma_ucs(ux, rdb).ub
         # An excess prior refuses returns data with no benchmark.
         @test_throws ArgumentError sigma_ucs(ux, rd)
@@ -3052,7 +3082,7 @@ end
             @test_throws MethodError f(un, rdb, pr; brt = true)
         end
         @test_throws MethodError PO.ucs_risk_measure(UncertaintySetVariance(; ucs = un),
-                                                     rdb; brt = true)
+                                                     rdb, pr; brt = true)
         # The walk passes through the measure and the set to the prior of the set.
         @test PO.reader_frames(ux, "ucs", false).excess
         @test isempty(PO.reader_frames(ux, "ucs", false).raw)

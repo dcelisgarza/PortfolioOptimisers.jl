@@ -746,7 +746,7 @@ end
 
 States whether an uncertainty set estimator calibrates on a Prior Result from the caller, and not on a prior that it fits.
 
-The predicate reads the type and the `pe` field, and never a method table. Three consumers give an estimator the argument that it reads. These are the three-argument form of the ucs Triple, [`ucs_risk_measure`](@ref) and the uncertainty step of the Pipeline. All three ask this one question, so they agree on the answer.
+The predicate reads the type and the `pe` field, and never a method table. Two consumers give an estimator the argument that it reads. These are the three-argument form of the ucs Triple, which [`ucs_risk_measure`](@ref) and [`ucs_returns_estimator`](@ref) call, and the uncertainty step of the Pipeline. Both ask this one question, so they agree on the answer.
 
 Two kinds of estimator return `true`. The first kind is every [`AbstractPriorUncertaintySetEstimator`](@ref), which holds no `pe`. The second kind is each of the four returns-data families when its `pe` is `nothing`. Each of these families declares its own method beside its method over a Prior Result.
 
@@ -852,7 +852,7 @@ end
 
 Fits the two uncertainty sets from an estimator, the returns data **and** the Prior Result that the optimisation solves on.
 
-Both JuMP builders call this form, so one call site serves every estimator. Each estimator reads the one argument that its fit uses, and [`reads_prior_result`](@ref) selects it. The passthrough method takes `args...` and is the third method of this form. So a field that holds a built pair also gets an answer here.
+A JuMP head calls the forms of [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) once, for each set of its optimisation, so one call site serves every estimator. Each estimator reads the one argument that its fit uses, and [`reads_prior_result`](@ref) selects it. The passthrough method takes `args...` and is the third method of this form. So a field that holds a built pair also gets an answer here.
 
 | `uc`                                                                                               | Reads   | Forwards to            |
 |:-------------------------------------------------------------------------------------------------- |:------- |:---------------------- |
@@ -892,7 +892,7 @@ end
 
 Fits the uncertainty set of the mean from an estimator, the returns data **and** the Prior Result that the optimisation solves on.
 
-The builder of the robust return calls this form. The table of [`ucs`](@ref) states which argument each estimator reads, and [`reads_prior_result`](@ref) selects it. The passthrough method takes `args...` and is the third method of this form. So a field that holds a built set also gets an answer here.
+[`ucs_returns_estimator`](@ref) and the builder of the robust return call this form. The table of [`ucs`](@ref) states which argument each estimator reads, and [`reads_prior_result`](@ref) selects it. The passthrough method takes `args...` and is the third method of this form. So a field that holds a built set also gets an answer here.
 
 # Arguments
 
@@ -924,7 +924,7 @@ end
 
 Fits the uncertainty set of the covariance from an estimator, the returns data **and** the Prior Result that the optimisation solves on.
 
-The builder of the uncertainty set variance calls this form. The table of [`ucs`](@ref) states which argument each estimator reads, and [`reads_prior_result`](@ref) selects it. The passthrough method takes `args...` and is the third method of this form. So a field that holds a built set also gets an answer here.
+[`ucs_risk_measure`](@ref) and the builder of the uncertainty set variance call this form. The table of [`ucs`](@ref) states which argument each estimator reads, and [`reads_prior_result`](@ref) selects it. The passthrough method takes `args...` and is the third method of this form. So a field that holds a built set also gets an answer here.
 
 # Arguments
 

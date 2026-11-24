@@ -1169,6 +1169,9 @@ const RULED_DEFAULTS = Dict{Symbol, Tuple{String, String}}(#
                                                            :bind_data_benchmark =>
                                                                ("keep (default)",
                                                                 "a traversal owns the identity on a leaf and ignores its context slot, as `adapt(to, x) = x` does in Adapt.jl (#2108)"),
+                                                           :ucs_risk_measure =>
+                                                               ("keep (default)",
+                                                                "a traversal owns the identity on a leaf and ignores its context slots, as `bind_data_benchmark` does (#2108, #2318)"),
                                                            :timestamp_positions =>
                                                                ("keep (default)",
                                                                 "an index that is not a timestamp or a name passes to `view`, which is the gate of the index (#2108)"),

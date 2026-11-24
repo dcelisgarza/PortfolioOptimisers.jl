@@ -955,7 +955,7 @@ Build the model of a [`MeanRisk`](@ref), solve it, and return its result.
  1. Replace each schedule of `mr` with its static default through [`reset_time_dependent_estimator`](@ref).
  2. Resolve `mr.opt` against `rd` with [`resolve_jump_optimiser`](@ref), with the blocks of `blocks`, giving `attrs`. It holds the prior, the block Results, the fees, the return terms and the Investable Mask.
  3. Take the view of `mr` and of `rd` at the investable assets with [`investable_view`](@ref). Both are unchanged when every asset is investable.
- 4. Bind the benchmark of each [`DataBenchmarkTracking`](@ref) measure to `rd` with [`bind_data_benchmark`](@ref).
+ 4. Bind the benchmark of each [`DataBenchmarkTracking`](@ref) measure to `rd` with [`bind_data_benchmark`](@ref). Fit the uncertainty set of each [`UncertaintySetVariance`](@ref) on `rd` and the reduced prior with [`ucs_risk_measure`](@ref).
  5. Build the model with [`build_mean_risk_model`](@ref), which adds every block.
  6. Under [`MaximumRatio`](@ref), resolve each [`Frontier`](@ref) of the model on a model that is not homogenised, with [`resolve_ratio_frontier!`](@ref), which adds every block too. Under every other objective this step does nothing.
  7. Solve with [`solve_mean_risk!`](@ref), which sweeps a frontier when the model holds one, giving `retcode` and `sol`.
@@ -994,6 +994,7 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult();
     # `rd`. Both are unchanged when every asset is investable.
     mr, rd = investable_view(mr, rd, attrs.pr, attrs.imsk)
     mr = bind_data_benchmark(mr, rd)
+    mr = ucs_risk_measure(mr, rd, attrs.pr)
     model = build_mean_risk_model(mr, attrs, rd, str_names; blocks = blocks)
     resolve_ratio_frontier!(model, mr, attrs, rd; blocks = blocks)
     retcode, sol = solve_mean_risk!(model, mr, attrs.pr,
