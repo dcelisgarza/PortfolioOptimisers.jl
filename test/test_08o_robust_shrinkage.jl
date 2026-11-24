@@ -188,6 +188,8 @@ signs(W) = W ./ sqrt.(sum(abs2, W; dims = 2))
         @test POR.mcd_subset_size(MCDShrinkage(), 0.5, 50, 70) == h
         @test POR.mcd_subset_size(MCDShrinkage(), 0.75, 50, 70) == 38
         @test POR.mcd_subset_size(MCDShrinkage(), 0.5, 51, 70) == 26
+        # The ceiling is exact: 0.55 * 100 is 55.00000000000001.
+        @test all(k -> POR.mcd_subset_size(MCDShrinkage(), k / 100, 100, 70) == k, 51:100)
         # A shrunk concentration step never raises the determinant. With fewer observations than
         # assets, the subset of a start is often its own fixed point.
         Q = first(POR.mcd_standardise(first(shrinkage_test_sample(StableRNG(2), 120, 10,

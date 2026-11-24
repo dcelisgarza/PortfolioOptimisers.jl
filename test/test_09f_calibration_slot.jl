@@ -1435,6 +1435,18 @@ const PRSKEW = prior(EmpiricalPrior(), XSKEW)
                CalibrationContext(; alpha = 0.01)) == k4
 end
 
+@testset "Calibration rules: the tail count is the exact ceiling" begin
+    # 0.07 * 100 is 7.000000000000001, and the tail at 0.07 of 100 values holds 7 of them.
+    X = randn(StableRNG(2307), 100, 2)
+    pool = prior(EmpiricalPrior(), X[1:50, :])
+    rows = prior(EmpiricalPrior(), X)
+    ctx = CalibrationContext(; alpha = 0.07)
+    for (Rule, pr) in ((HillTailDecay, pool), (RadialTailDecay, rows))
+        @test_throws "DomainError with 7:" Rule(; kmin = 8)(:kappa, pr, nothing, nothing,
+                                                            ctx)
+    end
+end
+
 @testset "Calibration rules: `HillTailDecay` answers per end" begin
     rule = HillTailDecay(; kmin = 20)
 

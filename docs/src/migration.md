@@ -1079,3 +1079,18 @@ The cardinality caps `card` and `scard` of `ConstraintBlock`, `JuMPOptimiser` an
 | `IntegerPhylogeny(; A, B).B` with a `FractionOf` in `B` | A `TypeError` | A vector of integers, one cap for each row of the stored `A`. |
 | A projection onto a `ProgrammeAllocationSet` that reads no rows, in a direct call of `project`, with a precomputed `lcse` or `gcarde` whose width is not the number of assets | The model raised the error | Raises the `DimensionMismatch` of the constraint width, as the same set raises it on rows. |
 | `JuMPOptimiser(; smtx = [A, B], …)` with precomputed matrices and no `sets` | Raised a `MethodError` at the fit | Solves, as one precomputed matrix does. |
+
+### [Counts that a fraction gives](@id migration-0-35-fraction-counts)
+
+Some readers of a fraction rounded the floating-point product of the fraction and the size, so the count could be one away from the count that the fraction states. They now compare the share of the count with the fraction. The default fractions and significance levels keep their counts.
+
+| Reader | Case | v0.34 | v0.35 |
+| --- | --- | --- | --- |
+| `NearestNeighbourMatch(; neighbours = FractionOf(0.29))` | 100 candidates | 28 neighbours | 29 |
+| `IntegerConditionalValueatRiskView(; sbar = FractionOf(0.07))` | 100 observations | 8 losses | 7 |
+| `IntegerConditionalValueatRiskView(; sbar = nothing)`, the floor of `2 * alpha * T` | `alpha = 0.07`, 100 observations | 15 losses | 14 |
+| `RankRule(; best = FractionOf(0.575))`, and the same in `worst` | 100 assets | 57 assets | 58 |
+| `LowerTailDependenceCovariance(; alpha = 0.07)` | 100 observations | 8 observations | 7 |
+| `HillTailDecay` and `RadialTailDecay` at `alpha = 0.07` | 100 pooled values or distances | 8 values | 7 |
+| `MCDCovariance(; alpha = 0.55, shr = MCDShrinkage())` | 100 observations | 56 observations | 55 |
+| `MCDCovariance(; alpha = 0.58)` | 101 observations of one asset | 58 observations | 59 |

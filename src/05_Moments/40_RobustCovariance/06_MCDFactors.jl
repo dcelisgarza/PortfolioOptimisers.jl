@@ -4,9 +4,9 @@
 
 Returns the size `h` of the MCD subset for the subset fraction `alpha`.
 
-At `alpha = 1/2`, ``h = \\lfloor (n + p + 1)/2 \\rfloor``, the size of the largest breakdown point. At `alpha = 1`, ``h = n``. The function interpolates between the two, as the function `h.alpha.n` of the R package `robustbase`, version 0.99-7, does.
+At `alpha = 1/2`, ``h = \\lfloor (n + p + 1)/2 \\rfloor``, the size of the largest breakdown point. At `alpha = 1`, ``h = n``. The function interpolates between the two, as the function `h.alpha.n` of the R package `robustbase`, version 0.99-7, does. That function takes the floor of a floating-point product, which can be one too small. This function takes the exact floor, with [`fraction_floor`](@ref).
 
-With a shrinkage, the scatter of a subset exists for every size, so the size does not depend on the number of assets. It is ``\\lceil \\alpha n \\rceil``, as [boudt2020](@cite) has it, and at least the smallest number above ``n/2``, which Theorem 1 of that work needs.
+With a shrinkage, the scatter of a subset exists for every size, so the size does not depend on the number of assets. It is ``\\lceil \\alpha n \\rceil``, as [boudt2020](@cite) has it, with the exact ceiling of [`fraction_ceil`](@ref), and at least the smallest number above ``n/2``, which Theorem 1 of that work needs.
 
 # Mathematical definition
 
@@ -43,12 +43,12 @@ h &= \\lfloor 2 h_2 - n + 2 (n - h_2) \\alpha \\rfloor\\,.
 """
 function mcd_subset_size(::Nothing, alpha::Number, n::Integer, p::Integer)
     h2 = div(n + p + 1, 2)
-    h = floor(Int, 2 * h2 - n + 2 * (n - h2) * alpha)
+    h = 2 * h2 - n + fraction_floor(alpha, 2 * (n - h2))
     assert_robust_rows(h, p, "the size h of the MCD subset")
     return h
 end
 function mcd_subset_size(::MCDShrinkage, alpha::Number, n::Integer, p::Integer)
-    h = max(ceil(Int, alpha * n), div(n, 2) + 1)
+    h = max(fraction_ceil(alpha, n), div(n, 2) + 1)
     @argcheck(1 < h <= n,
               DomainError((n, p),
                           "a shrunk MCD needs a subset of two observations or more, got $n observations of $p assets"))

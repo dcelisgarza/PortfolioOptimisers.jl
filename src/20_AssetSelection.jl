@@ -118,7 +118,7 @@ Take a number of assets from each end of the order of the scores, then keep them
 
 `best` and `worst` are **sizes of the part that the rule takes from each end**, not positions. Each is a [`CountOf`](@ref) of assets or a [`FractionOf`](@ref) of the assets with a finite score. `best = CountOf(20)` means twenty assets, not the asset at rank twenty, and `best = FractionOf(0.2)` means a fifth of the scored assets. A plain number is read through [`count_or_fraction`](@ref). [`bigger_is_better`](@ref) of the score sets which end is the best. For a risk measure, `RankRule(; best = 20)` keeps the twenty assets with the lowest risk. For `MeanReturn`, it keeps the twenty with the highest return. A rule with both tails takes both ends. `action = :drop` takes the complement of the selection. With it, a rule can drop the five worst assets with no knowledge of the size of the universe.
 
-A count **saturates** at the number of assets. On a window of 30 assets, `best = 50` keeps all 30 and does not throw. A hyperparameter search over `best` then does not fail at its largest value. A fraction becomes a count on the window that the rule fits, with `round(Int, f * n, RoundNearestTiesUp)` over the `n` assets with a finite score. An exact half rounds **up**. For example, `best = FractionOf(0.625)` on a window of 4 assets takes 3 assets, and not the 2 that the default `RoundNearest` of Julia gives. An asset with no score does not count in the size of the universe.
+A count **saturates** at the number of assets. On a window of 30 assets, `best = 50` keeps all 30 and does not throw. A hyperparameter search over `best` then does not fail at its largest value. A fraction becomes a count on the window that the rule fits, with [`rule_tail_count`](@ref) over the `n` assets with a finite score. An exact half rounds **up**. For example, `best = FractionOf(0.625)` on a window of 4 assets takes 3 assets, and not the 2 that the default `RoundNearest` of Julia gives. An asset with no score does not count in the size of the universe.
 
 !!! warning
 
@@ -150,7 +150,7 @@ Where:
   - ``\\mathcal{T}(k)``: The tail of size ``k``, at the end that the subscript names.
   - ``a_{i}``: The number of assets in ``\\mathcal{F}`` whose score is strictly better than ``s_{i}``. At the `best` end, a larger score is better when [`bigger_is_better`](@ref) is `true`, and a smaller score is better when it is `false`. The `worst` end reverses this order.
   - ``e_{i}``: The number of assets in ``\\mathcal{F}`` whose score is equal to ``s_{i}``. The number includes asset ``i``, so ``e_{i} \\geq 1``.
-  - ``k_{b}``, ``k_{w}``: The counts of `best` and `worst` from [`rule_tail_count`](@ref), each saturated to ``[0,\\, N_{\\mathcal{F}}]``. A tail of `nothing` is ``0``. A [`CountOf`](@ref) is its `val`. A [`FractionOf`](@ref) ``f`` is ``\\left\\lfloor f N_{\\mathcal{F}} + \\frac{1}{2} \\right\\rfloor``, the rounding mode `RoundNearestTiesUp`.
+  - ``k_{b}``, ``k_{w}``: The counts of `best` and `worst` from [`rule_tail_count`](@ref), each saturated to ``[0,\\, N_{\\mathcal{F}}]``. A tail of `nothing` is ``0``. A [`CountOf`](@ref) is its `val`. A [`FractionOf`](@ref) ``f`` is ``\\left\\lfloor f N_{\\mathcal{F}} + \\frac{1}{2} \\right\\rfloor``.
   - ``\\mathcal{S}``: The union of the two tails, before the rule applies `action`.
 
 Three facts follow from this definition. A tail admits asset ``i`` only when the whole tied block of ``i`` fits in ``k``. A tail excludes a block that crosses the cut, so ``\\left| \\mathcal{T}(k) \\right| \\leq k``. If all the finite scores are equal, ``a_{i} + e_{i} = N_{\\mathcal{F}}`` for every asset of ``\\mathcal{F}``, so every tail of size ``k < N_{\\mathcal{F}}`` is empty. An asset outside ``\\mathcal{F}`` is in no tail and in neither keep-set, so an asset with no score never survives the rule.
@@ -241,7 +241,7 @@ Convert one tail of a [`RankRule`](@ref) to the number of assets that it takes f
 
  1. Return `nothing` for a tail of `nothing`.
  2. Return `tail.val` for a [`CountOf`](@ref).
- 3. Return `round(Int, tail.val * n, RoundNearestTiesUp)` for a [`FractionOf`](@ref). An exact half rounds up.
+ 3. For a [`FractionOf`](@ref), count the half assets `h` with [`fraction_floor`](@ref)`(tail.val, 2 * n)`, and return `(h + 1) ÷ 2`. It is the number of assets nearest to the fraction, and an exact half rounds up. The exact floor finds a half that the product rounds away: the product of `0.575` and `100` is `57.49999999999999`.
 
 # Arguments
 
@@ -267,6 +267,7 @@ julia> PortfolioOptimisers.rule_tail_count(CountOf(50), 30)
   - [`RankRule`](@ref)
   - [`rule_keep`](@ref)
   - [`tail_mask`](@ref)
+  - [`fraction_floor`](@ref)
 """
 function rule_tail_count(::Nothing, ::Integer)
     return nothing
@@ -275,7 +276,7 @@ function rule_tail_count(tail::CountOf, ::Integer)
     return tail.val
 end
 function rule_tail_count(tail::FractionOf, n::Integer)
-    return round(Int, tail.val * n, RoundNearestTiesUp)
+    return div(fraction_floor(tail.val, 2 * n) + 1, 2)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
