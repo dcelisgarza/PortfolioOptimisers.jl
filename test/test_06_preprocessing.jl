@@ -1017,6 +1017,22 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test_throws DimensionMismatch price_jumps(Xz; span = trues(4, 2))
         @test isempty(price_jumps(TimeArray(ts[1:2], zeros(Rational{Int}, 2, 1), [:a])))
 
+        # A column of mixed number types reads as the other steps read it.
+        Xr = TimeArray(ts[1:3], Real[1.0 2; 30 4; 31 5], [:a, :b])
+        @test only(price_jumps(Xr)).ratio == 30
+        @test fit_preprocessing(PriceJumpFilter(), PricesResult(; X = Xr)).nx == [:b]
+        # A hand-built `PricesResult` can hold its one column as a vector.
+        for v in ([1.0, 2.0, 3.0], [1.0, NaN, 3.0])
+            pv = PricesResult(; X = TimeArray(ts[1:3], v, [:a]))
+            @test isempty(price_jumps(pv))
+            @test fit_preprocessing(PriceJumpFilter(), pv).nx == [:a]
+            stepped = PO.partial_fit!(PriceJumpFilter(), pv)
+            @test fit_preprocessing(stepped).nx == [:a]
+            @test only(stepped.cache.tail) == 3.0
+            @test PO.asset_gap_cells(pv) == reshape(isnan.(v), :, 1)
+            @test fit_preprocessing(MissingDataFilter(; col_thr = 0.5), pv).nx == [:a]
+        end
+
         # An absence from the listing ends a pair, and a gap does not.
         span = trues(size(P))
         span[2, 1] = false

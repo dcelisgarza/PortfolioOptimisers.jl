@@ -1147,12 +1147,12 @@ The filter changes only which assets survive. So the verb leaves the universe to
   - [`PriceJumpFilter`](@ref)
 """
 function partial_fit_transform(pjf::PriceJumpFilter, pr::PricesResult)
-    vals = values(unify_gaps(pr.X))
+    vals = price_matrix(pr.X)
     span = prices_listing_span(pr)
     T = Union{Missing, eltype(vals)}
     rows = axes(vals, 1)
     state = PriceJumpFilterState(; nx = TimeSeries.colnames(pr.X), factor = pjf.factor,
-                                 jump = price_jump_marks(pr, pjf.factor),
+                                 jump = price_jump_marks(vals, span, pjf.factor),
                                  head = T[end_price(vals, span, j, rows)
                                           for j in axes(vals, 2)],
                                  tail = T[end_price(vals, span, j, reverse(rows))

@@ -179,6 +179,7 @@ julia> fit_preprocessing(MissingDataFilter(; col_thr = 0.4, row_thr = 1 // 3,
   - [`FixedPointFilter`](@ref)
   - [`SinglePassFilter`](@ref)
   - [`MissingDataFilterResult`](@ref)
+  - [`PriceJumpFilter`](@ref)
   - [`AbstractPricesPreprocessingEstimator`](@ref)
   - [`PriceGapFill`](@ref)
   - [`PricesResult`](@ref)
@@ -525,7 +526,9 @@ function asset_gap_cells(pr::PricesResult)::BitMatrix
     ts = TimeSeries.timestamp(pr.X)
     vals = values(pr.X)
     n = size(vals, 2)
-    return BitMatrix(is_missing_value.(vals)) .| clock_gap_cells(pr.iv, ts, n) .|
+    #! The values of one column can be a vector, which reads as a matrix of one column.
+    return BitMatrix(reshape(is_missing_value.(vals), :, n)) .|
+           clock_gap_cells(pr.iv, ts, n) .|
            clock_gap_cells(benchmark_columns(pr.B, false), ts, n)
 end
 """
@@ -585,7 +588,7 @@ end
 
 Tell whether the move from the price `q` to the price `p` is a Price Jump.
 
-The comparison computes `1 / factor` in the number type of the price. So a whole ratio, such as a split of seven to one, is not a jump at the `factor` that names the ratio. Two equal prices are no move, so two zero prices are not a jump.
+The comparison is strict, so a ratio equal to `factor` or to its inverse is not a jump. The ratio of two floating-point prices can round across the bound, as `0.27 / 0.09 > 3` does. Two equal prices are no move, so two zero prices are not a jump.
 
 # Mathematical definition
 
@@ -631,6 +634,31 @@ function is_price_jump(q::Number, p::Number, factor::Number)::Bool
 end
 function is_price_jump(::Union{Missing, Number}, ::Union{Missing, Number}, ::Number)::Bool
     return false
+end
+"""
+    price_matrix(X::TimeSeries.TimeArray) -> AbstractMatrix
+
+Give the prices of `X` as a matrix in which each absent price is `NaN`.
+
+A `TimeArray` of one column can hold its values in a vector, which reads as a matrix of one column.
+
+# Arguments
+
+  - `X`: One price series, `observations × assets`.
+
+# Returns
+
+  - `P::AbstractMatrix`: The prices, `observations × assets`. It can share its memory with `X`, so do not change it.
+
+# Related
+
+  - [`unify_gaps`](@ref)
+  - [`price_jumps`](@ref)
+  - [`PriceJumpFilter`](@ref)
+"""
+function price_matrix(X::TimeSeries.TimeArray)
+    vals = values(unify_gaps(X))
+    return reshape(vals, size(vals, 1), size(vals, 2))
 end
 """
     foreach_price_jump(f, X::AbstractMatrix, span::Option{<:AbstractMatrix{Bool}},
@@ -729,15 +757,15 @@ Find every move of a price above a factor between two consecutive priced observa
 
 A price series can hold a jump that is not a move of the market, such as a split that the source of the data did not record, a reverse split, or a bad tick. One such jump enters the mean, the covariance and the tail of every risk measure, and no fit refuses it. This function finds the jumps and changes no data. It cannot tell a split from a real move, so the caller decides what a jump means. The caller can correct the price, keep the move, or drop the asset with a [`PriceJumpFilter`](@ref).
 
-The default factor of `5` suits the daily prices of a broad equity universe, where few real moves reach it. A factor of `3` also finds real events, such as a failed drug trial or the spin-off of a division.
+The default factor of `5` suits the daily prices of a broad equity universe, where few real moves reach it. A factor of `3` also finds real events, such as a failed drug trial or the spin-off of a division. A split of `n` to one divides the price by about `n`, so give a factor below the ratio of the smallest split to find. The default finds no split of two, three or four to one unless the price also falls, and it can miss a split of five to one.
 
 The comparison reads consecutive *priced* observations, not adjacent rows, so it finds a jump across a gap. A split often happens while a stock is suspended. No return crosses an absence from the listing, so two prices on the two sides of one make no pair.
 
 # Algorithm
 
  1. Check that `factor` is greater than one.
- 2. Give each absent price of `X` as `NaN` with [`unify_gaps`](@ref), and check that `span` has the shape of the prices.
- 3. Read the pairs of consecutive priced observations with [`foreach_price_jump`](@ref), and add one [`PriceJump`](@ref) for each pair that is a jump.
+ 2. Give the prices as a matrix in which each absent price is `NaN` with [`price_matrix`](@ref), and check that `span` has the shape of the prices.
+ 3. Read the pairs of consecutive priced observations with [`foreach_price_jump`](@ref), and make one [`PriceJump`](@ref) for each pair that is a jump.
 
 The method of a [`PricesResult`](@ref) calls the other method with its prices and its Listing Span.
 
@@ -784,19 +812,17 @@ julia> (jumps[1].asset, jumps[1].previous, jumps[1].timestamp, jumps[1].ratio)
 function price_jumps(X::TimeSeries.TimeArray; factor::Number = 5,
                      span::Option{<:AbstractMatrix{Bool}} = nothing)
     assert_jump_factor(factor)
-    A = unify_gaps(X)
-    #! The values of one column can be a vector, which reads as a matrix of one column.
-    vals = reshape(values(A), size(values(A), 1), size(values(A), 2))
+    vals = price_matrix(X)
     @argcheck(isnothing(span) || size(span) == size(vals),
               DimensionMismatch("a listing statement and the prices that it describes have the same shape; got size(span) = $(size(span)) for prices of $(size(vals, 1)) observations and $(size(vals, 2)) assets"))
-    ts = TimeSeries.timestamp(A)
-    nx = TimeSeries.colnames(A)
-    jumps = PriceJump{eltype(nx), eltype(ts), eltype(ts), eltype(vals)}[]
+    ts = TimeSeries.timestamp(X)
+    nx = TimeSeries.colnames(X)
+    moves = NTuple{3, Int}[]
     foreach_price_jump(vals, span, factor) do j, s, t
-        push!(jumps, PriceJump(nx[j], ts[s], ts[t], vals[t, j] / vals[s, j]))
+        push!(moves, (j, s, t))
         return nothing
     end
-    return jumps
+    return [PriceJump(nx[j], ts[s], ts[t], vals[t, j] / vals[s, j]) for (j, s, t) in moves]
 end
 function price_jumps(pr::PricesResult; factor::Number = 5)
     return price_jumps(pr.X; factor = factor, span = prices_listing_span(pr))
@@ -913,27 +939,30 @@ $(DocStringExtensions.FIELDS)
     nx
 end
 """
-    price_jump_marks(pr::PricesResult, factor::Number) -> BitVector
+    price_jump_marks(X::AbstractMatrix, span::Option{<:AbstractMatrix{Bool}},
+                     factor::Number) -> BitVector
 
-Mark the assets of `pr` with one Price Jump or more.
+Mark the assets of the prices `X` with one Price Jump or more.
 
 # Arguments
 
-  - `pr`: The prices.
+  - `X`: The prices, `observations × assets`. An absent price is `NaN`.
+  - `span`: The listing statement of the prices, `observations × assets`, or `nothing` when the prices state no absence.
   - $(arg_dict[:jump_factor])
 
 # Returns
 
-  - `jump::BitVector`: `true` for each asset with a jump, in the column order of `pr.X`.
+  - `jump::BitVector`: `true` for each asset with a jump, in the column order of `X`.
 
 # Related
 
   - [`PriceJumpFilter`](@ref)
   - [`foreach_price_jump`](@ref)
 """
-function price_jump_marks(pr::PricesResult, factor::Number)::BitVector
-    jump = falses(size(values(pr.X), 2))
-    foreach_price_jump(values(unify_gaps(pr.X)), prices_listing_span(pr), factor) do j, _, _
+function price_jump_marks(X::AbstractMatrix, span::Option{<:AbstractMatrix{Bool}},
+                          factor::Number)::BitVector
+    jump = falses(size(X, 2))
+    foreach_price_jump(X, span, factor) do j, _, _
         jump[j] = true
         return nothing
     end
@@ -1008,8 +1037,8 @@ function fitted_columns(nx::AbstractVector{Symbol}, pr::PricesResult)::Vector{In
     return cols
 end
 function fit_preprocessing(pjf::PriceJumpFilter, pr::PricesResult)::PriceJumpFilterResult
-    return price_jump_result(TimeSeries.colnames(pr.X), price_jump_marks(pr, pjf.factor),
-                             pjf.factor)
+    jump = price_jump_marks(price_matrix(pr.X), prices_listing_span(pr), pjf.factor)
+    return price_jump_result(TimeSeries.colnames(pr.X), jump, pjf.factor)
 end
 function apply_preprocessing(res::PriceJumpFilterResult, pr::PricesResult)::PricesResult
     return port_opt_view(pr, :, fitted_columns(res.nx, pr))
