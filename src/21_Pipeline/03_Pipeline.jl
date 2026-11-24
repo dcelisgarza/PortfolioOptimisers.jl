@@ -542,7 +542,7 @@ The steps whose values the last optimiser receives join the group of that optimi
 
 A Pipeline takes the online step. [`partial_fit!`](@ref) runs the steps in order, and folds each block of observations through them into the **row owner**. The row owner is the prior step, or the optimiser step when the pipeline has no prior step. `fit(pipe)` with no data returns the fitted [`PipelineResult`](@ref). Each step before the row owner is one of three kinds.
 
-  - A row-local step folds its rows and emits the transformed rows. [`PricesToReturns`](@ref), [`PriceGapFill`](@ref) with a [`CarriedPrice`](@ref), and [`MissingDataFilter`](@ref) at `row_thr = 1` are row-local.
+  - A row-local step folds its rows and emits the transformed rows. [`PricesToReturns`](@ref), [`PriceGapFill`](@ref) with a [`CarriedPrice`](@ref), [`MissingDataFilter`](@ref) at `row_thr = 1`, and [`PriceJumpFilter`](@ref) are row-local.
   - A universe-only step folds nothing. An [`AbstractAssetSelector`](@ref) and the column filter of a `MissingDataFilter` are universe-only. `fit(pipe)` with no data fits such a step again over the rows of the row owner, and applies its universe as a view.
   - A window-valued step, and every other step that writes a Data Slot, stops the warm-up with an error that names it. `Online(pipe)` is the declared refit that accepts such a step.
 

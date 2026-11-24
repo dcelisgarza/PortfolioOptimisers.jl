@@ -979,6 +979,99 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test fit_preprocessing(MissingDataFilter(; alg = KeepLastAsset()), pr).nx == [:c]
     end
 
+    @testset "price_jumps and PriceJumpFilter (#1990)" begin
+        PO = PortfolioOptimisers
+        ts = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 6))
+        # `a` splits five to one and more inside a gap, `b` is a bad tick and its reversal,
+        # `c` moves by exactly the factor, up and down, and `d` is priced once.
+        P = [100.0 10.0 1.0 NaN
+             NaN 10.0 5.0 NaN
+             19.0 100.0 1.0 3.0
+             20.0 10.0 1.0 NaN
+             21.0 10.0 5.0 NaN
+             20.0 10.0 5.0 NaN]
+        nx = [:a, :b, :c, :d]
+        X = TimeArray(ts, P, nx)
+        js = price_jumps(X)
+        @test js isa Vector{PriceJump{Symbol, Date, Date, Float64}}
+        @test getproperty.(js, :asset) == [:a, :b, :b]
+        @test getproperty.(js, :previous) == ts[[1, 2, 3]]
+        @test getproperty.(js, :timestamp) == ts[[3, 3, 4]]
+        @test getproperty.(js, :ratio) == [0.19, 10.0, 0.1]
+        # A factor just below the move of `c` finds its three moves.
+        @test count(j -> j.asset === :c, price_jumps(X; factor = 4.99)) == 3
+        @test isempty(price_jumps(X; factor = 10))
+        # A whole ratio is not a jump at its own factor, in each number type.
+        for T in (Float32, Float64, Rational{Int}), k in 2:13
+            Y = TimeArray(ts[1:3], reshape(T[k, 1, k], :, 1), [:a])
+            @test isempty(price_jumps(Y; factor = k))
+            @test length(price_jumps(Y; factor = k - 1 // 2)) == 2
+        end
+        # Integer and `missing` prices read as the layer gives them.
+        Xm = TimeArray(ts[1:3], reshape([100, missing, 10], :, 1), [:a])
+        @test only(price_jumps(Xm)).ratio === 0.1
+        # One series with one column of values, a price of zero, and no move at zero.
+        Xz = TimeArray(ts[1:4], [1.0, 0.0, 0.0, 1.0], [:a])
+        @test getproperty.(price_jumps(Xz), :ratio) == [0.0, Inf]
+        @test only(price_jumps(Xz; span = [true; true; true; false;;])).ratio == 0
+        @test_throws DimensionMismatch price_jumps(Xz; span = trues(4, 2))
+        @test isempty(price_jumps(TimeArray(ts[1:2], zeros(Rational{Int}, 2, 1), [:a])))
+
+        # An absence from the listing ends a pair, and a gap does not.
+        span = trues(size(P))
+        span[2, 1] = false
+        @test getproperty.(price_jumps(X; span = span), :asset) == [:b, :b]
+        # A price outside the listing is in no pair.
+        span[3, 2] = false
+        @test isempty(price_jumps(X; span = span))
+        prs = PricesResult(; X = X, span = span)
+        @test isempty(price_jumps(prs))
+        @test fit_preprocessing(PriceJumpFilter(), prs).nx == nx
+        @test_throws DimensionMismatch price_jumps(X; span = trues(2, 2))
+        for f in (1, 0.5, NaN)
+            @test_throws DomainError price_jumps(X; factor = f)
+            @test_throws DomainError PriceJumpFilter(; factor = f)
+        end
+        @test_throws DomainError price_jumps(TimeArray(ts[1:2], [1.0, Inf], [:a]))
+
+        # The filter drops the offenders of the training window, and replays by name.
+        pr = PricesResult(; X = X)
+        @test price_jumps(pr) == js
+        res = fit_preprocessing(PriceJumpFilter(), pr)
+        @test res isa PriceJumpFilterResult
+        @test res.nx == [:c, :d]
+        @test PriceJumpFilter().factor == 5 && isnothing(PriceJumpFilter().cache)
+        ap = apply_preprocessing(res, pr)
+        @test colnames(ap.X) == [:c, :d]
+        @test timestamp(ap.X) == ts
+        @test isequal(values(ap.X), P[:, 3:4])
+        # A later window keeps the fitted universe and its order, also when an asset jumps.
+        later = PricesResult(;
+                             X = TimeArray(ts[1:2] .+ Day(10),
+                                           [1.0 1.0 1.0 1.0; 1.0 9.0 1.0 1.0],
+                                           [:d, :c, :b, :a]))
+        @test colnames(apply_preprocessing(res, later).X) == [:c, :d]
+        @test_throws ArgumentError apply_preprocessing(res,
+                                                       PO.port_opt_view(later, :,
+                                                                        ["a", "c"]))
+        @test fit_preprocessing(PriceJumpFilter(; factor = 10), pr).nx == nx
+        @test_throws PO.IsEmptyError fit_preprocessing(PriceJumpFilter(),
+                                                       PO.port_opt_view(pr, :, ["a", "b"]))
+
+        # The place of a held-price fill changes no universe.
+        pri = price_ingestion(PriceIngestion(), X)
+        filled = apply_preprocessing(fit_preprocessing(PriceGapFill(), pri), pri)
+        @test fit_preprocessing(PriceJumpFilter(), filled).nx ==
+              fit_preprocessing(PriceJumpFilter(), pri).nx ==
+              [:c, :d]
+
+        # In a Pipeline, the step fits on the training prices alone.
+        pipe = Pipeline(; steps = (PriceJumpFilter(), PricesToReturns()))
+        pf = fit(pipe, PO.port_opt_view(pr, 1:2))
+        @test pf.ctx.returns.nx == ["a", "b", "c", "d"]
+        @test fit(pipe, pr).ctx.returns.nx == ["c", "d"]
+    end
+
     @testset "prices_to_returns filters neither axis" begin
         # Issue #473 was a defect in the interaction of the conversion's two threshold
         # keywords: the column filter counted the missing entries over the table as it was
