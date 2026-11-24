@@ -355,6 +355,8 @@ Shrinks the scatter of each subset of an [`MCDCovariance`](@ref) to a target, so
 
 The target `tgt` is a covariance matrix in the units of the data. A rule of [`CovarianceShrinkageTarget`](@ref) reads a robust pilot: the robust variances of the assets on the diagonal, and the sine transform of the Kendall correlations off it. The default [`DiagonalTarget`](@ref) is the diagonal of the robust variances, the identity target of [boudt2020](@cite) on its standardised data. [`ConstantCorrelationTarget`](@ref) is its equicorrelation target.
 
+From the same starts and the same target, the fit agrees with the function `CovMrcd` of the R package `rrcov`, version 1.7-7. Two parts differ. That package takes another rank correlation for its equicorrelation target, see [`mcd_pilot`](@ref). With fewer observations than assets, its starts read an arbitrary basis of the null space of each correlation estimate, and the starts of this library do not, see [`regular_directions`](@ref).
+
 # Fields
 
 $(DocStringExtensions.FIELDS)

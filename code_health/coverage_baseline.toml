@@ -196,10 +196,10 @@ commit = "391be5e"
 "src/05_Moments/40_RobustCovariance/01_Base_RobustCovariance.jl" = { lines = 19, misses = 0 }
 "src/05_Moments/40_RobustCovariance/02_QnScale.jl" = { lines = 63, misses = 0 }
 "src/05_Moments/40_RobustCovariance/03_RobustShrinkage.jl" = { lines = 43, misses = 0 }
-"src/05_Moments/40_RobustCovariance/04_MCDSearch.jl" = { lines = 110, misses = 0 }
-"src/05_Moments/40_RobustCovariance/05_DetMCDStarts.jl" = { lines = 27, misses = 0 }
+"src/05_Moments/40_RobustCovariance/04_MCDSearch.jl" = { lines = 113, misses = 0 }
+"src/05_Moments/40_RobustCovariance/05_DetMCDStarts.jl" = { lines = 35, misses = 0 }
 "src/05_Moments/40_RobustCovariance/06_MCDFactors.jl" = { lines = 34, misses = 0 }
-"src/05_Moments/40_RobustCovariance/07_MCDCovariance.jl" = { lines = 95, misses = 0 }
+"src/05_Moments/40_RobustCovariance/07_MCDCovariance.jl" = { lines = 94, misses = 0 }
 "src/05_Moments/40_RobustCovariance/08_TylerShrinkage.jl" = { lines = 111, misses = 0 }
 "src/05_Moments/40_RobustCovariance/09_TylerCovariance.jl" = { lines = 71, misses = 0 }
 "src/05_Moments/40_RobustCovariance/10_RobustExpectedReturns.jl" = { lines = 11, misses = 0 }

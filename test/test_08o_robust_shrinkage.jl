@@ -147,6 +147,39 @@ signs(W) = W ./ sqrt.(sum(abs2, W; dims = 2))
         @test cov(MCDCovariance(; shr = MCDShrinkage(; intensity = 1)), X) ≈
               Diagonal(s .^ 2)
     end
+    @testset "Parity with R" begin
+        # R 4.5.3, `rrcov` 1.7-7, `CovMrcd(X, h = 21, rho = 0.2)` and
+        # `CovMrcd(X, h = 30, maxcond = 3)`. The `rho` of the second comes from `uniroot`, whose
+        # tolerance is 1e-4.
+        rng = StableRNG(31)
+        A = randn(rng, 4, 4)
+        X = Matrix((cholesky(A * A' + I).L * randn(rng, 4, 40))')
+        X[1:5, :] .= 8 .+ 0.5 .* randn(rng, 5, 4)
+        r = StatsAPI.fit(MCDCovariance(; rw = nothing,
+                                       shr = MCDShrinkage(; intensity = 0.2)), X)
+        @test findall(isone, r.w) ==
+              [8, 9, 10, 12, 14, 15, 16, 17, 21, 22, 23, 27, 29, 31, 32, 33, 34, 35, 37, 38,
+               39]
+        @test r.mu ≈ [-0.33338082753357945, -0.47027683541339932, 0.56778163390352920,
+                      0.47786265858703270]
+        @test r.sigma ≈
+              [3.5500840474784909 -2.8160314717250192 2.1994560623879384 -1.9355857577468434
+               -2.8160314717250192 10.4815945061872728 -5.3366864937287000 3.1272921716744997
+               2.1994560623879384 -5.3366864937287000 8.3714382582355533 -1.4406273009269495
+               -1.9355857577468432 3.1272921716744997 -1.4406273009269492 5.4982509016698886]
+        rule = ConditionNumberIntensity(; max_cond = 3)
+        r = StatsAPI.fit(MCDCovariance(; alpha = 0.75, rw = nothing,
+                                       shr = MCDShrinkage(; intensity = rule)), X)
+        @test isapprox(r.intensity, 0.35337745260028769; atol = 1e-4)
+        @test r.mu ≈ [-0.063857872746176936, -0.813832938088058233, 0.612016875529001636,
+                      0.126419103613180095]
+        @test isapprox(r.sigma,
+                       [3.8139090487273597 -2.0062676011708649 1.3236865189080627 -1.2591896664615763
+                        -2.0062676011708649 10.4996461570338138 -3.4288638283055062 0.7964069413710438
+                        1.3236865189080627 -3.4288638283055057 8.1387548943498551 -0.4510623185940757
+                        -1.2591896664615765 0.7964069413710438 -0.4510623185940757 6.1823144494176931];
+                       rtol = 1e-4)
+    end
     @testset "The search of the shrunk MCD" begin
         X, = shrinkage_test_sample(StableRNG(9), 50, 70, 5)
         smp = POR.mcd_sample(MCDShrinkage(), X, nothing)
@@ -165,7 +198,22 @@ signs(W) = W ./ sqrt.(sum(abs2, W; dims = 2))
         o1 = last(POR.mcd_csteps(Q, start, 61, false, reg, 1))
         o9 = last(POR.mcd_csteps(Q, start, 61, false, reg, 200))
         @test o9 <= o1 < o0
-        # The pooled intensity: the largest one when it is small, and otherwise the median.
+        # The starts do not depend on the basis that the linear algebra library takes for the null
+        # space of a singular correlation estimate, and a regular estimate keeps every direction.
+        Ps = POR.detmcd_directions(Z)
+        @test size(Ps[1], 2) < 70
+        @test size(Ps[4], 2) == 50
+        @test all(P -> P' * P ≈ I, Ps)
+        Y = Z * Ps[1]
+        @test POR.outside_directions(Z, Y, Ps[1]) ≈
+              vec(sum(abs2, Z * nullspace(Matrix(Ps[1]')); dims = 2))
+        @test iszero(POR.outside_directions(Q, Q, Matrix(1.0I, 10, 10)))
+        @test size(POR.regular_directions([1.0 2.0; 2.0 1.0])) == (2, 2)
+        @test size(POR.regular_directions([1.0 1.0; 1.0 1.0])) == (2, 1)
+        o = randperm(StableRNG(1), 70)
+        @test map(sort, POR.mcd_starts(DetMCD(), Z[:, o], h, false, 0.1)) ==
+              map(sort, POR.mcd_starts(DetMCD(), Z, h, false, 0.1))
+        # The pooled intensity: the largest one of the starts that stay.
         starts = [collect(i:(i + h - 1)) for i in 1:6]
         rho, kept = POR.pooled_intensity(0.05, Z, starts, c, false)
         @test rho == 0.05 && length(kept) == 6
@@ -173,8 +221,8 @@ signs(W) = W ./ sqrt.(sum(abs2, W; dims = 2))
         @test rho == 0.4 && length(kept) == 6
         own = [POR.mcd_intensity(smp.intensity, Z, idx, c, false) for idx in starts]
         rho, kept = POR.pooled_intensity(smp.intensity, Z, starts, c, false)
-        @test rho == (maximum(own) <= 0.1 ? maximum(own) : max(0.1, median(own)))
-        @test kept == starts[own .<= rho]
+        @test kept == starts[own .<= max(0.1, median(own))]
+        @test rho == maximum(own[own .<= max(0.1, median(own))])
         loose = ConditionNumberIntensity(; max_cond = 1e6)
         rho, kept = POR.pooled_intensity(loose, Z, starts, c, false)
         @test rho < 0.1 && length(kept) == 6

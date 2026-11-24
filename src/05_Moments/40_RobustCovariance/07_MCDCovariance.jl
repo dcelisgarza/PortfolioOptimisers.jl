@@ -384,7 +384,7 @@ end
 
 Returns the robust pilot covariance that the target rule of an [`MCDShrinkage`](@ref) reads.
 
-A rule that reads the variances alone gets the diagonal matrix of the robust variances. Another rule gets the sine transform of the Kendall correlations, ``\\sin(\\pi \\tau / 2)``, scaled by the robust scales. [boudt2020](@cite) takes the mean Kendall correlation for its equicorrelation target. The sine transform is an addition of this library. It makes the correlation consistent at an elliptical model.
+A rule that reads the variances alone gets the diagonal matrix of the robust variances. Another rule gets the sine transform of the Kendall correlations, ``\\sin(\\pi \\tau / 2)``, scaled by the robust scales. [boudt2020](@cite) takes the mean Kendall correlation for its equicorrelation target. The sine transform is an addition of this library. It makes the correlation consistent at an elliptical model. The R package `rrcov`, version 1.7-7, applies the same transform to the Spearman correlations, for which it is not the consistent one, so the two equicorrelation targets differ.
 
 # Arguments
 
@@ -496,7 +496,7 @@ end
 
 Returns one shrinkage intensity for every start of an MCD search, and the starts that it permits.
 
-Every subset must have the same intensity, so that the determinants compare. Steps 3.3 to 3.5 of the algorithm of [boudt2020](@cite) take the intensity of each start. The pooled intensity is the largest one, if it is not above 0.1. Otherwise, it is the median, and at least 0.1, because a start that holds outliers can make its own intensity too large. A start whose own intensity is above the pooled one leaves the search.
+Every subset must have the same intensity, so that the determinants compare. Steps 3.3 to 3.5 of the algorithm of [boudt2020](@cite) take the intensity of each start. A start that holds outliers can make its own intensity too large, so a start whose intensity is above the largest of 0.1 and of the median leaves the search. The pooled intensity is the largest one of the starts that stay, the smallest value at which each of them meets the rule. The R package `rrcov`, version 1.7-7, does the same. The text of [boudt2020](@cite) takes the cut-off itself when an intensity is above 0.1.
 
 # Arguments
 
@@ -526,9 +526,8 @@ function pooled_intensity(intensity::Union{Number, AbstractSubsetShrinkageIntens
                           W::MatNum, starts, c::Number, fixed::Bool)
     rhos = [mcd_intensity(intensity, W, idx, c, fixed) for idx in starts]
     lim = one(eltype(rhos)) / 10
-    top = maximum(rhos)
-    rho = top <= lim ? top : max(lim, Statistics.median(rhos))
-    return rho, starts[rhos .<= rho]
+    keep = rhos .<= max(lim, Statistics.median(rhos))
+    return maximum(rhos[keep]), starts[keep]
 end
 """
     mcd_fit(ce::MCDCovariance, smp::MCDSample, idx::AbstractVector{<:Integer}, c::Number,

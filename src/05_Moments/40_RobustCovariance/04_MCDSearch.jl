@@ -618,12 +618,14 @@ function best_mcd_subset(Z::MatNum, starts, h::Integer, fixed::Bool,
     return best
 end
 """
-    mcd_starts(alg::DetMCD, Z::MatNum, h::Integer, fixed::Bool, intensity) -> Vector{Vector{Int}}
+    mcd_starts(alg::DetMCD, Z::MatNum, h::Integer, fixed::Bool, intensity::Nothing) -> Vector{Vector{Int}}
+    mcd_starts(alg::DetMCD, Z::MatNum, h::Integer, fixed::Bool,
+               intensity::Union{Number, AbstractSubsetShrinkageIntensity}) -> Vector{Vector{Int}}
     mcd_starts(alg::FastMCD, Z::MatNum, h::Integer, fixed::Bool, intensity) -> Vector{Vector{Int}}
 
 Returns the start subsets of the search `alg`.
 
-The [`DetMCD`](@ref) method returns six starts, one for each set of directions of [`detmcd_directions`](@ref), through [`detmcd_initset`](@ref). The [`FastMCD`](@ref) method resolves the generator from `alg.rng` and `alg.seed` with [`resolve_rng`](@ref), and draws `alg.n_starts` starts with [`fastmcd_random_start`](@ref).
+The [`DetMCD`](@ref) method returns six starts, one for each set of directions of [`detmcd_directions`](@ref), through [`detmcd_initset`](@ref). With a shrinkage it standardises the data again with [`mcd_standardise`](@ref), because the coordinates that turn the target into the identity matrix can change the scale of a column, and the six estimates read standardised data. The [`FastMCD`](@ref) method resolves the generator from `alg.rng` and `alg.seed` with [`resolve_rng`](@ref), and draws `alg.n_starts` starts with [`fastmcd_random_start`](@ref).
 
 # Arguments
 
@@ -650,8 +652,13 @@ The [`DetMCD`](@ref) method returns six starts, one for each set of directions o
   - $(ref_dict[:hubert2012]) Section 3.
   - $(ref_dict[:rousseeuw1999]) Section 3.1.
 """
-function mcd_starts(::DetMCD, Z::MatNum, h::Integer, fixed::Bool, ::Any)
+function mcd_starts(::DetMCD, Z::MatNum, h::Integer, fixed::Bool, ::Nothing)
     return [detmcd_initset(Z, P, h, fixed) for P in detmcd_directions(Z)]
+end
+function mcd_starts(alg::DetMCD, W::MatNum, h::Integer, fixed::Bool,
+                    ::Union{Number, AbstractSubsetShrinkageIntensity})
+    centre = fixed ? zeros(eltype(W), size(W, 2)) : nothing
+    return mcd_starts(alg, first(mcd_standardise(W, centre)), h, fixed, nothing)
 end
 function mcd_starts(alg::FastMCD, Z::MatNum, h::Integer, fixed::Bool, intensity)
     rng = resolve_rng(alg.rng, alg.seed)
