@@ -232,7 +232,7 @@ A plain `floor(part.val * n)` can be one too small, because the product can roun
 # Algorithm
 
  1. Round `part.val * n` to the nearest integer `c`.
- 2. When `c / n > part.val`, subtract one from `c`.
+ 2. When `c` is positive and `c / n > part.val`, subtract one from `c`. A set with no member gives zero.
  3. Return `c`.
 
 # Arguments
@@ -263,7 +263,8 @@ julia> PortfolioOptimisers.fraction_floor(FractionOf(0.5), 7)
 function fraction_floor(part::FractionOf, n::Real)::Int
     f = part.val
     c = round(Int, f * n)
-    return c * one(f) / n > f ? c - 1 : c
+    # A count of zero is the floor already, and a set with no member has no share to compare.
+    return c > 0 && c * one(f) / n > f ? c - 1 : c
 end
 """
     cardinality_cap(x::Option{<:Union{UnresolvedValue, Integer, VecInt}})

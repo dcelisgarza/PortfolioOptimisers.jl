@@ -766,6 +766,11 @@ end
     S = [1 1 0 0; 0 0 1 1; 0 0 0 0; 0 0 0 0]
     @test pe.resolve_cardinality_cap(FractionOf(0.5), S) == 1
     @test pe.resolve_cardinality_cap([FractionOf(1), CountOf(4)], [S, S]) == [2, 4]
+    # A set with no member gives zero for an exact fraction too, and the cap is then one.
+    for f in (0.5, 1 // 2)
+        @test pe.fraction_floor(FractionOf(f), 0) == 0
+        @test pe.resolve_cardinality_cap(FractionOf(f), zeros(Int, 2, 3)) == 1
+    end
     # The check of a slot goes entry by entry, and an empty vector is refused.
     gt0 = pe.assert_nonempty_gt0_finite_val
     @test isnothing(pe.assert_cardinality_cap(gt0, mixed, :scard))
