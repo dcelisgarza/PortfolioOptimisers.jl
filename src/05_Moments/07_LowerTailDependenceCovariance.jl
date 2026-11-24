@@ -20,7 +20,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     LowerTailDependenceCovariance(;
-        ve::AbstractVarianceEstimator = SimpleVariance(),
+        ve::StatsBase.CovarianceEstimator = SimpleVariance(),
         alpha::Number = 0.05,
         ex::FLoops.Transducers.Executor = ThreadedEx(),
         cache::Option{<:AbstractPartialFitState} = nothing
@@ -63,6 +63,7 @@ LowerTailDependenceCovariance
 # Related
 
   - [`AbstractVarianceEstimator`](@ref)
+  - [`library_covariance_estimator`](@ref)
   - [`SimpleVariance`](@ref)
   - [`AbstractCovarianceEstimator`](@ref)
   - [`lower_tail_dependence`](@ref)
@@ -78,7 +79,7 @@ LowerTailDependenceCovariance
 """
 @propagatable @concrete struct LowerTailDependenceCovariance <: AbstractCovarianceEstimator
     """
-    $(field_dict[:ve])
+    $(field_dict[:ve_slot])
     """
     @fprop @vprop ve
     """
@@ -93,7 +94,7 @@ LowerTailDependenceCovariance
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
-    function LowerTailDependenceCovariance(ve::AbstractVarianceEstimator, alpha::Number,
+    function LowerTailDependenceCovariance(ve::StatsBase.CovarianceEstimator, alpha::Number,
                                            ex::FLoops.Transducers.Executor,
                                            cache::Option{<:AbstractPartialFitState})
         assert_unit_interval(alpha, :alpha)
@@ -101,7 +102,8 @@ LowerTailDependenceCovariance
                                                                          cache)
     end
 end
-function LowerTailDependenceCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
+function LowerTailDependenceCovariance(;
+                                       ve::StatsBase.CovarianceEstimator = SimpleVariance(),
                                        alpha::Number = 0.05,
                                        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                                        cache::Option{<:AbstractPartialFitState} = nothing)::LowerTailDependenceCovariance

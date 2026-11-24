@@ -1507,7 +1507,8 @@ end
 function series_folds(ce::RegimeAdjustedExpWeightedCovariance)
     return isnothing(ce.cache)
 end
-function fold_mask_keywords(::RegimeAdjustedExpWeightedCovariance, amsk, emsk)
+function fold_mask_keywords(::Union{RegimeAdjustedExpWeightedVariance,
+                                    RegimeAdjustedExpWeightedCovariance}, amsk, emsk)
     return (; active_mask = amsk, estimation_mask = emsk)
 end
 """

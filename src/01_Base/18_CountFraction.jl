@@ -232,13 +232,13 @@ A plain `floor(f * n)` can be one too small, because the product can round below
 # Algorithm
 
  1. Round `f * n` to the nearest integer `c`.
- 2. When `c / n > f`, subtract one from `c`. An empty set has no share, so the function skips this step.
+ 2. When `c` is positive and `c / n > f`, subtract one from `c`. A set with no member gives zero.
  3. Return `c`.
 
 # Arguments
 
   - `f`: The fraction of the set, such as the `val` of a [`FractionOf`](@ref).
-  - `n`: The size of the set, `n >= 0`. An empty set gives zero.
+  - `n`: The size of the set, `n >= 0`.
 
 # Returns
 
@@ -266,7 +266,8 @@ julia> PortfolioOptimisers.fraction_floor(0.5, 7)
 """
 function fraction_floor(f::Number, n::Real)::Int
     c = round(Int, f * n)
-    return !iszero(n) && c * one(f) / n > f ? c - 1 : c
+    # A count of zero is the floor already, and a set with no member has no share to compare.
+    return c > 0 && c * one(f) / n > f ? c - 1 : c
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -278,13 +279,13 @@ A plain `ceil(f * n)` can be one too large, because the product can round above 
 # Algorithm
 
  1. Round `f * n` to the nearest integer `c`.
- 2. When `c / n < f`, add one to `c`. An empty set has no share, so the function skips this step.
+ 2. When `n` is positive and `c / n < f`, add one to `c`. A set with no member gives zero.
  3. Return `c`.
 
 # Arguments
 
   - `f`: The fraction of the set, such as the `val` of a [`FractionOf`](@ref) or a significance level.
-  - `n`: The size of the set, `n >= 0`. An empty set gives zero.
+  - `n`: The size of the set, `n >= 0`.
 
 # Returns
 
@@ -312,7 +313,8 @@ julia> PortfolioOptimisers.fraction_ceil(0.5, 7)
 """
 function fraction_ceil(f::Number, n::Real)::Int
     c = round(Int, f * n)
-    return !iszero(n) && c * one(f) / n < f ? c + 1 : c
+    # A set with no member has no share to compare.
+    return n > 0 && c * one(f) / n < f ? c + 1 : c
 end
 """
     cardinality_cap(x::Option{<:Union{UnresolvedValue, Integer, VecInt}})

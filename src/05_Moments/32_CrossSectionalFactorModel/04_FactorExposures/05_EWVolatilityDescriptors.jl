@@ -101,7 +101,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     EWVolatility(; half_life::Real = 40.0,
-                 ce::AbstractCovarianceEstimator = ew_variance_estimator(half_life),
+                 ce::StatsBase.CovarianceEstimator = ew_variance_estimator(half_life),
                  alg::AbstractMomentAlgorithm = FullMoment(),
                  mar::Real = 0.0,
                  cache::Option{<:AbstractPartialFitState} = nothing) -> EWVolatility
@@ -133,7 +133,7 @@ julia> (de.ce.decay ≈ exp2(-inv(5.0)), isa(de.alg, FullMoment), de.mar)
 """
 @concrete struct EWVolatility <: AbstractDescriptorEstimator
     """
-    Variance estimator whose [`variance_series`](@ref) the Descriptor takes the square root of. It carries the recursion, the warm-up and the reset of an asset that turns inactive. A [`PortfolioOptimisersCovariance`](@ref) with a step in its `mp`, as its default `mp` holds, raises on this series, as its docstring states.
+    Variance estimator, or a covariance estimator, whose [`variance_series`](@ref) the Descriptor takes the square root of. An estimator of another package is a valid value, and the series reduces each window to its Coverage Universe, as it does for a plain estimator of the library. It carries the recursion, the warm-up and the reset of an asset that turns inactive. A [`PortfolioOptimisersCovariance`](@ref) with a step in its `mp`, as its default `mp` holds, raises on this series, as its docstring states.
     """
     ce
     """
@@ -148,14 +148,14 @@ julia> (de.ce.decay ≈ exp2(-inv(5.0)), isa(de.alg, FullMoment), de.mar)
     $(field_dict[:ew_vol_desc_cache])
     """
     cache
-    function EWVolatility(ce::AbstractCovarianceEstimator, alg::AbstractMomentAlgorithm,
+    function EWVolatility(ce::StatsBase.CovarianceEstimator, alg::AbstractMomentAlgorithm,
                           mar::Real, cache::Option{<:AbstractPartialFitState})
         assert_finite(mar, :mar)
         return new{typeof(ce), typeof(alg), typeof(mar), typeof(cache)}(ce, alg, mar, cache)
     end
 end
 function EWVolatility(; half_life::Real = 40.0,
-                      ce::AbstractCovarianceEstimator = ew_variance_estimator(half_life),
+                      ce::StatsBase.CovarianceEstimator = ew_variance_estimator(half_life),
                       alg::AbstractMomentAlgorithm = FullMoment(), mar::Real = 0.0,
                       cache::Option{<:AbstractPartialFitState} = nothing)::EWVolatility
     return EWVolatility(ce, alg, mar, cache)
@@ -258,7 +258,7 @@ function descriptor(de::EWVolatility, rd::ReturnsResult)::Matrix{<:Real}
 end
 """
     EWDownsideVolatility(; half_life::Real = 40.0, mar::Real = 0.0,
-                         ce::AbstractCovarianceEstimator = ew_variance_estimator(half_life)) -> EWVolatility
+                         ce::StatsBase.CovarianceEstimator = ew_variance_estimator(half_life)) -> EWVolatility
 
 Exponentially weighted volatility of the returns that fall short of a minimum acceptable return.
 
@@ -295,7 +295,7 @@ julia> (de.ce.min_obs, isa(de.alg, SemiMoment), de.mar)
   - [`SemiMoment`](@ref)
 """
 function EWDownsideVolatility(; half_life::Real = 40.0, mar::Real = 0.0,
-                              ce::AbstractCovarianceEstimator = ew_variance_estimator(half_life))::EWVolatility
+                              ce::StatsBase.CovarianceEstimator = ew_variance_estimator(half_life))::EWVolatility
     return EWVolatility(; ce = ce, alg = SemiMoment(), mar = mar)
 end
 
@@ -343,7 +343,7 @@ $(DocStringExtensions.FIELDS)
                          beta_half_life::Real = 60.0,
                          beta_decay::Real = half_life_decay(beta_half_life, :beta_half_life),
                          beta_min_obs::Integer = 10,
-                         ce::AbstractCovarianceEstimator = ew_variance_estimator(half_life,
+                         ce::StatsBase.CovarianceEstimator = ew_variance_estimator(half_life,
                                                                                  max(half_life,
                                                                                      beta_half_life)),
                          alg::AbstractMomentAlgorithm = FullMoment(), mar::Real = 0.0,
@@ -387,7 +387,7 @@ julia> (de.ce.decay ≈ exp2(-inv(5.0)), de.ce.min_obs, de.beta_decay ≈ exp2(-
     """
     mcap
     """
-    Variance estimator whose [`variance_series`](@ref) the Descriptor takes the square root of, over the residual rather than over the return. It carries the recursion, the warm-up and the reset of an asset that turns inactive. It must be mask-aware, a windowed estimator whose window leaves the first observations, or a [`PortfolioOptimisersCovariance`](@ref) over one of them, because the residual of every asset is `NaN` until its beta exists, as [`assert_mask_aware_variance`](@ref) states. A [`PortfolioOptimisersCovariance`](@ref) with a step in its `mp`, as its default `mp` holds, raises on the `NaN` row of the warm-up, as its docstring states.
+    Variance estimator, or a covariance estimator, whose [`variance_series`](@ref) the Descriptor takes the square root of, over the residual rather than over the return. An estimator of another package reads no mask, so it is a valid value inside a [`WindowedCovariance`](@ref) with an integer window, and not alone. It carries the recursion, the warm-up and the reset of an asset that turns inactive. It must be mask-aware, a windowed estimator whose window leaves the first observations, or a [`PortfolioOptimisersCovariance`](@ref) over one of them, because the residual of every asset is `NaN` until its beta exists, as [`assert_mask_aware_variance`](@ref) states. A [`PortfolioOptimisersCovariance`](@ref) with a step in its `mp`, as its default `mp` holds, raises on the `NaN` row of the warm-up, as its docstring states.
     """
     ce
     """
@@ -410,7 +410,7 @@ julia> (de.ce.decay ≈ exp2(-inv(5.0)), de.ce.min_obs, de.beta_decay ≈ exp2(-
     $(field_dict[:ew_vol_desc_cache])
     """
     cache
-    function EWResidualVolatility(mcap::AbstractString, ce::AbstractCovarianceEstimator,
+    function EWResidualVolatility(mcap::AbstractString, ce::StatsBase.CovarianceEstimator,
                                   beta_decay::Real, beta_min_obs::Integer,
                                   alg::AbstractMomentAlgorithm, mar::Real,
                                   cache::Option{<:AbstractPartialFitState})
@@ -429,15 +429,15 @@ function EWResidualVolatility(; mcap::AbstractString = "market_cap", half_life::
                               beta_decay::Real = half_life_decay(beta_half_life,
                                                                  :beta_half_life),
                               beta_min_obs::Integer = 10,
-                              ce::AbstractCovarianceEstimator = ew_variance_estimator(half_life,
-                                                                                      max(half_life,
-                                                                                          beta_half_life)),
+                              ce::StatsBase.CovarianceEstimator = ew_variance_estimator(half_life,
+                                                                                        max(half_life,
+                                                                                            beta_half_life)),
                               alg::AbstractMomentAlgorithm = FullMoment(), mar::Real = 0.0,
                               cache::Option{<:AbstractPartialFitState} = nothing)::EWResidualVolatility
     return EWResidualVolatility(mcap, ce, beta_decay, beta_min_obs, alg, mar, cache)
 end
 """
-    assert_mask_aware_variance(ce::AbstractCovarianceEstimator, beta_min_obs::Integer)
+    assert_mask_aware_variance(ce::StatsBase.CovarianceEstimator, beta_min_obs::Integer)
     assert_mask_aware_variance(ce::Union{WindowedVariance, WindowedCovariance},
                                beta_min_obs::Integer)
     assert_mask_aware_variance(ce::PortfolioOptimisersCovariance, beta_min_obs::Integer)
@@ -446,7 +446,7 @@ Refuses a variance estimator whose [`variance_series`](@ref) over an Asset Panel
 
 [`ew_residual_returns`](@ref) writes `NaN` into the residual of every asset from its first observation until its beta exists. The beta of observation `1` reads one observation, whose market return does not vary, so it is `NaN` too. So the residual of every asset is `NaN` at each observation before `max(beta_min_obs, 2)`, the warm-up. A plain estimator reduces each window of the series to its Coverage Universe, and a window that holds a row of the warm-up covers no asset, so its row is `NaN`. A mask-aware estimator, by [`reads_active_mask`](@ref), reads each asset from its first finite residual, so it answers. The configuration alone decides if every window holds a row of the warm-up, so the constructor refuses that configuration:
 
-  - A plain estimator fits an expanding window, which holds observation `1` at every row, so it is refused.
+  - A plain estimator fits an expanding window, which holds observation `1` at every row, so it is refused. An estimator of another package is a plain estimator.
   - A windowed estimator with an integer window drops the first observations once its window is full, so it is admitted over any inner estimator. Its rows before the window leaves the warm-up are `NaN`.
   - A windowed estimator with an index window holds its first index at every row that keeps an observation. It is admitted when that index is past the warm-up, and otherwise it is admitted only when its inner estimator is.
   - A windowed estimator with no window is admitted only when its inner estimator is.
@@ -475,7 +475,7 @@ A variance estimator of your own whose [`variance_series`](@ref) over an Asset P
   - [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
   - [`CoveragePolicy`](@ref)
 """
-function assert_mask_aware_variance(ce::AbstractCovarianceEstimator, ::Integer)::Nothing
+function assert_mask_aware_variance(ce::StatsBase.CovarianceEstimator, ::Integer)::Nothing
     @argcheck(reads_active_mask(ce),
               ArgumentError("the `ce` of an EWResidualVolatility holds a `$(typeof(ce).name.name)`, which is not mask-aware: its variance series reduces each expanding window to its Coverage Universe, and the residual of every asset is `NaN` until its beta exists, so every cell of the Descriptor would be `NaN`. Pass the default `ce`, an `ExpWeightedVariance`, a `SimpleVariance(; cvg = CoveragePolicy())`, or a windowed estimator with an integer window, such as `WindowedVariance(; window = 60)`. A type of your own whose `variance_series` over an Asset Panel reads the active mask adds a method of `PortfolioOptimisers.reads_active_mask` that returns `true`."))
     return nothing
@@ -657,7 +657,7 @@ end
                                  mar::Real = 0.0,
                                  beta_decay::Real = half_life_decay(beta_half_life,
                                                                     :beta_half_life),
-                                 ce::AbstractCovarianceEstimator = ew_variance_estimator(half_life,
+                                 ce::StatsBase.CovarianceEstimator = ew_variance_estimator(half_life,
                                                                                          max(half_life,
                                                                                              beta_half_life)),
                                  beta_min_obs::Integer = 10) -> EWResidualVolatility
@@ -706,9 +706,9 @@ function EWResidualDownsideVolatility(; mcap::AbstractString = "market_cap",
                                       mar::Real = 0.0,
                                       beta_decay::Real = half_life_decay(beta_half_life,
                                                                          :beta_half_life),
-                                      ce::AbstractCovarianceEstimator = ew_variance_estimator(half_life,
-                                                                                              max(half_life,
-                                                                                                  beta_half_life)),
+                                      ce::StatsBase.CovarianceEstimator = ew_variance_estimator(half_life,
+                                                                                                max(half_life,
+                                                                                                    beta_half_life)),
                                       beta_min_obs::Integer = 10)::EWResidualVolatility
     return EWResidualVolatility(; mcap = mcap, ce = ce, beta_decay = beta_decay,
                                 beta_min_obs = beta_min_obs, alg = SemiMoment(), mar = mar)
@@ -848,7 +848,7 @@ end
 """
     ew_volatility_variance(ce::RegimeAdjustedExpWeightedVariance, Y::AbstractMatrix{<:Real},
                            pnl::AssetPanel, st::Option{<:RegimeAdjustedVarianceState})
-    ew_volatility_variance(ce::AbstractCovarianceEstimator, Y::AbstractMatrix{<:Real},
+    ew_volatility_variance(ce::StatsBase.CovarianceEstimator, Y::AbstractMatrix{<:Real},
                            pnl::AssetPanel, ::Any)
 
 Returns the point-in-time variance series of the input of a volatility Descriptor, and the state of the variance estimator after it.
@@ -888,8 +888,8 @@ function ew_volatility_variance(ce::RegimeAdjustedExpWeightedVariance,
     end
     return V, vs
 end
-function ew_volatility_variance(ce::AbstractCovarianceEstimator, Y::AbstractMatrix{<:Real},
-                                pnl::AssetPanel, ::Any)
+function ew_volatility_variance(ce::StatsBase.CovarianceEstimator,
+                                Y::AbstractMatrix{<:Real}, pnl::AssetPanel, ::Any)
     return variance_series(ce, Y, pnl; dims = 1), nothing
 end
 """

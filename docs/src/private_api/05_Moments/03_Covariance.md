@@ -41,6 +41,7 @@ partial_fit_corrected(ce::StatsBase.SimpleCovariance)
 partial_fit_corrected(ce::GeneralCovariance)
 partial_fit_corrected(ce::Covariance{<:Any, <:Any, <:FullMoment})
 partial_fit_corrected(ce::StatsBase.CovarianceEstimator)
+welford_folds
 ```
 
 ## Available-case fit

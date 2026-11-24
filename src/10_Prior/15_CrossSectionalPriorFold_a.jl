@@ -456,6 +456,15 @@ Folds a variance estimator over a block of residuals, and returns its variance a
 
 The first `seed` rows fold as one block: the series of those rows is the batch series, and a [`SeedWindow`](@ref) cuts the block. Each later row folds alone, and the variance after it is read from the folded state, so a row reads no residual after its own. An estimator that does not fold, as [`supports_partial_fit`](@ref) answers, gives the batch series of `E`, and the carry fold then gives it every fitted row at each step.
 
+A plain estimator, as [`reads_active_mask`](@ref) answers, has no correct answer for a gapped sample, so its batch fit refuses a gap. Its fold has one count for every asset, and a gap would write a non-finite value into its state. So the function refuses a gap in the rows that it folds, with the error of the batch fit.
+
+# Algorithm
+
+ 1. When `ve` does not fold, return its batch series and `ve`.
+ 2. When `seed > 0`, take the batch series of the first `seed` rows, which refuses a gap itself, and fold those rows as one block.
+ 3. When `ve` is plain, refuse a gap in the later rows with [`assert_finite_sample`](@ref), before a row writes into the state.
+ 4. Fold each later row with [`partial_fit!`](@ref), and read the variance after it. Each fold takes the masks that [`fold_mask_keywords`](@ref) gives.
+
 # Arguments
 
   - `ve`: The variance estimator, folded so far.
@@ -463,6 +472,10 @@ The first `seed` rows fold as one block: the series of those rows is the batch s
   - `em`: Estimation mask of the rows of `E`.
   - `am`: Active mask of the rows of `E`.
   - `seed`: Number of leading rows to fold as one block, `0` when `ve` already folded.
+
+# Validation
+
+  - When `ve` is plain, every cell of `E` is finite and active. An [`IsNonFiniteError`](@ref) is thrown otherwise.
 
 # Returns
 
@@ -472,6 +485,8 @@ The first `seed` rows fold as one block: the series of those rows is the batch s
 
   - [`variance_series`](@ref)
   - [`partial_fit!`](@ref)
+  - [`fold_mask_keywords`](@ref)
+  - [`reads_active_mask`](@ref)
   - [`cross_sectional_carry_fold`](@ref)
 """
 function cross_sectional_fold_variance(ve, E::MatNum, em::AbstractMatrix{Bool},
@@ -487,12 +502,16 @@ function cross_sectional_fold_variance(ve, E::MatNum, em::AbstractMatrix{Bool},
         push!(rows,
               variance_series(ve, E[b, :]; dims = 1, estimation_mask = em[b, :],
                               active_mask = am[b, :]))
-        ve = partial_fit!(ve, E[b, :]; dims = 1, estimation_mask = em[b, :],
-                          active_mask = am[b, :])
+        ve = partial_fit!(ve, E[b, :]; dims = 1,
+                          fold_mask_keywords(ve, view(am, b, :), view(em, b, :))...)
     end
-    for t in (seed + 1):size(E, 1)
-        ve = partial_fit!(ve, E[t:t, :]; dims = 1, estimation_mask = em[t:t, :],
-                          active_mask = am[t:t, :])
+    q = (seed + 1):size(E, 1)
+    if !reads_active_mask(ve)
+        assert_finite_sample(view(E, q, :), view(am, q, :))
+    end
+    for t in q
+        ve = partial_fit!(ve, E[t:t, :]; dims = 1,
+                          fold_mask_keywords(ve, view(am, t:t, :), view(em, t:t, :))...)
         push!(rows, permutedims(Statistics.var(ve)))
     end
     return reduce(vcat, rows), ve

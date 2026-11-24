@@ -18,7 +18,7 @@ $(DocStringExtensions.FIELDS)
         f_mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         re::AbstractTimeSeriesRegressionEstimator = StepwiseRegression(),
-        ve::AbstractVarianceEstimator = SimpleVariance(),
+        ve::StatsBase.CovarianceEstimator = SimpleVariance(),
         rsd::Bool = true,
         views::Lc_BLV,
         sets::Option{<:UniverseSets} = nothing,
@@ -206,7 +206,7 @@ This prior has no exact incremental recursion, and it takes the online step by a
     """
     @fprop @vprop re
     """
-    $(field_dict[:ve])
+    $(field_dict[:ve_slot])
     """
     @fprop @vprop ve
     """
@@ -257,7 +257,7 @@ This prior has no exact incremental recursion, and it takes the online step by a
                                        f_mp::AbstractMatrixProcessingEstimator,
                                        mp::AbstractMatrixProcessingEstimator,
                                        re::AbstractTimeSeriesRegressionEstimator,
-                                       ve::AbstractVarianceEstimator, rsd::Bool,
+                                       ve::StatsBase.CovarianceEstimator, rsd::Bool,
                                        views::Lc_BLV, sets::Option{<:UniverseSets},
                                        views_conf::Option{<:Num_VecNum},
                                        w::Option{<:VecNum}, rf::Number, l::Option{<:Number},
@@ -284,7 +284,7 @@ function FactorBlackLittermanPrior(;
                                    f_mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                                    mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                                    re::AbstractTimeSeriesRegressionEstimator = StepwiseRegression(),
-                                   ve::AbstractVarianceEstimator = SimpleVariance(),
+                                   ve::StatsBase.CovarianceEstimator = SimpleVariance(),
                                    rsd::Bool = true, views::Lc_BLV,
                                    sets::Option{<:UniverseSets} = nothing,
                                    views_conf::Option{<:Num_VecNum} = nothing,

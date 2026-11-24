@@ -5,7 +5,7 @@
 julia = "1.13.4"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "9c947158c2"
+commit = "317c335d55"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 6, cog_sum = 4, arg_sum = 16, macros = [] }
@@ -49,7 +49,7 @@ commit = "9c947158c2"
 "src/01_Base/11_VecScalar.jl" = { cyc = 1, cog = 1, arg = 2, cyc_sum = 2, cog_sum = 1, arg_sum = 4, macros = [] }
 "src/01_Base/12_NormError.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 28, cog_sum = 6, arg_sum = 52, macros = [] }
 "src/01_Base/13_KappaLog.jl" = { cyc = 1, cog = 0, arg = 2, cyc_sum = 1, cog_sum = 0, arg_sum = 2, macros = [] }
-"src/01_Base/14_PartialFit.jl" = { cyc = 4, cog = 4, arg = 6, cyc_sum = 20, cog_sum = 10, arg_sum = 34, macros = [] }
+"src/01_Base/14_PartialFit.jl" = { cyc = 4, cog = 5, arg = 6, cyc_sum = 26, cog_sum = 16, arg_sum = 40, macros = [] }
 "src/01_Base/15_Online_a.jl" = { cyc = 6, cog = 6, arg = 13, cyc_sum = 109, cog_sum = 72, arg_sum = 142, macros = [] }
 "src/01_Base/15_Online_b.jl" = { cyc = 5, cog = 6, arg = 7, cyc_sum = 50, cog_sum = 32, arg_sum = 52, macros = [] }
 "src/01_Base/16_CoveragePolicy.jl" = { cyc = 9, cog = 15, arg = 5, cyc_sum = 117, cog_sum = 118, arg_sum = 80, macros = [] }
