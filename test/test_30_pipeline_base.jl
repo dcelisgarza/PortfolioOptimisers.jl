@@ -1707,6 +1707,7 @@ end
         @test all(k -> PO.rule_tail_count(FractionOf(k / 100), 100) == k, 1:100)
         @test all(k -> PO.rule_tail_count(FractionOf((2k - 1) / 200), 100) == k, 1:100)
         @test PO.rule_tail_count(FractionOf(prevfloat(0.575)), 100) == 57
+        @test PO.rule_tail_count(FractionOf(1 // 2), 0) == 0
         @test PO.rule_tail_count(CountOf(50), 30) == 50
         @test isnothing(PO.rule_tail_count(nothing, 30))
 

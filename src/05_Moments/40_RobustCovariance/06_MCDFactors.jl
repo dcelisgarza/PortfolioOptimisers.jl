@@ -26,7 +26,7 @@ h &= \\lfloor 2 h_2 - n + 2 (n - h_2) \\alpha \\rfloor\\,.
 
 # Validation
 
-  - With no shrinkage, `h > p`, see [`assert_robust_rows`](@ref). With a shrinkage, `h > 1`. Otherwise, the function raises a `DomainError`.
+  - With no shrinkage, `n > p`, which is the same condition as `h > p`, see [`assert_robust_rows`](@ref). With a shrinkage, `h > 1`. Otherwise, the function raises a `DomainError`.
 
 # Returns
 
@@ -42,10 +42,9 @@ h &= \\lfloor 2 h_2 - n + 2 (n - h_2) \\alpha \\rfloor\\,.
   - $(ref_dict[:boudt2020]) Section 2.1 and Section 3, Theorem 1.
 """
 function mcd_subset_size(::Nothing, alpha::Number, n::Integer, p::Integer)
+    assert_robust_rows(n, p, "the number of observations")
     h2 = div(n + p + 1, 2)
-    h = 2 * h2 - n + fraction_floor(alpha, 2 * (n - h2))
-    assert_robust_rows(h, p, "the size h of the MCD subset")
-    return h
+    return 2 * h2 - n + fraction_floor(alpha, 2 * (n - h2))
 end
 function mcd_subset_size(::MCDShrinkage, alpha::Number, n::Integer, p::Integer)
     h = max(fraction_ceil(alpha, n), div(n, 2) + 1)

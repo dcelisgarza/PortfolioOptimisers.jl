@@ -351,7 +351,7 @@ Find the number of largest losses that the integer conditional value-at-risk for
 
  1. A [`CountOf`](@ref) is a number of losses. Return `sbar.val`, at most `T`.
  2. A [`FractionOf`](@ref) is a fraction of `T`. Return [`fraction_ceil`](@ref)`(sbar.val, T)`, at most `T`. The fraction is positive, so the count is at least one.
- 3. `nothing` uses the rule of thumb of [EPTail](@cite). Go through the losses from the largest down, and add their prior probabilities. Stop at the position `s` at which the sum first reaches `alpha`.
+ 3. `nothing` uses the rule of thumb of [EPTail](@cite). Go through the losses from the largest down, and add their prior probabilities. Stop at the position `s` at which the sum first reaches `alpha`. A sum of `j` probabilities reaches `alpha` when it is below `alpha` by at most `j` units in its last place, the bound on its rounding error. The first ten of 100 equal probabilities add to `0.09999999999999999`, and they reach `0.1`.
  4. Return two times `s`, at least [`fraction_ceil`](@ref)`(2 * alpha, T)`, at least one and at most `T`.
 
 [EPTail](@citet) uses a count of at most `s` for a view at or above the prior CVaR. For a view below the prior CVaR, it uses a count above `s` and far below `T`. Its examples use `int(alpha * T)` for the first case and `int(2 * alpha * T)` for the second case. The library uses the larger count for every view, and the factor of two is its own.
@@ -383,7 +383,7 @@ function ep_sbar(sbar::Nothing, T::Integer, alpha::Number, w::VecNum, ord::VecIn
     s = T
     for (j, o) in enumerate(Iterators.reverse(ord))
         cw += w[o]
-        if cw >= alpha
+        if cw + j * eps(float(cw)) >= alpha
             s = j
             break
         end

@@ -80,7 +80,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The size of a part of a set, stated as a fraction of the size of the set.
 
-The reader multiplies `val` by the size of its set, and rounds the product to a count by the rule of its source. The docstring of each field states the rounding.
+The reader takes the part `val` of the size of its set, and rounds it to a count by the rule of its source. The docstring of each field states the rounding.
 
 # Fields
 
@@ -232,13 +232,13 @@ A plain `floor(f * n)` can be one too small, because the product can round below
 # Algorithm
 
  1. Round `f * n` to the nearest integer `c`.
- 2. When `c / n > f`, subtract one from `c`.
+ 2. When `c / n > f`, subtract one from `c`. An empty set has no share, so the function skips this step.
  3. Return `c`.
 
 # Arguments
 
   - `f`: The fraction of the set, such as the `val` of a [`FractionOf`](@ref).
-  - `n`: The size of the set.
+  - `n`: The size of the set, `n >= 0`. An empty set gives zero.
 
 # Returns
 
@@ -266,7 +266,7 @@ julia> PortfolioOptimisers.fraction_floor(0.5, 7)
 """
 function fraction_floor(f::Number, n::Real)::Int
     c = round(Int, f * n)
-    return c * one(f) / n > f ? c - 1 : c
+    return !iszero(n) && c * one(f) / n > f ? c - 1 : c
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -278,13 +278,13 @@ A plain `ceil(f * n)` can be one too large, because the product can round above 
 # Algorithm
 
  1. Round `f * n` to the nearest integer `c`.
- 2. When `c / n < f`, add one to `c`.
+ 2. When `c / n < f`, add one to `c`. An empty set has no share, so the function skips this step.
  3. Return `c`.
 
 # Arguments
 
   - `f`: The fraction of the set, such as the `val` of a [`FractionOf`](@ref) or a significance level.
-  - `n`: The size of the set.
+  - `n`: The size of the set, `n >= 0`. An empty set gives zero.
 
 # Returns
 
@@ -312,7 +312,7 @@ julia> PortfolioOptimisers.fraction_ceil(0.5, 7)
 """
 function fraction_ceil(f::Number, n::Real)::Int
     c = round(Int, f * n)
-    return c * one(f) / n < f ? c + 1 : c
+    return !iszero(n) && c * one(f) / n < f ? c + 1 : c
 end
 """
     cardinality_cap(x::Option{<:Union{UnresolvedValue, Integer, VecInt}})

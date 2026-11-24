@@ -761,6 +761,10 @@ end
     @test pe.fraction_ceil(0.5, 7) == 4
     @test pe.fraction_ceil(nextfloat(0.0), 100) == 1
     @test pe.fraction_ceil(0.5, 0) == 0
+    # An empty set gives zero in each numeric type: a `Rational` raises on `0 // 0`.
+    for f in (1 // 2, 0.5f0, big"0.5", 1)
+        @test pe.fraction_floor(f, 0) == pe.fraction_ceil(f, 0) == 0
+    end
     @test pe.fraction_ceil(1, 7) == pe.fraction_floor(1, 7) == 7
     # The cap is at least one, and a count above the set does not bind.
     @test pe.resolve_cardinality_cap(FractionOf(0.2), 18) == 3

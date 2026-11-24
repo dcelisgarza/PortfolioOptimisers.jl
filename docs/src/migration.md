@@ -1082,13 +1082,14 @@ The cardinality caps `card` and `scard` of `ConstraintBlock`, `JuMPOptimiser` an
 
 ### [Counts that a fraction gives](@id migration-0-35-fraction-counts)
 
-Some readers of a fraction rounded the floating-point product of the fraction and the size, so the count could be one away from the count that the fraction states. They now compare the share of the count with the fraction. The default fractions and significance levels keep their counts.
+Some readers of a fraction rounded the floating-point product of the fraction and the size, so the count could be one away from the count that the fraction states. They now compare the share of the count with the fraction. The default fractions and significance levels keep their counts, except in the row for the positions of `sbar = nothing`. There the sum of the prior probabilities rounded below `alpha`, and the window had two losses too many.
 
 | Reader | Case | v0.34 | v0.35 |
 | --- | --- | --- | --- |
 | `NearestNeighbourMatch(; neighbours = FractionOf(0.29))` | 100 candidates | 28 neighbours | 29 |
 | `IntegerConditionalValueatRiskView(; sbar = FractionOf(0.07))` | 100 observations | 8 losses | 7 |
 | `IntegerConditionalValueatRiskView(; sbar = nothing)`, the floor of `2 * alpha * T` | `alpha = 0.07`, 100 observations | 15 losses | 14 |
+| `IntegerConditionalValueatRiskView(; sbar = nothing)`, the positions at which the prior probabilities reach `alpha` | `alpha = 0.05`, 120 observations with equal probabilities | 14 losses | 12 |
 | `RankRule(; best = FractionOf(0.575))`, and the same in `worst` | 100 assets | 57 assets | 58 |
 | `LowerTailDependenceCovariance(; alpha = 0.07)` | 100 observations | 8 observations | 7 |
 | `HillTailDecay` and `RadialTailDecay` at `alpha = 0.07` | 100 pooled values or distances | 8 values | 7 |
