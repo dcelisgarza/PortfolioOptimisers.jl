@@ -275,6 +275,50 @@ function ep_prior_probabilities(w::ScenarioProbabilities, T::Integer, Ti::Intege
     return w
 end
 """
+    ep_view_prior(imsk, pr::AbstractPriorResult, w::VecNum) -> AbstractPriorResult
+
+Make the prior result that the views of an entropy pooling fit read.
+
+A posterior puts no mass on an observation whose prior probability is zero, so the returns of that observation change no view. But each view row has one coefficient for each observation, and the size of a coefficient sets the scale of its row. One extreme return at a zero prior probability, such as a crash that the caller removed, then makes the rest of the row smaller than the tolerance of the solver, or overflows the exponential of a tail view. The fit returns the prior, or misses the view, with no error.
+
+So the views read the mean row of the support at each observation of zero prior probability. The moments of `pr` do not change. Only the views read the result. The refit reads the returns as they are.
+
+# Algorithm
+
+ 1. View `pr` at the Investable Mask with [`investable_prior`](@ref).
+ 2. Return that view when every entry of `w` is positive.
+ 3. Copy its returns. Replace each row whose entry of `w` is zero with the mean of the other rows under `w`.
+ 4. Return the view with the new returns, through [`forward_prior`](@ref).
+
+# Arguments
+
+  - `imsk`: The Investable Mask, or `nothing` when every asset is investable.
+  - $(arg_dict[:pr])
+  - `w`: Prior probabilities of the fit, one for each observation. They are the same at every stage, so every stage states its rows over the same returns.
+
+# Returns
+
+  - `vpr::AbstractPriorResult`: The prior over the investable assets that the views read.
+
+# Related
+
+  - [`investable_prior`](@ref)
+  - [`forward_prior`](@ref)
+  - [`entropy_pooling`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+  - [`MeucciEntropyPoolingPrior`](@ref)
+"""
+function ep_view_prior(imsk, pr::AbstractPriorResult, w::VecNum)
+    vpr = investable_prior(imsk, pr)
+    sup = w .> zero(eltype(w))
+    if all(sup)
+        return vpr
+    end
+    X = copy(vpr.X)
+    X[.!sup, :] .= transpose(w[sup]) * X[sup, :] ./ sum(w[sup])
+    return forward_prior(vpr; X = X)
+end
+"""
     entropy_pooling(w::VecNum, epc::AbstractDict, opt::OptimEntropyPooling)
 
 Solve the dual of the entropy pooling problem with Optim.jl.
