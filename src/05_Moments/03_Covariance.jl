@@ -2022,15 +2022,53 @@ function Statistics.cor(ce::Union{GeneralCovariance, Covariance}; strict::Bool =
     return Statistics.cor(ce, partial_fit_cache(ce); strict = strict)
 end
 
-# `GeneralCovariance` folds in every configuration. `Covariance` folds under `FullMoment`
-# alone: the `SemiMoment` clip is taken against the sample mean, so a past observation's
-# membership of the clipped set flips when the mean moves, and that arm falls back to the
-# default, which buffers wherever a wrapper gave it a buffer (see
-# [`supports_partial_fit`](@ref)).
-function supports_partial_fit(::GeneralCovariance)
+"""
+    welford_folds(ce::StatsBase.CovarianceEstimator) -> Bool
+    welford_folds(ce::StatsBase.SimpleCovariance) -> Bool
+    welford_folds(ce::Union{GeneralCovariance, Covariance{<:Any, <:Any, <:FullMoment}}) -> Bool
+
+Answers whether the Welford fold of a [`CovarianceState`](@ref) reproduces a covariance estimator.
+
+The accumulator gives the full-moment sample covariance of `StatsBase.SimpleCovariance` and no other estimator, as [`partial_fit_corrected`](@ref) states. That function refuses the other estimators at the fold. This function answers the same question without a throw, so [`supports_partial_fit`](@ref) sends them to the batch verb.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. On `StatsBase.SimpleCovariance`, return `true`.
+ 2. On a [`GeneralCovariance`](@ref), and on a [`Covariance`](@ref) whose algorithm is [`FullMoment`](@ref), return the answer of its `ce`.
+ 3. On every other estimator, return `false`.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+
+# Returns
+
+  - `folds::Bool`: `true` when the fold reproduces the estimator.
+
+# Related
+
+  - [`partial_fit_corrected`](@ref)
+  - [`supports_partial_fit`](@ref)
+  - [`CovarianceState`](@ref)
+"""
+function welford_folds(::StatsBase.CovarianceEstimator)
+    return false
+end
+function welford_folds(::StatsBase.SimpleCovariance)
     return true
 end
-function supports_partial_fit(::Covariance{<:Any, <:Any, <:FullMoment})
-    return true
+function welford_folds(ce::Union{GeneralCovariance, Covariance{<:Any, <:Any, <:FullMoment}})
+    return welford_folds(ce.ce)
+end
+# Both fold when their inner estimator is the sample covariance. `Covariance` folds under
+# `FullMoment` alone: the `SemiMoment` clip is taken against the sample mean, so a past
+# observation's membership of the clipped set flips when the mean moves, and that arm falls
+# back to the default, which buffers wherever a wrapper gave it a buffer (see
+# [`supports_partial_fit`](@ref)).
+function supports_partial_fit(ce::Union{GeneralCovariance,
+                                        Covariance{<:Any, <:Any, <:FullMoment}})
+    return isa(ce.cache, SampleBufferState) || welford_folds(ce)
 end
 export GeneralCovariance, Covariance, cov, cor

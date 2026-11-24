@@ -160,4 +160,53 @@ end
         # Every component is kept, so the scale of the factors does not change the fit.
         @test isapprox(rr.M, ref.M; rtol = 1e-8)
     end
+    @testset "A covariance estimator that states a mean keeps it in the standardisation" begin
+        # The fit took the mean under the weights of `retgt`, and ignored the `me` of a
+        # `Covariance`, where it reads the `me` of a `SimpleVariance`.
+        md = MedianExpectedReturns()
+        cv = Covariance(; me = md)
+        poc = PortfolioOptimisersCovariance(; ce = cv,
+                                            mp = MatrixProcessing(; pdm = nothing))
+        rs = regression(DimensionReductionRegression(; ve = SimpleVariance(; me = md)), X,
+                        F)
+        for ve in (cv, poc)
+            @test FVS.standardisation_mean(ve, nothing) === md
+            rr = regression(DimensionReductionRegression(; ve = ve), X, F)
+            @test isapprox(rr.b, rs.b; rtol = 1e-8)
+            @test isapprox(rr.M, rs.M; rtol = 1e-8)
+        end
+        w = pweights(range(0.5, 1.5; length = T))
+        for ve in (ForeignCovariance(), KendallCovariance(),
+                   PortfolioOptimisersCovariance(; ce = ForeignCovariance()))
+            @test FVS.standardisation_mean(ve, w).w === w
+        end
+    end
+    @testset "A wrapper of the library over an estimator that does not fold" begin
+        # The trait answered `true` for every `GeneralCovariance` and full-moment `Covariance`,
+        # so a prior folded one that refuses, where it fits the bare estimator again.
+        fc = ForeignCovariance()
+        rd = ReturnsResult(; nx = string.(1:N), X = X)
+        for ce in (GeneralCovariance(; ce = fc), Covariance(; ce = fc),
+                   Covariance(; ce = GeneralCovariance(; ce = fc)))
+            @test !PortfolioOptimisers.supports_partial_fit(ce)
+            @test_throws ArgumentError partial_fit!(ce, X)
+            buf = partial_fit!(FVS.update_online_estimator(Online(ce)), X)
+            @test PortfolioOptimisers.supports_partial_fit(buf)
+            @test isapprox(cov(buf), cov(ce, X); rtol = 1e-12)
+            pe = EmpiricalPrior(; ce = ce)
+            p2 = partial_fit!(partial_fit!(pe, FVS.port_opt_view(rd, 1:70, :)),
+                              FVS.port_opt_view(rd, 71:T, :))
+            @test isapprox(prior(p2).sigma, prior(pe, rd).sigma; rtol = 1e-10)
+        end
+        for ce in (GeneralCovariance(), Covariance(), Covariance(; ce = Covariance()),
+                   Covariance(; ce = StatsBase.SimpleCovariance()))
+            @test PortfolioOptimisers.supports_partial_fit(ce)
+        end
+        @test !PortfolioOptimisers.supports_partial_fit(Covariance(; alg = SemiMoment()))
+        # A seeded window over such an estimator gets the refusal of the fold, which names it.
+        wc = WindowedCovariance(; ce = fc, rule = SeedWindow())
+        msk = trues(T, N)
+        @test FVS.fold_mask_keywords(wc, msk, msk) === (; active_mask = msk)
+        @test_throws r"does not fold" FVS.cross_sectional_fold_variance(wc, X, msk, msk, 40)
+    end
 end

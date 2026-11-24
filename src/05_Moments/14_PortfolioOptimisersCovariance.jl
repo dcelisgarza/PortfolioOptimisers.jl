@@ -449,7 +449,7 @@ function fold_variance_series(ce::PortfolioOptimisersCovariance, X::MatNum,
     return val
 end
 """
-    fold_mask_keywords(ce::AbstractCovarianceEstimator, amsk, emsk) -> NamedTuple
+    fold_mask_keywords(ce::StatsBase.CovarianceEstimator, amsk, emsk) -> NamedTuple
     fold_mask_keywords(ce::Union{RegimeAdjustedExpWeightedVariance,
                                  RegimeAdjustedExpWeightedCovariance}, amsk, emsk)
         -> NamedTuple
@@ -479,7 +479,7 @@ A variance estimator of your own gets the active mask alone. If its batch fit an
   - [`fold_variance_series`](@ref)
   - [`cross_sectional_fold_variance`](@ref)
 """
-function fold_mask_keywords(::AbstractCovarianceEstimator, amsk, ::Any)
+function fold_mask_keywords(::StatsBase.CovarianceEstimator, amsk, ::Any)
     return (; active_mask = amsk)
 end
 function fold_mask_keywords(ce::PortfolioOptimisersCovariance, amsk, emsk)

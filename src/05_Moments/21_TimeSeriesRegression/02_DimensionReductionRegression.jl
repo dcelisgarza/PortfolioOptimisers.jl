@@ -197,7 +197,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Estimates a loadings matrix by regressing each asset on the leading components of the factors.
 
-`drtgt` maps the standardised factors to a basis of orthogonal components, and `retgt` fits each asset in that basis. The basis is smaller than the factor set only when `drtgt` retains fewer components than factors. The method then maps the coefficients back to the original factors. `ve` gives the standard deviation by which that map divides, and [`standardisation_mean`](@ref) gives the mean. A [`SimpleVariance`](@ref) states its own mean estimator in `ve.me`. Every other `ve` takes the mean under the observation weights of `retgt`. Every asset keeps every factor, which is not true of [`StepwiseRegression`](@ref).
+`drtgt` maps the standardised factors to a basis of orthogonal components, and `retgt` fits each asset in that basis. The basis is smaller than the factor set only when `drtgt` retains fewer components than factors. The method then maps the coefficients back to the original factors. `ve` gives the standard deviation by which that map divides, and [`standardisation_mean`](@ref) gives the mean. A [`SimpleVariance`](@ref) and a [`Covariance`](@ref) state their own mean estimator in `ve.me`, and a [`PortfolioOptimisersCovariance`](@ref) takes the one of its `ce`. Every other `ve` takes the mean under the observation weights of `retgt`. Every asset keeps every factor, which is not true of [`StepwiseRegression`](@ref).
 
 The standardisation and the recovery read the same statistics. [`prep_dim_red_reg`](@ref) computes them from `ve`, and `_regression` recovers the coefficients with the pair that it returns. So a weighted `ve`, which [`factory`](@ref) builds from the observation weights, gives its weights to both steps. Equations 8, 11, 12, 35 and 36 of [fekedulegn2002](@cite) need this. That work fits the regression on the principal components of the standardised factors, with the eigenvectors of their correlation matrix. A probabilistic target puts the matrix of Equation 9 of [tipping1999](@cite) in place of the eigenvectors, and neither source states this composition.
 
@@ -341,17 +341,20 @@ end
 """
     standardisation_mean(ve::StatsBase.CovarianceEstimator, w::Option{<:ObsWeights})
     standardisation_mean(ve::SimpleVariance, w::Option{<:ObsWeights})
+    standardisation_mean(ve::Covariance, w::Option{<:ObsWeights})
+    standardisation_mean(ve::PortfolioOptimisersCovariance, w::Option{<:ObsWeights})
 
 Return the expected returns estimator that centres the factors of a [`DimensionReductionRegression`](@ref).
 
-The fit discards the intercept of the reduced basis, and rebuilds it from the mean of the response and the mean of the factors. The rebuilt intercept is the intercept of the fit only when the mean of the factors has the weights of the fit. So an estimator that states no mean estimator of its own takes the mean under those weights. A covariance estimator, also one of another package, is such an estimator.
+The fit discards the intercept of the reduced basis, and rebuilds it from the mean of the response and the mean of the factors. The rebuilt intercept is the intercept of the fit only when the mean of the factors has the weights of the fit. So an estimator that states no mean estimator of its own takes the mean under those weights. An estimator of another package is such an estimator. An estimator that states one keeps it, so the fit takes the mean about which the estimator takes the standard deviation.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. On a [`SimpleVariance`](@ref) whose `me` is not `nothing`, return `ve.me`.
- 2. On every other estimator, and on a [`SimpleVariance`](@ref) whose `me` is `nothing`, return a [`SimpleExpectedReturns`](@ref) with the weights `w`.
+ 1. On a [`Covariance`](@ref), and on a [`SimpleVariance`](@ref) whose `me` is not `nothing`, return `ve.me`.
+ 2. On a [`PortfolioOptimisersCovariance`](@ref), return the mean estimator of its `ce`, because the processing of the matrix moves no mean.
+ 3. On every other estimator, and on a [`SimpleVariance`](@ref) whose `me` is `nothing`, return a [`SimpleExpectedReturns`](@ref) with the weights `w`.
 
 # Arguments
 
@@ -374,6 +377,12 @@ function standardisation_mean(::StatsBase.CovarianceEstimator, w::Option{<:ObsWe
 end
 function standardisation_mean(ve::SimpleVariance, w::Option{<:ObsWeights})
     return isnothing(ve.me) ? SimpleExpectedReturns(; w = w) : ve.me
+end
+function standardisation_mean(ve::Covariance, ::Option{<:ObsWeights})
+    return ve.me
+end
+function standardisation_mean(ve::PortfolioOptimisersCovariance, w::Option{<:ObsWeights})
+    return standardisation_mean(ve.ce, w)
 end
 """
     prep_dim_red_reg(re::DimensionReductionRegression{<:Any, <:Any, <:Any, <:Any, Nothing},
