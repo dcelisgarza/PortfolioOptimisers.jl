@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.4"
 julia_syntax = "1.0.2"
-commit = "666cfa9753"
+commit = "d3a7fe37e9"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { code = 35, doc = 0, comment = 5, blank = 4, total = 44 }
@@ -196,7 +196,7 @@ commit = "666cfa9753"
 "src/05_Moments/38_ElasticNet.jl" = { code = 266, doc = 745, comment = 2, blank = 311, total = 1324 }
 "src/05_Moments/39_WeightedAvailableCase.jl" = { code = 195, doc = 258, comment = 2, blank = 118, total = 573 }
 "src/05_Moments/40_RobustCovariance/01_Base_RobustCovariance.jl" = { code = 50, doc = 131, comment = 0, blank = 55, total = 236 }
-"src/05_Moments/40_RobustCovariance/02_QnScale.jl" = { code = 83, doc = 124, comment = 0, blank = 73, total = 280 }
+"src/05_Moments/40_RobustCovariance/02_QnScale.jl" = { code = 119, doc = 134, comment = 0, blank = 74, total = 327 }
 "src/05_Moments/40_RobustCovariance/03_RobustShrinkage.jl" = { code = 90, doc = 401, comment = 1, blank = 195, total = 687 }
 "src/05_Moments/40_RobustCovariance/04_MCDSearch.jl" = { code = 185, doc = 397, comment = 1, blank = 185, total = 768 }
 "src/05_Moments/40_RobustCovariance/05_DetMCDStarts.jl" = { code = 45, doc = 83, comment = 0, blank = 50, total = 178 }

@@ -1,32 +1,64 @@
 """
-    weighted_high_median(a::AbstractVector, w::AbstractVector{<:Integer}) -> Number
+    weighted_high_median!(a::AbstractVector, b::AbstractVector, m::Integer) -> Number
 
-Returns the smallest entry of `a` at which the cumulative weight reaches half of the total weight.
+Returns the smallest value of the first `m` pairs of `a` at which the cumulative weight reaches half of the total weight.
+
+Each entry of `a` is a pair of a value and an integer weight. The method selects the value and does not sort the pairs, so it takes ``O(m)`` operations on average. The partition has no branch on the data. It writes each pair at the two ends of the other buffer, and moves only the end that the comparison with the pivot names. A branch on the data costs more than the two writes, because the processor cannot predict it.
 
 [`kth_pairwise_difference`](@ref) uses the value as its trial value. At least half of the weight is at or below the value, and at least half of the weight is at or above it. So each trial removes at least one quarter of the candidates.
 
 # Algorithm
 
- 1. Sort the positions of `a` by value.
- 2. Add the weights in that order. Return the first value at which twice the cumulative weight is at least the total weight.
+ 1. Take all `m` pairs as the range. The target is half of the total weight, rounded up.
+ 2. While the range holds more than one pair, do these steps:
+     1. Take the median of the first, the middle and the last value of the range as the pivot.
+     2. Copy the pairs below the pivot to the start of the same range of the other buffer, and the pairs above it to the end. Add the weight of each group.
+     3. If the weight below the pivot reaches the target, keep the pairs below it. If the weight at or below the pivot reaches the target, return the pivot. Otherwise, subtract that weight from the target, and keep the pairs above the pivot.
+     4. Swap the two buffers.
+ 3. Return the value that is left.
 
 # Arguments
 
-  - `a`: The values.
-  - `w`: The integer weight of each value, of the same length as `a`.
+  - `a`: The pairs of a value and a positive integer weight. The method overwrites it.
+  - `b`: A buffer of the same element type and of length `m` or more. The method overwrites it.
+  - `m`: The number of pairs, `1 <= m <= length(a)`.
 
 # Returns
 
-  - `m::Number`: The weighted high median, an entry of `a`.
+  - `t::Number`: The weighted high median, one of the values of `a`.
 
 # Related
 
   - [`kth_pairwise_difference`](@ref)
 """
-function weighted_high_median(a::AbstractVector, w::AbstractVector{<:Integer})
-    o = sortperm(a)
-    c = cumsum(w[o])
-    return a[o[findfirst(x -> 2 * x >= last(c), c)]]
+function weighted_high_median!(a::AbstractVector, b::AbstractVector, m::Integer)
+    l, r = 1, m
+    total = sum(last, view(a, 1:m))
+    target = cld(total, 2)
+    while l < r
+        x, y, z = first(a[l]), first(a[(l + r) >>> 1]), first(a[r])
+        t = max(min(x, y), min(max(x, y), z))
+        lt, gt = l, r
+        below = above = 0
+        for i in l:r
+            b[lt] = b[gt] = a[i]
+            v, w = a[i]
+            lt += v < t
+            gt -= v > t
+            below += (v < t) * w
+            above += (v > t) * w
+        end
+        if target <= below
+            r, total = lt - 1, below
+        elseif target <= total - above
+            return t
+        else
+            target -= total - above
+            l, total = gt + 1, above
+        end
+        a, b = b, a
+    end
+    return first(a[l])
 end
 """
     count_pairs_below!(P::Vector{Int}, y::VecNum, t::Number, cmp) -> Int
@@ -67,18 +99,18 @@ end
 
 Returns the `k`-th smallest of the differences `y[j] - y[i]`, `i < j`, of a sorted vector.
 
-The method selects the order statistic in ``O(n \\log n)`` operations and does not form the ``n(n-1)/2`` differences. The differences of each row `i` are sorted in `j`. The method keeps, for each row, the range of the positions `j` that can hold the answer. Each step takes the median candidate of each row, and gives it the weight of the size of its range. The weighted high median of these candidates is the trial value, see [`weighted_high_median`](@ref). The method then counts the differences below the trial value, and the differences at or below it, with [`count_pairs_below!`](@ref). The answer is the trial value, or it is in the ranges below or above it. Each step removes at least one quarter of the candidates. When at most `n` candidates remain, the method selects the answer among them.
+The method selects the order statistic in ``O(n \\log n)`` operations and does not form the ``n(n-1)/2`` differences. The differences of each row `i` are sorted in `j`. The method keeps, for each row, the number of differences that are below its range of candidates, and the number that are at or before the end of that range. These are the counts of earlier steps, so a step that narrows the ranges swaps two vectors. Each step takes the median candidate of each row, and gives it the weight of the size of its range. The weighted high median of these candidates is the trial value, see [`weighted_high_median!`](@ref). The method then counts the differences below the trial value, and the differences at or below it, with [`count_pairs_below!`](@ref). The answer is the trial value, or it is in the ranges below or above it. Each step removes at least one quarter of the candidates. When at most `n` candidates remain, the method selects the answer among them.
 
 [`qn_scale`](@ref) uses it for the order statistic of the scale estimator ``Q_n``.
 
 # Algorithm
 
- 1. Set the range of row `i` to the positions `i + 1` to `n`.
+ 1. Set the candidates of row `i` to all its `n - i` differences.
  2. While more than `n` candidates remain, do these steps:
-     1. Find the trial value from the median candidates of the rows that are not empty.
-     2. Count `sp`, the differences below the trial value, and `sq`, the differences at or below it.
-     3. If `k <= sp`, remove from each row the candidates at or above the trial value. If `k > sq`, remove from each row the candidates at or below the trial value. Otherwise, return the trial value.
- 3. Count the differences to the left of the ranges. They are below every candidate. Select the remaining rank among the candidates with `partialsort!`.
+     1. Find the trial value from the median candidates of the rows that are not empty, with [`pairwise_trial_value!`](@ref).
+     2. Count the differences below the trial value. If `k` is at most this count, the count of each row is the new end of its range. Go to the next step of the loop.
+     3. Count the differences at or below the trial value. If `k` is at most this count, return the trial value. Otherwise, the count of each row is the new number below its range.
+ 3. Collect the candidates. Subtract the number of differences below the ranges from `k`, and select the remaining rank with `partialsort!`.
 
 # Arguments
 
@@ -92,33 +124,41 @@ The method selects the order statistic in ``O(n \\log n)`` operations and does n
 # Related
 
   - [`qn_scale`](@ref)
-  - [`weighted_high_median`](@ref)
+  - [`pairwise_trial_value!`](@ref)
+  - [`weighted_high_median!`](@ref)
   - [`count_pairs_below!`](@ref)
 """
 function kth_pairwise_difference(y::VecNum, k::Integer)
     n = length(y)
-    lo = collect(2:(n + 1))
-    hi = fill(n, n)
+    L = zeros(Int, n)
+    R = collect((n - 1):-1:0)
     P = Vector{Int}(undef, n)
-    while sum(i -> max(hi[i] - lo[i] + 1, 0), 1:n) > n
-        trial = pairwise_trial_value(y, lo, hi)
-        sp = count_pairs_below!(P, y, trial, <)
-        if k <= sp
-            hi .= min.(hi, (1:n) .+ P)
+    a = Vector{Tuple{eltype(y), Int}}(undef, n)
+    b = similar(a)
+    sl, sr = 0, div(n * (n - 1), 2)
+    while sr - sl > n
+        trial = pairwise_trial_value!(a, b, y, L, R)
+        s = count_pairs_below!(P, y, trial, <)
+        if k <= s
+            R, P, sr = P, R, s
             continue
         end
-        sq = count_pairs_below!(P, y, trial, <=)
-        if k <= sq
+        s = count_pairs_below!(P, y, trial, <=)
+        if k <= s
             return trial
         end
-        lo .= max.(lo, (1:n) .+ P .+ 1)
+        L, P, sl = P, L, s
     end
-    below = sum(i -> lo[i] - i - 1, 1:n)
-    cand = [y[j] - y[i] for i in 1:n for j in lo[i]:hi[i]]
-    return partialsort!(cand, k - below)
+    cand = similar(y, sr - sl)
+    m = 0
+    for i in 1:n, c in (L[i] + 1):R[i]
+        m += 1
+        cand[m] = y[i + c] - y[i]
+    end
+    return partialsort!(cand, k - sl)
 end
 """
-    pairwise_trial_value(y::VecNum, lo::Vector{Int}, hi::Vector{Int}) -> Number
+    pairwise_trial_value!(a::AbstractVector, b::AbstractVector, y::VecNum, L::Vector{Int}, R::Vector{Int}) -> Number
 
 Returns the trial value of one step of [`kth_pairwise_difference`](@ref).
 
@@ -126,9 +166,11 @@ The trial value is the weighted high median of the median candidate of each row 
 
 # Arguments
 
+  - `a`: A buffer of pairs of a value and a weight, of the length of `y`. The method overwrites it.
+  - `b`: A second buffer of the same element type and length. The method overwrites it.
   - `y`: The data, sorted in increasing order.
-  - `lo`: The first candidate position of each row.
-  - `hi`: The last candidate position of each row.
+  - `L`: The number of differences of each row that are below its candidates.
+  - `R`: The number of differences of each row at or before its last candidate.
 
 # Returns
 
@@ -137,13 +179,18 @@ The trial value is the weighted high median of the median candidate of each row 
 # Related
 
   - [`kth_pairwise_difference`](@ref)
-  - [`weighted_high_median`](@ref)
+  - [`weighted_high_median!`](@ref)
 """
-function pairwise_trial_value(y::VecNum, lo::Vector{Int}, hi::Vector{Int})
-    rows = findall(i -> lo[i] <= hi[i], eachindex(lo))
-    a = [y[(lo[i] + hi[i]) >>> 1] - y[i] for i in rows]
-    w = [hi[i] - lo[i] + 1 for i in rows]
-    return weighted_high_median(a, w)
+function pairwise_trial_value!(a::AbstractVector, b::AbstractVector, y::VecNum,
+                               L::Vector{Int}, R::Vector{Int})
+    m = 0
+    for i in eachindex(y, L, R)
+        if L[i] < R[i]
+            m += 1
+            a[m] = (y[i + (L[i] + R[i] + 1) >>> 1] - y[i], R[i] - L[i])
+        end
+    end
+    return weighted_high_median!(a, b, m)
 end
 """
     qn_finite_factor(n::Integer) -> Number

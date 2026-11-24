@@ -118,7 +118,27 @@ end
         @test iszero(POR.qn_scale(z))
         @test POR.robust_column_scale(z) > 0
         @test POR.robust_column_scale(zeros(10)) == 1
-        @test POR.weighted_high_median([3.0, 1.0, 2.0], [1, 1, 5]) == 2.0
+        # The weighted high median against a sort, with tied values and a longer buffer.
+        function sorted_high_median(a)
+            s = sort(a; by = first)
+            c = cumsum(last.(s))
+            return first(s[findfirst(x -> 2 * x >= last(c), c)])
+        end
+        for _ in 1:300
+            m = rand(rng, 1:40)
+            v = rand(rng, Bool) ? randn(rng, m) : Float64.(rand(rng, 0:5, m))
+            a = collect(zip(v, rand(rng, 1:9, m)))
+            @test POR.weighted_high_median!([a; (-9.0, 99)], similar(a), m) ==
+                  sorted_high_median(a)
+        end
+        # A trial allocates nothing, because it reads and writes the buffers alone.
+        y = sort(randn(rng, 200))
+        a = Vector{Tuple{Float64, Int}}(undef, 200)
+        b = similar(a)
+        L, R = zeros(Int, 200), collect(199:-1:0)
+        trial_bytes(a, b, y, L, R) = @allocated POR.pairwise_trial_value!(a, b, y, L, R)
+        trial_bytes(a, b, y, L, R)
+        @test iszero(trial_bytes(a, b, y, L, R))
     end
     @testset "Factors" begin
         # Croux-Haesbroeck at p = 2, a = 1/2 has a closed form: q = 2 log 2 and

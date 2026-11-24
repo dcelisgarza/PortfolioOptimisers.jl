@@ -5,7 +5,7 @@
 julia = "1.13.4"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "666cfa9753"
+commit = "d3a7fe37e9"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 6, cog_sum = 4, arg_sum = 16, macros = [] }
@@ -195,7 +195,7 @@ commit = "666cfa9753"
 "src/05_Moments/38_ElasticNet.jl" = { cyc = 8, cog = 12, arg = 10, cyc_sum = 59, cog_sum = 47, arg_sum = 65, macros = [] }
 "src/05_Moments/39_WeightedAvailableCase.jl" = { cyc = 3, cog = 4, arg = 9, cyc_sum = 33, cog_sum = 23, arg_sum = 94, macros = [] }
 "src/05_Moments/40_RobustCovariance/01_Base_RobustCovariance.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 8, cog_sum = 4, arg_sum = 23, macros = [] }
-"src/05_Moments/40_RobustCovariance/02_QnScale.jl" = { cyc = 4, cog = 5, arg = 4, cyc_sum = 19, cog_sum = 17, arg_sum = 14, macros = [] }
+"src/05_Moments/40_RobustCovariance/02_QnScale.jl" = { cyc = 5, cog = 7, arg = 5, cyc_sum = 26, cog_sum = 28, arg_sum = 17, macros = [] }
 "src/05_Moments/40_RobustCovariance/03_RobustShrinkage.jl" = { cyc = 2, cog = 1, arg = 4, cyc_sum = 15, cog_sum = 4, arg_sum = 25, macros = [] }
 "src/05_Moments/40_RobustCovariance/04_MCDSearch.jl" = { cyc = 4, cog = 5, arg = 6, cyc_sum = 40, cog_sum = 30, arg_sum = 77, macros = [] }
 "src/05_Moments/40_RobustCovariance/05_DetMCDStarts.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 8, cog_sum = 4, arg_sum = 10, macros = [] }
