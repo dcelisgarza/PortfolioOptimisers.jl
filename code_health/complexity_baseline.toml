@@ -5,7 +5,7 @@
 julia = "1.13.4"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "d3a7fe37e9"
+commit = "74b5c19437"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 6, cog_sum = 4, arg_sum = 16, macros = [] }
@@ -298,7 +298,7 @@ commit = "d3a7fe37e9"
 "src/14_NetReturnsDrawdowns.jl" = { cyc = 6, cog = 8, arg = 5, cyc_sum = 127, cog_sum = 80, arg_sum = 210, macros = [] }
 "src/15_Tracking.jl" = { cyc = 2, cog = 3, arg = 3, cyc_sum = 38, cog_sum = 22, arg_sum = 44, macros = ["@propagatable"] }
 "src/16_RiskMeasures/01_Base_RiskMeasures.jl" = { cyc = 6, cog = 12, arg = 6, cyc_sum = 136, cog_sum = 76, arg_sum = 179, macros = [] }
-"src/16_RiskMeasures/02_Variance.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 57, cog_sum = 21, arg_sum = 103, macros = ["@propagatable"] }
+"src/16_RiskMeasures/02_Variance.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 53, cog_sum = 22, arg_sum = 98, macros = ["@propagatable"] }
 "src/16_RiskMeasures/03_MomentRiskMeasures.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 59, cog_sum = 32, arg_sum = 95, macros = ["@propagatable"] }
 "src/16_RiskMeasures/04_Kurtosis.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 15, cog_sum = 4, arg_sum = 10, macros = [] }
 "src/16_RiskMeasures/05_NegativeSkewness.jl" = { cyc = 4, cog = 6, arg = 7, cyc_sum = 17, cog_sum = 9, arg_sum = 12, macros = [] }

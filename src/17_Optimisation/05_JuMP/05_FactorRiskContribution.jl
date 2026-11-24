@@ -507,7 +507,7 @@ Build the model of a [`FactorRiskContribution`](@ref), solve it, and return its 
  1. Replace each schedule of `frc` with its static default through [`reset_time_dependent_estimator`](@ref).
  2. Resolve `frc.opt` against `rd` with [`resolve_jump_optimiser`](@ref), with the blocks of `blocks`, giving `attrs`.
  3. Take the view of `frc` and of `rd` at the investable assets with [`investable_view`](@ref). Both are unchanged when every asset is investable.
- 4. Bind the benchmark of each [`DataBenchmarkTracking`](@ref) measure to `rd` with [`bind_data_benchmark`](@ref).
+ 4. Bind the benchmark of each [`DataBenchmarkTracking`](@ref) measure to `rd` with [`bind_data_benchmark`](@ref). Fit the uncertainty set of each [`UncertaintySetVariance`](@ref) on `rd` and the reduced prior with [`ucs_risk_measure`](@ref).
  5. Build a new model. Register the scales with [`set_model_scales!`](@ref), the number of observations with [`set_model_observations!`](@ref), the homogenisation variables of a ratio with [`set_maximum_ratio_factor_variables!`](@ref) and the corner of a lifted variance with [`set_sdp_lift_corner!`](@ref).
  6. Create the factor weights and register `w` with [`set_factor_risk_contribution_constraints!`](@ref), giving `b1`, `b2` and `rr`. `b` is `b1`, or `[b1 b2]` when `flag = true`, the basis of the whole decision vector.
  7. Add the weight bounds, the budgets, the constraints, the return terms and the risk measures of every block with [`assemble_jump_model!`](@ref), which reads `b`. The constructor refuses an asset phylogeny of the semidefinite kind, so the assembly adds the rows of an integer one alone.
@@ -546,6 +546,7 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     # `rd`. Both are unchanged when every asset is investable.
     frc, rd = investable_view(frc, rd, attrs.pr, attrs.imsk)
     frc = bind_data_benchmark(frc, rd)
+    frc = ucs_risk_measure(frc, rd, attrs.pr)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, frc.opt.sc, frc.opt.so)

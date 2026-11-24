@@ -178,9 +178,9 @@ end
     allocation_set_tracking(tr::Nothing, cbr::ResolvedConstraintBlock)
     allocation_set_tracking(tr, cbr::ResolvedConstraintBlock)
 
-Binds the tracking errors of a programme set to the rows of its block.
+Binds the tracking errors of a programme set to the rows of its block, and fits their uncertainty sets on them.
 
-The set comes after `factory(set, w)`, so a benchmark that is not fixed already holds the Price-Adjusted Allocation of the step. The function cuts each benchmark series to the row count of the prior of the block with [`prefix_tracking_benchmark`](@ref), and binds each [`DataBenchmarkTracking`](@ref) to the benchmark of the rows `cbr.rd` with [`bind_data_benchmark`](@ref). The constructor of the set refuses a data benchmark under a prior of the Excess Frame, so a data benchmark binds to the raw rows that the set's prior reads.
+The set comes after `factory(set, w)`, so a benchmark that is not fixed already holds the Price-Adjusted Allocation of the step. The function cuts each benchmark series to the row count of the prior of the block with [`prefix_tracking_benchmark`](@ref), and binds each [`DataBenchmarkTracking`](@ref) to the benchmark of the rows `cbr.rd` with [`bind_data_benchmark`](@ref). The constructor of the set refuses a data benchmark under a prior of the Excess Frame, so a data benchmark binds to the raw rows that the set's prior reads. The uncertainty set of an [`UncertaintySetVariance`](@ref) that a [`RiskTrackingError`](@ref) tracks fits on the rows and the prior of the block with [`ucs_risk_measure`](@ref), so the benchmark risk and the risk expression read one fitted set.
 
 # Arguments
 
@@ -189,18 +189,20 @@ The set comes after `factory(set, w)`, so a benchmark that is not fixed already 
 
 # Returns
 
-  - `tr'`: The bound tracking errors, or `nothing`.
+  - `tr'`: The bound tracking errors with their sets fitted, or `nothing`.
 
 # Related
 
   - [`add_allocation_set_block!`](@ref)
   - [`prefix_tracking_benchmark`](@ref)
+  - [`ucs_risk_measure`](@ref)
 """
 function allocation_set_tracking(::Nothing, ::ResolvedConstraintBlock)::Nothing
     return nothing
 end
 function allocation_set_tracking(tr, cbr::ResolvedConstraintBlock)
-    return bind_data_benchmark(prefix_tracking_benchmark(tr, size(cbr.pr.X, 1)), cbr.rd)
+    tr = bind_data_benchmark(prefix_tracking_benchmark(tr, size(cbr.pr.X, 1)), cbr.rd)
+    return ucs_risk_measure(tr, cbr.rd, cbr.pr)
 end
 """
     prefix_tracking_benchmark(tr, T::Integer)

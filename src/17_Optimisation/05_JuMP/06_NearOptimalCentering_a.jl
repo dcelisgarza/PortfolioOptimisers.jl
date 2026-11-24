@@ -693,7 +693,7 @@ Solve the anchors of [`NearOptimalCentering`](@ref), and compute the bounds of i
 
 # Algorithm
 
- 1. Process the optimiser into its attributes with [`resolve_jump_optimiser`](@ref), with the blocks of `blocks`, reduce `noc` and `rd` to the investable universe, and bind a data benchmark to the rows of the view. Give the blocks after the first of the bundle to every anchor sub-problem below, viewed at the investable universe, with [`constraint_block_steps`](@ref).
+ 1. Process the optimiser into its attributes with [`resolve_jump_optimiser`](@ref), with the blocks of `blocks`, reduce `noc` and `rd` to the investable universe, bind a data benchmark to the rows of the view, and fit the uncertainty sets of the risk measures on them with [`ucs_risk_measure`](@ref). Give the blocks after the first of the bundle to every anchor sub-problem below, viewed at the investable universe, with [`constraint_block_steps`](@ref).
  2. If an anchor of minimum risk or of maximum return is missing, if the variant is [`UnconstrainedNearOptimalCentering`](@ref), or if a return term holds a [`Frontier`](@ref), make the copies of the risk measures and of the optimiser without bounds. The copies keep their uncertainty sets, so every anchor and the centring model read the same worst case.
  3. Solve each missing anchor as a [`MeanRisk`](@ref) problem. The anchors of minimum risk and of maximum return solve with the copies without bounds, and the anchor of `obj` solves with `r` and `opt` as they are.
  4. For the unconstrained variant, replace `r` and `opt` with the copies without bounds, which the centring model reads.
@@ -730,7 +730,6 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     w_opt_retcode = OptimisationSuccess()
     w_max_retcode = OptimisationSuccess()
     unconstrained = isa(noc.alg, UnconstrainedNearOptimalCentering)
-    r = ucs_risk_measure(noc.r, rd)
     attrs = resolve_jump_optimiser(noc.opt, rd; blocks = blocks, kwargs...)
     # An optimiser holds one block, so the other blocks reach each corner solve as the
     # keyword of its entry, reduced to the universe of the bundle.
@@ -739,10 +738,12 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     # `rd`, so the head is reduced before any of them, and before the optimiser is
     # repackaged from the bundle. `_optimise` takes the same view of its own locals.
     noc, rd = investable_view(noc, rd, attrs.pr, attrs.imsk)
-    # A data benchmark binds to the rows of the view, before the corner solves and the
-    # risks of the corners read it.
+    # A data benchmark binds to the rows of the view, and the set of an uncertainty-set
+    # variance fits on them, before the corner solves and the risks of the corners read
+    # them. So the anchors, the corner solves and the centring model read one fitted set.
     noc = bind_data_benchmark(noc, rd)
-    r = bind_data_benchmark(r, rd)
+    noc = ucs_risk_measure(noc, rd, attrs.pr)
+    r = noc.r
     opt = jump_optimiser_from_attributes(noc.opt, attrs)
     # The per-term corner solves need the same unbounded pair the max-return corner uses, so
     # the pair is built whenever a return term declares a frontier bound, even when both

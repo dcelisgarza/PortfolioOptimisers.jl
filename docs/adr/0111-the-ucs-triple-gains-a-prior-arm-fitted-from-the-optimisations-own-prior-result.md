@@ -226,3 +226,21 @@ radii pass through. The projection of an l1 ball onto the coordinates of the mas
 the same radius on those coordinates, so the view at the mask recovers the reduced fit
 (ADR 0189). `test/test_10_uncertainty_set.jl` checks the five l1 configurations on the prior route
 and on the returns route.
+
+## Amendment (2026-11-24)
+
+The section on the near-optimal-centering pre-fit no longer holds (#2318, #2320). The pre-fit ran
+before the prior and before the reduction to the Investable Mask, so it passed a prior-reading
+estimator through, and it fitted every other estimator on the full universe. The builder then fitted
+the set for its own rows alone. The levels of a risk `Frontier`, the benchmark risk of a dependent
+tracker, the anchors of a prior-reading set and the risk measures of the Result read the nominal
+variance, beside rows that bound the worst case.
+
+Every JuMP head now fits the set once, after the view at the Investable Mask, with
+`ucs_risk_measure(est, rd, pr)`. The verb calls the three-argument `sigma_ucs` on the reduced
+returns data and the reduced prior, so it fits a prior-reading estimator too. It reaches the risk
+measures of the head, the measure that a tracker holds and the tracking errors of the optimiser, and
+an Allocation Set calls it for its ceilings and its tracking errors on the prior of its block. The
+corner solves of a centring read the reduced prior of the head as their own prior, so one fit serves
+them all, and the consequence "fits that set once per corner" no longer holds. The builder keeps its
+fit for a caller that gives it an estimator directly.

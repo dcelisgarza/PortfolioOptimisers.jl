@@ -1235,39 +1235,62 @@ function factory(r::UncertaintySetVariance, ucs::UcSE_UcS,
     return rebuild_struct(r, (; ucs = ucs, sigma = sigma))
 end
 """
-    ucs_risk_measure(r, rd::ReturnsResult)
+    ucs_risk_measure(r, rd, pr)
+    ucs_risk_measure(r::UncertaintySetVariance, rd::ReturnsResult, pr::AbstractPriorResult)
+    ucs_risk_measure(r::Union{RiskTrackingError, RiskTrackingRiskMeasure}, rd, pr)
+    ucs_risk_measure(rs::AbstractVector, rd, pr)
+    ucs_risk_measure(opt::JuMPOptimiser, rd, pr)
+    ucs_risk_measure(est::JuMPOptimisationEstimator, rd, pr)
+    ucs_risk_measure(est::RiskJuMPOptimisationEstimator, rd, pr)
 
-Fit the uncertainty set of an [`UncertaintySetVariance`](@ref) on the returns data `rd`, so that the set becomes an [`AbstractUncertaintySetResult`](@ref).
+Fit the uncertainty set of each [`UncertaintySetVariance`](@ref) in the first argument on the returns data `rd` and the prior result `pr`, so that each set becomes an [`AbstractUncertaintySetResult`](@ref).
 
-[`near_optimal_centering_setup`](@ref) calls it once, so that the risk targets of the barrier, the sub-problem solves and the model of [`NearOptimalCentering`](@ref) read one fitted set. The functor of a measure with a fitted set gives [`ucs_variance`](@ref), so the targets agree with the risk expression of the model.
+Every `JuMP` head calls it once, after [`bind_data_benchmark`](@ref), on the reduced prior and the reduced returns data that the builder of the model reads. So the rows of the model, the levels of a risk [`Frontier`](@ref), the benchmark risk of [`DependentVariableTracking`](@ref), the anchors of [`NearOptimalCentering`](@ref) with its sub-problems, and the risk measures of the Result read one fitted set. The functor of a measure with a fitted set gives [`ucs_variance`](@ref), so each of these values is the worst case that the model bounds. [`set_allocation_risk_return_bounds!`](@ref) and [`allocation_set_tracking`](@ref) call it for the ceilings and the tracking errors of a [`ProgrammeAllocationSet`](@ref), on the prior and the rows of the block of the set. It is the risk twin of [`ucs_returns_estimator`](@ref).
 
-Three inputs return unchanged. A measure of another type returns unchanged. A set that is already a result passes through [`sigma_ucs`](@ref) unchanged. An estimator that reads a prior result, one for which [`reads_prior_result`](@ref) is `true`, returns unchanged too. Such an estimator is an [`AbstractPriorUncertaintySetEstimator`](@ref), or an estimator of returns data with `pe = nothing`. It is fitted on the prior of the optimisation, and no prior exists when this method runs, so each solve fits it later from its own prior. A vector of measures is fitted element by element.
+[`sigma_ucs`](@ref) of three arguments gives the estimator the argument that it reads. An estimator with a `pe` reads the returns of `rd` under the source that its own `pe` states. So a set whose prior states `x_src = ExcessSource()` fits on `X - B`, whatever the source of the prior of the optimiser is. An estimator that reads a prior result, one for which [`reads_prior_result`](@ref) is `true`, reads `pr`.
 
-The set reads the returns of `rd` under the source that its own `pe` states, see [`sigma_ucs`](@ref). A set whose prior states `x_src = ExcessSource()` fits on `X - B`, whatever the source of the prior of the optimiser is.
+  - A measure of another type, a set that is already fitted and `nothing` return unchanged. So does each ceiling of an Allocation Set that reads no rows, whose `rd` and `pr` are `nothing`.
+  - A [`RiskTrackingError`](@ref) and a [`RiskTrackingRiskMeasure`](@ref) fit the measure `r` that they track.
+  - A vector fits each of its elements.
+  - A [`JuMPOptimiser`](@ref) fits its tracking errors `tr`. A head fits its `opt`, and a [`RiskJuMPOptimisationEstimator`](@ref) also fits its `r`.
+
+A container rebuilds through its keyword constructor only when a part of it changes, so a container with no estimator of a set comes back as itself.
+
+# Algorithm
+
+ 1. A measure whose `ucs` holds an estimator fits it with [`sigma_ucs`](@ref), and rebuilds with the fitted set through [`rebuild_struct`](@ref).
+ 2. A container fits each part that can hold such a measure.
+ 3. Return the container itself when every part is the part that it replaces, by `===`. Otherwise rebuild the container with the new parts.
+
+# Arguments
+
+  - `r`, `rs`, `opt`, `est`: The measure, the tracker, the vector, the optimiser or the head.
+  - `rd`: The returns data that the model is built on, or `nothing` for an Allocation Set that reads no rows.
+  - `pr`: The prior result that the model is built on, or `nothing` for an Allocation Set that reads no rows.
+
+# Returns
+
+  - The first argument with each estimator of a set replaced by its fitted set.
 
 # Related
 
   - [`UncertaintySetVariance`](@ref)
   - [`sigma_ucs`](@ref)
   - [`reads_prior_result`](@ref)
-  - [`near_optimal_centering_setup`](@ref)
+  - [`ucs_returns_estimator`](@ref)
+  - [`bind_data_benchmark`](@ref)
 """
-function ucs_risk_measure(r::UncertaintySetVariance, rd::ReturnsResult)
-    # The pre-fit runs before any prior exists. An estimator that is calibrated on the
-    # optimisation's own prior result has nothing to fit here, so it passes through unchanged
-    # and each corner solve fits it inside its own builder, from the prior that solve was
-    # handed. The predicate reads the type, so the branch folds.
-    return if reads_prior_result(r.ucs)
-        r
-    else
-        rebuild_struct(r, (; ucs = sigma_ucs(r.ucs, rd)))
-    end
-end
-function ucs_risk_measure(r::Any, ::ReturnsResult)
+function ucs_risk_measure(r::Any, ::Any, ::Any)
     return r
 end
-function ucs_risk_measure(rs::VecBaseRM, rd::ReturnsResult)
-    return ucs_risk_measure.(rs, Ref(rd))
+function ucs_risk_measure(r::UncertaintySetVariance{<:Any,
+                                                    <:AbstractUncertaintySetEstimator},
+                          rd::ReturnsResult, pr::AbstractPriorResult)
+    return rebuild_struct(r, (; ucs = sigma_ucs(r.ucs, rd, pr)))
+end
+function ucs_risk_measure(rs::AbstractVector, rd, pr)
+    fitted = [ucs_risk_measure(r, rd, pr) for r in rs]
+    return all(splat(===), zip(fitted, rs)) ? rs : fitted
 end
 """
     reader_frames(r::UncertaintySetVariance, path::AbstractString, refit::Bool)

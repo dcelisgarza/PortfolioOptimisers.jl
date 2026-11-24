@@ -1107,3 +1107,22 @@ An optimiser with a frontier sweep and a fallback `fb` gave the result of the fa
 | A walk-forward of an optimiser that holds a frontier sweep and the fallback `PreviousWeights()` | Ran the fallback on every fold | `ArgumentError` at the fold after a solved sweep, because a sweep gives no one portfolio as the previous weights. Optimise one portfolio per fold, or use a fallback that reads no previous weights. |
 | `sort_by_measure` of a population whose paths hold a frontier sweep | An empty vector | `ArgumentError`. A path that holds a sweep has one score for each point and no rank. |
 | `quantile_by_measure` and `NearestQuantilePrediction` of such a population | `ArgumentError` that named an empty data vector | `ArgumentError` that names the sweep |
+
+### [Results that move](@id migration-0-34-6-numbers)
+
+Each entry is about an `UncertaintySetVariance` with an estimator in `ucs`, such as the default `NormalUncertaintySet()`. A measure with a fitted set gives the numbers of v0.34.5. A `JuMP` optimiser now fits the set once, and every part of the optimisation reads it. In v0.34.5 only the rows of the model read the set, and the other parts read the nominal variance.
+
+- **A `Frontier` in `settings.ub`** spans the worst-case variance of the two corner portfolios. v0.34.5 took the levels from the nominal variance, so the first point of the sweep was infeasible.
+- **`RiskTrackingRiskMeasure` and `RiskTrackingError` with `DependentVariableTracking`** compare the worst-case variance of the portfolio with the worst-case variance of the benchmark. v0.34.5 compared it with the nominal variance of the benchmark.
+- **The field `r` of the result of a `JuMP` optimiser** holds the fitted set. So `expected_risk(res.r, res.w, res.pr)` gives the worst case that the optimiser read, where v0.34.5 gave the nominal variance.
+- **`NearOptimalCentering` with an estimator that reads the prior result**, such as `NormalUncertaintySet(; pe = nothing)` or `OrthogonalUncertaintySet()`, computes the risks of its anchors on the worst case. v0.34.5 computed them on the nominal variance, and fitted the set again for each anchor.
+
+### [Calls that now succeed](@id migration-0-34-6-success)
+
+- **`NearOptimalCentering` with a risk measure that holds per-asset data, or an `UncertaintySetVariance` with an estimator, and an asset that is not investable.** v0.34.5 raised a `DimensionMismatch`, because it did not cut the risk measure to the investable assets.
+- **A `ProgrammeAllocationSet` whose ceiling `r` or tracking error `tr` holds an `UncertaintySetVariance` with an estimator that has its own `pe`.** v0.34.5 raised an `IsNothingError`, because the fit got no rows.
+- **A `RiskTrackingError` whose measure holds an estimator in a slot**, such as `Variance(; sigma = PortfolioOptimisersCovariance())`, raised a `MethodError` in v0.34.5.
+
+### [If you extend the library](@id migration-0-34-6-extending)
+
+- **`PortfolioOptimisers.ucs_risk_measure(r, rd)`**, an internal function, takes the prior result too: `ucs_risk_measure(r, rd, pr)`.

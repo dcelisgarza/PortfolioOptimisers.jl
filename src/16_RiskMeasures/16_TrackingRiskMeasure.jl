@@ -750,6 +750,10 @@ function bind_data_benchmark(r::Union{RiskTrackingError, RiskTrackingRiskMeasure
     inner = bind_data_benchmark(r.r, rd)
     return inner === r.r ? r : rebuild_struct(r, (; r = inner))
 end
+function ucs_risk_measure(r::Union{RiskTrackingError, RiskTrackingRiskMeasure}, rd, pr)
+    inner = ucs_risk_measure(r.r, rd, pr)
+    return inner === r.r ? r : rebuild_struct(r, (; r = inner))
+end
 """
     reader_frames(r::Union{RiskTrackingError, RiskTrackingRiskMeasure},
                   path::AbstractString, refit::Bool)

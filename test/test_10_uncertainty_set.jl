@@ -2258,22 +2258,19 @@ end
             @test isnothing(ucs(nothing, rd776, pr776))
         end
 
-        @testset "ucs_risk_measure passes a prior-reading estimator through" begin
+        @testset "ucs_risk_measure fits a prior-reading estimator on the prior" begin
             ue = Ticket776PriorUCS()
             r = UncertaintySetVariance(; ucs = ue)
-            # The pre-fit runs before any prior exists, so the estimator travels unchanged and
-            # each corner solve fits it in its own builder.
-            @test PortfolioOptimisers.ucs_risk_measure(r, rd776) === r
-            @test isa(PortfolioOptimisers.ucs_risk_measure(r, rd776).ucs, Ticket776PriorUCS)
-            # A returns-data estimator is still fitted there, which is the rule this method
-            # narrows rather than replaces.
+            # A head fits after its prior, so the estimator reads that prior (#2318).
+            fitted = PortfolioOptimisers.ucs_risk_measure(r, rd776, pr776).ucs
+            @test isa(fitted, PortfolioOptimisers.AbstractUncertaintySetResult)
+            # A returns-data estimator is fitted on the returns.
             rd = UncertaintySetVariance(; ucs = DeltaUncertaintySet(;))
-            @test isa(PortfolioOptimisers.ucs_risk_measure(rd, rd776).ucs,
+            @test isa(PortfolioOptimisers.ucs_risk_measure(rd, rd776, pr776).ucs,
                       PortfolioOptimisers.AbstractUncertaintySetResult)
-            # A vector of risk measures is still resolved element-wise.
-            rs = PortfolioOptimisers.ucs_risk_measure([r, rd], rd776)
-            @test isa(rs[1].ucs, Ticket776PriorUCS)
-            @test isa(rs[2].ucs, PortfolioOptimisers.AbstractUncertaintySetResult)
+            # A vector of risk measures is resolved element-wise.
+            rs = PortfolioOptimisers.ucs_risk_measure([r, rd], rd776, pr776)
+            @test all(x -> isa(x.ucs, PortfolioOptimisers.AbstractUncertaintySetResult), rs)
         end
 
         @testset "The root is an uncertainty set estimator, and it is unexported" begin
@@ -2436,17 +2433,19 @@ end
             @test_throws MethodError mu_ucs(NormalUncertaintySet(), pr1015)
         end
 
-        @testset "ucs_risk_measure passes a prior-less set through" begin
-            r = UncertaintySetVariance(; ucs = NormalUncertaintySet(; pe = nothing))
-            @test PortfolioOptimisers.ucs_risk_measure(r, rd1015) === r
+        @testset "ucs_risk_measure fits a prior-less set on the prior" begin
+            r = UncertaintySetVariance(;
+                                       ucs = NormalUncertaintySet(; pe = nothing, seed = 1))
+            @test PortfolioOptimisers.ucs_risk_measure(r, rd1015, pr1015).ucs.ub ==
+                  sigma_ucs(r.ucs, pr1015).ub
             ro = UncertaintySetVariance(; ucs = NormalUncertaintySet(; seed = 1))
-            @test isa(PortfolioOptimisers.ucs_risk_measure(ro, rd1015).ucs,
+            @test isa(PortfolioOptimisers.ucs_risk_measure(ro, rd1015, pr1015).ucs,
                       PortfolioOptimisers.AbstractUncertaintySetResult)
             # A built set and an empty slot still pass through.
             rb = UncertaintySetVariance(; ucs = sigma_ucs(ro.ucs, X1015))
-            @test PortfolioOptimisers.ucs_risk_measure(rb, rd1015).ucs === rb.ucs
+            @test PortfolioOptimisers.ucs_risk_measure(rb, rd1015, pr1015) === rb
             rn = UncertaintySetVariance(; ucs = nothing)
-            @test isnothing(PortfolioOptimisers.ucs_risk_measure(rn, rd1015).ucs)
+            @test PortfolioOptimisers.ucs_risk_measure(rn, rd1015, pr1015) === rn
         end
 
         @testset "A prior-less set reads a prior of any shape" begin
