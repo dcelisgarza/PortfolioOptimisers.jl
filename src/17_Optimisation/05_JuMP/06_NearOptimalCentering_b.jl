@@ -70,45 +70,50 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                            i -> set_noc_anchor!(p_rk, p_rt, rk_units, rt_units, i))
 end
 """
-    get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
+    get_overall_retcode(w_min_retcode::OptimisationReturnCode, w_opt_retcode::OptimisationReturnCode, w_max_retcode::OptimisationReturnCode, noc_retcode::OptimisationReturnCode)
+    get_overall_retcode(w_min_retcode::OptimisationReturnCode, w_opt_retcode::OptRetCode_VecOptRetCode, w_max_retcode::OptimisationReturnCode, noc_retcode::VecOptRetCode)
 
-Compute the overall optimisation return code from individual sub-problem return codes.
+Combine the return codes of the three anchors and of the centring solve into the return code of a [`NearOptimalCentering`](@ref).
 
-Combines the return codes from the minimum, optimal, and maximum weight sub-problems with the near-optimal centering return code to determine the overall status.
+A frontier sweep solves the centring once for each point, so it has one combined code for each point. The anchor of `obj` can have one code for each point too. The anchors of minimum risk and of maximum return have one code, which stands for every point.
+
+# Algorithm
+
+ 1. For one centring solve, write one line of `msg` for each code that is an [`OptimisationFailure`](@ref), in the order `w_min`, `w_opt`, `w_max`, `noc_opt`.
+ 2. Return an [`OptimisationSuccess`](@ref) when `msg` is empty. Otherwise warn, and return an [`OptimisationFailure`](@ref) whose `res` is `(; msg, w_min, w_opt, w_max, noc_opt)`. Each return code keeps its own diagnostics.
+ 3. For a sweep, do steps 1 and 2 for each point, on the code of the point that [`member_retcode`](@ref) reads.
 
 # Arguments
 
-  - `w_min_retcode`: Return code from the minimum weight sub-problem.
-  - `w_opt_retcode`: Return code from the optimal weight sub-problem.
-  - `w_max_retcode`: Return code from the maximum weight sub-problem.
-  - `noc_retcode`: Return code from the near-optimal centering sub-problem.
+  - `w_min_retcode`: Return code of the sub-problem of minimum risk.
+  - `w_opt_retcode`: Return code of the sub-problem of the objective, or one for each point of a frontier sweep.
+  - `w_max_retcode`: Return code of the sub-problem of maximum return.
+  - `noc_retcode`: Return code of the centring solve, or one for each point of a frontier sweep.
 
 # Returns
 
-  - `OptimisationSuccess()` if every sub-problem succeeded; otherwise an
-    `OptimisationFailure` whose `res` is a named tuple `(; msg, w_min, w_opt, w_max, noc_opt)` carrying the failure summary and the individual sub-problem return codes
-    (including their solver trial diagnostics).
+  - `retcode::OptRetCode_VecOptRetCode`: The combined return code, or one for each point of a frontier sweep.
 
 # Related
 
   - [`NearOptimalCentering`](@ref)
+  - [`member_retcode`](@ref)
 """
-function get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
+function get_overall_retcode(w_min_retcode::OptimisationReturnCode,
+                             w_opt_retcode::OptimisationReturnCode,
+                             w_max_retcode::OptimisationReturnCode,
+                             noc_retcode::OptimisationReturnCode)
     msg = ""
     if isa(w_min_retcode, OptimisationFailure)
         msg *= "w_min failed.\n"
     end
-    if !isa(w_opt_retcode, AbstractVector) && isa(w_opt_retcode, OptimisationFailure) ||
-       isa(w_opt_retcode, AbstractVector) &&
-       any(x -> isa(x, OptimisationFailure), w_opt_retcode)
+    if isa(w_opt_retcode, OptimisationFailure)
         msg *= "w_opt failed.\n"
     end
     if isa(w_max_retcode, OptimisationFailure)
         msg *= "w_max failed.\n"
     end
-    if !isa(noc_retcode, AbstractVector) && isa(noc_retcode, OptimisationFailure) ||
-       isa(noc_retcode, AbstractVector) &&
-       any(x -> isa(x, OptimisationFailure), noc_retcode)
+    if isa(noc_retcode, OptimisationFailure)
         msg *= "noc_opt failed."
     end
     return if isempty(msg)
@@ -121,6 +126,15 @@ function get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_re
                                    w_opt = w_opt_retcode, w_max = w_max_retcode,
                                    noc_opt = noc_retcode))
     end
+end
+function get_overall_retcode(w_min_retcode::OptimisationReturnCode,
+                             w_opt_retcode::OptRetCode_VecOptRetCode,
+                             w_max_retcode::OptimisationReturnCode,
+                             noc_retcode::VecOptRetCode)
+    return OptimisationReturnCode[get_overall_retcode(w_min_retcode,
+                                                      member_retcode(w_opt_retcode, i),
+                                                      w_max_retcode, rc)
+                                  for (i, rc) in pairs(noc_retcode)]
 end
 """
     assemble_near_optimal_centering_model!(alg, model, noc, setup, rd; blocks = ())
@@ -298,7 +312,7 @@ Build the model of a [`NearOptimalCentering`](@ref), solve it, and return its re
  4. Build a new model. Register the scales of `opt` with [`set_model_scales!`](@ref), the number of observations of the prior with [`set_model_observations!`](@ref), the expression `k = 1` with [`set_maximum_ratio_factor_variables!`](@ref), and the weights with [`set_w!`](@ref). The weights start at the optimal anchor when `w_opt` is one weight vector. A vector of anchors, of a sweep, sets no start value.
  5. Add the rows of the variant `noc.alg` with [`assemble_near_optimal_centering_model!`](@ref).
  6. Solve the barrier with [`solve_near_optimal_centering!`](@ref), giving `noc_retcode` and `sol`.
- 7. Combine the return codes of the three anchors and of the barrier with [`get_overall_retcode`](@ref), giving `retcode`.
+ 7. Combine the return codes of the three anchors and of the barrier with [`get_overall_retcode`](@ref), giving `retcode`. A frontier sweep gives one code for each point.
  8. Build the result. It holds `attrs`, `retcode`, `sol`, the model when `save` is `true`, the risk measures resolved against the prior, and the four return codes.
 
 # Arguments
@@ -312,7 +326,7 @@ Build the model of a [`NearOptimalCentering`](@ref), solve it, and return its re
 
 # Returns
 
-  - [`NearOptimalCenteringResult`](@ref): The result, with `fb = nothing`. [`optimise`](@ref) runs the fallback chain when the solve fails.
+  - [`NearOptimalCenteringResult`](@ref): The result, with `fb = nothing`. [`optimise`](@ref) runs the fallback chain when the solve fails, and when each point of a frontier sweep fails.
 
 # Related
 

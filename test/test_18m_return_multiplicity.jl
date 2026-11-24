@@ -575,6 +575,9 @@ end
     @test PO.bound_scale([1 // 4, -1 // 2]) === 1 // 2
     @test PO.bound_scale([2, 3]) === 3
     # A scalar bound is its own only point.
+    # A point with no anchor has no size, so it does not change the scale of the others.
+    @test PO.bound_scale([1e-7, NaN, -3e-7, Inf]) == 3e-7
+    @test PO.bound_scale([NaN, NaN]) === 1.0
     @test PO.bound_scale(-2e-7) == 2e-7
     @test PO.bound_scale(0.0) === 1.0
     @test PO.bound_scale(-1 // 4) === 1 // 4

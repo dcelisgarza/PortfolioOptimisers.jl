@@ -65,13 +65,14 @@ All concrete optimisation results must subtype `OptimisationResult`.
 A subtype declares no method, but [`optimise`](@ref) and [`factory`](@ref) read three of its properties. A subtype holds them as fields, or forwards them from an embedded core, as the JuMP results and the hierarchical results do.
 
   - `w`: The portfolio weights.
-  - `retcode`: An [`OptimisationReturnCode`](@ref). [`optimise`](@ref) runs the fallback chain until it reads an [`OptimisationSuccess`](@ref).
+  - `retcode`: An [`OptimisationReturnCode`](@ref). [`optimise`](@ref) runs the fallback chain until it reads an [`OptimisationSuccess`](@ref). A result with a population of weight vectors can hold one code for each member, and then the chain stops at a result with one success.
   - `fb`: The record of the fallbacks that ran. It must be the last field of the struct, because [`factory`](@ref) rebuilds the result with a new last field.
 
 # Related
 
   - [`NonFiniteAllocationOptimisationResult`](@ref)
   - [`OptimisationReturnCode`](@ref)
+  - [`any_solved`](@ref)
 """
 abstract type OptimisationResult <: AbstractResult end
 """
@@ -204,6 +205,7 @@ A subtype declares no method. It has one field, `res`, which holds the diagnosti
 
   - [`OptimisationSuccess`](@ref)
   - [`OptimisationFailure`](@ref)
+  - [`any_solved`](@ref)
 """
 abstract type OptimisationReturnCode <: AbstractResult end
 """
@@ -229,7 +231,65 @@ A result that holds a population of weight vectors holds one return code for eac
   - [`VecOptRetCode`](@ref)
 """
 const OptRetCode_VecOptRetCode = Union{OptimisationReturnCode, VecOptRetCode}
+"""
+    any_solved(retcode::OptimisationReturnCode)
+    any_solved(retcode::VecOptRetCode)
 
+Says whether an optimisation gave an answer: its return code is an [`OptimisationSuccess`](@ref), or the code of at least one member of its population is.
+
+The fallback chain of [`optimise`](@ref) runs when this predicate is `false`. A frontier sweep with an infeasible end keeps its other points, and the caller reads the code of each point. [`fold_solved`](@ref) is the stricter predicate, which holds when every member solved.
+
+# Arguments
+
+  - `retcode`: The return code, or one return code for each member of the population.
+
+# Returns
+
+  - `flag::Bool`: `true` when one code is an [`OptimisationSuccess`](@ref). An empty vector gives `false`.
+
+# Related
+
+  - [`fold_solved`](@ref)
+  - [`member_retcode`](@ref)
+  - [`optimise`](@ref)
+  - [`read_out_fallback`](@ref)
+"""
+function any_solved(retcode::OptimisationReturnCode)
+    return isa(retcode, OptimisationSuccess)
+end
+function any_solved(retcode::VecOptRetCode)
+    return any(any_solved, retcode)
+end
+"""
+    member_retcode(retcode::OptimisationReturnCode, j::Integer)
+    member_retcode(retcode::VecOptRetCode, j::Integer)
+
+Gives the return code of member `j` of a population.
+
+A population with one return code for each member reads entry `j`. A single code stands for every member, as a single weight vector does in [`member_vector`](@ref).
+
+# Arguments
+
+  - `retcode`: The return code, or one return code for each member of the population.
+  - `j`: The index of the member.
+
+# Returns
+
+  - `retcode::OptimisationReturnCode`: The return code of member `j`.
+
+# Related
+
+  - [`member_vector`](@ref)
+  - [`any_solved`](@ref)
+  - [`subset_resampling_finaliser`](@ref)
+  - [`get_overall_retcode`](@ref)
+"""
+function member_retcode(retcode::OptimisationReturnCode, ::Integer)
+    return retcode
+end
+function member_retcode(retcode::VecOptRetCode, j::Integer)
+    return retcode[j]
+end
 """
     set_retcode(res::NonFiniteAllocationOptimisationResult, retcode::OptRetCode_VecOptRetCode)
 

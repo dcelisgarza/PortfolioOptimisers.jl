@@ -156,6 +156,49 @@ end
                            rtol = 1e-14)
         end
     end
+    @testset "a point of the frontier reads its own codes, and a fallback stands at each" begin
+        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                     check_sol = (; allow_local = true, allow_almost = true),
+                     settings = Dict("verbose" => false))
+        mu = vec(mean(X[:, 1:6]; dims = 1))
+        function swept(lb; kwargs...)
+            ret = ArithmeticReturn(; settings = JuMPReturnsSettings(; lb = lb))
+            mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv, ret = ret), kwargs...)
+            return optimise(SubsetResampling(; opt = mr, subset_size = 4, n_subsets = 5,
+                                             ex = seq, seed = 4), rd6)
+        end
+        idx = swept([-1.0, -1.0]).idx
+        tops = [maximum(mu[idx[:, i]]) for i in axes(idx, 2)]
+        # No subset reaches the second level, so that point fails alone and by name.
+        res = swept([-1.0, 1.0])
+        @test isa(res.retcode[1], OptimisationSuccess)
+        @test res.retcode[2].res.msg == "opti failed.\nweight bounds finalisation failed.\n"
+        @test all(x -> isa(x, OptimisationFailure), res.retcode[2].res.opti)
+        @test all(isfinite, res.w[1]) && all(isnan, res.w[2][unique(idx)])
+        # With a fallback the subset keeps its first point. Its second point still fails.
+        rfb = swept([-1.0, 1.0]; fb = EqualWeighted())
+        @test rfb.w[1] == res.w[1] && !PO.any_solved(rfb.retcode[2])
+        # Levels that a part of the subsets reach. Such a subset answers with a frontier, and
+        # the other subsets answer with one portfolio, which stands at each point.
+        @test !allequal(tops)
+        level = (minimum(tops) + maximum(tops)) / 2
+        mix = swept([level, level - 1e-7]; fb = EqualWeighted())
+        single = [isa(x.w, PO.VecNum) for x in mix.ress]
+        @test single == (tops .< level) && any(single) && !all(single)
+        @test PO.fold_solved(mix.retcode) && length(mix.w) == 2
+        for j in 1:2
+            @test isapprox(mix.w[j],
+                           subset_average(mix, X[:, 1:6],
+                                          (m, S) -> PO.member_vector(mix.ress[m].w, j));
+                           rtol = 1e-14)
+        end
+        # The subsets must agree on the number of points.
+        @test_throws DimensionMismatch PO.subset_resampling_finaliser(6, 5, mix.idx, mix.wb,
+                                                                      IterativeWeightFinaliser(),
+                                                                      mix.ress,
+                                                                      [zeros(4)
+                                                                       for _ in 1:3])
+    end
     @testset "the subset size" begin
         pr5 = prior(EmpiricalPrior(), ReturnsResult(; nx = rd.nx[1:5], X = X[:, 1:5]))
         pr6 = prior(EmpiricalPrior(), rd6)
@@ -291,15 +334,14 @@ end
         @test res.retcode.res.msg == "weight bounds finalisation failed.\n"
         @test all(x -> isa(x, OptimisationSuccess), res.retcode.res.opti)
         fail = OptimisationFailure(; res = "x")
-        @test PO.subset_resampling_retcode(res.ress, OptimisationSuccess()) ==
-              OptimisationSuccess()
+        @test PO.subset_resampling_retcode([x.retcode for x in res.ress],
+                                           OptimisationSuccess()) == OptimisationSuccess()
         bad = PO.set_retcode(res, fail)
-        rc = PO.subset_resampling_retcode([bad, res.ress[2]], fail)
+        rc = PO.subset_resampling_retcode([bad.retcode, res.ress[2].retcode], fail)
         @test rc.res.msg == "opti failed.\nweight bounds finalisation failed.\n"
         @test rc.res.opti[1] === fail && rc.res.wb === fail
         @test_throws MethodError PO.subset_resampling_finaliser(6, 3, res.idx, nothing,
-                                                                sr.wf, res.ress,
-                                                                res.ress[1].w)
+                                                                sr.wf, res.ress, 1)
         rs = PO.set_retcode(res, OptimisationSuccess())
         @test rs.retcode == OptimisationSuccess() && rs.w === res.w && rs.idx === res.idx
         fb = Tuple{PO.OptimisationEstimator, PO.OptimisationResult}[(sr, res)]

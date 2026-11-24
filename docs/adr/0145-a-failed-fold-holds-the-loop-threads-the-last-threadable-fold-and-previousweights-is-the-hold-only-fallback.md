@@ -160,3 +160,21 @@ the weight bounds** was rejected because a hold that is rewritten is no longer a
   leaf; it was pre-existing, filed as
   [#1024](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1024), and fixed there by
   widening the bound to `Option{<:OptE_Opt_FbChain}` (ADR 0011, amendment of 2026-09-11).
+
+## Amendment (2026-11-24): the fallback chain reads a frontier sweep by its points (#2317)
+
+`optimise` tested `isa(res.retcode, OptimisationSuccess)`. The return code of a frontier sweep is a
+vector, so the test was false for every sweep, and an estimator with a fallback discarded a sweep
+whose every point solved. The maintainer ruled that the chain runs only when no point solved.
+
+- **`any_solved(retcode)` decides the chain**, for one code and for a vector of codes. An infeasible
+  end of a frontier is usual, and the caller reads the code of each point. `fold_solved(retcode)`
+  stays the stricter predicate, all of the points, and the loop threads a fold by it.
+- **Every head that sweeps gives one code for each point.** `NearOptimalCentering` gave one code for
+  the sweep. A failed anchor fails its own point, and its `NaN` does not enter the scale of the
+  other points.
+- **A fallback answers a whole sweep with one portfolio.** Where its neighbours hold a sweep, that
+  portfolio stands at every point: a subset of `SubsetResampling`, and a fold of a path. The
+  precedent is `member_vector`.
+- **A failed vector holds no population.** Under a source, a fold whose chain failed on one vector,
+  after a fold that gave a population, keeps its `NaN` weights. The record has the shape of `w`.

@@ -162,7 +162,7 @@ end
 """
     bound_scale(vals::Num_VecNum)
 
-Return the fixed scale of a bound: the largest absolute value of `vals`, or one when every value is zero. A number is its own only value, and a vector holds the points of a sweep.
+Return the fixed scale of a bound: the largest absolute value of the finite entries of `vals`, or one when each of them is zero. An entry that is not finite states no size: it is the bound of a point with no anchor, and it must not change the scale of the other points. A number is its own only value, and a vector holds the points of a sweep.
 
 Each bound row divides its expression by this scale, so that its coefficients are of order one. Clarabel judges a residual against a norm of order one, so a row whose coefficients are of the size of a fourth moment, near `1e-7`, can pass with a residual that is a large share of the bound. The equilibration of the solver scales such a row up only to its cap, `1e4` by default. Under the exponential cones of [`ConstrainedNearOptimalCentering`](@ref), the solve then stops at `ALMOST_SOLVED`, and the row breaks. For that centring on 20 assets of the S&P 500, with Clarabel at its default settings, the undivided ceilings of [`EntropicValueatRisk`](@ref) and [`Kurtosis`](@ref) broke by up to `1.7 %` and `0.9 %`. The divided ceilings held to `5e-7`.
 
@@ -186,7 +186,8 @@ A sweep writes its parameter in units of this scale, so the parameter takes the 
   - [`set_return_bounds!`](@ref)
 """
 function bound_scale(vals::Num_VecNum)
-    s = maximum(abs, vals; init = abs(zero(eltype(vals))))
+    z = abs(zero(eltype(vals)))
+    s = maximum(v -> ifelse(isfinite(v), abs(v), z), vals; init = z)
     return ifelse(iszero(s), one(s), s)
 end
 """
@@ -394,7 +395,7 @@ end
 
 Solve the model once for each sweep point and collect the outcomes.
 
-Every frontier sweep ends in this loop. The head builds the model once and sets its objective once. A sweep point changes only the values of the parameters, so the loop builds no constraint between two solves. `point!` is the hook of the optimiser. The loop calls it with the flat index of the point, from one, after it writes the bounds of the point. [`NearOptimalCentering`](@ref) uses it to move `noc_rk` and `noc_rt` to the anchor of that point, and [`MeanRisk`](@ref) passes no hook.
+Every frontier sweep ends in this loop. The head builds the model once and sets its objective once. A sweep point changes only the values of the parameters, so the loop builds no constraint between two solves. `point!` is the hook of the optimiser. The loop calls it with the flat index of the point, from one, after it writes the bounds of the point. The hook returns `nothing` when the point has a model to solve, and an [`OptimisationFailure`](@ref) when it has none. [`NearOptimalCentering`](@ref) uses it to move `noc_rk` and `noc_rt` to the anchor of that point, and [`MeanRisk`](@ref) passes no hook.
 
 The method with `n::Integer` sweeps `n` points that write no bound. It is the [`NearOptimalCentering`](@ref) sweep over a vector of anchors with no frontier.
 
@@ -402,8 +403,8 @@ The method with `n::Integer` sweeps `n` points that write no bound. It is the [`
 
  1. For each sweep point, with its flat index `i`:
      1. Write the bounds of the point with [`set_frontier_point!`](@ref).
-     2. Call `point!(i)`.
-     3. Solve the model with [`optimise_JuMP_model!`](@ref), giving `retcode` and `sol`.
+     2. Call `point!(i)`, giving `failure`.
+     3. When `failure` is `nothing`, solve the model with [`optimise_JuMP_model!`](@ref), giving `retcode` and `sol`. Otherwise `retcode` is `failure`, and [`process_model`](@ref) gives a `sol` of `NaN` weights with no solve.
      4. Push `retcode` onto `retcodes` and `sol` onto `sols`.
 
 # Arguments
@@ -412,7 +413,7 @@ The method with `n::Integer` sweeps `n` points that write no bound. It is the [`
   - `opt::JuMPOptimisationEstimator`: The optimiser, for [`optimise_JuMP_model!`](@ref).
   - `::Type{T}`: Element type of the returns matrix.
   - `points`: A [`frontier_sweep_axes`](@ref) iterator, or the point count `n`.
-  - `point!`: Hook with one argument, the flat index of the sweep point. It defaults to a hook that does nothing.
+  - `point!`: Hook with one argument, the flat index of the sweep point. It returns `nothing`, or the [`OptimisationFailure`](@ref) of a point with no model. It defaults to a hook that returns `nothing`.
 
 # Returns
 
@@ -432,8 +433,12 @@ function frontier_sweep!(model::JuMP.Model, opt::JuMPOptimisationEstimator, ::Ty
     sols = sizehint!(JuMPOptimisationSolution[], n)
     for (i, point) in enumerate(points)
         set_frontier_point!(model, point)
-        point!(i)
-        retcode, sol = optimise_JuMP_model!(model, opt, T)
+        failure = point!(i)
+        retcode, sol = if isnothing(failure)
+            optimise_JuMP_model!(model, opt, T)
+        else
+            failure, process_model(model, failure)
+        end
         push!(retcodes, retcode)
         push!(sols, sol)
     end

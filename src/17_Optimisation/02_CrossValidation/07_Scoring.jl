@@ -576,7 +576,7 @@ public AbstractSearchReduction
 
 Says whether every fold of the population member `p` solved.
 
-A [`PredictionResult`](@ref) is one fold, and it solved when its return code is an [`OptimisationSuccess`](@ref). A [`MultiPeriodPredictionResult`](@ref) solved when each of its folds solved.
+A [`PredictionResult`](@ref) is one fold, and it solved when [`fold_solved`](@ref) holds of its return code. A fold that holds a frontier sweep solved when every point did. A [`MultiPeriodPredictionResult`](@ref) solved when each of its folds solved.
 
 # Arguments
 
@@ -588,10 +588,11 @@ A [`PredictionResult`](@ref) is one fold, and it solved when its return code is 
 
 # Related
 
+  - [`fold_solved`](@ref)
   - [`successful_members`](@ref)
 """
 function member_solved(p::PredictionResult)
-    return isa(p.res.retcode, OptimisationSuccess)
+    return fold_solved(p.res.retcode)
 end
 function member_solved(p::MultiPeriodPredictionResult)
     return all(member_solved, p.pred)
@@ -607,6 +608,10 @@ Gives the members of `ppred` whose every fold solved.
 
   - `ppred`: Population prediction result.
 
+# Validation
+
+  - Every member holds one return series, `ArgumentError` otherwise. A member that holds a frontier sweep has one score for each point, so it has no rank.
+
 # Returns
 
   - `pred::VecPredRes_MultiPredRes`: The members for which [`member_solved`](@ref) holds, in population order.
@@ -614,11 +619,14 @@ Gives the members of `ppred` whose every fold solved.
 # Related
 
   - [`member_solved`](@ref)
+  - [`prediction_returns`](@ref)
   - [`sort_by_measure`](@ref)
   - [`quantile_by_measure`](@ref)
   - [`PopulationPredictionResult`](@ref)
 """
 function successful_members(ppred::PopulationPredictionResult)
+    @argcheck(all(p -> isa(prediction_returns(p), VecNum), ppred.pred),
+              ArgumentError("a path that holds a frontier sweep has one score for each point and no rank; score one point, or optimise without a `Frontier`"))
     return filter(member_solved, ppred.pred)
 end
 """

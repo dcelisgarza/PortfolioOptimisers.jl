@@ -187,11 +187,11 @@ resN = optimise(NearOptimalCentering(;
                                                          ret = ret15), r = r))
 
 #=
-NOC solves many `MeanRisk` problems and returns one `retcode` for all of them. We check that it is
-a success.
+NOC solves many `MeanRisk` problems for each point and returns one `retcode` for each point. We
+check that each one is a success.
 =#
 
-isa(resN.retcode, OptimisationSuccess)
+all(x -> isa(x, OptimisationSuccess), resN.retcode)
 
 #=
 We print the largest single weight at each point of both frontiers. A lower number means that the

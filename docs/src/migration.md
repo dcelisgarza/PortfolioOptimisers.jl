@@ -1090,3 +1090,20 @@ A static `TensorPanelField` and a static feature matrix keep `assets × labels` 
 
 - **A variance estimator of your own in `DimensionReductionRegression`** that holds a mean estimator in a field `me` adds a method `PortfolioOptimisers.standardisation_mean(ve::MyVariance, w) = ve.me`. Without it the mean of the factors takes the weights of `retgt`.
 - **A variance estimator of your own that folds, in the `ve` of `CrossSectionalFactorPrior`**, gets the `active_mask` keyword alone in `partial_fit!`. Add a method of `PortfolioOptimisers.fold_mask_keywords` that gives the estimation mask too, if the fold reads it. A fold that reads the active mask adds a method of `PortfolioOptimisers.reads_active_mask` that returns `true`. Without it, a step with a gap raises an `IsNonFiniteError`.
+
+## From v0.34.5 to v0.34.6
+
+### [Return codes that change shape](@id migration-0-34-6-retcodes)
+
+- **`NearOptimalCentering` gives one return code for each point of a frontier sweep**, as every other optimiser that sweeps does. `res.retcode` of a sweep was one code, and it failed when one point failed. Write `all(rc -> rc isa OptimisationSuccess, res.retcode)` in place of `res.retcode isa OptimisationSuccess`. A solve of one portfolio keeps its one code. A point whose anchor is infeasible now fails alone. It made every point of the sweep fail in v0.34.5.
+
+### [Calls that now raise](@id migration-0-34-6-raises)
+
+An optimiser with a frontier sweep and a fallback `fb` gave the result of the fallback, also when every point of the sweep solved. It now gives the sweep when one point or more solved, and the fallback runs only when no point solved. These calls get the sweep where they got the one portfolio of the fallback.
+
+| Call | v0.34.5 | v0.34.6 |
+| --- | --- | --- |
+| `NestedClustered` or `Stacking` with an inner optimiser that holds a frontier sweep and a fallback | Ran on the portfolio of the fallback | `ArgumentError`, as with no fallback. An inner optimiser gives one portfolio. |
+| A walk-forward of an optimiser that holds a frontier sweep and the fallback `PreviousWeights()` | Ran the fallback on every fold | `ArgumentError` at the fold after a solved sweep, because a sweep gives no one portfolio as the previous weights. Optimise one portfolio per fold, or use a fallback that reads no previous weights. |
+| `sort_by_measure` of a population whose paths hold a frontier sweep | An empty vector | `ArgumentError`. A path that holds a sweep has one score for each point and no rank. |
+| `quantile_by_measure` and `NearestQuantilePrediction` of such a population | `ArgumentError` that named an empty data vector | `ArgumentError` that names the sweep |
