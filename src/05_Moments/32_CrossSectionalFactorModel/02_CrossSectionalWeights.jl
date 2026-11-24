@@ -27,7 +27,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## `cs_weights_refine`
 
-  - [`cs_weights_refine(alg::AbstractCrossSectionalWeightsAlgorithm, W0::MatNum, eps::MatNum, ve::AbstractCovarianceEstimator, mask::AbstractMatrix{Bool}; kwargs...)`](@ref): Returns the weights of the second pass. A member whose [`needs_second_pass`](@ref) is `false` needs no method, because the caller never calls it.
+  - [`cs_weights_refine(alg::AbstractCrossSectionalWeightsAlgorithm, W0::MatNum, eps::MatNum, ve::StatsBase.CovarianceEstimator, mask::AbstractMatrix{Bool}; kwargs...)`](@ref): Returns the weights of the second pass. A member whose [`needs_second_pass`](@ref) is `false` needs no method, because the caller never calls it.
 
 ### Arguments
 
@@ -472,7 +472,7 @@ julia> PortfolioOptimisers.cross_sectional_lagged_inverse_variance(SimpleVarianc
   - [`cs_weights_refine`](@ref)
   - [`variance_series`](@ref)
 """
-function cross_sectional_lagged_inverse_variance(ve::AbstractCovarianceEstimator,
+function cross_sectional_lagged_inverse_variance(ve::StatsBase.CovarianceEstimator,
                                                  eps::MatNum, mask::AbstractMatrix{Bool};
                                                  kwargs...)::MatNum
     @argcheck(!isempty(eps), IsEmptyError("eps cannot be empty"))
@@ -672,7 +672,7 @@ function cross_sectional_median_cap!(IV::Matrix{<:Number}, ratio::Real)::BitVect
 end
 """
     cs_weights_refine(alg::BlendedInverseVarianceWeights, W0::MatNum, eps::MatNum,
-                      ve::AbstractCovarianceEstimator, mask::AbstractMatrix{Bool};
+                      ve::StatsBase.CovarianceEstimator, mask::AbstractMatrix{Bool};
                       kwargs...) -> Matrix{<:Number}
 
 Return the second-pass cross-sectional regression weights of a weight policy.
@@ -730,7 +730,7 @@ julia> PortfolioOptimisers.cs_weights_refine(alg, W0, eps, SimpleVariance(), tru
   - [`cross_sectional_median_cap!`](@ref)
 """
 function cs_weights_refine(alg::BlendedInverseVarianceWeights, W0::MatNum, eps::MatNum,
-                           ve::AbstractCovarianceEstimator, mask::AbstractMatrix{Bool};
+                           ve::StatsBase.CovarianceEstimator, mask::AbstractMatrix{Bool};
                            kwargs...)::MatNum
     @argcheck(size(W0) == size(eps),
               DimensionMismatch("W0 ($(size(W0, 1))×$(size(W0, 2))) must match eps ($(size(eps, 1))×$(size(eps, 2)))"))

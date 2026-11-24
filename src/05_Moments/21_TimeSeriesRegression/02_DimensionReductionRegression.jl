@@ -197,11 +197,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Estimates a loadings matrix by regressing each asset on the leading components of the factors.
 
-`drtgt` maps the standardised factors to a basis of orthogonal components, and `retgt` fits each asset in that basis. The basis is smaller than the factor set only when `drtgt` retains fewer components than factors. The method then maps the coefficients back to the original factors. `ve` gives the mean, and the standard deviation by which that map divides. The mean comes from the expected returns estimator `ve.me`, or from `SimpleExpectedReturns()` when `ve.me` is `nothing`. Every asset keeps every factor, which is not true of [`StepwiseRegression`](@ref).
+`drtgt` maps the standardised factors to a basis of orthogonal components, and `retgt` fits each asset in that basis. The basis is smaller than the factor set only when `drtgt` retains fewer components than factors. The method then maps the coefficients back to the original factors. `ve` gives the standard deviation by which that map divides, and [`standardisation_mean`](@ref) gives the mean. A [`SimpleVariance`](@ref) and a [`Covariance`](@ref) state their own mean estimator in `ve.me`, and a [`PortfolioOptimisersCovariance`](@ref) takes the one of its `ce`. Every other `ve` takes the mean under the observation weights of `retgt`. Every asset keeps every factor, which is not true of [`StepwiseRegression`](@ref).
 
 The standardisation and the recovery read the same statistics. [`prep_dim_red_reg`](@ref) computes them from `ve`, and `_regression` recovers the coefficients with the pair that it returns. So a weighted `ve`, which [`factory`](@ref) builds from the observation weights, gives its weights to both steps. Equations 8, 11, 12, 35 and 36 of [fekedulegn2002](@cite) need this. That work fits the regression on the principal components of the standardised factors, with the eigenvectors of their correlation matrix. A probabilistic target puts the matrix of Equation 9 of [tipping1999](@cite) in place of the eigenvectors, and neither source states this composition.
 
-A penalised `retgt`, such as [`ElasticNet`](@ref), keeps the fit and the recovery in agreement. The estimator names the column of ones with [`InterceptColumn`](@ref), so the target does not penalise the intercept. The intercept is then the weighted mean of the residual of the slopes. The components have a weighted mean of zero, so the intercept is the weighted mean of the response, which the recovery rebuilds. The condition is the same as for an unpenalised target: `ve` and `retgt` carry the same weights, as [`factory`](@ref) gives them. The penalty shrinks the coefficients of the components, which are in the units of the standardised factors. The degrees of freedom of the residuals count one for each column of the reduced design, and a penalised fit has fewer.
+A penalised `retgt`, such as [`ElasticNet`](@ref), keeps the fit and the recovery in agreement. The estimator names the column of ones with [`InterceptColumn`](@ref), so the target does not penalise the intercept. The intercept is then the weighted mean of the residual of the slopes. The components have a weighted mean of zero, so the intercept is the weighted mean of the response, which the recovery rebuilds. The condition is the same as for an unpenalised target: the mean that [`standardisation_mean`](@ref) gives carries the weights of `retgt`. The penalty shrinks the coefficients of the components, which are in the units of the standardised factors. The degrees of freedom of the residuals count one for each column of the reduced design, and a penalised fit has fewer.
 
 The reduction reads every observation, so a fit over more observations can reduce to other components. `proj` fixes the components as linear combinations of the original factors, and the fit then makes no reduction. `choice` states whether the online step of a prior that fits this regression writes the components of the first fit into `proj`. A batch fit gives the same answer under both rules.
 
@@ -212,7 +212,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     DimensionReductionRegression(;
-        ve::AbstractVarianceEstimator = SimpleVariance(),
+        ve::StatsBase.CovarianceEstimator = SimpleVariance(),
         drtgt::DimensionReductionTarget = PCA(),
         retgt::AbstractRegressionTarget = LinearModel(),
         choice::AbstractChoiceRule = BatchChoice(),
@@ -266,6 +266,7 @@ DimensionReductionRegression
 
   - [`AbstractTimeSeriesRegressionEstimator`](@ref)
   - [`AbstractVarianceEstimator`](@ref)
+  - [`library_covariance_estimator`](@ref)
   - [`DimensionReductionTarget`](@ref)
   - [`AbstractRegressionTarget`](@ref)
   - [`regression_target_weights`](@ref)
@@ -285,7 +286,7 @@ DimensionReductionRegression
 @propagatable @concrete struct DimensionReductionRegression <:
                                AbstractTimeSeriesRegressionEstimator
     """
-    $(field_dict[:ve])
+    $(field_dict[:ve_slot])
     """
     @fprop @vprop ve
     """
@@ -308,7 +309,7 @@ DimensionReductionRegression
     $(field_dict[:x_src_re])
     """
     x_src
-    function DimensionReductionRegression(ve::AbstractVarianceEstimator,
+    function DimensionReductionRegression(ve::StatsBase.CovarianceEstimator,
                                           drtgt::DimensionReductionTarget,
                                           retgt::AbstractRegressionTarget,
                                           choice::AbstractChoiceRule,
@@ -328,13 +329,60 @@ DimensionReductionRegression
                    typeof(x_src)}(ve, drtgt, retgt, choice, proj, x_src)
     end
 end
-function DimensionReductionRegression(; ve::AbstractVarianceEstimator = SimpleVariance(),
+function DimensionReductionRegression(;
+                                      ve::StatsBase.CovarianceEstimator = SimpleVariance(),
                                       drtgt::DimensionReductionTarget = PCA(),
                                       retgt::AbstractRegressionTarget = LinearModel(),
                                       choice::AbstractChoiceRule = BatchChoice(),
                                       proj::Option{<:MatNum} = nothing,
                                       x_src::Option{<:AbstractReturnsSource} = nothing)::DimensionReductionRegression
     return DimensionReductionRegression(ve, drtgt, retgt, choice, proj, x_src)
+end
+"""
+    standardisation_mean(ve::StatsBase.CovarianceEstimator, w::Option{<:ObsWeights})
+    standardisation_mean(ve::SimpleVariance, w::Option{<:ObsWeights})
+    standardisation_mean(ve::Covariance, w::Option{<:ObsWeights})
+    standardisation_mean(ve::PortfolioOptimisersCovariance, w::Option{<:ObsWeights})
+
+Return the expected returns estimator that centres the factors of a [`DimensionReductionRegression`](@ref).
+
+The fit discards the intercept of the reduced basis, and rebuilds it from the mean of the response and the mean of the factors. The rebuilt intercept is the intercept of the fit only when the mean of the factors has the weights of the fit. So an estimator that states no mean estimator of its own takes the mean under those weights. An estimator of another package is such an estimator. An estimator that states one keeps it, so the fit takes the mean about which the estimator takes the standard deviation.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. On a [`Covariance`](@ref), and on a [`SimpleVariance`](@ref) whose `me` is not `nothing`, return `ve.me`.
+ 2. On a [`PortfolioOptimisersCovariance`](@ref), return the mean estimator of its `ce`, because the processing of the matrix moves no mean.
+ 3. On every other estimator, and on a [`SimpleVariance`](@ref) whose `me` is `nothing`, return a [`SimpleExpectedReturns`](@ref) with the weights `w`.
+
+# Arguments
+
+  - `ve`: Estimator that gives the standard deviations of the factors.
+  - `w`: Observation weights of the regression target, from [`regression_target_weights`](@ref), or `nothing`.
+
+# Returns
+
+  - $(arg_dict[:me])
+
+# Related
+
+  - [`DimensionReductionRegression`](@ref)
+  - [`prep_dim_red_reg`](@ref)
+  - [`regression_target_weights`](@ref)
+  - [`SimpleExpectedReturns`](@ref)
+"""
+function standardisation_mean(::StatsBase.CovarianceEstimator, w::Option{<:ObsWeights})
+    return SimpleExpectedReturns(; w = w)
+end
+function standardisation_mean(ve::SimpleVariance, w::Option{<:ObsWeights})
+    return isnothing(ve.me) ? SimpleExpectedReturns(; w = w) : ve.me
+end
+function standardisation_mean(ve::Covariance, ::Option{<:ObsWeights})
+    return ve.me
+end
+function standardisation_mean(ve::PortfolioOptimisersCovariance, w::Option{<:ObsWeights})
+    return standardisation_mean(ve.ce, w)
 end
 """
     prep_dim_red_reg(re::DimensionReductionRegression{<:Any, <:Any, <:Any, <:Any, Nothing},
@@ -352,10 +400,10 @@ When `re.proj` holds the components, the method makes no reduction. It centres t
 
 The method that Julia selects is the algorithm.
 
- 1. Read the expected returns estimator from `re.ve.me`, and call it `me`. Use `SimpleExpectedReturns()` when it is `nothing`.
+ 1. Read the expected returns estimator of `re.ve` and the weights of `re.retgt` with [`standardisation_mean`](@ref), and call it `me`.
  2. Take the mean of each column of `X` under `me`, and call it `mu`.
  3. `re.proj` is `nothing`:
-     1. Take the standard deviation of each column of `X` under `re.ve`, and call it `sigma`. Raise every entry to at least `eps(eltype(sigma))`, so that a constant factor does not cause a division by zero.
+     1. Take the standard deviation of each column of `X` under `re.ve`, through [`library_covariance_estimator`](@ref), and call it `sigma`. Raise every entry to at least `eps(eltype(sigma))`, so that a constant factor does not cause a division by zero.
      2. Centre `X` with [`demean_returns`](@ref) at `mu`, divide each column by its entry of `sigma`, and transpose. Call the result `X_std`.
      3. Fit `re.drtgt` to `X_std`, and call the fit `model`.
      4. Project `X_std` through `model` and transpose. Call the result `Xp`, the factors in the reduced basis.
@@ -367,7 +415,7 @@ The method that Julia selects is the algorithm.
 
 # Arguments
 
-  - `re`: Dimension reduction regression estimator. Its `ve` gives the standard deviation, and its `ve.me` gives the mean. When `ve.me` is `nothing`, the method uses `SimpleExpectedReturns()`.
+  - `re`: Dimension reduction regression estimator. Its `ve` gives the standard deviation, and [`standardisation_mean`](@ref) gives the mean estimator.
   - `X`: Factor matrix `observations × factors`, which the method reduces.
 
 # Validation
@@ -388,6 +436,7 @@ The method that Julia selects is the algorithm.
   - [`PPCA`](@ref)
   - [`demean_returns`](@ref)
   - [`dimension_reduction_map`](@ref)
+  - [`standardisation_mean`](@ref)
   - [`_regression(::DimensionReductionRegression, ::VecNum, ::VecNum, ::VecNum, ::MatNum, ::MatNum)`](@ref)
 
 # References
@@ -397,8 +446,8 @@ The method that Julia selects is the algorithm.
 function prep_dim_red_reg(re::DimensionReductionRegression{<:Any, <:Any, <:Any, <:Any,
                                                            Nothing}, X::MatNum)
     N = size(X, 1)
-    me = ifelse(isnothing(re.ve.me), SimpleExpectedReturns(), re.ve.me)
-    sigma = vec(Statistics.std(re.ve, X; dims = 1))
+    me = standardisation_mean(re.ve, regression_target_weights(re.retgt))
+    sigma = vec(Statistics.std(library_covariance_estimator(re.ve), X; dims = 1))
     sigma .= max.(sigma, eps(eltype(sigma)))
     mu = Statistics.mean(me, X; dims = 1)
     X_std = permutedims(demean_returns(X, me; dims = 1, mean = mu) ./ transpose(sigma))
@@ -412,7 +461,7 @@ function prep_dim_red_reg(re::DimensionReductionRegression{<:Any, <:Any, <:Any, 
                                                            <:MatNum}, X::MatNum)
     @argcheck(size(re.proj, 1) == size(X, 2),
               DimensionMismatch("re.proj holds one row per factor. Got\nsize(re.proj, 1) => $(size(re.proj, 1))\nsize(X, 2) => $(size(X, 2))"))
-    me = ifelse(isnothing(re.ve.me), SimpleExpectedReturns(), re.ve.me)
+    me = standardisation_mean(re.ve, regression_target_weights(re.retgt))
     mu = Statistics.mean(me, X; dims = 1)
     Xp = demean_returns(X, me; dims = 1, mean = mu) * re.proj
     x1 = [ones(eltype(X), size(X, 1)) Xp]
@@ -763,3 +812,4 @@ function reader_frames(re::Union{StepwiseRegression, DimensionReductionRegressio
 end
 
 export PCA, PPCA, DimensionReductionRegression
+public standardisation_mean

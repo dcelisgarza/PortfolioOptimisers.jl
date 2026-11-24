@@ -12,6 +12,5 @@ PortfolioOptimisers.observation_count(ce::PortfolioOptimisersCovariance{<:Any, <
 PortfolioOptimisers.processing_observation_count
 PortfolioOptimisers.series_folds
 PortfolioOptimisers.fold_variance_series
-PortfolioOptimisers.fold_mask_keywords
 PortfolioOptimisers.variance_series(ce::PortfolioOptimisersCovariance, X::MatNum; dims::Int = 1, kwargs...)
 ```
