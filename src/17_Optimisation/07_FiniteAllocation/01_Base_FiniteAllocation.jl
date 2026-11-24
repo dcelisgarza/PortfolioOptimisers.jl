@@ -7,7 +7,7 @@ A finite allocation estimator buys share counts with a stated cash budget at sta
 
 # Interfaces
 
-To implement a new finite allocation estimator, subtype `FiniteAllocationOptimisationEstimator`, give it an `fb` field, and implement the two methods below. The `fb` field holds a [`FOptE_FOpt`](@ref) or `nothing`.
+To implement a new finite allocation estimator, subtype `FiniteAllocationOptimisationEstimator`, give it an `fb` field, and implement the methods below. The `fb` field holds a [`FOptE_FOpt`](@ref) or `nothing`.
 
 ## `_optimise`
 
@@ -23,9 +23,19 @@ To implement a new finite allocation estimator, subtype `FiniteAllocationOptimis
 
   - `res::FiniteAllocationOptimisationResult`: The realised allocation. Its last field is `fb`.
 
-## `optimise`
+## `port_opt_view`
 
-  - `optimise(fa::MyAllocation, fai::FiniteAllocationInput; kwargs...)`: Calls `_optimise`. Restrict the method to an `fb` of type `Nothing`, as [`DiscreteAllocation`](@ref) and [`GreedyAllocation`](@ref) do, so that it is more specific than the generic method of [`optimise`](@ref) for an [`OptimisationEstimator`](@ref).
+  - `port_opt_view(fa::MyAllocation, i, args...) -> FiniteAllocationOptimisationEstimator`: Restricts the allocator to the assets `i`, and a fallback estimator in `fb` with it. A precomputed result in `fb` stays as it is. The method is optional. Define it when a field holds a value for each asset. The generic method returns the allocator unchanged.
+
+### Arguments
+
+  - `fa`: An instance of the concrete subtype.
+  - `i`: Indices of the assets that the view keeps.
+  - `args...`: Forwarded to the view of `fb`.
+
+### Returns
+
+  - `fa::FiniteAllocationOptimisationEstimator`: The allocator restricted to the assets at `i`.
 
 # Related
 
@@ -34,6 +44,7 @@ To implement a new finite allocation estimator, subtype `FiniteAllocationOptimis
   - [`GreedyAllocation`](@ref)
   - [`FiniteAllocationInput`](@ref)
   - [`FiniteAllocationOptimisationResult`](@ref)
+  - [`port_opt_view`](@ref)
 
 # References
 
@@ -1194,8 +1205,92 @@ function prepare_finite_allocation(fai::FiniteAllocationInput)
     return w, lbgt, sbgt, lidx, sidx, lsf, ssf
 end
 """
-    allocation_lot_unit(unit::LuE_Lu, sets::Option{<:UniverseSets}, strict::Bool,
-                        fai::FiniteAllocationInput)
+    assert_allocation_unit(unit::LuE_Lu, sets::Option{<:UniverseSets},
+                           idx::Option{<:VecInt})
+
+Check that the `unit`, the `sets` and the `idx` of a finite allocator agree.
+
+Both allocators call this method in their constructors. A [`LotUnit`](@ref) states one value for each asset of the input, so a view of the allocator slices it, and it has no use for an `idx`.
+
+# Arguments
+
+  - `unit::LuE_Lu`: The `unit` field of the allocator.
+  - `sets::Option{<:UniverseSets}`: The `sets` field of the allocator.
+  - `idx::Option{<:VecInt}`: The `idx` field of the allocator.
+
+# Validation
+
+  - $(val_dict[:unit])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`DiscreteAllocation`](@ref)
+  - [`GreedyAllocation`](@ref)
+  - [`allocation_unit_view`](@ref)
+"""
+function assert_allocation_unit(::LotUnit, ::Option{<:UniverseSets}, ::Nothing)::Nothing
+    return nothing
+end
+function assert_allocation_unit(::LotUnit, ::Option{<:UniverseSets}, ::VecInt)
+    return throw(ArgumentError("idx must be nothing when unit is a LotUnit: idx selects the assets that a LotUnitEstimator keeps after it resolves, and a LotUnit states the lot unit of the assets of the input"))
+end
+function assert_allocation_unit(::LotUnitEstimator, sets::Option{<:UniverseSets},
+                                idx::Option{<:VecInt})::Nothing
+    @argcheck(!isnothing(sets),
+              IsNothingError("sets cannot be nothing when unit is a LotUnitEstimator"))
+    @argcheck(isnothing(idx) || !isempty(idx), IsEmptyError("idx cannot be empty"))
+    return nothing
+end
+"""
+    allocation_unit_view(unit::LotUnit, sets::Option{<:UniverseSets}, ::Nothing, i)
+    allocation_unit_view(unit::LotUnitEstimator, sets::UniverseSets,
+                         idx::Option{<:VecInt}, i)
+
+Give the `unit` and the `idx` of a finite allocator for the assets `i`.
+
+The [`port_opt_view`](@ref) methods of [`DiscreteAllocation`](@ref) and [`GreedyAllocation`](@ref) call this method. A [`LotUnitEstimator`](@ref) names assets of the whole universe, and a name of an asset that `i` leaves out is a correct name. So the estimator and the `sets` stay whole, and the view records the positions that it keeps. [`allocation_lot_unit`](@ref) resolves on the whole universe and cuts the lot unit at these positions, so a name that the view left out gives no diagnostic, and a name outside the whole universe still gives one. The number type comes from the input, as it does with no view.
+
+# Algorithm
+
+ 1. On a [`LotUnit`](@ref), return its [`port_opt_view`](@ref) at `i`, and `nothing` for `idx`.
+ 2. On a [`LotUnitEstimator`](@ref), read the positions of the universe that `unit.key` selects in `sets`, or of the universe of `sets.xkey` when `unit.key` is `nothing`. If `idx` is not `nothing`, keep the positions at `idx`.
+ 3. Return `unit`, and the positions of step 2 at `i`.
+
+# Arguments
+
+  - `unit`: The `unit` field of the allocator.
+  - `sets`: The `sets` field of the allocator.
+  - `idx`: The `idx` field of the allocator.
+  - `i`: Indices of the assets that the view keeps, on the axis of the assets that the allocator holds now.
+
+# Returns
+
+  - `unit::LuE_Lu`: The lot unit of the view.
+  - `idx::Option{<:VecInt}`: The positions of the view.
+
+# Related
+
+  - [`DiscreteAllocation`](@ref)
+  - [`GreedyAllocation`](@ref)
+  - [`allocation_lot_unit`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function allocation_unit_view(unit::LotUnit, ::Option{<:UniverseSets}, ::Nothing, i)
+    return port_opt_view(unit, i), nothing
+end
+function allocation_unit_view(unit::LotUnitEstimator, sets::UniverseSets,
+                              idx::Option{<:VecInt}, i)
+    key = ifelse(isnothing(unit.key), sets.xkey, unit.key)
+    pos = eachindex(sets.dict[key])
+    return unit, (isnothing(idx) ? pos : pos[idx])[i]
+end
+"""
+    allocation_lot_unit(unit::LuE_Lu, sets::Option{<:UniverseSets},
+                        idx::Option{<:VecInt}, strict::Bool, fai::FiniteAllocationInput)
 
 Give the lot unit of each asset of a finite allocation, on the axis of `w`.
 
@@ -1204,13 +1299,15 @@ Both allocators call this method before they solve a side, so they read one reso
 # Algorithm
 
  1. Resolve `unit` to a [`LotUnit`](@ref) with [`lot_unit_constraints`](@ref) against `sets`, with `strict`. The number type of the fill value is `promote_type(eltype(fai.w), eltype(fai.prices))`.
- 2. If the lot unit is a vector, check that it has one entry for each entry of `fai.w`.
- 3. Return the `val` of the [`LotUnit`](@ref).
+ 2. If `idx` is not `nothing` and the lot unit is a vector, take its view at `idx`.
+ 3. If the lot unit is a vector, check that it has one entry for each entry of `fai.w`.
+ 4. Return the lot unit.
 
 # Arguments
 
   - `unit::LuE_Lu`: The `unit` field of the allocator, a [`LotUnit`](@ref) or a [`LotUnitEstimator`](@ref).
   - `sets::Option{<:UniverseSets}`: The `sets` field of the allocator. The constructor of the allocator refuses `nothing` when `unit` is a [`LotUnitEstimator`](@ref).
+  - `idx::Option{<:VecInt}`: The `idx` field of the allocator.
   - `strict::Bool`: The `strict` field of the allocator.
   - `fai::FiniteAllocationInput`: The input of the allocation.
 
@@ -1227,15 +1324,20 @@ Both allocators call this method before they solve a side, so they read one reso
   - [`LotUnit`](@ref)
   - [`LotUnitEstimator`](@ref)
   - [`lot_unit_constraints`](@ref)
+  - [`allocation_unit_view`](@ref)
   - [`DiscreteAllocation`](@ref)
   - [`GreedyAllocation`](@ref)
   - [`prepare_finite_allocation`](@ref)
 """
-function allocation_lot_unit(unit::LuE_Lu, sets::Option{<:UniverseSets}, strict::Bool,
+function allocation_lot_unit(unit::LuE_Lu, sets::Option{<:UniverseSets},
+                             idx::Option{<:VecInt}, strict::Bool,
                              fai::FiniteAllocationInput)
     lu = lot_unit_constraints(unit, sets;
                               datatype = promote_type(eltype(fai.w), eltype(fai.prices)),
                               strict = strict).val
+    if !isnothing(idx)
+        lu = nothing_scalar_array_view(lu, idx)
+    end
     if isa(lu, AbstractVector)
         @argcheck(length(lu) == length(fai.w),
                   DimensionMismatch("the lot unit ($(length(lu))) must match w ($(length(fai.w)))"))

@@ -89,10 +89,10 @@
     # The site that miscounted, pinned by name. `fb` is the eighth field, and an estimator
     # without a fallback reaches the same driver as an estimator with one.
     @test fieldnames(DiscreteAllocation) ==
-          (:slv, :sc, :so, :wf, :unit, :sets, :strict, :fb)
+          (:slv, :sc, :so, :wf, :unit, :sets, :strict, :fb, :idx)
     da_type(fb) = DiscreteAllocation{Any, Float64, Float64,
                                      PortfolioOptimisers.JuMPWeightFinaliserFormulation,
-                                     LotUnit{Int}, Nothing, Bool, fb}
+                                     LotUnit{Int}, Nothing, Bool, fb, Nothing}
     no_fb = which(PortfolioOptimisers.optimise,
                   Tuple{da_type(Nothing), FiniteAllocationInput})
     with_fb = which(PortfolioOptimisers.optimise,

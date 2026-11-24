@@ -216,7 +216,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :cash_alloc => "`cash`: Remaining uninvested cash after allocation, from the third method of the collateral algorithm of the input. It includes the cash that no side received, and it is negative when the book borrows.",#
                  :fees_alloc => "`fees`: Fee the allocation paid over the whole horizon. It is the sum of the two sides' charges, and it is never signed.",#
                  :unit => "`unit`: Lot unit of each asset, the number of shares that one purchase buys. A [`LotUnit`](@ref) states it, and a [`LotUnitEstimator`](@ref) resolves it against `sets`. A share count is a non-negative integer multiple of the lot unit of its asset. The default `LotUnit(1)` buys whole shares.",#
-                 :sets_alloc => "`sets`: Universe sets that a [`LotUnitEstimator`](@ref) in `unit` resolves against, or `nothing`. The universe must name the assets of the input in the order of `w`.",#
+                 :sets_alloc => "`sets`: Universe sets that a [`LotUnitEstimator`](@ref) in `unit` resolves against, or `nothing`. The universe must name the assets of the input in the order of `w`, unless `idx` selects the assets of the input from it.",#
+                 :idx_alloc => "`idx`: Positions, in the universe of `sets`, of the assets of the input in the order of `w`, or `nothing` when the input holds the whole universe. [`port_opt_view`](@ref) writes it, so that a [`LotUnitEstimator`](@ref) in `unit` resolves on the whole universe before the cut.",#
                  # Hierarchical and Schur complement optimisers.
                  :ri => "`ri`: Inner risk measure.",#
                  :ri_res => "`ri`: The intra-cluster risk measure the optimisation ran under, or a vector of them, stored resolved.",#
