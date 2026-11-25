@@ -138,5 +138,5 @@ it, and build ticket #1089 sets the compat bound from the version that it names.
 Several pieces that this ADR made the library's own now exist upstream: the weights, the tau
 inversion, the truncation by mBICV and the grouped first tree. By the rule "each owned piece is a
 loan", the build tickets take the package's own option where it gives the same result, and the
-central-asset boost is a `tree_criterion` function, with no change upstream. ADR 0245 records the
+central-asset boost is a `tree_criterion` function, with no change upstream. ADR 0248 records the
 Stress Statement decision that found these facts.

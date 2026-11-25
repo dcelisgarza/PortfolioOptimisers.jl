@@ -192,7 +192,7 @@ a refit per fold passes the estimator.
 
 ## Amendment (2026-11-23)
 
-ADR 0245 (#1087) decides the routes that this ADR left open:
+ADR 0248 (#1087) decides the routes that this ADR left open:
 
 - The importance route is the member `KernelFallback(; bandwidth = nothing, min_ess = 100,
   resample = true)` of a fallback family on `VineCopulaEstimator`. Its `Bool` is `resample`:
