@@ -1547,12 +1547,18 @@ end
     @test UncertaintySetVariance().mtx_sqrt === EigenFallbackSquareRoot()
     w = fill(1 / N_ms, N_ms)
     W = w * transpose(w)
-    @test_throws PosDefException PO.ucs_variance(e0, S_ms, w, nothing)
-    for alg in algs_ms
-        # The eigen square root is exact, and the ridge moves the value by its ridge alone.
-        @test isapprox(PO.ucs_variance(e0, S_ms, w, alg),
-                       dot(w, S_ms, w) + 5e-3 * sqrt(dot(vec(W), Om, vec(W))); rtol = 1e-10)
+    # The value reads the quadratic form of the matrix, so it takes no square root, and the
+    # algorithm of the measure does not move it.
+    val = dot(w, S_ms, w) + 5e-3 * sqrt(dot(vec(W), Om, vec(W)))
+    @test isapprox(PO.ucs_variance(e0, S_ms, w), val; rtol = 1e-14)
+    for alg in (nothing, algs_ms...)
+        r = UncertaintySetVariance(; ucs = e0, sigma = S_ms, mtx_sqrt = alg)
+        @test isapprox(r(w), val; rtol = 1e-14)
     end
+    # A form that rounding takes below zero counts as zero.
+    eneg = EllipsoidalUncertaintySet(; sigma = Matrix(-1e-18I, N_ms^2, N_ms^2), k = 5e-3,
+                                     class = SigmaUncertaintySetClass())
+    @test PO.ucs_variance(eneg, S_ms, w) == dot(w, S_ms, w)
     @test_throws PosDefException optimise(MeanRisk(;
                                                    r = UncertaintySetVariance(; ucs = e0,
                                                                               mtx_sqrt = nothing),
@@ -1569,7 +1575,7 @@ end
         @test isapprox(value_ms(res, :t_eucs), norm(x); rtol = 1e-6)
         # The model keeps the dual matrix, so its value is at or below the value level.
         @test value_ms(res, :eucs_variance_risk_) <=
-              PO.ucs_variance(e0, S_ms, res.w, alg) * (1 + 1e-6)
+              PO.ucs_variance(e0, S_ms, res.w) * (1 + 1e-6)
         # A variance rebuilt for a sub-problem keeps the algorithm.
         @test PO.no_bounds_risk_measure(r).mtx_sqrt === alg
     end

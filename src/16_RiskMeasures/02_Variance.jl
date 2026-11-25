@@ -793,7 +793,7 @@ Under [`MaximumRatio`](@ref) the corner of the lift sets the degree of the worst
 \\begin{align}
 \\mathrm{UncertaintySetVariance}(\\boldsymbol{w}) &= \\underset{\\mathbf{\\Sigma} \\in U_{\\mathbf{\\Sigma}}}{\\max} \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}\\,,\\\\
 R_{\\mathrm{box}}(\\boldsymbol{w}) &= \\langle \\mathbf{\\Sigma}_u, (\\boldsymbol{w} \\boldsymbol{w}^\\intercal)_{+} \\rangle - \\langle \\mathbf{\\Sigma}_l, (-\\boldsymbol{w} \\boldsymbol{w}^\\intercal)_{+} \\rangle\\,,\\\\
-R_{\\mathrm{ell}}(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}} \\boldsymbol{w} + k_{e} \\lVert \\mathbf{G}_{\\Omega} \\, \\mathrm{vec}(\\boldsymbol{w} \\boldsymbol{w}^\\intercal) \\rVert_{2}\\,,\\\\
+R_{\\mathrm{ell}}(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}} \\boldsymbol{w} + k_{e} \\sqrt{\\mathrm{vec}(\\boldsymbol{w} \\boldsymbol{w}^\\intercal)^\\intercal \\mathbf{\\Omega} \\, \\mathrm{vec}(\\boldsymbol{w} \\boldsymbol{w}^\\intercal)}\\,,\\\\
 R_{\\mathrm{nb}}(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}} \\boldsymbol{w} + \\kappa_{b} \\lVert \\mathbf{L}^\\intercal \\mathrm{vec}(\\boldsymbol{w} \\boldsymbol{w}^\\intercal) \\rVert_{p^{*}}\\,,\\\\
 R_{\\mathrm{cpt}}(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}} \\boldsymbol{w} + \\kappa \\underset{\\boldsymbol{z}}{\\min} \\left( \\lVert \\mathbf{C} \\boldsymbol{w} - \\mathbf{Q} \\boldsymbol{z} \\rVert_{2}^{2} + \\lVert \\mathbf{R} \\boldsymbol{z} \\rVert_{2}^{2} \\right)\\,.
 \\end{align}
@@ -807,7 +807,7 @@ Where:
   - ``\\mathbf{\\Sigma}_l``, ``\\mathbf{\\Sigma}_u``: Lower and upper bounds of the box, `lb` and `ub`.
   - ``(\\cdot)_{+}``: Positive part, entry by entry.
   - ``\\hat{\\mathbf{\\Sigma}}``: Centre of the set, the `val` of the set when it states one and the `sigma` of the measure otherwise.
-  - ``k_{e}``, ``\\mathbf{G}_{\\Omega}``: Radius of the ellipsoid, `k`, and the transpose of the square root of its matrix ``\\mathbf{\\Omega}``, `sigma`, that [`matrix_square_root`](@ref) takes under `mtx_sqrt`, so ``\\mathbf{G}_{\\Omega}^\\intercal \\mathbf{G}_{\\Omega} = \\mathbf{\\Omega}``.
+  - ``k_{e}``, ``\\mathbf{\\Omega}``: Radius of the ellipsoid, `k`, and its matrix, `sigma`. The cone of the model reads a square root of ``\\mathbf{\\Omega}`` under `mtx_sqrt`, and this value reads none.
   - ``\\kappa_{b}``, ``\\mathbf{L}``, ``p^{*}``: Radius of the norm ball, its map, and the dual order of its norm.
   - ``\\mathbf{C}``, ``\\mathbf{Q}``, ``\\mathbf{R}``, ``\\boldsymbol{z}``: Diagonal metric of the compact set, its basis, the factor of the rows a view dropped from the basis, and the free coefficients of the basis. A fitted set has no row in ``\\mathbf{R}``, and its value is ``\\lVert (\\mathbf{I} - \\mathbf{Q} \\mathbf{Q}^{+}) \\mathbf{C} \\boldsymbol{w} \\rVert_{2}^{2}``, with ``\\mathbf{Q}^{+}`` the pseudo-inverse.
   - $(math_dict[:kappa_cpt])
@@ -955,7 +955,7 @@ julia> r(w)
     """
     sigma
     """
-    Square-root algorithm of the matrix of an [`EllipsoidalUncertaintySet`](@ref) in `ucs`, and of the centre of a [`CompactCovarianceUncertaintySet`](@ref), or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. The default takes the square root of the eigendecomposition of a singular positive semidefinite matrix. [`matrix_square_root`](@ref) states each algorithm. The box and the norm ball read no square root.
+    Square-root algorithm of the matrix of an [`EllipsoidalUncertaintySet`](@ref) in `ucs`, and of the centre of a [`CompactCovarianceUncertaintySet`](@ref), or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. The default takes the square root of the eigendecomposition of a singular positive semidefinite matrix. [`matrix_square_root`](@ref) states each algorithm. The model reads it. The box, the norm ball and the value of the measure read no square root.
     """
     mtx_sqrt
     """
@@ -1044,14 +1044,13 @@ A fitted [`AbstractUncertaintySetResult`](@ref) in `r.ucs` gives [`ucs_variance`
   - [`ucs_variance`](@ref)
 """
 function (r::UncertaintySetVariance{<:Any, <:AbstractUncertaintySetResult, <:Any})(w::VecNum)
-    return ucs_variance(r.ucs, r.sigma, w, r.mtx_sqrt)
+    return ucs_variance(r.ucs, r.sigma, w)
 end
 function (r::UncertaintySetVariance)(w::VecNum)
     return LinearAlgebra.dot(w, r.sigma, w)
 end
 """
-    ucs_variance(ucs::AbstractUncertaintySetResult, sigma::MatNum, w::VecNum,
-                 mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
+    ucs_variance(ucs::AbstractUncertaintySetResult, sigma::MatNum, w::VecNum)
 
 Compute the worst-case portfolio variance of the weights `w` over a fitted uncertainty set.
 
@@ -1062,7 +1061,7 @@ It is the value level of the risk expression that [`set_ucs_variance_risk!`](@re
 ```math
 \\begin{align}
 R_{\\mathrm{box}}(\\boldsymbol{w}) &= \\langle \\mathbf{\\Sigma}_u, (\\boldsymbol{w} \\boldsymbol{w}^\\intercal)_{+} \\rangle - \\langle \\mathbf{\\Sigma}_l, (-\\boldsymbol{w} \\boldsymbol{w}^\\intercal)_{+} \\rangle\\,,\\\\
-R_{\\mathrm{ell}}(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}} \\boldsymbol{w} + k_{e} \\lVert \\mathbf{G}_{\\Omega} \\, \\mathrm{vec}(\\boldsymbol{w} \\boldsymbol{w}^\\intercal) \\rVert_{2}\\,,\\\\
+R_{\\mathrm{ell}}(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}} \\boldsymbol{w} + k_{e} \\sqrt{\\mathrm{vec}(\\boldsymbol{w} \\boldsymbol{w}^\\intercal)^\\intercal \\mathbf{\\Omega} \\, \\mathrm{vec}(\\boldsymbol{w} \\boldsymbol{w}^\\intercal)}\\,,\\\\
 R_{\\mathrm{nb}}(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}} \\boldsymbol{w} + \\kappa_{b} \\lVert \\mathbf{L}^\\intercal \\mathrm{vec}(\\boldsymbol{w} \\boldsymbol{w}^\\intercal) \\rVert_{p^{*}}\\,,\\\\
 R_{\\mathrm{cpt}}(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}} \\boldsymbol{w} + \\kappa \\underset{\\boldsymbol{z}}{\\min} \\left( \\lVert \\mathbf{C} \\boldsymbol{w} - \\mathbf{Q} \\boldsymbol{z} \\rVert_{2}^{2} + \\lVert \\mathbf{R} \\boldsymbol{z} \\rVert_{2}^{2} \\right)\\,.
 \\end{align}
@@ -1075,7 +1074,7 @@ Where:
   - ``\\mathbf{\\Sigma}_l``, ``\\mathbf{\\Sigma}_u``: Lower and upper bounds of the box, `lb` and `ub`.
   - ``(\\cdot)_{+}``: Positive part, entry by entry.
   - ``\\hat{\\mathbf{\\Sigma}}``: Centre of the set, the `val` of the set when it states one and `sigma` otherwise.
-  - ``k_{e}``, ``\\mathbf{G}_{\\Omega}``: Radius of the ellipsoid, `k`, and the transpose of the square root of its matrix ``\\mathbf{\\Omega}``, `sigma`, that [`matrix_square_root`](@ref) takes under `mtx_sqrt`, so ``\\mathbf{G}_{\\Omega}^\\intercal \\mathbf{G}_{\\Omega} = \\mathbf{\\Omega}``.
+  - ``k_{e}``, ``\\mathbf{\\Omega}``: Radius of the ellipsoid, `k`, and its matrix, `sigma`. The cone of the model reads a square root of ``\\mathbf{\\Omega}`` under `mtx_sqrt`, and this value reads none.
   - ``\\kappa_{b}``, ``\\mathbf{L}``, ``p^{*}``: Radius of the norm ball, its map, and the dual order of its norm. A map with no column adds nothing.
   - ``\\mathbf{C}``, ``\\mathbf{Q}``, ``\\mathbf{R}``, ``\\boldsymbol{z}``: Diagonal metric of the compact set, its basis, the factor of the rows a view dropped from the basis, and the free coefficients of the basis. A fitted set has no row in ``\\mathbf{R}``. A basis with no column leaves ``\\lVert \\mathbf{C} \\boldsymbol{w} \\rVert_{2}^{2}``.
   - $(math_dict[:kappa_cpt])
@@ -1088,11 +1087,8 @@ The least-squares problem of the compact line projects onto the span of ``\\math
   - `ucs`: Fitted uncertainty set.
   - `sigma::MatNum`: Fallback centre of the set. The `val` of the set wins over it, and the box reads neither.
   - `w::VecNum`: Asset weights.
-  - `mtx_sqrt`: Square-root algorithm of the matrix of an ellipsoid, or `nothing` for the plain Cholesky factor. The other sets ignore it, because the value level of the compact set takes no square root.
 
-# Validation
-
-  - Ellipsoid: `ucs.sigma` has a square root under `mtx_sqrt`, as [`matrix_square_root`](@ref) states. Raises a `LinearAlgebra.PosDefException`.
+The function does not check that the matrix of an ellipsoid is positive semidefinite. The value takes a quadratic form below zero as zero, and the model refuses the matrix.
 
 # Returns
 
@@ -1107,22 +1103,23 @@ The least-squares problem of the compact line projects onto the span of ``\\math
   - [`CompactCovarianceUncertaintySet`](@ref)
   - [`set_ucs_variance_risk!`](@ref): The model expression, whose optimum is at or below this value.
 """
-function ucs_variance(ucs::BoxUncertaintySet, ::Any, w::VecNum, ::Any = nothing)
+function ucs_variance(ucs::BoxUncertaintySet, ::Any, w::VecNum)
     W = w * transpose(w)
     z = zero(eltype(W))
     return sum(ucs.ub[i] * max(W[i], z) for i in eachindex(ucs.ub, W)) -
            sum(ucs.lb[i] * max(-W[i], z) for i in eachindex(ucs.lb, W))
 end
-function ucs_variance(ucs::EllipsoidalUncertaintySet, sigma::MatNum, w::VecNum,
-                      mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
-    W = w * transpose(w)
+function ucs_variance(ucs::EllipsoidalUncertaintySet, sigma::MatNum, w::VecNum)
+    v = vec(w * transpose(w))
     # The set names its own centre; `sigma` is the fallback (ADR 0050).
     sigma = something(ucs.val, sigma)
-    G = transpose(matrix_square_root(mtx_sqrt, ucs.sigma))
-    return LinearAlgebra.dot(w, sigma, w) + ucs.k * LinearAlgebra.norm(G * vec(W))
+    # The quadratic form needs no square root of the `N^2` by `N^2` matrix, which a caller
+    # that evaluates many portfolios pays at each one. `dot` skips the columns where `v` is
+    # zero. Rounding can take the form below zero where the matrix is singular.
+    q = LinearAlgebra.dot(v, ucs.sigma, v)
+    return LinearAlgebra.dot(w, sigma, w) + ucs.k * sqrt(max(q, zero(q)))
 end
-function ucs_variance(ucs::CompactCovarianceUncertaintySet, sigma::MatNum, w::VecNum,
-                      ::Any = nothing)
+function ucs_variance(ucs::CompactCovarianceUncertaintySet, sigma::MatNum, w::VecNum)
     # The set names its own centre; `sigma` is the fallback (ADR 0050).
     sigma = something(ucs.val, sigma)
     # The rows a view dropped enter as `R` against a zero target, so the stacked residual
@@ -1136,7 +1133,7 @@ function ucs_variance(ucs::CompactCovarianceUncertaintySet, sigma::MatNum, w::Ve
 end
 function ucs_variance(ucs::NormBallUncertaintySet{<:Any, <:Any, <:Any,
                                                   <:SigmaUncertaintySetClass},
-                      sigma::MatNum, w::VecNum, ::Any = nothing)
+                      sigma::MatNum, w::VecNum)
     W = w * transpose(w)
     # The set names its own centre; `sigma` is the fallback (ADR 0050).
     sigma = something(ucs.val, sigma)
@@ -1153,6 +1150,8 @@ end
 Create an instance of [`UncertaintySetVariance`](@ref) whose empty slots take the uncertainty set `ucs` and the covariance matrix of the prior result `pr`.
 
 A slot that the measure states keeps its value. So `ucs` fills `r.ucs` only when `r.ucs` is `nothing`, and it does not replace a set that the measure holds.
+
+An estimator of a set stays an estimator, and the functor of the new measure then gives the nominal variance. The method that takes the returns data in the place of `ucs` fits it.
 
 # Algorithm
 
@@ -1188,6 +1187,29 @@ function factory(r::UncertaintySetVariance, pr::AbstractPriorResult, ::Any,
     ucs = ucs_selector(r.ucs, ucs)
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     return rebuild_struct(r, (; ucs = ucs, sigma = sigma))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`UncertaintySetVariance`](@ref) from the prior result `pr`, with an estimator of its set fitted on the returns data `rd`.
+
+`rd` takes the place of the uncertainty set that the first method reads. [`resolve_ucs_measure`](@ref) passes it, so the functor of the new measure gives the worst case over one fitted set. Every other measure ignores that position, and a composite measure gives it to the measures that it holds. So `rd` reaches an `UncertaintySetVariance` inside a ratio, a tracker or a vector.
+
+# Algorithm
+
+ 1. Fill the empty `sigma` from `pr` with [`factory`](@ref).
+ 2. Fit an estimator of the set on `rd` and `pr` with [`ucs_risk_measure`](@ref). A fitted set and `nothing` stay as they are.
+
+# Related
+
+  - [`UncertaintySetVariance`](@ref)
+  - [`factory`](@ref)
+  - [`resolve_ucs_measure`](@ref)
+  - [`ucs_risk_measure`](@ref)
+"""
+function factory(r::UncertaintySetVariance, pr::AbstractPriorResult, ::Any,
+                 rd::ReturnsResult, args...; kwargs...)
+    return ucs_risk_measure(factory(r, pr), rd, pr)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1245,7 +1267,7 @@ end
 
 Fit the uncertainty set of each [`UncertaintySetVariance`](@ref) in the first argument on the returns data `rd` and the prior result `pr`, so that each set becomes an [`AbstractUncertaintySetResult`](@ref).
 
-Every `JuMP` head calls it once, after [`bind_data_benchmark`](@ref), on the reduced prior and the reduced returns data that the builder of the model reads. So the rows of the model, the levels of a risk [`Frontier`](@ref), the benchmark risk of [`DependentVariableTracking`](@ref), the anchors of [`NearOptimalCentering`](@ref) with its sub-problems, and the risk measures of the Result read one fitted set. The functor of a measure with a fitted set gives [`ucs_variance`](@ref), so each of these values is the worst case that the model bounds. [`set_allocation_risk_return_bounds!`](@ref) and [`allocation_set_tracking`](@ref) call it for the ceilings and the tracking errors of a [`ProgrammeAllocationSet`](@ref), on the prior and the rows of the block of the set. It is the risk twin of [`ucs_returns_estimator`](@ref).
+Every `JuMP` head calls it once, after [`bind_data_benchmark`](@ref), on the reduced prior and the reduced returns data that the builder of the model reads. So the rows of the model, the levels of a risk [`Frontier`](@ref), the benchmark risk of [`DependentVariableTracking`](@ref), the anchors of [`NearOptimalCentering`](@ref) with its sub-problems, and the risk measures of the Result read one fitted set. The functor of a measure with a fitted set gives [`ucs_variance`](@ref), so each of these values is the worst case that the model bounds. [`set_allocation_risk_return_bounds!`](@ref) and [`allocation_set_tracking`](@ref) call it for the ceilings and the tracking errors of a [`ProgrammeAllocationSet`](@ref), on the prior and the rows of the block of the set. [`factory`](@ref) of the measure calls it when the caller passes the returns data in the place of a set, as [`resolve_ucs_measure`](@ref) does for a hierarchical optimiser and a [`RiskLoss`](@ref). It is the risk twin of [`ucs_returns_estimator`](@ref).
 
 [`sigma_ucs`](@ref) of three arguments gives the estimator the argument that it reads. An estimator with a `pe` reads the returns of `rd` under the source that its own `pe` states. So a set whose prior states `x_src = ExcessSource()` fits on `X - B`, whatever the source of the prior of the optimiser is. An estimator that reads a prior result, one for which [`reads_prior_result`](@ref) is `true`, reads `pr`.
 
@@ -1291,6 +1313,75 @@ end
 function ucs_risk_measure(rs::AbstractVector, rd, pr)
     fitted = [ucs_risk_measure(r, rd, pr) for r in rs]
     return all(splat(===), zip(fitted, rs)) ? rs : fitted
+end
+"""
+    holds_ucs_estimator(x) -> Bool
+    holds_ucs_estimator(r::AbstractBaseRiskMeasure) -> Bool
+    holds_ucs_estimator(r::UncertaintySetVariance{<:Any, <:AbstractUncertaintySetEstimator}) -> Bool
+    holds_ucs_estimator(rt::ArithmeticReturn{<:Any, <:AbstractUncertaintySetEstimator}) -> Bool
+    holds_ucs_estimator(rs::VecBaseRM) -> Bool
+    holds_ucs_estimator(rt::VecJRE) -> Bool
+
+Return whether a risk measure or a return term holds an estimator of an uncertainty set that is not fitted.
+
+An [`UncertaintySetVariance`](@ref) and an [`ArithmeticReturn`](@ref) with an estimator in `ucs` hold one. A composite measure holds one when a part that its [`deferred_slots`](@ref) declares holds one, and a vector when one of its elements does. The types decide the answer, so it is a constant for a single measure and for a vector of one concrete type. A vector of mixed measures pays one dynamic call for each element, with no allocation.
+
+# Related
+
+  - [`resolve_ucs_measure`](@ref)
+  - [`ucs_risk_measure`](@ref)
+  - [`deferred_slots`](@ref)
+"""
+function holds_ucs_estimator(::Any)
+    return false
+end
+function holds_ucs_estimator(r::AbstractBaseRiskMeasure)
+    return any(holds_ucs_estimator, values(deferred_slots(r)))
+end
+function holds_ucs_estimator(::UncertaintySetVariance{<:Any,
+                                                      <:AbstractUncertaintySetEstimator})
+    return true
+end
+function holds_ucs_estimator(rs::VecBaseRM)
+    return any(holds_ucs_estimator, rs)
+end
+"""
+    resolve_ucs_measure(r::BaseRM_VecBaseRM, pr::AbstractPriorResult, slv, rd::ReturnsResult)
+
+Resolve a risk measure against a prior result, with each estimator of an uncertainty set that it holds fitted on the returns data.
+
+A reader that computes the values of a measure, and builds no model, calls it: [`HierarchicalRiskParity`](@ref), [`HierarchicalEqualRiskContribution`](@ref) and [`RiskLoss`](@ref). A measure that holds no estimator of a set takes the plain [`factory`](@ref), so it pays nothing for the fit. The `JuMP` heads fit their sets with [`ucs_risk_measure`](@ref) before the build, because the rows of the model read them too.
+
+# Algorithm
+
+ 1. When [`holds_ucs_estimator`](@ref) is `true`, return `factory(r, pr, slv, rd)`, which fits the sets on `rd` and `pr`.
+ 2. Otherwise return `factory(r, pr, slv)`.
+
+# Arguments
+
+  - $(arg_dict[:r])
+  - $(arg_dict[:pr])
+  - `slv`: The solver that the optimisation gives to the measure, or `nothing`.
+  - $(arg_dict[:rd])
+
+# Returns
+
+  - `r'`: The resolved measure, or the vector of them.
+
+# Related
+
+  - [`holds_ucs_estimator`](@ref)
+  - [`ucs_risk_measure`](@ref)
+  - [`UncertaintySetVariance`](@ref)
+  - [`factory`](@ref)
+"""
+function resolve_ucs_measure(r::BaseRM_VecBaseRM, pr::AbstractPriorResult, slv,
+                             rd::ReturnsResult)
+    return if holds_ucs_estimator(r)
+        factory(r, pr, slv, rd)
+    else
+        factory(r, pr, slv)
+    end
 end
 """
     reader_frames(r::UncertaintySetVariance, path::AbstractString, refit::Bool)

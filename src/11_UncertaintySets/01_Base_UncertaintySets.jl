@@ -436,7 +436,7 @@ end
 
 Returns an uncertainty set estimator unchanged, because an estimator has no asset axis to restrict.
 
-The method is a passthrough, so it has no `# Algorithm` section. A hierarchical optimiser calls [`port_opt_view`](@ref) once for each cluster. Later, the optimiser fits the estimator on the returns of the cluster. So the fit does the restriction, and this method does not. The methods that take a built result apply the index, and each one states its steps.
+The method is a passthrough, so it has no `# Algorithm` section. The optimiser that takes the view fits the estimator on the returns of the view. So the fit does the restriction, and this method does not. The methods that take a built result apply the index, and each one states its steps.
 
 # Arguments
 

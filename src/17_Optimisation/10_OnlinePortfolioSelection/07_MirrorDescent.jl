@@ -1280,13 +1280,16 @@ A leg that the window does not cover gets a zero gradient, so the loss does not 
 
 The measure reads the rows `rd` that the prior is fitted on: each [`DataBenchmarkTracking`](@ref) of the measure binds to their benchmark with [`bind_data_benchmark`](@ref), after the view at the mask. The constructor of the loss refuses a data benchmark under a prior that states `x_src = ExcessSource()`, so a data benchmark meets only a prior of the raw rows.
 
-When the mask is `nothing`, every asset is priced, and the method returns [`risk_gradient`](@ref) of the bound measure at `u`. Otherwise it runs these steps.
+[`resolve_ucs_measure`](@ref) resolves the bound measure against the prior, and it fits the uncertainty set of an [`UncertaintySetVariance`](@ref) or of an [`ArithmeticReturn`](@ref) on the rows `rd`, so the gradient is that of the worst case. An estimator of a set that draws samples draws them again at each step, unless it states a seed.
+
+When the mask is `nothing`, every asset is priced, and the method returns [`risk_gradient`](@ref) of the resolved measure at `u`. Otherwise it runs these steps.
 
  1. Find the indices `idx` of the assets on the mask.
  2. Make the zero vector `g` of the length of `u`.
  3. View the measure at `idx` with [`port_opt_view`](@ref). The view cuts a benchmark, a turnover reference or a moment that the measure holds to the legs on the mask.
  4. Bind the viewed measure to the rows viewed at `idx`.
- 5. Write [`risk_gradient`](@ref) of the bound measure at `u[idx]`, against the prior viewed at `idx`, into `g[idx]`. The slice of `u` is not renormalised.
+ 5. Resolve the bound measure against the prior and the rows viewed at `idx`, with [`resolve_ucs_measure`](@ref).
+ 6. Write [`risk_gradient`](@ref) of the resolved measure at `u[idx]`, on the returns of the viewed prior, into `g[idx]`. The slice of `u` is not renormalised.
 
 # Related
 
@@ -1296,14 +1299,18 @@ When the mask is `nothing`, every asset is priced, and the method returns [`risk
 """
 function investable_risk_gradient(obj::RiskLoss, u::AbstractVector, pr::AbstractPriorResult,
                                   ::Nothing, rd::ReturnsResult)
-    return risk_gradient(bind_data_benchmark(obj.r, rd), u, pr; sca = obj.sca)
+    r = resolve_ucs_measure(bind_data_benchmark(obj.r, rd), pr, nothing, rd)
+    return risk_gradient(r, u, pr.X; sca = obj.sca)
 end
 function investable_risk_gradient(obj::RiskLoss, u::AbstractVector, pr::AbstractPriorResult,
                                   imsk::BitVector, rd::ReturnsResult)
     idx = findall(imsk)
     g = zeros(eltype(u), length(u))
-    r = bind_data_benchmark(port_opt_view(obj.r, idx, pr.X), port_opt_view(rd, idx))
-    g[idx] .= risk_gradient(r, u[idx], port_opt_view(pr, idx); sca = obj.sca)
+    rd = port_opt_view(rd, idx)
+    r = bind_data_benchmark(port_opt_view(obj.r, idx, pr.X), rd)
+    pr = port_opt_view(pr, idx)
+    r = resolve_ucs_measure(r, pr, nothing, rd)
+    g[idx] .= risk_gradient(r, u[idx], pr.X; sca = obj.sca)
     return g
 end
 """

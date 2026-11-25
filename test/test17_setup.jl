@@ -39,7 +39,7 @@ pr = prior(HighOrderPriorEstimator(), rd)
 clr = clusterise(ClustersEstimator(), pr)
 w0 = range(; start = inv(size(pr.X, 2)), stop = inv(size(pr.X, 2)), length = size(pr.X, 2))
 opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv)
-rs = [EqualRisk(), Variance(), StandardDeviation(), UncertaintySetVariance(),
+rs = [EqualRisk(), Variance(), StandardDeviation(), UncertaintySetVariance(; ucs = nothing),
       LowOrderMoment(), HighOrderMoment(), Kurtosis(), NegativeSkewness(), ValueatRisk(),
       ValueatRiskRange(), ConditionalValueatRisk(),
       DistributionallyRobustConditionalValueatRisk(), ConditionalValueatRiskRange(),

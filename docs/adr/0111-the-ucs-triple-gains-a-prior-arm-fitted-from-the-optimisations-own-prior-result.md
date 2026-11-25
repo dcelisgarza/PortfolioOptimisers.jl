@@ -244,3 +244,27 @@ an Allocation Set calls it for its ceilings and its tracking errors on the prior
 corner solves of a centring read the reduced prior of the head as their own prior, so one fit serves
 them all, and the consequence "fits that set once per corner" no longer holds. The builder keeps its
 fit for a caller that gives it an estimator directly.
+
+## Amendment (2026-11-25)
+
+The section "The hierarchical route needs nothing" holds for the view alone (#2324). An estimator
+crosses a cluster boundary unchanged, but no head refitted it: `factory` of an
+`UncertaintySetVariance` kept the estimator, and the functor gave the nominal variance. So the two
+hierarchical heads allocated as a plain `Variance`, and a `RiskLoss` took the gradient of one.
+
+A reader that computes values and builds no model now resolves its measure with
+`resolve_ucs_measure(r, pr, slv, rd)`. These readers are `HierarchicalRiskParity`,
+`HierarchicalEqualRiskContribution` and `RiskLoss`. The verb passes the reduced returns data to
+`factory` in the place of the set, and only `UncertaintySetVariance` and `ArithmeticReturn` read it
+there. A composite measure and a vector already forward their arguments, so the data reaches every
+nested measure with no walk of its own.
+
+The maintainer ruled that no other measure pays for the repair. `holds_ucs_estimator` guards the
+call, and the types decide it, so it is a constant for a single measure and for a vector of one
+concrete type, and those calls run the code that they ran before. A vector of mixed measures pays
+about 15 ns for each measure and no allocation, once for each optimisation. Two other forms lost on
+the same measurement: a keyword of `factory`, and the data passed to every measure, each added 64
+bytes for each measure of a mixed vector.
+
+The value over an ellipsoid reads the quadratic form of its matrix. A hierarchical head evaluates
+about `3 N` portfolios, and the root of the `N^2` by `N^2` matrix was taken at each one.

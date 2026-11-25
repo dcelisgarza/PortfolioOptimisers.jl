@@ -361,6 +361,12 @@ function factory(rt::ArithmeticReturn, pr::AbstractPriorResult, ::Any,
                           (; ucs = ucs_selector(rt.ucs, ucs),
                            mu = nothing_scalar_array_selector(rt.mu, pr.mu)))
 end
+function factory(rt::ArithmeticReturn, pr::AbstractPriorResult, ::Any, rd::ReturnsResult,
+                 args...; kwargs...)
+    # The returns data in the place of a set fits the estimator of the set, as `factory` of
+    # an `UncertaintySetVariance` does.
+    return ucs_returns_estimator(factory(rt, pr), rd, pr)
+end
 function factory(rt::ArithmeticReturn, pr::AbstractPriorResult,
                  ucs::Option{<:UcSE_UcS} = nothing; kwargs...)
     rt = resolve_deferred_quantities(rt, pr)
@@ -846,6 +852,8 @@ Fit the estimator in the `ucs` of an [`ArithmeticReturn`](@ref) on the returns d
 
 [`resolve_jump_optimiser`](@ref) calls it once, on the reduced prior and the reduced returns data that the builder of the model reads. So the model, the levels of a return [`Frontier`](@ref), the anchors of [`NearOptimalCentering`](@ref) and its sub-problems read one fitted set, and [`ucs_expected_return`](@ref) gives the worst case that the model bounds. It is the return twin of [`ucs_risk_measure`](@ref). The prior exists here, so an estimator that reads a prior result is fitted too, through [`mu_ucs`](@ref) of three arguments.
 
+[`factory`](@ref) of an [`ArithmeticReturn`](@ref) calls it too, when its caller passes the returns data in the place of a set. So a [`RiskLoss`](@ref) over an [`ExpectedReturn`](@ref) reads the worst case.
+
 A set that is already fitted, `nothing`, and a term of another type return unchanged. A vector of terms is fitted term by term.
 
 # Arguments
@@ -877,6 +885,12 @@ function ucs_returns_estimator(rt::JuMPReturnsEstimator, ::ReturnsResult,
 end
 function ucs_returns_estimator(rt::VecJRE, rd::ReturnsResult, pr::AbstractPriorResult)
     return [ucs_returns_estimator(rt_i, rd, pr) for rt_i in rt]
+end
+function holds_ucs_estimator(::ArithmeticReturn{<:Any, <:AbstractUncertaintySetEstimator})
+    return true
+end
+function holds_ucs_estimator(rt::VecJRE)
+    return any(holds_ucs_estimator, rt)
 end
 """
     bounds_returns_estimator(r, lb)

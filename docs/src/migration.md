@@ -1116,6 +1116,8 @@ Each entry is about an `UncertaintySetVariance` with an estimator in `ucs`, such
 - **`RiskTrackingRiskMeasure` and `RiskTrackingError` with `DependentVariableTracking`** compare the worst-case variance of the portfolio with the worst-case variance of the benchmark. v0.34.5 compared it with the nominal variance of the benchmark.
 - **The field `r` of the result of a `JuMP` optimiser** holds the fitted set. So `expected_risk(res.r, res.w, res.pr)` gives the worst case that the optimiser read, where v0.34.5 gave the nominal variance.
 - **`NearOptimalCentering` with an estimator that reads the prior result**, such as `NormalUncertaintySet(; pe = nothing)` or `OrthogonalUncertaintySet()`, computes the risks of its anchors on the worst case. v0.34.5 computed them on the nominal variance, and fitted the set again for each anchor.
+- **`HierarchicalRiskParity` and `HierarchicalEqualRiskContribution`** fit the set once on the returns data and the prior of the optimisation, and allocate on the worst case. v0.34.5 allocated on the nominal variance, so the default `UncertaintySetVariance()` gave the weights of `Variance()`. The same holds for an `UncertaintySetVariance` inside a `RiskRatio`, a `RiskTrackingRiskMeasure` or a vector of measures. An estimator with its own `pe` reads the returns data, so a call with a prior result in `opt.pe` and no returns data raises an `IsNothingError`. Pass the returns data, or set `pe = nothing` in the estimator, which then reads the prior result. An estimator that draws samples gives other weights at each call, unless it states a seed.
+- **`RiskLoss`** takes the gradient of the worst case, for an `UncertaintySetVariance` and for an `ArithmeticReturn` with an estimator in `ucs` inside an `ExpectedReturn` or an `ExpectedReturnRiskRatio`. v0.34.5 took the gradient of the nominal value.
 
 ### [Calls that now succeed](@id migration-0-34-6-success)
 
@@ -1126,3 +1128,4 @@ Each entry is about an `UncertaintySetVariance` with an estimator in `ucs`, such
 ### [If you extend the library](@id migration-0-34-6-extending)
 
 - **`PortfolioOptimisers.ucs_risk_measure(r, rd)`**, an internal function, takes the prior result too: `ucs_risk_measure(r, rd, pr)`.
+- **`PortfolioOptimisers.ucs_variance(ucs, sigma, w, mtx_sqrt)`**, an internal function, takes no `mtx_sqrt`. The value over an ellipsoid reads the quadratic form of its matrix and no square root, so an `UncertaintySetVariance(; mtx_sqrt = nothing)` gives a value at a singular matrix, where v0.34.5 raised a `LinearAlgebra.PosDefException`. The model still reads the square root, and still raises.
