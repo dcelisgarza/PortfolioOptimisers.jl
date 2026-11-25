@@ -28,9 +28,9 @@ permissions:
 concurrency:
   # Skip intermediate builds: always.
   # Cancel intermediate builds: only of a pull request or of a `dev-` branch, whose new head
-  # has runs of its own. ADR 0220.
+  # has runs of its own. A manual run cancels nothing, because it gives no `- push` check. ADR 0220.
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') || startsWith(github.ref, 'refs/heads/dev-') }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/dev-')) }}
 
 jobs:
   # Citing an approved Rationale is bookkeeping that any contributor may do. Adding one is a

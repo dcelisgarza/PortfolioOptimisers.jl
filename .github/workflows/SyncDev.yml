@@ -4,7 +4,8 @@ name: Sync dev
 # commits behind `main`, and issues were filed by rules that `main` had replaced. So each push to
 # `main` merges `main` into `dev` (ADR 0240).
 #
-# A conflict turns the run red. A session then merges `main` into `dev` by hand. A merge by
+# A conflict turns the run red. A session then merges `main` into `dev` by hand. A rewind of `main`
+# turns it red too, because `dev` still holds the commits that `main` lost. A merge by
 # `GITHUB_TOKEN` starts no workflow, so the head of `dev` gets its checks at the next push of a
 # session. The ruleset of `main` waits for them.
 
@@ -31,6 +32,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          REWOUND: ${{ github.event.forced }}
         run: |
           set -euo pipefail
           found="$(gh api "repos/$GH_REPO/git/matching-refs/heads/dev" \
@@ -38,6 +40,11 @@ jobs:
           if [ -z "$found" ]; then
             echo "origin has no dev."
             exit 0
+          fi
+          # A merge takes no commit out of dev, and the next batch puts each one back on main.
+          if [ "$REWOUND" = true ]; then
+            echo "::error::main moved back. Remove from dev each commit that main lost."
+            exit 1
           fi
           # The server makes the merge, and it answers 204 when dev holds main, and 409 on a conflict.
           if ! gh api "repos/$GH_REPO/merges" -f base=dev -f head=main \

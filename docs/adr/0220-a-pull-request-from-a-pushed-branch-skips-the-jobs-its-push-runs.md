@@ -134,9 +134,11 @@ The queue held 31 runs, and the runs of three merged branches and of an old head
 1. **A newer push to a `dev-` branch cancels the runs of the old head.** The merge reads the checks of
    the new head alone. `Test.yml` and `Aqua.yml` had no concurrency group. They have one for each
    `dev-` branch now, and a group of its own for each other run, so each commit of `main`, `dev` and a
-   tag keeps its run. The other workflows cancel on `refs/heads/dev-` as on `refs/pull/`.
+   tag keeps its run. The other workflows cancel on `refs/heads/dev-` as on `refs/pull/`. A manual
+   run cancels no push run, because its check does not carry a `- push` name.
 2. **The close of a pull request cancels the push runs of its branch** (`ClosedBranch.yml`), unless
-   the branch has another open pull request. The push to `main` tests the tree of the merge.
+   the branch has another open pull request. The push to `main` tests the tree of the merge. A pull
+   request that opens again needs a new run of each cancelled check.
 3. **The ruleset has a file.** `.github/rulesets/protect-main.json` holds the rules, and
    `Ruleset.yml` compares the live ruleset with it each day. On 2026-11-24 the live ruleset asked for a
    current base, which this ADR and ADR 0240 refuse, and it had the admin role as a bypass actor. The
@@ -146,6 +148,7 @@ The queue held 31 runs, and the runs of three merged branches and of an old head
 5. **`dev` follows `main`.** Sessions start in a checkout of `dev`, which stood five commits behind
    `main`, and they filed issues by rules that `main` had replaced. `SyncDev.yml` merges `main` into
    `dev` after each push to `main`, and a conflict turns it red. A merge by `GITHUB_TOKEN` starts no
-   workflow, so that head gets its checks at the next push of a session.
+   workflow, so that head gets its checks at the next push of a session. A rewind of `main` turns the
+   run red too, because `dev` still holds the commits that `main` lost.
 
 Item 1 replaces the sentence of ADR 0240, § *Own branch*, that each commit of a branch keeps a run.
