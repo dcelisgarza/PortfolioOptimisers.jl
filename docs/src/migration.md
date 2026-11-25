@@ -1114,3 +1114,23 @@ A `ConstraintBlock` holds concentration rules, such as the UCITS 5/10/40 rule, i
 - **`GreedyAllocation`** takes five positional arguments, where v0.34.6 took three or four, because `fb` is now the fifth field and has no default. Pass `nothing` after `sets`, or use the keyword constructor. The type parameters gain one entry after the one of `sets`.
 - **The show** of both types prints the row `idx ┼ nothing` after `sets`. A doctest of your own that prints an allocator gains the row.
 - **An allocator with a `LotUnitEstimator`, after a selection.** `optimise` on the selected assets raised a `DimensionMismatch`, and with the `sets` viewed by hand it raised an `ArgumentError` under `strict`. Give `PortfolioOptimisers.port_opt_view(allocator, idx)` the index of the selection, and it buys the lots of the assets that remain.
+
+## From v0.34.7 to v0.34.8
+
+### [Calls that now answer](@id migration-0-34-8-answers)
+
+| Call | v0.34.7 | v0.34.8 |
+| --- | --- | --- |
+| `prior` of an `OpinionPoolingPrior` with `alg = LogarithmicOpinionPooling()`, when an opinion of zero probability gives an observation a zero weight | `ArgumentError` | Runs. The opinion does not change the pool. |
+| `prior` of an `OpinionPoolingPrior` with a large `p`, when the penalty takes the probability of every opinion below the smallest number | `ArgumentError` | Runs. The opinions nearest the consensus keep the probability. |
+
+### [Calls that now raise](@id migration-0-34-8-raises)
+
+| Call | v0.34.7 | v0.34.8 |
+| --- | --- | --- |
+| `OpinionPoolingPrior(; p = Inf)` | `ArgumentError` in `prior` | Raises a `DomainError` at the construction. |
+
+### [Results that move](@id migration-0-34-8-numbers)
+
+- **An entropy pooling prior with `OptimEntropyPooling`, the default optimiser, and a prior probability of zero** meets its views. With `alg = LogEntropyPooling()`, v0.34.7 stopped at the start of the solve and reported success, and the posterior missed the views. With `alg = ExpEntropyPooling()`, v0.34.7 could miss a view when an observation of zero prior probability held an extreme value. `JuMPEntropyPooling` had neither defect.
+- **An `EntropyPoolingPrior` or a `MeucciEntropyPoolingPrior` with a prior probability of zero at an extreme return**, such as a crash that `w` removes, meets its views under every optimiser. v0.34.7 scaled each view with the return that the prior removes. A kurtosis view could miss its target by a third of it. An entropic value at risk view gave the prior back, with no error, or raised an error about the grid or about a `NaN` coefficient. The views now read the mean row of the other observations there, so the posterior moves by rounding when the removed returns are ordinary.
