@@ -1135,9 +1135,9 @@ A `ConstraintBlock` holds concentration rules, such as the UCITS 5/10/40 rule, i
 - **An entropy pooling prior with `OptimEntropyPooling`, the default optimiser, and a prior probability of zero** meets its views. With `alg = LogEntropyPooling()`, v0.34.7 stopped at the start of the solve and reported success, and the posterior missed the views. With `alg = ExpEntropyPooling()`, v0.34.7 could miss a view when an observation of zero prior probability held an extreme value. `JuMPEntropyPooling` had neither defect.
 - **An `EntropyPoolingPrior` or a `MeucciEntropyPoolingPrior` with a prior probability of zero at an extreme return**, such as a crash that `w` removes, meets its views under every optimiser. v0.34.7 scaled each view with the return that the prior removes. A kurtosis view could miss its target by a third of it. An entropic value at risk view gave the prior back, with no error, or raised an error about the grid or about a `NaN` coefficient. The views now read the mean row of the other observations there, so the posterior moves by rounding when the removed returns are ordinary.
 
-## From v0.34.8 to v0.34.9
+## From v0.34 to v0.35
 
-### [Views of a finite allocation](@id migration-0-34-9-allocators)
+### [Views of a finite allocation](@id migration-0-35-allocators)
 
 `DiscreteAllocation` and `GreedyAllocation` no longer have the field `idx`. `PortfolioOptimisers.port_opt_view(allocator, i)` resolves a `LotUnitEstimator` against the whole `sets`, and returns an allocator that holds the `LotUnit` of the assets `i`, with `sets = nothing`. A name that the view left out still gives no diagnostic.
 
