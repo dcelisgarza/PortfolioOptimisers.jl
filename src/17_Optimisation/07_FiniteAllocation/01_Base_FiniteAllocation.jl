@@ -401,7 +401,7 @@ Where:
   - `w`: Target portfolio weights over the full universe. A negative weight is on the short side.
   - `umsk`: Mask of the Unpriced Assets, in the order of `w`.
 
-The returned vector must have the length of `w`, and a zero at every Unpriced Asset. The allocators check both conditions, and throw an `ArgumentError` when one fails. A plain function with the same signature is also a valid `upw`. A rule that holds a value or a position for each asset also defines [`port_opt_view`](@ref), as [`AssetRedistribution`](@ref) does. [`unpriced_weights`](@ref) states the zero-weight reading of `nothing`, which a rule can call to start from.
+The returned vector must have the length of `w`, and a zero at every Unpriced Asset. The allocators check both conditions, and throw an `ArgumentError` when one fails. A plain function with the same signature is also a valid `upw`. A rule that holds a value or a position for each asset also defines [`port_opt_view`](@ref), as [`AssetRedistribution`](@ref) does. A plain function passes a view unchanged, so write a rule of the family for a function that names positions. [`unpriced_weights`](@ref) states the zero-weight reading of `nothing`, which a rule can call to start from.
 
 # Examples
 

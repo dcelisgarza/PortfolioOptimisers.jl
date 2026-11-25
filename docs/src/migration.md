@@ -1139,13 +1139,13 @@ A `ConstraintBlock` holds concentration rules, such as the UCITS 5/10/40 rule, i
 
 ### [Views of a finite allocation](@id migration-0-34-9-allocators)
 
-`DiscreteAllocation` and `GreedyAllocation` no longer have the field `idx`. `PortfolioOptimisers.port_opt_view(allocator, i)` resolves a `LotUnitEstimator` against the whole `sets`, and returns an allocator that holds the `LotUnit` and the `sets` of the assets `i`. A name that the view left out still gives no diagnostic.
+`DiscreteAllocation` and `GreedyAllocation` no longer have the field `idx`. `PortfolioOptimisers.port_opt_view(allocator, i)` resolves a `LotUnitEstimator` against the whole `sets`, and returns an allocator that holds the `LotUnit` of the assets `i`, with `sets = nothing`. A name that the view left out still gives no diagnostic.
 
 - **`DiscreteAllocation`** takes eight positional arguments, where v0.34.8 took nine. Remove the argument after `sets`, or use the keyword constructor. The type parameters lose the entry after the one of `sets`.
 - **`GreedyAllocation`** takes four positional arguments, where v0.34.8 took five. Remove the argument after `sets`, or use the keyword constructor. The type parameters lose the entry after the one of `sets`. The fallback has no positional default, so the three-argument form of v0.34.6 does not return.
 - **The keyword `idx`** is gone from both constructors. Replace `GreedyAllocation(; unit = unit, sets = sets, idx = i)` with `PortfolioOptimisers.port_opt_view(GreedyAllocation(; unit = unit, sets = sets), i)`.
 - **The show** of both types loses the row `idx ┼ nothing`.
-- **The fields of a view.** `unit` is a `LotUnit` of the selected assets and `sets` holds the selected assets alone, where v0.34.8 kept both whole.
+- **The fields of a view.** `unit` is a `LotUnit` of the selected assets and `sets` is `nothing`, where v0.34.8 kept both whole.
 - **A name outside the whole universe** raises or warns at the view, where v0.34.8 did so at `optimise`.
 - **The number type of the lots of a view** comes from the values of the `LotUnitEstimator`, where v0.34.8 took the number type of the input. A `Float32` input with `Float64` lots can give a share count that differs in its last digit. The share counts keep the number type of the input.
 

@@ -1368,7 +1368,7 @@ end
             for a in (ga, da)
                 v = PO.port_opt_view(a, i)
                 @test v.unit.val == [0.5, 0.25]
-                @test v.sets.dict["nx"] == ["B", "D"]
+                @test isnothing(v.sets)
                 r = optimise(v, wc)
                 @test r.shares ==
                       optimise(PO.rebuild_struct(a, (; unit = LotUnit(l[[2, 4]]))), wc).shares
@@ -1391,10 +1391,22 @@ end
 
         # A view of a view indexes the assets that the first view kept, in the stated order.
         v2 = PO.port_opt_view(PO.port_opt_view(ga, BitVector([1, 1, 0, 1])), [3, 1])
-        @test v2.sets.dict["nx"] == ["D", "A"]
+        @test isnothing(v2.sets)
         @test v2.unit.val == [0.25, 100.0]
         # The whole axis keeps every asset.
         @test PO.port_opt_view(ga, :).unit.val == l
+        # The index is on the universe that `key` selects, which can be longer than the one of
+        # `xkey`.
+        ksets = UniverseSets(;
+                             dict = Dict("nx" => ["A", "B"],
+                                         "isin" => ["a", "b", "c", "d"]))
+        ku = LotUnitEstimator(; val = Dict("d" => 5.0), key = "isin")
+        for a in (GreedyAllocation(; unit = ku, sets = ksets, strict = true),
+                  DiscreteAllocation(; slv = mip_slv, unit = ku, sets = ksets, strict = true))
+            v = PO.port_opt_view(a, [2, 4])
+            @test v.unit.val == [1.0, 5.0]
+            @test is_lot_multiple(collect(optimise(v, wc).shares), [1.0, 5.0])
+        end
 
         # Every form of the estimator gives the lots of the whole universe at the cut, and the
         # share counts have the number type of the input.

@@ -199,7 +199,8 @@ Keywords correspond to the struct's fields. The default fallback reads the same 
 `DiscreteAllocation` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
 
   - A [`LotUnitEstimator`](@ref) in `unit` resolves against the whole `sets`, under `strict`, and the view holds the [`LotUnit`](@ref) of the selected assets. A name that the view left out is a correct name, so it gives no diagnostic. A name outside the whole universe gives one.
-  - A [`LotUnit`](@ref) in `unit` and the `sets` are sliced to the selected assets.
+  - A [`LotUnit`](@ref) in `unit` is sliced to the selected assets.
+  - `sets` becomes `nothing`, because the [`LotUnit`](@ref) of the view resolves no name.
   - `fb` goes through [`view_child`](@ref), which views a fallback estimator and keeps a fallback result.
 
 # Examples
@@ -316,9 +317,9 @@ Call it after a selection, with the index that cut the returns data, so that the
 # Algorithm
 
  1. Resolve `unit` with [`lot_unit_constraints`](@ref) against the whole `sets`, under `strict`. The fill value of an unnamed asset is an integer one, so the number type of the lots comes from the values of `unit`.
- 2. View the resolved lot unit and the `sets` at `i`.
+ 2. View the resolved lot unit at `i`.
  3. View `fb` at `i` through [`view_child`](@ref), so the fallback reads the same assets.
- 4. Rebuild the allocator with the new `unit`, `sets` and `fb`. The other fields hold no value for each asset.
+ 4. Rebuild the allocator with the new `unit` and `fb`, and with `sets` set to `nothing`, because a [`LotUnit`](@ref) resolves no name. The other fields hold no value for each asset.
 
 # Arguments
 
@@ -354,8 +355,7 @@ true
 function port_opt_view(da::DiscreteAllocation, i, args...)::DiscreteAllocation
     unit = lot_unit_constraints(da.unit, da.sets; datatype = Int, strict = da.strict)
     return rebuild_struct(da,
-                          (; unit = port_opt_view(unit, i),
-                           sets = port_opt_view(da.sets, i),
+                          (; unit = port_opt_view(unit, i), sets = nothing,
                            fb = view_child(da.fb, i, args...)))
 end
 """
