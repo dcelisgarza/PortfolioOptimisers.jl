@@ -1065,3 +1065,72 @@ A static `TensorPanelField` and a static feature matrix keep `assets × labels` 
 ### [Calls that now succeed](@id migration-0-34-3-success)
 
 - **`DependentVariableTracking` of a measure with a quadratic risk expression**, such as `Variance()` without a semidefinite phylogeny. v0.34.2 logged a warning at the construction of a `RiskTrackingRiskMeasure`, and the solver refused the model. v0.34.3 states the risk with a rotated second-order cone, and the constructor logs no warning.
+
+## From v0.34.4 to v0.34.5
+
+### [Calls that now answer](@id migration-0-34-5-answers)
+
+| Call | v0.34.4 | v0.34.5 |
+| --- | --- | --- |
+| A covariance estimator of another package, such as `StatsBase.SimpleCovariance(; corrected = true)`, in a slot that reads the variances of a matrix: the `ve` of `KendallCovariance`, `SpearmanCovariance`, `MutualInfoCovariance`, `LowerTailDependenceCovariance`, `DimensionReductionRegression`, `ImpliedVolatilityRegression`, `ElasticNet`, `FactorPrior`, `FactorBlackLittermanPrior` and `CrossSectionalFactorPrior`, and the `ce` of `EWVolatility` | Refused by the constructor | Runs. The fit reads the variances of the estimator, the diagonal of its covariance matrix. A covariance estimator of the library runs in each of these slots too. The estimator of another package gets no observation weights. A slot that reads the variance of one vector, such as the `ve` of `SecondMoment`, `HighOrderMoment`, `ThirdCentralMoment` and `WindowedVariance`, still takes a variance estimator alone. |
+| `WindowedCovariance(; ce = StatsBase.SimpleCovariance())` in `cov`, `cor`, `var`, `std` or a variance series, and `PortfolioOptimisersCovariance(; ce = StatsBase.SimpleCovariance())` as the `ce` of `EWVolatility` or the `ve` of `CrossSectionalFactorPrior` | `MethodError` at the fit | Runs. |
+| `DimensionReductionRegression(; ve = ExpWeightedVariance())`, or another `ve` with no field `me` | `FieldError` at the fit | Runs. The mean of the factors takes the weights of `retgt`. |
+| `partial_fit!` of a `CrossSectionalFactorPrior` whose `ve` folds and is not an `ExpWeightedVariance` or a `RegimeAdjustedExpWeightedVariance`, such as `SimpleVariance()`, `Covariance()`, `GeneralCovariance()` or `ExpWeightedCovariance()` | `MethodError` at the first fit | Runs, and the call with no data equals the batch fit. A `ve` that is not mask-aware refuses a step with a gap with an `IsNonFiniteError`, as the batch fit does. |
+| `var(ce)` and `std(ce)` with no data, for a covariance estimator that holds a partial-fit state | `MethodError` | The diagonal of `cov(ce)`, and its square root. |
+| `partial_fit!` of a prior whose covariance is a `GeneralCovariance` or a `Covariance` over an estimator other than `StatsBase.SimpleCovariance`, such as `EmpiricalPrior(; ce = Covariance(; ce = MyCovariance()))` | `ArgumentError` at the fold | Runs. `supports_partial_fit` answers `false` for such an estimator, so the prior runs the batch verb over its own rows, as it does for the bare estimator. `partial_fit!` of the estimator itself still raises the `ArgumentError`. |
+| `covariance_forecast_evaluation` of a covariance estimator of another package | `MethodError` | Runs, as for `GeneralCovariance(; ce = ce)`. |
+| `partial_fit!(ce::GeneralCovariance, X; active_mask)`, and the carry of an `EmpiricalPrior` with `ce = GeneralCovariance()` over an asset panel that varies in time | `MethodError` | Runs. An inactive cell folds as a `NaN`, as in a `Covariance`. |
+
+### [Results that move](@id migration-0-34-5-numbers)
+
+- **`DimensionReductionRegression` with `ve = SimpleVariance(; me = nothing)` and weights in `retgt`** takes the mean of the factors under those weights. v0.34.4 took the mean with no weights, so the intercept that it rebuilt was not the intercept of the fit.
+- **`var`, `std` and a variance series of a `GeodesicShrinkageCovariance` over an asset panel**, when its `ce` is mask-aware, such as `ExpWeightedCovariance()`, read the gaps of the sample, as its `cov` does. v0.34.4 removed each asset with a gap from the window and gave it `NaN`, where `cov` estimates it. An `EWResidualVolatility` now takes such an estimator as its `ce`.
+
+### [If you extend the library](@id migration-0-34-5-extending)
+
+- **A variance estimator of your own in `DimensionReductionRegression`** that holds a mean estimator in a field `me` adds a method `PortfolioOptimisers.standardisation_mean(ve::MyVariance, w) = ve.me`. Without it the mean of the factors takes the weights of `retgt`.
+- **A variance estimator of your own that folds, in the `ve` of `CrossSectionalFactorPrior`**, gets the `active_mask` keyword alone in `partial_fit!`. Add a method of `PortfolioOptimisers.fold_mask_keywords` that gives the estimation mask too, if the fold reads it. A fold that reads the active mask adds a method of `PortfolioOptimisers.reads_active_mask` that returns `true`. Without it, a step with a gap raises an `IsNonFiniteError`.
+
+## From v0.34.5 to v0.34.6
+
+### [Concentration limits](@id migration-0-34-6-concentration)
+
+A `ConstraintBlock` holds concentration rules, such as the UCITS 5/10/40 rule, in the new slot `conc`. Code that builds the block, its Result or an asset sets matrix estimator by keyword does not change.
+
+- **`ConstraintBlock`** has the field `conc` after `sgst`, so its positional constructor takes 33 arguments, where v0.34.5 took 32. Pass `nothing` after `sgst`, or use the keyword constructor. The type parameters gain one entry after the one of `sgst`.
+- **`ResolvedConstraintBlock`** has the field `conc` after `sgst`, so its positional constructor takes 33 arguments, where v0.34.5 took 32. The type parameters gain one entry after the one of `sgst`.
+- **The show** of a `ConstraintBlock`, and of every optimiser that holds one, prints the row `conc ┼ nothing` after `sgst`. A doctest of your own that prints a `JuMPOptimiser` gains the row.
+- **`AssetSetsMatrixEstimator`** has the field `on` after `val`, with the default `nothing`, so its type gains a second parameter. `AssetSetsMatrixEstimator(val)` still gives the v0.34.5 estimator. Its show prints the row `on ┴ nothing` last.
+- **`asset_sets_matrix`** of an estimator takes the keyword `strict`, with the default `false`, and gives it to the names of `on`. A method of your own for a precomputed matrix that `asset_sets_matrix` reads must take keywords.
+- **The exact cost budget**, a `BudgetCosts` with `xbgt = true`, names two rows of its model `cost_bgt_gd_ub` and `cost_bgt_gd_lb`, where v0.34.5 named them `cost_bgt_gz_ub` and `cost_bgt_gz_lb`. Under an objective that is not a ratio, the model holds no entry `cost_bgt_g`. Read the binaries from `cost_bgt_z` there.
+
+## From v0.34.6 to v0.34.7
+
+### [Views of a finite allocator](@id migration-0-34-7-allocators)
+
+`DiscreteAllocation` and `GreedyAllocation` have the field `idx` after `sets`, with the default `nothing`. Code that builds them by keyword does not change.
+
+- **`DiscreteAllocation`** takes nine positional arguments, where v0.34.6 took eight, because `fb` is now the ninth field. Pass `nothing` after `sets`, or use the keyword constructor. The type parameters gain one entry after the one of `sets`.
+- **`GreedyAllocation`** takes five positional arguments, where v0.34.6 took three or four, because `fb` is now the fifth field and has no default. Pass `nothing` after `sets`, or use the keyword constructor. The type parameters gain one entry after the one of `sets`.
+- **The show** of both types prints the row `idx ┼ nothing` after `sets`. A doctest of your own that prints an allocator gains the row.
+- **An allocator with a `LotUnitEstimator`, after a selection.** `optimise` on the selected assets raised a `DimensionMismatch`, and with the `sets` viewed by hand it raised an `ArgumentError` under `strict`. Give `PortfolioOptimisers.port_opt_view(allocator, idx)` the index of the selection, and it buys the lots of the assets that remain.
+
+## From v0.34.7 to v0.34.8
+
+### [Calls that now answer](@id migration-0-34-8-answers)
+
+| Call | v0.34.7 | v0.34.8 |
+| --- | --- | --- |
+| `prior` of an `OpinionPoolingPrior` with `alg = LogarithmicOpinionPooling()`, when an opinion of zero probability gives an observation a zero weight | `ArgumentError` | Runs. The opinion does not change the pool. |
+| `prior` of an `OpinionPoolingPrior` with a large `p`, when the penalty takes the probability of every opinion below the smallest number | `ArgumentError` | Runs. The opinions nearest the consensus keep the probability. |
+
+### [Calls that now raise](@id migration-0-34-8-raises)
+
+| Call | v0.34.7 | v0.34.8 |
+| --- | --- | --- |
+| `OpinionPoolingPrior(; p = Inf)` | `ArgumentError` in `prior` | Raises a `DomainError` at the construction. |
+
+### [Results that move](@id migration-0-34-8-numbers)
+
+- **An entropy pooling prior with `OptimEntropyPooling`, the default optimiser, and a prior probability of zero** meets its views. With `alg = LogEntropyPooling()`, v0.34.7 stopped at the start of the solve and reported success, and the posterior missed the views. With `alg = ExpEntropyPooling()`, v0.34.7 could miss a view when an observation of zero prior probability held an extreme value. `JuMPEntropyPooling` had neither defect.
+- **An `EntropyPoolingPrior` or a `MeucciEntropyPoolingPrior` with a prior probability of zero at an extreme return**, such as a crash that `w` removes, meets its views under every optimiser. v0.34.7 scaled each view with the return that the prior removes. A kurtosis view could miss its target by a third of it. An entropic value at risk view gave the prior back, with no error, or raised an error about the grid or about a `NaN` coefficient. The views now read the mean row of the other observations there, so the posterior moves by rounding when the removed returns are ordinary.

@@ -52,7 +52,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :pe1 => "`pe1`: Prior estimator whose returns `X` the opinions and `pe2` read, or `nothing` to read the returns as given.",#
                  :pe2 => "`pe2`: Prior estimator that the pool fits under the pooled weights. Every moment of the result comes from it.",#
                  :op_w_pe => "`w`: Opinion probabilities, one for each estimator in `pes`, each in `[0, 1]` and with a sum of at most one, or `nothing` to give every opinion the same probability. A uniform prior over the observations takes the remainder `1 - sum(w)`.",#
-                 :p_pool => "`p`: Penalty of robust opinion pooling, above zero, or `nothing` to pool the opinion weights as given. A larger value moves more weight to the opinions nearest the consensus.",#
+                 :p_pool => "`p`: Penalty of robust opinion pooling, above zero and finite, or `nothing` to pool the opinion weights as given. A larger value moves more weight to the opinions nearest the consensus.",#
                  # Entropy pooling.
                  :mu_views => "`mu_views`: Mean views, or `nothing` for no mean view.",#
                  :var_views => "`var_views`: Value at risk views, as one view group or a vector of groups, or `nothing` for no value at risk view.",#

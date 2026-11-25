@@ -114,6 +114,17 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :lu_val => "`val`: Lot unit of each asset, the number of shares in one lot, as a map from asset or group names to values, a scalar, a vector or an algorithmic rule.",#
                  :lu_res_val => "`val`: Lot unit of each asset, as one scalar for every asset or one value for each asset. A share count of an asset is a non-negative integer multiple of its lot unit. A lot unit below one buys fractional shares, and a lot unit above one buys board lots.",#
                  :lu_dval => "`dval`: Lot unit of each asset that `val` does not name. `nothing` gives `one(datatype)`, one whole share.",#
+                 :asets_on => "`on`: Asset or group names of `sets.dict` whose assets give the rows of the matrix, or `nothing` for every asset. A group of the key that holds none of these assets gives no row.",#
+                 :cnl_t => "`t`: Threshold of a large position. A position over `t` counts towards the sum limit `s`. The UCITS value is `0.05`.",#
+                 :cnl_c => "`c`: Cap on each position. The UCITS value is `0.10`. It is a cap on the issuer when `set` groups the assets by issuer.",#
+                 :cnl_s => "`s`: Limit of the sum of the positions over `t`. The UCITS value is `0.40`.",#
+                 :cnl_set => "`set`: The positions that the rule reads. `nothing` makes each asset its own position. An `AssetSetsMatrixEstimator` or a membership matrix makes each row of the matrix one position, such as one issuer, so two share classes of one issuer are one position.",#
+                 :cnl_res_set => "`set`: Membership matrix whose rows are the positions that the rule reads, or `nothing` to make each asset its own position.",#
+                 :cnl_pos => "`pos`: Reading of a position with a short side: `GrossPosition()`, `NetPosition()` or `LongPosition()`. On a long-only book the three readings are the weights.",#
+                 :cnl_alg => "`alg`: Form of the rule: `ExactConcentration()`, the mixed-integer rule itself, or `SumLargestConcentration()`, a linear form that is stricter than the rule.",#
+                 :cnm_x => "`x`: The position of each row of the rule, as `pos` and `set` read the weights.",#
+                 :cnm_cap => "`cap`: The cap margin of each position, `x - c`. A margin `<= 0` passes.",#
+                 :cnm_total => "`total`: The sum margin, the sum of the positions over `t` minus `s`. A margin `<= 0` passes.",#
                  # Preselection. `20_AssetSelection.jl` pairs two redundancy
                  # algorithms over one correlation matrix, and two selection
                  # rules over one taken set, so each of the five descriptions

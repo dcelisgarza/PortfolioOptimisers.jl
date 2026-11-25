@@ -1,7 +1,12 @@
 ```@meta
-Description = "MIP indicators has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "MIP indicators, public API of PortfolioOptimisers.jl: mip_key, declare_mip_gate!."
 ```
 
 # MIP indicators
 
-Every name of this topic is private. The [private page](@ref private-api-mip-indicators) documents them.
+The [private page](@ref private-api-mip-indicators) documents the other names of this topic.
+
+```@docs
+mip_key
+declare_mip_gate!
+```

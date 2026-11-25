@@ -112,7 +112,8 @@ more cash unspent. The table compares single shares with lots of ten.
 A lot unit can differ between assets. A vector `LotUnit` gives one lot unit to each asset, and
 a `LotUnitEstimator` names them by asset or group, and resolves against the `sets` of the
 allocator. A lot unit below one buys fractional shares. `DiscreteAllocation` takes the same
-`unit`.
+`unit`. When you cut the assets after a selection, give the same index to the allocator:
+`PortfolioOptimisers.port_opt_view(allocator, idx)` keeps the lots of the assets that remain.
 =#
 
 greedy_lots = optimise(GreedyAllocation(; unit = LotUnit(10)),
@@ -168,6 +169,6 @@ plot_stacked_bar_composition([res, greedy, discrete], rd;
 #src     The old NEGATIVE leftover (-$268.44) is gone: both greedy passes now test the cost plus
 #src     the fee against the cash left, so a lot never overdraws the budget.
 #src   - Budget sweep, discrete vs greedy drift: 25k 0.0147 vs 0.0174, 5k 0.0849 vs 0.0947; at 5k
-#src     the discrete allocation leaves more cash ($15.81 vs $5.37). DiscreteAllocation has no lots.
+#src     the discrete allocation leaves more cash ($15.81 vs $5.37).
 #src - optimise(GreedyAllocation()|DiscreteAllocation(; slv=mip), FiniteAllocationInput(; w, prices, cash)); prices =
 #src   vec(values(X)[end,:]). Result fields shares/cost/w/cash.

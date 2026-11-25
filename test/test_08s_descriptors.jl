@@ -3270,7 +3270,11 @@ end
         pnone = MatrixProcessing(; pdm = nothing)
         for ce in (Covariance(), SimpleVariance(), GerberCovariance(),
                    PortfolioOptimisersCovariance(), WindowedVariance(),
-                   WindowedVariance(; window = collect(1:40)))
+                   WindowedVariance(; window = collect(1:40)),
+                   # A covariance estimator of another package reads no mask (#2282).
+                   StatsBase.SimpleCovariance(),
+                   WindowedCovariance(; ce = StatsBase.SimpleCovariance()),
+                   PortfolioOptimisersCovariance(; ce = StatsBase.SimpleCovariance()))
             @test_throws ArgumentError EWResidualVolatility(; ce = ce)
             @test_throws r"not mask-aware" EWResidualDownsideVolatility(; ce = ce)
         end
@@ -3296,6 +3300,7 @@ end
                    WindowedVariance(; ve = SimpleVariance(; cvg = pol), window = 4),
                    WindowedCovariance(; ce = Covariance(; cvg = pol), window = 4),
                    WindowedVariance(; window = 4), WindowedCovariance(; window = 4),
+                   WindowedCovariance(; ce = StatsBase.SimpleCovariance(), window = 4),
                    WindowedVariance(; ve = WindowedVariance(; window = 4)),
                    WindowedVariance(; window = collect(2:40)),
                    PortfolioOptimisersCovariance(; ce = ExpWeightedCovariance(; min_obs = 3),
