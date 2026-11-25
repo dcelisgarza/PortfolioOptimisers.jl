@@ -1091,9 +1091,53 @@ A static `TensorPanelField` and a static feature matrix keep `assets × labels` 
 - **A variance estimator of your own in `DimensionReductionRegression`** that holds a mean estimator in a field `me` adds a method `PortfolioOptimisers.standardisation_mean(ve::MyVariance, w) = ve.me`. Without it the mean of the factors takes the weights of `retgt`.
 - **A variance estimator of your own that folds, in the `ve` of `CrossSectionalFactorPrior`**, gets the `active_mask` keyword alone in `partial_fit!`. Add a method of `PortfolioOptimisers.fold_mask_keywords` that gives the estimation mask too, if the fold reads it. A fold that reads the active mask adds a method of `PortfolioOptimisers.reads_active_mask` that returns `true`. Without it, a step with a gap raises an `IsNonFiniteError`.
 
-## From v0.34 to v0.35
+## From v0.34.5 to v0.34.6
 
-### [Results that move](@id migration-0-35-numbers)
+### [Concentration limits](@id migration-0-34-6-concentration)
 
-- **`performance_summary` of weights or of an optimisation result reads a gap in the returns as `predict` does.** v0.34 multiplied the returns by the weights as they are, and `0 * NaN` is `NaN`. So one asset with a gap made the figures `NaN`, also an asset with a zero weight, and the `cvar` was a finite wrong number. Each return that is not finite is now zero. A gap at a zero weight gives no message. A gap at a weight that is not zero gives a warning that names the asset, and an `ArgumentError` under the new keyword `strict = true`. So `performance_summary(res, rd)` gives the figures of `performance_summary(predict(res, rd))`, except the three excess statistics, which only the prediction takes from the benchmark of `rd`. The figures of returns with no gap do not move. `plot_performance_summary` takes the same keyword.
+A `ConstraintBlock` holds concentration rules, such as the UCITS 5/10/40 rule, in the new slot `conc`. Code that builds the block, its Result or an asset sets matrix estimator by keyword does not change.
+
+- **`ConstraintBlock`** has the field `conc` after `sgst`, so its positional constructor takes 33 arguments, where v0.34.5 took 32. Pass `nothing` after `sgst`, or use the keyword constructor. The type parameters gain one entry after the one of `sgst`.
+- **`ResolvedConstraintBlock`** has the field `conc` after `sgst`, so its positional constructor takes 33 arguments, where v0.34.5 took 32. The type parameters gain one entry after the one of `sgst`.
+- **The show** of a `ConstraintBlock`, and of every optimiser that holds one, prints the row `conc ┼ nothing` after `sgst`. A doctest of your own that prints a `JuMPOptimiser` gains the row.
+- **`AssetSetsMatrixEstimator`** has the field `on` after `val`, with the default `nothing`, so its type gains a second parameter. `AssetSetsMatrixEstimator(val)` still gives the v0.34.5 estimator. Its show prints the row `on ┴ nothing` last.
+- **`asset_sets_matrix`** of an estimator takes the keyword `strict`, with the default `false`, and gives it to the names of `on`. A method of your own for a precomputed matrix that `asset_sets_matrix` reads must take keywords.
+- **The exact cost budget**, a `BudgetCosts` with `xbgt = true`, names two rows of its model `cost_bgt_gd_ub` and `cost_bgt_gd_lb`, where v0.34.5 named them `cost_bgt_gz_ub` and `cost_bgt_gz_lb`. Under an objective that is not a ratio, the model holds no entry `cost_bgt_g`. Read the binaries from `cost_bgt_z` there.
+
+## From v0.34.6 to v0.34.7
+
+### [Views of a finite allocator](@id migration-0-34-7-allocators)
+
+`DiscreteAllocation` and `GreedyAllocation` have the field `idx` after `sets`, with the default `nothing`. Code that builds them by keyword does not change.
+
+- **`DiscreteAllocation`** takes nine positional arguments, where v0.34.6 took eight, because `fb` is now the ninth field. Pass `nothing` after `sets`, or use the keyword constructor. The type parameters gain one entry after the one of `sets`.
+- **`GreedyAllocation`** takes five positional arguments, where v0.34.6 took three or four, because `fb` is now the fifth field and has no default. Pass `nothing` after `sets`, or use the keyword constructor. The type parameters gain one entry after the one of `sets`.
+- **The show** of both types prints the row `idx ┼ nothing` after `sets`. A doctest of your own that prints an allocator gains the row.
+- **An allocator with a `LotUnitEstimator`, after a selection.** `optimise` on the selected assets raised a `DimensionMismatch`, and with the `sets` viewed by hand it raised an `ArgumentError` under `strict`. Give `PortfolioOptimisers.port_opt_view(allocator, idx)` the index of the selection, and it buys the lots of the assets that remain.
+
+## From v0.34.7 to v0.34.8
+
+### [Calls that now answer](@id migration-0-34-8-answers)
+
+| Call | v0.34.7 | v0.34.8 |
+| --- | --- | --- |
+| `prior` of an `OpinionPoolingPrior` with `alg = LogarithmicOpinionPooling()`, when an opinion of zero probability gives an observation a zero weight | `ArgumentError` | Runs. The opinion does not change the pool. |
+| `prior` of an `OpinionPoolingPrior` with a large `p`, when the penalty takes the probability of every opinion below the smallest number | `ArgumentError` | Runs. The opinions nearest the consensus keep the probability. |
+
+### [Calls that now raise](@id migration-0-34-8-raises)
+
+| Call | v0.34.7 | v0.34.8 |
+| --- | --- | --- |
+| `OpinionPoolingPrior(; p = Inf)` | `ArgumentError` in `prior` | Raises a `DomainError` at the construction. |
+
+### [Results that move](@id migration-0-34-8-numbers)
+
+- **An entropy pooling prior with `OptimEntropyPooling`, the default optimiser, and a prior probability of zero** meets its views. With `alg = LogEntropyPooling()`, v0.34.7 stopped at the start of the solve and reported success, and the posterior missed the views. With `alg = ExpEntropyPooling()`, v0.34.7 could miss a view when an observation of zero prior probability held an extreme value. `JuMPEntropyPooling` had neither defect.
+- **An `EntropyPoolingPrior` or a `MeucciEntropyPoolingPrior` with a prior probability of zero at an extreme return**, such as a crash that `w` removes, meets its views under every optimiser. v0.34.7 scaled each view with the return that the prior removes. A kurtosis view could miss its target by a third of it. An entropic value at risk view gave the prior back, with no error, or raised an error about the grid or about a `NaN` coefficient. The views now read the mean row of the other observations there, so the posterior moves by rounding when the removed returns are ordinary.
+
+## From v0.34.8 to v0.34.9
+
+### [Results that move](@id migration-0-34-9-numbers)
+
+- **`performance_summary` of weights or of an optimisation result reads a gap in the returns as `predict` does.** v0.34.8 multiplied the returns by the weights as they are, and `0 * NaN` is `NaN`. So one asset with a gap made the figures `NaN`, also an asset with a zero weight, and the `cvar` was a finite wrong number. Each return that is not finite is now zero. A gap at a zero weight gives no message. A gap at a weight that is not zero gives a warning that names the asset, and an `ArgumentError` under the new keyword `strict = true`. So `performance_summary(res, rd)` gives the figures of `performance_summary(predict(res, rd))`, except the three excess statistics, which only the prediction takes from the benchmark of `rd`. The figures of returns with no gap do not move. `plot_performance_summary` takes the same keyword.
 - **`plot_portfolio_cumulative_returns`, `plot_drawdowns`, `plot_histogram`, `plot_rolling_drawdowns`, `plot_rolling_measure` and `plot_benchmark` of weights or of an optimisation result** read a gap in the same way, with a warning for a gap at a weight that is not zero, or an `ArgumentError` under the new keyword `strict = true`. `plot_portfolio_dashboard` reads a gap in the same way in its panels 2, 3 and 4, and takes the same keyword. `plot_histogram` dropped each row with a gap, and now it keeps the row. `plot_portfolio_cumulative_returns` of weights on a prior with a non-investable asset draws a finite curve. `plot_asset_cumulative_returns` does not change.

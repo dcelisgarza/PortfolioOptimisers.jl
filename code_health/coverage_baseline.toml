@@ -245,6 +245,7 @@ commit = "391be5e"
 "src/09_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { lines = 55, misses = 0 }
 "src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { lines = 43, misses = 0 }
 "src/09_ConstraintGeneration/10_LotUnitConstraintGeneration.jl" = { lines = 20, misses = 0 }
+"src/09_ConstraintGeneration/11_ConcentrationLimitGeneration.jl" = { lines = 53, misses = 0 }
 "src/10_Prior/01_Base_Prior.jl" = { lines = 238, misses = 0 }
 "src/10_Prior/02_EmpiricalPrior.jl" = { lines = 50, misses = 0 }
 "src/10_Prior/03_FactorPrior.jl" = { lines = 68, misses = 1 }
@@ -378,6 +379,7 @@ commit = "391be5e"
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl" = { lines = 151, misses = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl" = { lines = 68, misses = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/14_ConstraintBlock.jl" = { lines = 46, misses = 0 }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/15_ConcentrationConstraints.jl" = { lines = 58, misses = 0 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl" = { lines = 97, misses = 0 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl" = { lines = 116, misses = 3 }
 "src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { lines = 167, misses = 0 }

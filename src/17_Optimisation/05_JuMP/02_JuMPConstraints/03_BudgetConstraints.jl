@@ -1239,7 +1239,7 @@ Where:
   - $(math_dict[:w_port])
   - $(math_dict[:k_budget])
   - ``\\boldsymbol{w}_p``, ``\\boldsymbol{w}_n``, ``\\boldsymbol{v}_p``, ``\\boldsymbol{v}_n``, ``\\boldsymbol{u}_p``, ``\\boldsymbol{u}_n``: As in [`BudgetCosts`](@ref).
-  - ``\\boldsymbol{g}``: The gate ``k\\,\\boldsymbol{z}`` of the binaries ``\\boldsymbol{z}``. When ``k`` is a number it is that product. Else it is a variable with ``0 \\leq g_i \\leq k``, ``g_i \\leq s\\,z_i`` and ``g_i \\geq k - s\\,(1 - z_i)``, with ``s`` the big-M of [`set_mip_ss_expr!`](@ref), as [`declare_mip_indicators!`](@ref) gates its bits.
+  - ``\\boldsymbol{g}``: The gate ``k\\,\\boldsymbol{z}`` of the binaries ``\\boldsymbol{z}``. [`declare_mip_gate!`](@ref) declares both, under the names `cost_bgt_z` and `cost_bgt_g`.
   - ``\\mathrm{lb}``: The scalar `bgt`, or the `lb` of a [`BudgetRange`](@ref). A `lb` of `nothing` adds no floor.
 
 # Arguments
@@ -1256,6 +1256,7 @@ Where:
 # Related
 
   - [`BudgetCosts`](@ref)
+  - [`declare_mip_gate!`](@ref)
   - [`set_cost_budget_constraints!`](@ref)
   - [`set_block_constraints!`](@ref)
   - [`set_exact_budget_constraints!`](@ref): Pins the long and short parts of the weights in the same way.
@@ -1277,20 +1278,10 @@ function set_cost_budget_mip_constraints!(model::JuMP.Model, bgt::BudgetCosts,
     sc = get_constraint_scale(model)
     wp = shared_get(model, :wp)
     wn = shared_get(model, :wn)
-    N = length(wp)
-    JuMP.@variable(model, cost_bgt_z[1:N], binary = true)
-    if isa(k, Number)
-        JuMP.@expression(model, cost_bgt_g, k * cost_bgt_z)
-    else
-        s = set_mip_ss_expr!(model, ss, wb)
-        JuMP.@variable(model, cost_bgt_g[1:N], lower_bound = 0)
-        JuMP.@constraint(model, cost_bgt_g_ub, sc * (cost_bgt_g .- k) <= 0)
-        JuMP.@constraint(model, cost_bgt_gz_ub, sc * (cost_bgt_g - s * cost_bgt_z) <= 0)
-        JuMP.@constraint(model, cost_bgt_gz_lb,
-                         sc * ((cost_bgt_g + s * (1 .- cost_bgt_z)) .- k) >= 0)
-    end
-    JuMP.@constraint(model, cost_bgt_wp_xbgt, sc * (wp ⊖ bgt.up ⊙ cost_bgt_g) <= 0)
-    JuMP.@constraint(model, cost_bgt_wn_xbgt, sc * (wn ⊖ bgt.un ⊙ (k .- cost_bgt_g)) <= 0)
+    _, g = declare_mip_gate!(model, AssetMIPSpace(), :cost_bgt_z, :cost_bgt_g, length(wp),
+                             wb, ss)
+    JuMP.@constraint(model, cost_bgt_wp_xbgt, sc * (wp ⊖ bgt.up ⊙ g) <= 0)
+    JuMP.@constraint(model, cost_bgt_wn_xbgt, sc * (wn ⊖ bgt.un ⊙ (k .- g)) <= 0)
     lb = isa(bgt.bgt, Number) ? bgt.bgt : bgt.bgt.lb
     if !isnothing(lb)
         JuMP.@constraint(model, cost_bgt_lb,

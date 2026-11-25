@@ -86,6 +86,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :sst => "`sst`: Sub-group short threshold.",#
                  :sglt => "`sglt`: Sub-grouped long threshold.",#
                  :sgst => "`sgst`: Sub-grouped short threshold.",#
+                 :conc => "`conc`: Concentration limit(s), one rule or a vector of rules. Each rule caps each position and limits the sum of the positions over its threshold, as the UCITS 5/10/40 rule does.",#
                  :tn_jmp => "`tn`: Turnover constraint estimator(s).",#
                  :fees_jmp => "`fees`: Fee estimator or fee structure.",#
                  :tr_jmp => "`tr`: Tracking error constraint(s).",#
@@ -99,7 +100,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :cbe => "`cbe`: Constraint Block that holds the feasible set of the weights and the terms of the Objective Penalty, see [`ConstraintBlock`](@ref). Its slots are flat keywords and properties of the owner.",#
                  :sc => "`sc`: Constraint scale factor.",#
                  :so => "`so`: Objective scale factor.",#
-                 :ss => "`ss`: Optional scalar shrinkage parameter.",#
+                 :ss => "`ss`: Big-M constant of the mixed-integer rows. `nothing` computes it from the weight bounds, see [`get_mip_ss`](@ref).",#
                  :card => "`card`: Global cardinality constraint.",#
                  :scard => "`scard`: Sub-group cardinality constraint(s).",#
                  :l2c => "`l2c`: 2-norm ceiling on the weights. It bounds `norm(w, 2) <= l2c * k`, where `k` is the homogenisation variable, so the ceiling holds on the weights the result reports and the budget does not scale it. Smaller `l2c` forces a more evenly spread portfolio. Used as a diversification floor via the reciprocal: `l2c = 1 / sqrt(m)` requires at least `m` effective assets (`inv(norm(w, 2)^2) >= m`). Norm-constraint family with `lpc` and `linfc`. The bound is [`Num_NormCeilCal`](@ref) under the time-dependent wrapper, so the slot takes the ceiling itself, an [`AbstractNormCeilingCalibrationAlgorithm`](@ref) that computes it from the prior result, or a plain function of the same five arguments.",#
@@ -216,7 +217,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :cash_alloc => "`cash`: Remaining uninvested cash after allocation, from the third method of the collateral algorithm of the input. It includes the cash that no side received, and it is negative when the book borrows.",#
                  :fees_alloc => "`fees`: Fee the allocation paid over the whole horizon. It is the sum of the two sides' charges, and it is never signed.",#
                  :unit => "`unit`: Lot unit of each asset, the number of shares that one purchase buys. A [`LotUnit`](@ref) states it, and a [`LotUnitEstimator`](@ref) resolves it against `sets`. A share count is a non-negative integer multiple of the lot unit of its asset. The default `LotUnit(1)` buys whole shares.",#
-                 :sets_alloc => "`sets`: Universe sets that a [`LotUnitEstimator`](@ref) in `unit` resolves against, or `nothing`. The universe must name the assets of the input in the order of `w`.",#
+                 :sets_alloc => "`sets`: Universe sets that a [`LotUnitEstimator`](@ref) in `unit` resolves against, or `nothing`. The universe must name the assets of the input in the order of `w`, unless `idx` selects the assets of the input from it.",#
+                 :idx_alloc => "`idx`: Positions, in the universe of `sets`, of the assets of the input in the order of `w`, a mask of that universe, or `nothing` when the input holds the whole universe. [`port_opt_view`](@ref) writes it, so that a [`LotUnitEstimator`](@ref) in `unit` resolves on the whole universe before the cut.",#
                  # Hierarchical and Schur complement optimisers.
                  :ri => "`ri`: Inner risk measure.",#
                  :ri_res => "`ri`: The intra-cluster risk measure the optimisation ran under, or a vector of them, stored resolved.",#
