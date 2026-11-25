@@ -137,7 +137,6 @@ $(DocStringExtensions.FIELDS)
     GreedyAllocation(;
         unit::LuE_Lu = LotUnit(),
         sets::Option{<:UniverseSets} = nothing,
-        idx::Option{<:VecInt} = nothing,
         strict::Bool = false,
         fb::Option{<:FOptE_FOpt} = nothing
     ) -> GreedyAllocation
@@ -150,11 +149,13 @@ Keywords correspond to the struct's fields.
 
 ## View parameters
 
-`GreedyAllocation` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - A [`LotUnit`](@ref) in `unit` is sliced to the selected assets.
-  - A [`LotUnitEstimator`](@ref) in `unit` and its `sets` pass through unchanged, and `idx` takes the positions of the selected assets. The allocation resolves the estimator on the whole universe and then keeps these positions, so a name of an asset that the view left out gives no diagnostic.
-  - `fb` goes through [`view_child`](@ref), which views a fallback estimator and keeps a fallback result.
+  - `unit`: Recursively viewed through [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `fb`: Recursively viewed through [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
+
+A [`LotUnitEstimator`](@ref) of the view resolves against the sliced `sets`, so the universe no longer holds a name that the view left out. `strict` raises on such a name, and the loose form warns, as in every estimator that names assets. The resolution skips a name on the Non-Investable Axis of `sets`.
 
 # Examples
 
@@ -164,7 +165,6 @@ GreedyAllocation
     unit ┼ LotUnit
          │   val ┴ Int64: 1
     sets ┼ nothing
-     idx ┼ nothing
   strict ┼ Bool: false
       fb ┴ nothing
 ```
@@ -177,25 +177,22 @@ GreedyAllocation
   - [`DiscreteAllocation`](@ref)
   - [`LotUnit`](@ref)
   - [`LotUnitEstimator`](@ref)
+  - [`UniverseSets`](@ref)
   - [`port_opt_view`](@ref)
 
 # References
 
   - $(ref_dict[:martin2021]) Methods, page 3. $(ref_dict[:no_original_source])
 """
-@concrete struct GreedyAllocation <: FiniteAllocationOptimisationEstimator
+@propagatable @concrete struct GreedyAllocation <: FiniteAllocationOptimisationEstimator
     """
     $(field_dict[:unit])
     """
-    unit
+    @vprop unit
     """
     $(field_dict[:sets_alloc])
     """
-    sets
-    """
-    $(field_dict[:idx_alloc])
-    """
-    idx
+    @vprop sets
     """
     $(field_dict[:strict_opt])
     """
@@ -203,70 +200,21 @@ GreedyAllocation
     """
     $(field_dict[:fb])
     """
-    fb
-    function GreedyAllocation(unit::LuE_Lu, sets::Option{<:UniverseSets},
-                              idx::Option{<:VecInt}, strict::Bool, fb::Option{<:FOptE_FOpt})
-        assert_allocation_unit(unit, sets, idx)
-        return new{typeof(unit), typeof(sets), typeof(idx), typeof(strict), typeof(fb)}(unit,
-                                                                                        sets,
-                                                                                        idx,
-                                                                                        strict,
-                                                                                        fb)
+    @vprop fb
+    function GreedyAllocation(unit::LuE_Lu, sets::Option{<:UniverseSets}, strict::Bool,
+                              fb::Option{<:FOptE_FOpt})
+        if isa(unit, LotUnitEstimator)
+            @argcheck(!isnothing(sets),
+                      IsNothingError("sets cannot be nothing when unit is a LotUnitEstimator"))
+        end
+        return new{typeof(unit), typeof(sets), typeof(strict), typeof(fb)}(unit, sets,
+                                                                           strict, fb)
     end
 end
 function GreedyAllocation(; unit::LuE_Lu = LotUnit(),
-                          sets::Option{<:UniverseSets} = nothing,
-                          idx::Option{<:VecInt} = nothing, strict::Bool = false,
+                          sets::Option{<:UniverseSets} = nothing, strict::Bool = false,
                           fb::Option{<:FOptE_FOpt} = nothing)::GreedyAllocation
-    return GreedyAllocation(unit, sets, idx, strict, fb)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a copy of [`GreedyAllocation`](@ref) for the assets `i`.
-
-Call it after a selection, with the index that cut the returns data, so that the allocator buys the lots of the assets that the selection kept.
-
-# Algorithm
-
- 1. Take the lot unit and the positions of the assets `i` with [`allocation_unit_view`](@ref).
- 2. View `fb` at `i` through [`view_child`](@ref), so the fallback reads the same assets.
- 3. Rebuild the allocator with the new `unit`, `idx` and `fb`. The other fields hold no value for each asset, and `sets` stays whole.
-
-# Arguments
-
-  - `ga`: The allocator.
-  - `i`: Indices of the assets that the view keeps.
-  - `args...`: Forwarded to the view of `fb`.
-
-# Returns
-
-  - `ga::GreedyAllocation`: The allocator restricted to the assets at `i`.
-
-# Examples
-
-```jldoctest
-julia> sets = UniverseSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
-
-julia> unit = LotUnitEstimator(; val = Dict(\"A\" => 100, \"B\" => 0.5));
-
-julia> alloc = GreedyAllocation(; unit = unit, sets = sets);
-
-julia> PortfolioOptimisers.port_opt_view(alloc, [2, 3]).idx == [2, 3]
-true
-```
-
-# Related
-
-  - [`GreedyAllocation`](@ref)
-  - [`allocation_unit_view`](@ref)
-  - [`port_opt_view`](@ref)
-  - [`view_child`](@ref)
-"""
-function port_opt_view(ga::GreedyAllocation, i, args...)::GreedyAllocation
-    unit, idx = allocation_unit_view(ga.unit, ga.sets, ga.idx, i)
-    return rebuild_struct(ga,
-                          (; unit = unit, idx = idx, fb = view_child(ga.fb, i, args...)))
+    return GreedyAllocation(unit, sets, strict, fb)
 end
 """
     greedy_fee_delta(::Nothing, ::VecNum, shares::VecNum, ::Integer, ::Number)
@@ -502,7 +450,7 @@ Run the Greedy Allocation portfolio optimisation.
 function _optimise(ga::GreedyAllocation, fai::FiniteAllocationInput; kwargs...)
     p, cash, ca = fai.prices, fai.cash, fai.ca
     w, lbgt, sbgt, lidx, sidx, lsf, ssf = prepare_finite_allocation(fai)
-    lu = allocation_lot_unit(ga.unit, ga.sets, ga.idx, ga.strict, fai)
+    lu = allocation_lot_unit(ga.unit, ga.sets, ga.strict, fai)
     sshares, scost, sw, _, sfee = finite_sub_allocation!(-view(w, sidx), view(p, sidx),
                                                          nothing_scalar_array_view(lu,
                                                                                    sidx),

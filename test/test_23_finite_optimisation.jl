@@ -1276,9 +1276,9 @@ end
         @test_throws DimensionMismatch optimise(DiscreteAllocation(; slv = mip_slv,
                                                                    unit = LotUnit([1, 2]),
                                                                    fb = nothing), fai)
-        @test PO.allocation_lot_unit(LotUnit(0.5), nothing, nothing, false, fai) == 0.5
+        @test PO.allocation_lot_unit(LotUnit(0.5), nothing, false, fai) == 0.5
         @test PO.allocation_lot_unit(LotUnitEstimator(; val = Dict("C" => 10.0)), sets,
-                                     nothing, false, fai) == [1.0, 1.0, 10.0]
+                                     false, fai) == [1.0, 1.0, 10.0]
         # The default fallback of the discrete allocator buys the same lots.
         u = LotUnitEstimator(; val = Dict("C" => 10.0))
         da = DiscreteAllocation(; slv = mip_slv, unit = u, sets = sets, strict = true)
@@ -1349,25 +1349,23 @@ end
         @test rl.shares[2] < 0
     end
 
-    # A selection cuts the asset axis, and the allocator follows it (#1991). The estimator
-    # resolves on the whole universe and then keeps the selected assets.
+    # A selection cuts the asset axis, and the allocator follows it (#1991). The view cuts
+    # `unit`, `sets` and `fb`, as the view of every other holder of a `sets` does.
     @testset "a view of an allocator follows a cut of the assets" begin
         usets = UniverseSets(;
-                             dict = Dict("nx" => ["A", "B", "C", "D"], "g" => ["A", "C"],
-                                         "isin" => ["a", "b", "c", "d"]))
+                             dict = Dict("nx" => ["A", "B", "C", "D"], "g" => ["B", "D"],
+                                         "nx_isin" => ["a", "b", "c", "d"]))
         l = [100.0, 0.5, 1.0, 0.25]
-        u = LotUnitEstimator(; val = Dict("A" => 100, "B" => 0.5, "D" => 0.25))
+        u = LotUnitEstimator(; val = Dict("B" => 0.5, "D" => 0.25))
         wc = FiniteAllocationInput(; w = [0.6, 0.4], prices = [71.0, 129.0], cash = 1000.0)
         ga = GreedyAllocation(; unit = u, sets = usets, strict = true)
         da = DiscreteAllocation(; slv = mip_slv, unit = u, sets = usets, strict = true)
 
-        # A cut name gives no refusal under `strict`, and no warning without it.
         for i in ([2, 4], BitVector([0, 1, 0, 1]), 2:2:4)
             for a in (ga, da)
-                v = PO.port_opt_view(a, i)
-                @test v.unit === u
-                @test v.sets === usets
-                @test v.idx == [2, 4]
+                v = @inferred PO.port_opt_view(a, i)
+                @test v.unit.val === u.val
+                @test v.sets.dict["nx"] == ["B", "D"]
                 r = optimise(v, wc)
                 @test r.shares ==
                       optimise(PO.rebuild_struct(a, (; unit = LotUnit(l[[2, 4]]))), wc).shares
@@ -1375,48 +1373,52 @@ end
             end
         end
         # The fallback views the same assets.
-        @test PO.port_opt_view(da, [2, 4]).fb.idx == [2, 4]
-        # The loose form logs nothing for a cut name.
-        vl = PO.port_opt_view(GreedyAllocation(; unit = u, sets = usets), [2, 4])
-        @test (@test_logs optimise(vl, wc)).shares ==
-              optimise(PO.port_opt_view(ga, [2, 4]), wc).shares
-        # A name outside the whole universe is still refused.
-        vz = PO.port_opt_view(GreedyAllocation(;
-                                               unit = LotUnitEstimator(; val = "Z" => 0.5),
-                                               sets = usets, strict = true), [2, 4])
-        @test_throws ArgumentError optimise(vz, wc)
+        @test PO.port_opt_view(da, [2, 4]).fb.sets.dict["nx"] == ["B", "D"]
+
+        # A name that the view left out takes the diagnostic of every other estimator that
+        # names assets, and the Non-Investable Axis excuses it.
+        uc = LotUnitEstimator(; val = Dict("A" => 100, "B" => 0.5, "D" => 0.25))
+        gc = PO.port_opt_view(GreedyAllocation(; unit = uc, sets = usets, strict = true),
+                              [2, 4])
+        @test_throws ArgumentError optimise(gc, wc)
+        gl = PO.port_opt_view(GreedyAllocation(; unit = uc, sets = usets), [2, 4])
+        ref = optimise(PO.port_opt_view(ga, [2, 4]), wc).shares
+        @test (@test_logs (:warn,) optimise(gl, wc)).shares == ref
+        ni = UniverseSets(; dict = Dict("nx" => ["B", "D"], "ni" => ["A", "C"]))
+        @test (@test_logs optimise(PO.rebuild_struct(gc, (; sets = ni)), wc)).shares == ref
+        wb = WeightBoundsEstimator(; ub = Dict("A" => 0.5, "B" => 0.5))
+        hopt = PO.port_opt_view(HierarchicalOptimiser(; wb = wb, sets = usets,
+                                                      strict = true), [2, 4])
+        @test_throws ArgumentError weight_bounds_constraints(hopt.wb, hopt.sets;
+                                                             strict = hopt.strict)
 
         # A view of a view indexes the assets that the first view kept, in the stated order.
-        v2 = PO.port_opt_view(PO.port_opt_view(ga, BitVector([1, 1, 0, 1])), [3, 1])
-        @test v2.idx == [4, 1]
-        @test PO.allocation_lot_unit(v2.unit, v2.sets, v2.idx, true, wc) == [0.25, 100.0]
+        lots(a, w = wc) = PO.allocation_lot_unit(a.unit, a.sets, a.strict, w)
+        v2 = PO.port_opt_view(PO.port_opt_view(ga, BitVector([0, 1, 1, 1])), [3, 1])
+        @test v2.sets.dict["nx"] == ["D", "B"]
+        @test lots(v2) == [0.25, 0.5]
         # The whole axis keeps every asset.
-        @test PO.port_opt_view(ga, :).idx == 1:4
+        @test PO.port_opt_view(ga, :).sets.dict["nx"] == usets.dict["nx"]
 
-        # The group, the vector, the scalar and the keyed forms resolve on the whole universe.
-        lots(unit, i) =
-            let v = PO.port_opt_view(GreedyAllocation(; unit = unit, sets = usets,
-                                                      strict = true), i)
-                PO.allocation_lot_unit(v.unit, v.sets, v.idx, v.strict, wc)
-            end
-        @test lots(LotUnitEstimator(; val = "g" => 10.0), [3, 4]) == [10.0, 1.0]
-        @test lots(LotUnitEstimator(; val = l), [4, 1]) == [0.25, 100.0]
-        @test lots(LotUnitEstimator(; val = 0.5), [4, 1]) == 0.5
-        @test lots(LotUnitEstimator(; val = Dict("a" => 5.0, "d" => 2.0), key = "isin"),
-                   [3, 4]) == [1.0, 2.0]
+        # The group, the vector, the scalar and the keyed forms follow the cut.
+        glots(unit, i) = lots(PO.port_opt_view(GreedyAllocation(; unit = unit, sets = usets,
+                                                                strict = true), i))
+        @test glots(LotUnitEstimator(; val = "g" => 10.0), [4, 2]) == [10.0, 10.0]
+        @test glots(LotUnitEstimator(; val = l), [4, 1]) == [0.25, 100.0]
+        @test glots(LotUnitEstimator(; val = 0.5), [4, 1]) == 0.5
+        @test glots(LotUnitEstimator(; val = Dict("d" => 2.0), key = "nx_isin"), [3, 4]) ==
+              [1.0, 2.0]
         # The number type comes from the input, as with no view.
         w32 = FiniteAllocationInput(; w = Float32[0.6, 0.4], prices = Float32[71, 129],
                                     cash = 1000.0f0)
-        v32 = PO.port_opt_view(ga, [2, 4])
-        @test eltype(PO.allocation_lot_unit(v32.unit, v32.sets, v32.idx, true, w32)) ==
-              Float32
+        @test eltype(lots(PO.port_opt_view(ga, [2, 4]), w32)) == Float32
 
         # A resolved lot unit is sliced, and a scalar one is kept.
         vu = PO.port_opt_view(DiscreteAllocation(; slv = mip_slv, unit = LotUnit(l)),
                               [2, 4])
         @test vu.unit.val == [0.5, 0.25]
         @test vu.fb.unit.val == [0.5, 0.25]
-        @test isnothing(vu.idx)
+        @test isnothing(vu.sets)
         @test PO.port_opt_view(GreedyAllocation(; unit = LotUnit(0.5)), [2, 4]).unit.val ==
               0.5
         # No fallback views to none, and a precomputed fallback stays as it is.
@@ -1425,20 +1427,5 @@ end
                       FiniteAllocationInput(; w = fill(0.25, 4), prices = fill(1.0, 4),
                                             cash = 1000.0))
         @test PO.port_opt_view(GreedyAllocation(; fb = rg), [2, 4]).fb === rg
-
-        # The constructors refuse an `idx` that no estimator reads, an empty one, and one
-        # that does not index the universe. A stated mask reads as its positions do.
-        for f in (kw -> GreedyAllocation(; kw...),
-                  kw -> DiscreteAllocation(; slv = mip_slv, kw...))
-            @test_throws ArgumentError f((; unit = LotUnit(l), idx = [1, 2]))
-            @test_throws PO.IsEmptyError f((; unit = u, sets = usets, idx = Int[]))
-            for i in ([2, 5], [0, 1], [true, false])
-                @test_throws DomainError f((; unit = u, sets = usets, idx = i))
-            end
-            mk = f((; unit = u, sets = usets, idx = BitVector([0, 1, 0, 1])))
-            @test optimise(mk, wc).shares ==
-                  optimise(f((; unit = u, sets = usets, idx = [2, 4])), wc).shares
-            @test PO.port_opt_view(mk, [2]).idx == [4]
-        end
     end
 end

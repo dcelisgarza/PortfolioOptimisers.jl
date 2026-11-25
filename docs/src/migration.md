@@ -1134,3 +1134,17 @@ A `ConstraintBlock` holds concentration rules, such as the UCITS 5/10/40 rule, i
 
 - **An entropy pooling prior with `OptimEntropyPooling`, the default optimiser, and a prior probability of zero** meets its views. With `alg = LogEntropyPooling()`, v0.34.7 stopped at the start of the solve and reported success, and the posterior missed the views. With `alg = ExpEntropyPooling()`, v0.34.7 could miss a view when an observation of zero prior probability held an extreme value. `JuMPEntropyPooling` had neither defect.
 - **An `EntropyPoolingPrior` or a `MeucciEntropyPoolingPrior` with a prior probability of zero at an extreme return**, such as a crash that `w` removes, meets its views under every optimiser. v0.34.7 scaled each view with the return that the prior removes. A kurtosis view could miss its target by a third of it. An entropic value at risk view gave the prior back, with no error, or raised an error about the grid or about a `NaN` coefficient. The views now read the mean row of the other observations there, so the posterior moves by rounding when the removed returns are ordinary.
+
+## From v0.34.8 to v0.34.9
+
+### [The view of a finite allocator cuts its sets](@id migration-0-34-9-allocators)
+
+`DiscreteAllocation` and `GreedyAllocation` no longer have the field `idx`. `PortfolioOptimisers.port_opt_view(allocator, i)` now cuts `unit`, `sets` and `fb` at the assets `i`, as the view of every other estimator that holds a `UniverseSets` does.
+
+- **`DiscreteAllocation`** takes eight positional arguments, where v0.34.8 took nine. Remove the argument after `sets`, or use the keyword constructor. The type parameters lose the entry after the one of `sets`.
+- **`GreedyAllocation`** takes four positional arguments, where v0.34.8 took five. Remove the argument after `sets`, or use the keyword constructor. The type parameters lose the entry after the one of `sets`. The fallback has no positional default, so the three-argument form of v0.34.6 does not return.
+- **The keyword `idx`** is gone from both constructors. Replace `GreedyAllocation(; unit = unit, sets = sets, idx = i)` with `PortfolioOptimisers.port_opt_view(GreedyAllocation(; unit = unit, sets = sets), i)`.
+- **The show** of both types loses the row `idx ┼ nothing`.
+- **A name that the view left out.** A `LotUnitEstimator` of the view resolves against the cut `sets`. A name that the cut removed raises an `ArgumentError` under `strict`, and logs a warning without it, where v0.34.8 gave no diagnostic. Every other estimator that names assets does the same. Name the assets of the selection alone in `val`, or give the allocator of the selected assets a `sets` that lists the removed names under `nikey`, such as `UniverseSets(; dict = Dict("nx" => kept, "ni" => removed))`. The resolution skips those names.
+- **A `LotUnitEstimator` with a `key`** resolves on the cut universe only when the name of that universe starts with `xkey`, such as `"nx_isin"`. The view of a `UniverseSets` does not cut a universe of another name, such as `"isin"`, so the allocation then raises a `DimensionMismatch`.
+- **A `LotUnitEstimator` with a rule in `val`**, such as `UniformValues()`, reads the number of selected assets, where v0.34.8 read the number of assets of the whole universe.
