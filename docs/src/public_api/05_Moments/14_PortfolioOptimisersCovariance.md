@@ -1,5 +1,5 @@
 ```@meta
-Description = "PortfolioOptimisersCovariance, public API of PortfolioOptimisers.jl: PortfolioOptimisersCovariance, cov, cor, var, supports_partial_fit, partial_fit!."
+Description = "PortfolioOptimisersCovariance, public API of PortfolioOptimisers.jl: PortfolioOptimisersCovariance, cov, cor, var, supports_partial_fit, partial_fit!, …"
 ```
 
 # PortfolioOptimisersCovariance
@@ -14,4 +14,5 @@ PortfolioOptimisers.supports_partial_fit(ce::PortfolioOptimisersCovariance)
 PortfolioOptimisers.partial_fit!(ce::PortfolioOptimisersCovariance{<:Any, <:Any, Nothing}, X::MatNum; dims::Int = 1, kwargs...)
 cov(ce::PortfolioOptimisersCovariance{<:Any, <:Any, Nothing}; kwargs...)
 cov(ce::PortfolioOptimisersCovariance{<:Any, <:Any, <:PortfolioOptimisers.SampleBufferState})
+PortfolioOptimisers.fold_mask_keywords
 ```

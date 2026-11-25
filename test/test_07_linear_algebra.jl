@@ -904,6 +904,22 @@ const REFX10 = Dict(:scaled =>
         @test isposdef(pr.sigma[[1, 2, 4, 5], [1, 2, 4, 5]])
         rho = cor(cvg, Xn, nothing)
         @test isnan.(diag(rho)) == [false, false, true, false, false]
+        # The variance over a panel is the diagonal of the covariance over the panel, so a
+        # mask-aware `ce` reads the gap in both (#2285).
+        pnl = AssetPanel(; amsk = isfinite.(Xn), emsk = isfinite.(Xn))
+        sg = cov(cvg, Xn, pnl)
+        @test PO.reads_active_mask(cvg) && !PO.reads_active_mask(ce)
+        @test isfinite.(diag(sg)) == [true, true, false, true, true]
+        @test isequal(vec(var(cvg, Xn, pnl)), diag(sg))
+        @test isequal(std(cvg, permutedims(Xn), pnl; dims = 2),
+                      reshape(sqrt.(diag(sg)), :, 1))
+        vs = PO.variance_series(cvg, Xn, pnl)
+        @test isequal(vs[end, :], diag(sg))
+        @test isequal(vs[50, :], vec(var(cvg, Xn[1:50, :], PO.port_opt_view(pnl, 1:50, :))))
+        # A plain `ce` keeps the reduce-and-expand series.
+        pl = GeodesicShrinkageCovariance(; alpha = 0.3)
+        @test isequal(PO.variance_series(pl, Xn, pnl),
+                      PO.coverage_variance_series(pl, Xn, pnl))
         @test diag(rho)[[1, 2, 4, 5]] ≈ ones(4)
         # A frame of `NaN` around the finite block: the block is shrunk, the frame is kept.
         sigma = cov(Covariance(), X)

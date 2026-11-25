@@ -337,7 +337,7 @@ $(DocStringExtensions.FIELDS)
                               cre::AbstractCrossSectionalRegressionEstimator = CrossSectionalLinearRegression(),
                               wa::AbstractCrossSectionalWeightsAlgorithm = MarketCapWeights(),
                               pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(; me = ExpWeightedExpectedReturns(), ce = RegimeAdjustedExpWeightedCovariance(; centring = PreCentred())),
-                              ve::AbstractCovarianceEstimator = RegimeAdjustedExpWeightedVariance(; centring = PreCentred()),
+                              ve::StatsBase.CovarianceEstimator = RegimeAdjustedExpWeightedVariance(; centring = PreCentred()),
                               ce::StatsBase.CovarianceEstimator = ExpWeightedCovariance(; centring = PreCentred()),
                               pdm::AbstractPosdefEstimator = Posdef(; alg = ClippedNearestCorrelation()),
                               f_mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
@@ -467,7 +467,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     """
     @fprop pe
     """
-    $(field_dict[:ve]) [`variance_series`](@ref) on it gives the idiosyncratic variance history, whose last row is the idiosyncratic risk of the latest observation. The default is a [`RegimeAdjustedExpWeightedVariance`](@ref) with `centring = PreCentred()`, which measures the second moment of each idiosyncratic series about zero. The prior states the mean of an asset through the factors alone, so the model sets the mean of the idiosyncratic return to zero, and the specific risk is its second moment. A variance about a running mean would understate it, and would also move the regime multiplier. A [`PortfolioOptimisersCovariance`](@ref) with a step in its `mp`, as its default `mp` holds, raises on this history, as its docstring states.
+    $(field_dict[:ve_slot]) An estimator that reads no mask, and an estimator of another package is one, refuses an idiosyncratic return that is not finite. [`variance_series`](@ref) on it gives the idiosyncratic variance history, whose last row is the idiosyncratic risk of the latest observation. The default is a [`RegimeAdjustedExpWeightedVariance`](@ref) with `centring = PreCentred()`, which measures the second moment of each idiosyncratic series about zero. The prior states the mean of an asset through the factors alone, so the model sets the mean of the idiosyncratic return to zero, and the specific risk is its second moment. A variance about a running mean would understate it, and would also move the regime multiplier. A [`PortfolioOptimisersCovariance`](@ref) with a step in its `mp`, as its default `mp` holds, raises on this history, as its docstring states.
     """
     @fprop @vprop ve
     """
@@ -569,7 +569,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
                                        cre::AbstractCrossSectionalRegressionEstimator,
                                        wa::AbstractCrossSectionalWeightsAlgorithm,
                                        pe::AbstractLowOrderPriorEstimator_A_AF,
-                                       ve::AbstractCovarianceEstimator,
+                                       ve::StatsBase.CovarianceEstimator,
                                        ce::StatsBase.CovarianceEstimator,
                                        pdm::AbstractPosdefEstimator,
                                        f_mp::AbstractMatrixProcessingEstimator,
@@ -633,8 +633,8 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                                                                             me = ExpWeightedExpectedReturns(),
                                                                                             ce = RegimeAdjustedExpWeightedCovariance(;
                                                                                                                                      centring = PreCentred())),
-                                   ve::AbstractCovarianceEstimator = RegimeAdjustedExpWeightedVariance(;
-                                                                                                       centring = PreCentred()),
+                                   ve::StatsBase.CovarianceEstimator = RegimeAdjustedExpWeightedVariance(;
+                                                                                                         centring = PreCentred()),
                                    ce::StatsBase.CovarianceEstimator = ExpWeightedCovariance(;
                                                                                              centring = PreCentred()),
                                    pdm::AbstractPosdefEstimator = Posdef(;

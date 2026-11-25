@@ -1,5 +1,5 @@
 ```@meta
-Description = "Dimension reduction regression, public API of PortfolioOptimisers.jl: PCA, PPCA, DimensionReductionRegression, fit, regression, returns_source."
+Description = "Dimension reduction regression, public API of PortfolioOptimisers.jl: PCA, PPCA, DimensionReductionRegression, standardisation_mean, fit, regression, …"
 ```
 
 # Dimension reduction regression
@@ -8,6 +8,7 @@ Description = "Dimension reduction regression, public API of PortfolioOptimisers
 PCA
 PPCA
 DimensionReductionRegression
+standardisation_mean
 fit(drtgt::PCA, X::MatNum)
 fit(drtgt::PPCA, X::MatNum)
 regression(re::DimensionReductionRegression, X::MatNum, F::MatNum)

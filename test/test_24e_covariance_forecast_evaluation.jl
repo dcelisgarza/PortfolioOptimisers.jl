@@ -888,6 +888,9 @@ end
             @test length(cfe(ce, rd, batch_cv).dates) ==
                   length(split(batch_cv, rd).test_idx)
         end
+        # The bare estimator is read as the `GeneralCovariance` over it.
+        @test cfe(StatsBase.SimpleCovariance(), rd, batch_cv).qlike ==
+              cfe(GeneralCovariance(; ce = StatsBase.SimpleCovariance()), rd, batch_cv).qlike
         @test isequal(po.forecast_location(PortfolioOptimisersCovariance(;
                                                                          ce = StatsBase.SimpleCovariance()),
                                            Xg[1:60, :], po.port_opt_view(rdg, 1:60, :).pnl),

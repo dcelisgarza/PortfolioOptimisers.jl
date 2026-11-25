@@ -1384,6 +1384,11 @@ function variance_series(ce::AbstractCovarianceEstimator, X::MatNum,
                          pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
     return coverage_variance_series(ce, X, pnl; dims = dims, kwargs...)
 end
+# The library wraps an estimator of another package, as the matrix method of the verb does.
+function variance_series(ce::StatsBase.CovarianceEstimator, X::MatNum,
+                         pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    return variance_series(library_covariance_estimator(ce), X, pnl; dims = dims, kwargs...)
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -1427,7 +1432,7 @@ function coverage_variance_series(ce::AbstractCovarianceEstimator, X::MatNum,
     return isone(dims) ? val : permutedims(val)
 end
 """
-    covers_an_asset(est::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel};
+    covers_an_asset(est::StatsBase.CovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel};
                     dims::Int = 1, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                     kwargs...) -> Bool
     covers_an_asset(est::Union{WindowedVariance, WindowedCovariance}, X::MatNum,
@@ -1465,7 +1470,7 @@ The method of [`panel_series_row`](@ref) for a wrapper reads the answer, so a va
   - [`coverage_flags`](@ref)
   - [`reads_active_mask`](@ref)
 """
-function covers_an_asset(est::AbstractCovarianceEstimator, X::MatNum,
+function covers_an_asset(est::StatsBase.CovarianceEstimator, X::MatNum,
                          pnl::Option{<:AssetPanel}; dims::Int = 1,
                          active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     return reads_active_mask(est) ||
