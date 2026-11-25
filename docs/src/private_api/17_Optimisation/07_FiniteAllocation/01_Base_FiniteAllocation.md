@@ -11,6 +11,7 @@ FOptE_FOpt_FbChain
 CollateralAlg_Func
 UnpricedAlg_Func
 unpriced_side_weight
+assert_unpriced_rule
 allocation_horizon
 setup_alloc_optim
 prepare_finite_allocation
