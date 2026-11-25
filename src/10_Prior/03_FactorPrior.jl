@@ -21,7 +21,7 @@ $(DocStringExtensions.FIELDS)
         pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
         mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         re::AbstractTimeSeriesRegressionEstimator = StepwiseRegression(),
-        ve::AbstractVarianceEstimator = SimpleVariance(),
+        ve::StatsBase.CovarianceEstimator = SimpleVariance(),
         rsd::Bool = true,
         mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
         cache::Option{<:AbstractPartialFitState} = nothing,
@@ -130,6 +130,7 @@ FactorPrior
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`AbstractTimeSeriesRegressionEstimator`](@ref)
   - [`AbstractVarianceEstimator`](@ref)
+  - [`library_covariance_estimator`](@ref)
   - [`EmpiricalPrior`](@ref)
   - [`StepwiseRegression`](@ref)
   - [`SimpleVariance`](@ref)
@@ -155,7 +156,7 @@ FactorPrior
     """
     @fprop @vprop re
     """
-    $(field_dict[:ve])
+    $(field_dict[:ve_slot])
     """
     @fprop @vprop ve
     """
@@ -177,7 +178,7 @@ FactorPrior
     function FactorPrior(pe::AbstractLowOrderPriorEstimator_A_AF,
                          mp::AbstractMatrixProcessingEstimator,
                          re::AbstractTimeSeriesRegressionEstimator,
-                         ve::AbstractVarianceEstimator, rsd::Bool,
+                         ve::StatsBase.CovarianceEstimator, rsd::Bool,
                          mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm},
                          cache::Option{<:AbstractPartialFitState},
                          x_src::Option{<:AbstractReturnsSource})
@@ -195,7 +196,7 @@ end
 function FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
                      mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                      re::AbstractTimeSeriesRegressionEstimator = StepwiseRegression(),
-                     ve::AbstractVarianceEstimator = SimpleVariance(), rsd::Bool = true,
+                     ve::StatsBase.CovarianceEstimator = SimpleVariance(), rsd::Bool = true,
                      mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
                      cache::Option{<:AbstractPartialFitState} = nothing,
                      x_src::Option{<:AbstractReturnsSource} = nothing)::FactorPrior
@@ -346,7 +347,7 @@ $(DocStringExtensions.FIELDS)
     ediv
 end
 """
-    factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVarianceEstimator,
+    factor_lift(mp::AbstractMatrixProcessingEstimator, ve::StatsBase.CovarianceEstimator,
                 rsd::Bool, rr::AbstractLoadingsRegressionResult, f_mu::VecNum, f_sigma::MatNum,
                 X::MatNum, posterior_X::MatNum, T::Real = size(posterior_X, 1);
                 mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
@@ -388,7 +389,7 @@ The identity ``\\mathtt{chol}^\\intercal \\mathtt{chol} = \\hat{\\mathbf{\\Sigma
  3. Project the factor covariance through the loadings to get `posterior_sigma`, the systematic block.
  4. Process `posterior_sigma` in place with [`sample_matrix_processing!`](@ref), under `mp`, `posterior_X` and `T`. The matrix is assembled from the factor moments, so the denoising step reads the count of the factor covariance, and not the number of rows of `posterior_X`.
  5. Take the square root of `f_sigma` under `mtx_sqrt` with [`matrix_square_root`](@ref), and multiply it by the loadings to get `posterior_csigma`. This reads the `f_sigma` that the caller passed, which step 4 does not change.
- 6. When `rsd` is `true`, take the reconstruction error `err = X - posterior_X`. Measure `esigma`, the column variances of `err`, with `ve`. Read the counts of those variances with [`variance_count`](@ref), and combine them with the `edof` of `rr` through [`residual_variance_counts`](@ref) to get `edof` and `ediv`. Let `err_sigma` be the diagonal matrix of the variances. When `rsd` is `false`, `esigma` and `ediv` are `nothing`, and `edof` is the `edof` of `rr`.
+ 6. When `rsd` is `true`, take the reconstruction error `err = X - posterior_X`. Measure `esigma`, the column variances of `err`, with `ve`, through [`library_covariance_estimator`](@ref). Read the counts of those variances with [`variance_count`](@ref), and combine them with the `edof` of `rr` through [`residual_variance_counts`](@ref) to get `edof` and `ediv`. Let `err_sigma` be the diagonal matrix of the variances. When `rsd` is `false`, `esigma` and `ediv` are `nothing`, and `edof` is the `edof` of `rr`.
  7. Under `rsd`, add `err_sigma` to `posterior_sigma`, and re-condition the sum with [`posdef!`](@ref) under the estimator that [`matrix_processing_posdef`](@ref) gives for `mp`. This is the only explicit [`posdef!`](@ref) call of the function. For a [`MatrixProcessing`](@ref) that estimator is `mp.pdm`, and it also acts on `posterior_sigma` inside step 4 when `:pdm` is a member of `mp.order`.
  8. Under `rsd`, append the columns of `sqrt.(err_sigma)` to `posterior_csigma`, so the factor also holds the block that step 7 added to the covariance.
  9. Reshape `posterior_csigma` to `length(posterior_mu)` columns and transpose it into `chol`. Return `mu`, `sigma`, `chol`, `esigma`, `edof` and `ediv`.
@@ -396,7 +397,7 @@ The identity ``\\mathtt{chol}^\\intercal \\mathtt{chol} = \\hat{\\mathbf{\\Sigma
 # Arguments
 
   - $(arg_dict[:mp])
-  - $(arg_dict[:ve])
+  - $(arg_dict[:ve_slot])
   - $(arg_dict[:rsd])
   - `rr`: Regression result carrying the loadings `M` and intercepts `b`.
   - `f_mu`: Factor expected returns, `factors × 1`.
@@ -421,10 +422,10 @@ The identity ``\\mathtt{chol}^\\intercal \\mathtt{chol} = \\hat{\\mathbf{\\Sigma
   - [`FactorBlackLittermanPrior`](@ref)
   - [`LowOrderPrior`](@ref)
 """
-function factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVarianceEstimator,
-                     rsd::Bool, rr::AbstractLoadingsRegressionResult, f_mu::VecNum,
-                     f_sigma::MatNum, X::MatNum, posterior_X::MatNum,
-                     T::Real = size(posterior_X, 1);
+function factor_lift(mp::AbstractMatrixProcessingEstimator,
+                     ve::StatsBase.CovarianceEstimator, rsd::Bool,
+                     rr::AbstractLoadingsRegressionResult, f_mu::VecNum, f_sigma::MatNum,
+                     X::MatNum, posterior_X::MatNum, T::Real = size(posterior_X, 1);
                      mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
                      kwargs...)
     (; b, M) = rr
@@ -437,7 +438,7 @@ function factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVariance
     ediv = nothing
     if rsd
         err = X - posterior_X
-        esigma = vec(Statistics.var(ve, err; dims = 1))
+        esigma = vec(Statistics.var(library_covariance_estimator(ve), err; dims = 1))
         (; edof, ediv) = residual_variance_counts(variance_count(ve, err), rr.edof,
                                                   size(err, 1))
         err_sigma = LinearAlgebra.diagm(esigma)

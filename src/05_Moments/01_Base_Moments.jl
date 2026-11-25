@@ -171,7 +171,7 @@ To implement a new variance estimator, subtype `AbstractVarianceEstimator`. Keep
 
 `Statistics.cov(ve::AbstractVarianceEstimator, X::MatNum; kwargs...)` and `Statistics.cor(ve::AbstractVarianceEstimator, X::MatNum; kwargs...)` always throw a `MethodError`. A variance estimator computes one marginal variance for each asset and no relation between two assets, so it cannot compute either matrix.
 
-A slot of the library that calls `cov` or `cor` refuses a variance estimator in its constructor, with the `ArgumentError` of `assert_covariance_estimator`. A slot that calls only `var` or `std` accepts one.
+A slot of the library that calls `cov` or `cor` refuses a variance estimator in its constructor, with the `ArgumentError` of `assert_covariance_estimator`. A slot that calls only `var` or `std` accepts one. When such a slot reads a matrix alone, it accepts every `StatsBase.CovarianceEstimator`, also one of another package, and calls it through `library_covariance_estimator`. When it reads the variance of one vector, it accepts an `AbstractVarianceEstimator` alone, because a covariance estimator has no vector form. The slots of the risk measures, and the slot of [`WindowedVariance`](@ref), are such slots. [`WindowedCovariance`](@ref) holds a covariance estimator.
 
 ## Factory
 
@@ -860,7 +860,7 @@ end
 
 Computes the covariance matrix from the correlation matrix of the estimator and the standard deviations of its variance estimator `ce.ve`.
 
-With this fallback, a covariance estimator that computes a correlation needs only its own [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cov/) method. The fallback scales the correlation matrix by the standard deviations from `std(ce.ve, X)`. An estimator whose covariance is not a scaled correlation defines its own method. [`ImpliedVolatility`](@ref) is one such estimator.
+With this fallback, a covariance estimator that computes a correlation needs only its own [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cov/) method. The fallback scales the correlation matrix by the standard deviations from `std(ce.ve, X)`. It calls `ce.ve` through [`library_covariance_estimator`](@ref), so `ce.ve` can be a covariance estimator of another package. An estimator whose covariance is not a scaled correlation defines its own method. [`ImpliedVolatility`](@ref) is one such estimator.
 
 # Mathematical definition
 
@@ -879,7 +879,7 @@ Where:
 # Algorithm
 
  1. Estimate the correlation matrix with `Statistics.cor(ce, X)`.
- 2. Estimate the marginal standard deviations with `Statistics.std(ce.ve, X)`.
+ 2. Estimate the marginal standard deviations with `Statistics.std(library_covariance_estimator(ce.ve), X)`.
  3. Scale the correlation matrix into a covariance matrix with `StatsBase.cor2cov!`. The call writes in place, over the matrix that step 1 returned.
 
 # Arguments
@@ -902,7 +902,8 @@ Where:
 function Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1,
                         kwargs...)
     return StatsBase.cor2cov!(Statistics.cor(ce, X; dims = dims, kwargs...),
-                              Statistics.std(ce.ve, X; dims = dims, kwargs...))
+                              Statistics.std(library_covariance_estimator(ce.ve), X;
+                                             dims = dims, kwargs...))
 end
 """
     gap_fill_value(ce::StatsBase.CovarianceEstimator) -> Number

@@ -1750,7 +1750,7 @@ end
     @test isapprox(sum(rx.w) + lc(rx.w), 1.0; atol = 1e-8)
     @test cmin(rx) <= 1e-8
     @test isapprox(rx.w[4], 0.19798; atol = 1e-5)
-    @test haskey(rx.model, :cost_bgt_lb) && !haskey(rx.model, :cost_bgt_gz_lb)
+    @test haskey(rx.model, :cost_bgt_lb) && !haskey(rx.model, :cost_bgt_gd_lb)
     # A `BudgetRange` floor holds the cost under `xbgt`.
     rxr = mr(BudgetCosts(; bgt = BudgetRange(; lb = 0.98, ub = 1.0), w = w0, vp = 0.01,
                          vn = 0.01, up = 0.05, un = 0.05, xbgt = true), prn; s = mip)
@@ -1762,7 +1762,7 @@ end
     @test isa(rxk.retcode, PO.OptimisationSuccess)
     @test isapprox(sum(rxk.w) + lc(rxk.w), 1.0; atol = 1e-8)
     @test cmin(rxk) <= 1e-8
-    @test haskey(rxk.model, :cost_bgt_gz_lb)
+    @test haskey(rxk.model, :cost_bgt_gd_lb)
     # The centring model of `UnconstrainedNearOptimalCentering` runs no MIP step, so it states
     # the convex form of the budget and keeps the floor of the invested weights. Before R63 of
     # #1817 it held no floor under `xbgt = true`: `sum(w) + cost` was 0.869 under a floor of

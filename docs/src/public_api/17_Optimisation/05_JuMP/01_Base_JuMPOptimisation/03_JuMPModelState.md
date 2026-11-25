@@ -1,7 +1,11 @@
 ```@meta
-Description = "JuMP model state has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "JuMP model state, public API of PortfolioOptimisers.jl: state_set!."
 ```
 
 # JuMP model state
 
-Every name of this topic is private. The [private page](@ref private-api-jump-model-state) documents them.
+The [private page](@ref private-api-jump-model-state) documents the other names of this topic.
+
+```@docs
+state_set!
+```
