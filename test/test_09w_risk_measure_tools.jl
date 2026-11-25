@@ -53,9 +53,6 @@ end
 
 # The same measure with a bound, `rke = true` and a scale of 2.5, where its settings hold them.
 function _bounded610(r)
-    if !hasproperty(r, :settings)
-        return r
-    end
     s = r.settings
     if s isa RiskMeasureSettings
         return PO.rebuild_struct(r,
