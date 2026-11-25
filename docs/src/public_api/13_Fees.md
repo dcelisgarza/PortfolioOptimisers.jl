@@ -18,7 +18,7 @@ calc_asset_fees
 calc_asset_fixed_fees
 calc_total_fees
 calc_total_asset_fees
-port_opt_view(fees::Fees, i, X::MatNum, args...)
+port_opt_view(fees::Fees, i, args...)
 needs_previous_weights(fe::FeesE_Fees)
 investable_fees_view
 ```

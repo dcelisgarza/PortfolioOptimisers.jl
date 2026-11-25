@@ -1300,10 +1300,10 @@ function investable_risk_gradient(obj::RiskLoss, u::AbstractVector, pr::Abstract
 end
 function investable_risk_gradient(obj::RiskLoss, u::AbstractVector, pr::AbstractPriorResult,
                                   imsk::BitVector, rd::ReturnsResult)
-    idx = findall(imsk)
+    idx = InvestableIndex(imsk)
     g = zeros(eltype(u), length(u))
-    r = bind_data_benchmark(port_opt_view(obj.r, idx, pr.X), port_opt_view(rd, idx))
-    g[idx] .= risk_gradient(r, u[idx], port_opt_view(pr, idx); sca = obj.sca)
+    r = bind_data_benchmark(port_opt_view(obj.r, idx, pr.X), port_opt_view(rd, idx.idx))
+    g[imsk] .= risk_gradient(r, u[imsk], port_opt_view(pr, idx.idx); sca = obj.sca)
     return g
 end
 """

@@ -145,15 +145,15 @@ end
 function investable_reduction(pr::AbstractPriorResult, opt::AbstractOptimisationEstimator,
                               rd::ReturnsResult, imsk::BitVector = investable_mask(pr))
     assert_universe_axis_order(opt, rd)
-    idx = findall(imsk)
+    idx = InvestableIndex(imsk)
     # Read the departed names before the view, declare them after it: the view drops the
     # Non-Investable Axis, so this function is the one place a name-keyed constraint stated
     # for an asset that left can still be resolved.
     ni = non_investable_names(rd.nx, imsk)
     announce_non_investable(ni)
-    return imsk, port_opt_view(pr, idx),
+    return imsk, port_opt_view(pr, idx.idx),
            non_investable_universe(port_opt_view(opt, idx, pr.X), ni),
-           port_opt_view(rd, idx)
+           port_opt_view(rd, idx.idx)
 end
 # The estimators that hold a distance estimator, each forwarded to the estimator it holds, so
 # that `feature_readable_mask` finds each `FeatureDistance` of a fit. They load after the
@@ -265,14 +265,14 @@ end
 function coverage_reduction(cmsk::BitVector, opt::AbstractOptimisationEstimator,
                             rd::ReturnsResult)
     assert_universe_axis_order(opt, rd)
-    idx = findall(cmsk)
+    idx = InvestableIndex(cmsk)
     # As in `investable_reduction`: the Coverage Universe and the Investable Mask are the
     # same object downstream, so a prior-free head declares the Non-Investable Axis exactly
     # as a prior-fitting one does, and a departure behaves the same in every family.
     ni = non_investable_names(rd.nx, cmsk)
     announce_non_investable(ni)
     return cmsk, non_investable_universe(port_opt_view(opt, idx, rd.X), ni),
-           port_opt_view(rd, idx)
+           port_opt_view(rd, idx.idx)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

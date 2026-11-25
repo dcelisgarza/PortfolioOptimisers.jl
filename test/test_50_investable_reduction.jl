@@ -1876,13 +1876,14 @@ end
 
     @testset "The two-axis split from a width is the split from a matrix" begin
         lqf = Fees(; l = fill(0.001, N), lq = Turnover(; w = fill(0.2, N), val = 0.01))
-        a = PO.two_axis_fees_view(lqf, keep, N)
-        b = PO.port_opt_view(lqf, keep, X)
+        m = BitVector(in(keep).(1:N))
+        a = PO.investable_fees_view(lqf, m, N)
+        b = PO.investable_fees_view(lqf, m, X)
         @test collect(a.l) == collect(b.l)
         @test collect(a.lq.w) == collect(b.lq.w) == [0.2]
-        @test isnothing(a.imsk)
-        # A full index leaves no complement, so the carriers go.
-        @test isnothing(PO.two_axis_fees_view(lqf, 1:N, N).lq)
+        @test a.imsk == b.imsk == m
+        # A full mask leaves no complement, so the carriers go.
+        @test isnothing(PO.investable_fees_view(lqf, trues(N), N).lq)
     end
 
     @testset "expected_risk, calc_net_returns and performance_summary reach the oracle" begin

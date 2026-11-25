@@ -25,7 +25,7 @@ To implement a new finite allocation estimator, subtype `FiniteAllocationOptimis
 
 ## `port_opt_view`
 
-  - `port_opt_view(fa::MyAllocation, i, args...) -> FiniteAllocationOptimisationEstimator`: Restricts the allocator to the assets `i`, and a fallback estimator in `fb` with it. A precomputed result in `fb` stays as it is. The method is optional. Define it when a field holds a value for each asset. The generic method returns the allocator unchanged.
+  - `port_opt_view(fa::MyAllocation, i, args...) -> FiniteAllocationOptimisationEstimator`: Restricts the allocator to the assets `i`, and a fallback estimator in `fb` with it. A precomputed result in `fb` stays as it is. The method is optional. Tag each field that holds a value for each asset with [`@vprop`](@ref), and [`@propagatable`](@ref) makes the method. The generic method returns the allocator unchanged. The other values for each asset are in the [`FiniteAllocationInput`](@ref), which has its own view.
 
 ### Arguments
 
@@ -841,7 +841,7 @@ Holds the target weights, prices and cash that a finite allocation reads.
 
 [`optimise`](@ref) takes it as the second argument, with a [`DiscreteAllocation`](@ref) or a [`GreedyAllocation`](@ref). It also holds the cash before the trade, an optional horizon, fee and Investable Mask, and the collateral algorithm that gives each side of the book its cash. It subtypes [`AbstractEstimator`](@ref) and not [`OptimisationResult`](@ref), because it is the input of an allocation. The methods that dispatch on a result, such as the plots and the result [`factory`](@ref), cannot read its fields.
 
-An optimisation over a reduced universe solves on its Investable Mask, and expands the weights back to the full universe. Its result then has a full-length `w` and a fee on two reduced axes. `imsk` records the reduction. [`allocation_side_fees`](@ref) calls [`lift_fees`](@ref) to put the fee back on the axis of `w` and `prices`, so the allocation charges the forced exit of an asset that left the universe on the money that the exit sold. The fee records its mask in its own `imsk` field too, and the constructor makes the two agree through [`mark_fees`](@ref). A stated `imsk` marks a fee that has no mask. A marked fee gives its mask when `imsk` is `nothing`. The constructor refuses two masks that differ.
+An optimisation over a reduced universe solves on its Investable Mask, and expands the weights back to the full universe. Its result then has a full-length `w` and a fee on two reduced axes. `imsk` records the reduction. [`allocation_side_fees`](@ref) calls [`lift_fees`](@ref) to put the fee back on the axis of `w` and `prices`, so the allocation charges the forced exit of an asset that left the universe on the money that the exit sold. The fee goes through [`investable_fees_view`](@ref), as the fee of every continuous optimisation does. An unmarked fee states every term over the universe of `w`, the exits `lq` and `flq` included. With a stated `imsk`, the constructor reduces it. With no mask, no asset left, so the constructor drops the exits. A marked fee stays as it is, and gives its mask when `imsk` is `nothing`.
 
 An Unpriced Asset has a `NaN` price, the price of an asset with no bar on the allocation date. Both allocators solve each side over its priced assets only, so they buy no Unpriced Asset, and its shares, cost and realised weight are zero. Its price reaches no other number of the result. `upw` states what its target weight becomes. With `upw = nothing`, the weight is read as a zero weight, and the money of that weight stays in the `cash` of the result. A rule of [`AbstractUnpricedWeightAlgorithm`](@ref) moves it to priced assets of the same side. A held Unpriced Asset ends the trade with no money, so its turnover fee charges the sale of the whole previous position, as [`allocation_side_fees`](@ref) states.
 
@@ -893,8 +893,20 @@ Reads from a fitted optimisation every value that an allocation can take from it
   - `cash > 0`, else a `DomainError`.
   - `prev_cash >= 0`, else a `DomainError`.
   - `horizon` is not `nothing` when `fees` is not `nothing`, else an [`IsNothingError`](@ref).
-  - The mask of `fees` is `nothing` or equal to `imsk`. [`mark_fees`](@ref) throws an `ArgumentError` otherwise.
+  - Each vector of an unmarked `fees` has `length(w)` entries, else a `DimensionMismatch`.
+  - The mask of a marked `fees` is equal to a stated `imsk`, else an `ArgumentError`.
   - `imsk`, stated or read from the fee, has `length(imsk) == length(w)`, else a `DimensionMismatch`, and `any(imsk)`, else an [`IsEmptyError`](@ref).
+
+## View parameters
+
+`FiniteAllocationInput` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - `w`: Sliced to the selected assets, after the rule `upw` moved the weight of each Unpriced Asset of the whole book.
+  - `prices`: Sliced to the selected assets.
+  - `fees`: Lifted onto the axis of `w`, sliced to the selected assets in each term, and reduced again at the view of `imsk`.
+  - `imsk`: Sliced to the selected assets.
+  - `upw`: Set to `nothing`, because the weights of the view hold its answer.
+  - `cash`, `prev_cash`, `horizon` and `ca`: Kept. They belong to the account, and not to an asset.
 
 # Examples
 
@@ -922,7 +934,7 @@ FiniteAllocationInput
   - [`allocation_side_fees`](@ref)
   - [`extract_fees`](@ref)
   - [`lift_fees`](@ref)
-  - [`mark_fees`](@ref)
+  - [`investable_fees_view`](@ref)
   - [`result_investable_mask`](@ref)
   - [`setup_alloc_optim`](@ref)
   - [`AbstractCollateralAlgorithm`](@ref)
@@ -956,7 +968,7 @@ FiniteAllocationInput
     """
     fees
     """
-    Investable Mask of the optimisation that gave `w`, `true` for each asset that it traded. `nothing` means that the weights and the fee are on the full universe. The constructor makes it agree with the mask of the fee through [`mark_fees`](@ref).
+    Investable Mask of the optimisation that gave `w`, `true` for each asset that it traded. `nothing` means that the weights and the fee are on the full universe. A marked fee gives it when the caller states none.
     """
     imsk
     """
@@ -985,13 +997,20 @@ FiniteAllocationInput
             @argcheck(!isnothing(horizon),
                       IsNothingError("horizon cannot be nothing when fees are provided"))
         end
-        fees, imsk = mark_fees(fees, imsk)
+        if isnothing(imsk) && !isnothing(fees)
+            imsk = fees.imsk
+        end
         if !isnothing(imsk)
             @argcheck(length(imsk) == length(w),
                       DimensionMismatch("imsk ($(length(imsk))) must match w ($(length(w)))"))
             @argcheck(any(imsk),
                       IsEmptyError("imsk must keep at least one asset, and it keeps none"))
         end
+        # The check runs before the reduction, which drops the exits when no asset left.
+        if !isnothing(fees) && isnothing(fees.imsk)
+            assert_fees_width(fees, length(w))
+        end
+        fees = investable_fees_view(fees, imsk, length(w))
         return new{typeof(w), typeof(prices), typeof(cash), typeof(prev_cash),
                    typeof(horizon), typeof(fees), typeof(imsk), typeof(ca), typeof(upw)}(w,
                                                                                          prices,
@@ -1027,6 +1046,66 @@ function FiniteAllocationInput(res::NonFiniteAllocationOptimisationResult; price
                                  allocation_horizon(res, horizon), extract_fees(res, fees),
                                  isnothing(imsk) ? result_investable_mask(res) : imsk, ca,
                                  upw)
+end
+"""
+    port_opt_view(fai::FiniteAllocationInput, i, args...)
+
+Return the [`FiniteAllocationInput`](@ref) of the assets `i`, the book in which only these assets trade.
+
+Give the allocator the same index, so that the lots and the input are on one axis. Each value of an asset goes with it: its weight, its price, its fees, its previous money, and the charge of its forced exit. So the views of a partition of the book hold each forced exit one time. The weight of an asset that `i` leaves out stays in the cash of the account, as the weight of an Unpriced Asset with `upw = nothing` does.
+
+# Algorithm
+
+ 1. When an asset has a `NaN` price, give the weights to [`unpriced_weights`](@ref) with the rule `fai.upw`. The rule reads the whole book, so the positions and the sides that it states are those of the book.
+ 2. Put the fee on the axis of `w` with [`lift_fees`](@ref). An exit is then at its own asset, and every other entry of `lq` and `flq` is zero. View it at `i` with the [`port_opt_view`](@ref) of a [`Fees`](@ref).
+ 3. View the weights and the prices at `i`, and take the entries `i` of `imsk`.
+ 4. Build the input. Its constructor reduces the fee at the mask of the view, as it does for a stated fee.
+
+# Arguments
+
+  - `fai`: The input to view.
+  - `i`: Indices of the assets that the view keeps.
+  - `args...`: Ignored.
+
+# Validation
+
+  - The view keeps an asset of `imsk`, else an [`IsEmptyError`](@ref). A book with no asset to trade has no allocation.
+
+# Returns
+
+  - `fai::FiniteAllocationInput`: The input of the assets `i`.
+
+# Examples
+
+```jldoctest
+julia> fai = FiniteAllocationInput(; w = [0.5, 0.0, 0.5], prices = [10.0, 20.0, 5.0],
+                                   cash = 1000.0);
+
+julia> PortfolioOptimisers.port_opt_view(fai, [1, 3]).prices == [10.0, 5.0]
+true
+```
+
+# Related
+
+  - [`FiniteAllocationInput`](@ref)
+  - [`DiscreteAllocation`](@ref)
+  - [`GreedyAllocation`](@ref)
+  - [`lift_fees`](@ref)
+  - [`investable_fees_view`](@ref)
+  - [`unpriced_weights`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function port_opt_view(fai::FiniteAllocationInput, i, args...)::FiniteAllocationInput
+    w = fai.w
+    umsk = isnan.(fai.prices)
+    if any(umsk)
+        w = unpriced_weights(fai.upw, w, umsk)
+    end
+    imsk = fai.imsk
+    return rebuild_struct(fai,
+                          (; w = view(w, i), prices = view(fai.prices, i),
+                           fees = port_opt_view(lift_fees(fai.fees), i),
+                           imsk = isnothing(imsk) ? nothing : imsk[i], upw = nothing))
 end
 export FiniteAllocationInput
 public FiniteAllocationOptimisationEstimator, AbstractCollateralAlgorithm,
@@ -1205,99 +1284,8 @@ function prepare_finite_allocation(fai::FiniteAllocationInput)
     return w, lbgt, sbgt, lidx, sidx, lsf, ssf
 end
 """
-    assert_allocation_unit(unit::LuE_Lu, sets::Option{<:UniverseSets},
-                           idx::Option{<:VecInt})
-
-Check that the `unit`, the `sets` and the `idx` of a finite allocator agree.
-
-Both allocators call this method in their constructors. A [`LotUnit`](@ref) states one value for each asset of the input, so a view of the allocator slices it, and it has no use for an `idx`.
-
-# Arguments
-
-  - `unit::LuE_Lu`: The `unit` field of the allocator.
-  - `sets::Option{<:UniverseSets}`: The `sets` field of the allocator.
-  - `idx::Option{<:VecInt}`: The `idx` field of the allocator.
-
-# Validation
-
-  - $(val_dict[:unit])
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`DiscreteAllocation`](@ref)
-  - [`GreedyAllocation`](@ref)
-  - [`allocation_unit_view`](@ref)
-"""
-function assert_allocation_unit(::LotUnit, ::Option{<:UniverseSets}, ::Nothing)::Nothing
-    return nothing
-end
-function assert_allocation_unit(::LotUnit, ::Option{<:UniverseSets}, ::VecInt)
-    return throw(ArgumentError("idx must be nothing when unit is a LotUnit: idx selects the assets that a LotUnitEstimator keeps after it resolves, and a LotUnit states the lot unit of the assets of the input"))
-end
-function assert_allocation_unit(unit::LotUnitEstimator, sets::Option{<:UniverseSets},
-                                idx::Option{<:VecInt})::Nothing
-    @argcheck(!isnothing(sets),
-              IsNothingError("sets cannot be nothing when unit is a LotUnitEstimator"))
-    if !isnothing(idx)
-        @argcheck(!isempty(idx), IsEmptyError("idx cannot be empty"))
-        key = ifelse(isnothing(unit.key), sets.xkey, unit.key)
-        N = length(sets.dict[key])
-        @argcheck(checkbounds(Bool, Base.OneTo(N), idx),
-                  DomainError(idx,
-                              "`idx` selects assets of the universe `$key`, which names $N assets. State positions from 1 to $N, or a mask of $N entries."))
-    end
-    return nothing
-end
-"""
-    allocation_unit_view(unit::LotUnit, sets::Option{<:UniverseSets}, ::Nothing, i)
-    allocation_unit_view(unit::LotUnitEstimator, sets::UniverseSets,
-                         idx::Option{<:VecInt}, i)
-
-Give the `unit` and the `idx` of a finite allocator for the assets `i`.
-
-The [`port_opt_view`](@ref) methods of [`DiscreteAllocation`](@ref) and [`GreedyAllocation`](@ref) call this method. A [`LotUnitEstimator`](@ref) names assets of the whole universe, and a name of an asset that `i` leaves out is a correct name. So the estimator and the `sets` stay whole, and the view records the positions that it keeps. [`allocation_lot_unit`](@ref) resolves on the whole universe and cuts the lot unit at these positions, so a name that the view left out gives no diagnostic, and a name outside the whole universe still gives one. The number type comes from the input, as it does with no view.
-
-# Algorithm
-
- 1. On a [`LotUnit`](@ref), return its [`port_opt_view`](@ref) at `i`, and `nothing` for `idx`.
- 2. On a [`LotUnitEstimator`](@ref), read the positions of the universe that `unit.key` selects in `sets`, or of the universe of `sets.xkey` when `unit.key` is `nothing`. If `idx` is not `nothing`, keep the positions at `idx`.
- 3. Return `unit`, and the positions of step 2 at `i`.
-
-# Arguments
-
-  - `unit`: The `unit` field of the allocator.
-  - `sets`: The `sets` field of the allocator.
-  - `idx`: The `idx` field of the allocator.
-  - `i`: Indices of the assets that the view keeps, on the axis of the assets that the allocator holds now.
-
-# Returns
-
-  - `unit::LuE_Lu`: The lot unit of the view.
-  - `idx::Option{<:VecInt}`: The positions of the view.
-
-# Related
-
-  - [`DiscreteAllocation`](@ref)
-  - [`GreedyAllocation`](@ref)
-  - [`allocation_lot_unit`](@ref)
-  - [`port_opt_view`](@ref)
-"""
-function allocation_unit_view(unit::LotUnit, ::Option{<:UniverseSets}, ::Nothing, i)
-    return port_opt_view(unit, i), nothing
-end
-function allocation_unit_view(unit::LotUnitEstimator, sets::UniverseSets,
-                              idx::Option{<:VecInt}, i)
-    key = ifelse(isnothing(unit.key), sets.xkey, unit.key)
-    pos = eachindex(sets.dict[key])
-    return unit, (isnothing(idx) ? pos : pos[idx])[i]
-end
-"""
-    allocation_lot_unit(unit::LuE_Lu, sets::Option{<:UniverseSets},
-                        idx::Option{<:VecInt}, strict::Bool, fai::FiniteAllocationInput)
+    allocation_lot_unit(unit::LuE_Lu, sets::Option{<:UniverseSets}, strict::Bool,
+                        fai::FiniteAllocationInput)
 
 Give the lot unit of each asset of a finite allocation, on the axis of `w`.
 
@@ -1306,15 +1294,13 @@ Both allocators call this method before they solve a side, so they read one reso
 # Algorithm
 
  1. Resolve `unit` to a [`LotUnit`](@ref) with [`lot_unit_constraints`](@ref) against `sets`, with `strict`. The number type of the fill value is `promote_type(eltype(fai.w), eltype(fai.prices))`.
- 2. If `idx` is not `nothing` and the lot unit is a vector, take its view at `idx`.
- 3. If the lot unit is a vector, check that it has one entry for each entry of `fai.w`.
- 4. Return the lot unit.
+ 2. If the lot unit is a vector, check that it has one entry for each entry of `fai.w`.
+ 3. Return the `val` of the [`LotUnit`](@ref).
 
 # Arguments
 
   - `unit::LuE_Lu`: The `unit` field of the allocator, a [`LotUnit`](@ref) or a [`LotUnitEstimator`](@ref).
   - `sets::Option{<:UniverseSets}`: The `sets` field of the allocator. The constructor of the allocator refuses `nothing` when `unit` is a [`LotUnitEstimator`](@ref).
-  - `idx::Option{<:VecInt}`: The `idx` field of the allocator.
   - `strict::Bool`: The `strict` field of the allocator.
   - `fai::FiniteAllocationInput`: The input of the allocation.
 
@@ -1331,20 +1317,15 @@ Both allocators call this method before they solve a side, so they read one reso
   - [`LotUnit`](@ref)
   - [`LotUnitEstimator`](@ref)
   - [`lot_unit_constraints`](@ref)
-  - [`allocation_unit_view`](@ref)
   - [`DiscreteAllocation`](@ref)
   - [`GreedyAllocation`](@ref)
   - [`prepare_finite_allocation`](@ref)
 """
-function allocation_lot_unit(unit::LuE_Lu, sets::Option{<:UniverseSets},
-                             idx::Option{<:VecInt}, strict::Bool,
+function allocation_lot_unit(unit::LuE_Lu, sets::Option{<:UniverseSets}, strict::Bool,
                              fai::FiniteAllocationInput)
     lu = lot_unit_constraints(unit, sets;
                               datatype = promote_type(eltype(fai.w), eltype(fai.prices)),
                               strict = strict).val
-    if !isnothing(idx)
-        lu = nothing_scalar_array_view(lu, idx)
-    end
     if isa(lu, AbstractVector)
         @argcheck(length(lu) == length(fai.w),
                   DimensionMismatch("the lot unit ($(length(lu))) must match w ($(length(fai.w)))"))

@@ -112,8 +112,9 @@ more cash unspent. The table compares single shares with lots of ten.
 A lot unit can differ between assets. A vector `LotUnit` gives one lot unit to each asset, and
 a `LotUnitEstimator` names them by asset or group, and resolves against the `sets` of the
 allocator. A lot unit below one buys fractional shares. `DiscreteAllocation` takes the same
-`unit`. When you cut the assets after a selection, give the same index to the allocator:
-`PortfolioOptimisers.port_opt_view(allocator, idx)` keeps the lots of the assets that remain.
+`unit`. When you cut the assets after a selection, give the same index to the allocator and to
+its input: `PortfolioOptimisers.port_opt_view(allocator, idx)` keeps the lots of the assets that
+remain, and `PortfolioOptimisers.port_opt_view(input, idx)` keeps their weights, prices and fees.
 =#
 
 greedy_lots = optimise(GreedyAllocation(; unit = LotUnit(10)),

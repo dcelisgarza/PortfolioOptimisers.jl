@@ -34,8 +34,9 @@ function cross_val_predict(opt::OptE_TD, rd::ReturnsResult, cv::CVER = KFold(); 
     assert_internal_optimiser(opt)
     assert_external_optimiser(opt)
     if !isa(cols, Colon)
-        rd = port_opt_view(rd, cols)
+        # The view indexes the matrix by `cols`, so it reads the matrix before the cut.
         opt = port_opt_view(opt, cols, rd.X)
+        rd = port_opt_view(rd, cols)
     end
     return fit_and_predict(opt, rd, cv; ex = ex)
 end

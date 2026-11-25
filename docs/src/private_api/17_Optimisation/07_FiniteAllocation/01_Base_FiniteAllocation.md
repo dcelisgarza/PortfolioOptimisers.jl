@@ -14,8 +14,6 @@ unpriced_side_weight
 allocation_horizon
 setup_alloc_optim
 prepare_finite_allocation
-assert_allocation_unit
-allocation_unit_view
 allocation_lot_unit
 allocation_turnover_money
 allocation_liquidation_fee

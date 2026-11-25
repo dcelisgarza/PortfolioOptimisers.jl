@@ -694,8 +694,10 @@ function port_opt_view(st::Stacking, i, X::MatNum, args...)::Stacking
     wb = port_opt_view(st.wb, i)
     fees = port_opt_view(st.fees, i, X)
     sets = port_opt_view(st.sets, i)
-    opti = port_opt_view(st.opti, i, X)
-    opto = port_opt_view(st.opto, i, X)
+    # An inner head reads no departure of its parent, so its view takes a plain index.
+    j = selection_index(i)
+    opti = port_opt_view(st.opti, j, X)
+    opto = port_opt_view(st.opto, j, X)
     return Stacking(; pe = pe, wb = wb, fees = fees, sets = sets, scale = st.scale,
                     opti = opti, opto = opto, cv = st.cv, scorer = st.scorer, wf = st.wf,
                     ex = st.ex, fb = view_child(st.fb, i, X), strict = st.strict,

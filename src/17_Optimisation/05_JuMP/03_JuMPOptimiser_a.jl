@@ -158,13 +158,13 @@ function investable_view(optimiser::JuMPOptimisationEstimator, rd::ReturnsResult
                          pr::AbstractPriorResult, imsk::BitVector)
     assert_universe_axis_order(optimiser, rd)
     X = isnothing(rd.X) ? pr.X : rd.X
-    idx = findall(imsk)
+    idx = InvestableIndex(imsk)
     # The head takes the view that `investable_reduction` took of the optimiser for the
     # bundle, so it declares the Non-Investable Axis on the sets that it holds. It reports
     # nothing, because `investable_reduction` reported the departure.
     return non_investable_universe(port_opt_view(optimiser, idx, X),
                                    non_investable_names(rd.nx, imsk)),
-           port_opt_view(rd, idx)
+           port_opt_view(rd, idx.idx)
 end
 function expand_investable_weights(::Nothing, sol::JuMPOptSol_VecJuMPOptSol)
     return sol

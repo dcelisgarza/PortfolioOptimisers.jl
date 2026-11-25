@@ -864,8 +864,10 @@ function port_opt_view(nco::NestedClustered, i, X::MatNum, args...)
     wb = port_opt_view(nco.wb, i)
     fees = port_opt_view(nco.fees, i, X)
     sets = port_opt_view(nco.sets, i)
-    opti = port_opt_view(nco.opti, i, X)
-    opto = port_opt_view(nco.opto, i, X)
+    # An inner head reads no departure of its parent, so its view takes a plain index.
+    j = selection_index(i)
+    opti = port_opt_view(nco.opti, j, X)
+    opto = port_opt_view(nco.opto, j, X)
     return NestedClustered(; pe = pe, cle = nco.cle, wb = wb, fees = fees, sets = sets,
                            opti = opti, opto = opto, cv = nco.cv, scorer = nco.scorer,
                            wf = nco.wf, ex = nco.ex, fb = view_child(nco.fb, i, X),
