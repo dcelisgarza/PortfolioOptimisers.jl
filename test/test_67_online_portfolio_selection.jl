@@ -220,25 +220,22 @@ end
         opt = OPS(; alg = ExponentiatedGradient())
         # An inactive cell is filled silently: no warning over the unlisted span.
         res = @test_nowarn optimise(opt, rows(rdg, 1:5))
-        # The recursion keeps 1/N on the unlisted leg; the read-out slices it away and
-        # renormalises, and the Result expands with a zero.
+        # The book holds a zero on the unlisted leg and the iterate keeps 1/N, and the Result
+        # expands with a zero (#2346).
         o = po.partial_fit!(opt, rows(rdg, 1:5))
-        @test 0.2 < o.cache.w[4] < 0.3
+        @test o.cache.w[4] == 0 && o.cache.st.u[4] == 0.25
         @test res.w[4] == 0
         @test res.imsk == amsk[5, :]
         @test isapprox(sum(res.w), 1; atol = 1e-14)
         @test isapprox(res.w[1:3], o.cache.w[1:3] ./ sum(o.cache.w[1:3]); atol = 1e-14)
-        # At row 11 D relists at the recursion's own weight, never at zero.
+        # At row 11 D relists at the weight of the iterate, never at zero.
         res11 = optimise(opt, rows(rdg, 1:11))
         @test res11.w[4] > 0.2
-        # The parked weight over the unlisted span enters the gross return that a rule
-        # reads. Buy-and-hold scales each leg by its own relative, so its fund is the
-        # recursion over the listed names alone; the exponentiated-gradient step divides by
-        # the gross return, so its fund is not.
+        # The step leaves the unlisted leg out, so the fund of each rule is the recursion
+        # over the listed names alone (#2346).
         full = optimise(OPS(; alg = ExponentiatedGradient()),
                         ReturnsResult(; nx = nx[1:3], X = R[1:5, 1:3])).w
-        @test !isapprox(res.w[1:3], full; atol = 1e-6)
-        @test isapprox(res.w[1:3] .- 1 / 3, full .- 1 / 3; rtol = 1e-2)
+        @test isapprox(res.w[1:3], full; atol = 1e-15)
         bah = optimise(OPS(; alg = BuyAndHold()), rows(rdg, 1:5)).w
         bah3 = optimise(OPS(; alg = BuyAndHold()),
                         ReturnsResult(; nx = nx[1:3], X = R[1:5, 1:3])).w
@@ -372,10 +369,15 @@ end
         R1[T, 1:2] .= NaN
         rd1 = ReturnsResult(; nx = nx, X = R1,
                             pnl = AssetPanel(; amsk = amsk1, emsk = amsk1))
+        # The bounds of the two active assets do not reach the budget, so the last step holds
+        # a book on the two departed ones, and the head fails (#2346).
         w0 = [0.5, 0.5, 0.0, 0.0]
-        for fb in (EqualWeighted(), InverseVolatility(),
-                   OPS(; alg = BuyAndHold(), w0 = w0, fb = EqualWeighted()))
-            head = OPS(; alg = BuyAndHold(), w0 = w0, fb = fb)
+        caps = BoundedAllocationSet(;
+                                    wb = WeightBounds(; lb = 0.0,
+                                                      ub = [1.0, 1.0, 0.4, 0.4]))
+        failing(fb) = OPS(; alg = BuyAndHold(), set = caps, w0 = w0, fb = fb)
+        for fb in (EqualWeighted(), InverseVolatility(), failing(EqualWeighted()))
+            head = failing(fb)
             b = optimise(head, rd1)
             o = optimise(po.partial_fit!(po.partial_fit!(head, rows(rd1, 1:20)),
                                          rows(rd1, 21:T)))
@@ -388,7 +390,7 @@ end
         # the chain answers online at fold 1, where `w` is `nothing` (#1745).
         for fb in (PreviousWeights(; fb = EqualWeighted()),
                    PreviousWeights(; fb = InverseVolatility()))
-            head = OPS(; alg = BuyAndHold(), w0 = w0, fb = fb)
+            head = failing(fb)
             b = optimise(head, rd1)
             o = optimise(po.partial_fit!(po.partial_fit!(head, rows(rd1, 1:20)),
                                          rows(rd1, 21:T)))
@@ -398,8 +400,7 @@ end
             @test length(o.fb) == length(b.fb) == 2
         end
         # A `PreviousWeights` that holds `w` still holds it, and its fallback never runs.
-        pwh = OPS(; alg = BuyAndHold(), w0 = w0,
-                  fb = PreviousWeights(; w = fill(0.25, N), fb = EqualWeighted()))
+        pwh = failing(PreviousWeights(; w = fill(0.25, N), fb = EqualWeighted()))
         opwh = optimise(po.partial_fit!(pwh, rd1))
         @test opwh.w == fill(0.25, N) && length(opwh.fb) == 1
         # The warm-up resolves a wrapper in the prior of the fallback of a
@@ -634,8 +635,10 @@ end
         w = [0.5, 0.3, 0.2]
         x = [1.1, 0.9, 1.0]
         @test po.price_adjusted_allocation(w, x) == w .* x ./ dot(w, x)
-        st, wn = po.online_update!(BuyAndHold(), nothing, w, x, nothing, set)
-        @test isnothing(st) &&
+        st, wn = po.online_update!(BuyAndHold(), po.rule_state_seed(BuyAndHold(), w), w, x,
+                                   nothing, set)
+        @test st.n == 1 &&
+              st.u === wn &&
               isapprox(wn, po.price_adjusted_allocation(w, x); atol = 1e-15)
         # A mixture's weighting under the Newton step carries a K × K Gram.
         mix = ExpertMixture(;

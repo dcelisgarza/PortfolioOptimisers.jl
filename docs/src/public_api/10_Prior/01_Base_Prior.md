@@ -18,6 +18,7 @@ prior(pe::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
 prior(pr::AbstractPriorResult, args...; kwargs...)
 forward_prior
 reconstruct_prior
+investable_mask
 port_opt_view(pr::Union{Nothing, AbstractPriorEstimator}, ::Any, args...)
 port_opt_view(pr::LowOrderPrior, rd, args...)
 port_opt_view(pr::HighOrderPrior, rd, args...)

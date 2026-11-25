@@ -165,9 +165,10 @@ end
         @test isnothing(po.investable_mask([1.0, Inf]))
         @test isnothing(po.investable_mask([NaN, NaN]))
         @test po.investable_mask([1.0, NaN]) == BitVector([1, 0])
-        @test po.investable_gradient([1.0, NaN]) == ([1.0, 0.0], BitVector([1, 0]))
+        @test po.investable_gradient([1.0, NaN], ones(2)) == ([1.0, 0.0], BitVector([1, 0]))
         g = [1.0, 2.0]
-        @test po.investable_gradient(g)[1] === g && isnothing(po.investable_gradient(g)[2])
+        @test po.investable_gradient(g, ones(2))[1] === g
+        @test isnothing(po.investable_gradient(g, ones(2))[2])
         a, b = BitVector([1, 1, 0]), BitVector([0, 1, 1])
         @test isnothing(po.investable_intersection(nothing, nothing))
         @test po.investable_intersection(nothing, b) === b
@@ -332,8 +333,9 @@ end
                                                              BitVector([1, 1, 0, 0])),
                                             rows(rf, 4:4), 1)
         @test out == wh && length(held) == 1
-        # A mask is read on rows, so a set with no rows refuses one.
-        @test_throws IsNothingError po.resolve_projection_entry(resolve(plain, 4), wh,
-                                                                nothing, only2)
+        # A set that reads no rows takes a mask with none (#2346).
+        imsk, setr, _ = po.resolve_projection_entry(resolve(plain, 4), wh, nothing,
+                                                    BitVector([1, 1, 1, 1]))
+        @test imsk == trues(4) && isa(setr, ProgrammeAllocationSet)
     end
 end

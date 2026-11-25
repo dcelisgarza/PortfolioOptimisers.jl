@@ -1,9 +1,77 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
+Carries the iterate of a rule that multiplies its own allocation and keeps nothing else.
+
+[`BuyAndHold`](@ref), [`AggregatingAlgorithm`](@ref) and [`SwitchingWeighting`](@ref) seed it with the Start Allocation. While every asset is active, the iterate is the allocation that the rule returned last. At a row with an inactive asset, the book holds a zero at that asset and the iterate keeps its weight, see [`parked_iterate`](@ref). So the asset comes back at that weight, where a multiplicative step from a zero would hold the zero for ever.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`price_adjusted_iterate`](@ref)
+  - [`parked_iterate`](@ref)
+  - [`MirrorDescentState`](@ref)
+  - [`AbstractPartialFitState`](@ref)
+"""
+@concrete struct AllocationIterateState <: AbstractPartialFitState
+    """
+    $(field_dict[:pf_n])
+    """
+    n
+    """
+    The iterate, over the full pinned universe or over the experts. It sums to one.
+    """
+    u
+end
+function merge_states(::AllocationIterateState, ::AllocationIterateState)
+    return throw(ArgumentError("an `AllocationIterateState` is not merged on its own: it holds an iterate that is order-dependent, so the head's state refuses the merge, and the state of the rule follows it."))
+end
+function Base.copy(x::AllocationIterateState)
+    return AllocationIterateState(x.n, copy(x.u))
+end
+function port_opt_view(x::AllocationIterateState, i, args...)
+    return AllocationIterateState(x.n, renormalised_view(x.u, i))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the iterate of a rule that multiplies its own allocation, adjusted by the price relative `x` of the row and reduced to the Investable Mask `imsk`.
+
+It is the [`price_adjusted_allocation`](@ref) of the iterate, which the [`investable_book`](@ref) of the mask reduces first. While no asset was ever inactive, the iterate is the allocation `w` itself, and the function returns `wh`.
+
+# Arguments
+
+  - `st`: The state of the rule.
+  - `w`: The allocation held during the period.
+  - `wh`: The price-adjusted allocation of `w`.
+  - `x`: The price relative of the period.
+  - `imsk`: The Investable Mask of `x`, or `nothing`.
+
+# Returns
+
+  - `q::AbstractVector`: The adjusted iterate, with a zero at every asset outside the mask.
+
+# Related
+
+  - [`AllocationIterateState`](@ref)
+"""
+function price_adjusted_iterate(st::AllocationIterateState, w::AbstractVector,
+                                wh::AbstractVector, x::AbstractVector,
+                                imsk::Option{BitVector})
+    if st.u === w && isnothing(imsk)
+        return wh
+    end
+    return price_adjusted_allocation(investable_book(st.u, imsk), x)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Lets the allocation drift with the market and never trades it, the buy-and-hold benchmark (BAH).
 
-It is the benchmark of Section 3.1.1 of the online selection survey [lihoi2014](@cite). From the uniform Start Allocation it is the uniform buy-and-hold portfolio, which [lihoi2014](@citet) call the usual market index. The rule keeps no state and reads no rows.
+It is the benchmark of Section 3.1.1 of the online selection survey [lihoi2014](@cite). From the uniform Start Allocation it is the uniform buy-and-hold portfolio, which [lihoi2014](@citet) call the usual market index. The rule reads no rows. Its state is its iterate, an [`AllocationIterateState`](@ref), which is the allocation itself while every asset is active.
 
 # Mathematical definition
 
@@ -32,7 +100,11 @@ As the weighting of an [`ExpertMixture`](@ref), the rule reads the expert-return
 # Algorithm
 
  1. Compute `wh`, the Price-Adjusted Allocation of `w` over `x`.
- 2. Project `wh` onto the Allocation Set `set` with `alg.proj`, from `wh`. Return `st` unchanged, and the projection. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing.
+ 2. Take `q`, the Price-Adjusted Allocation of the iterate `st.u`, with [`price_adjusted_iterate`](@ref). It is `wh` while every asset is active. `st` is the state of the rule: what the rule keeps from one update to the next, here an [`AllocationIterateState`](@ref).
+ 3. Project `q` onto the Allocation Set `set` with `alg.proj`, from `wh`, giving `wn`.
+ 4. Return the state with the period count raised by one and the iterate `wn`, and `wn`.
+
+At a row with an inactive asset, the steps run on the active assets alone, and the new allocation holds a zero at every other asset, see [`online_update!`](@ref). The iterate keeps the weight of an inactive asset, through [`parked_iterate`](@ref), so the asset comes back at that weight.
 
 # Fields
 
@@ -76,10 +148,17 @@ end
 function BuyAndHold(; proj::EuclideanProjection = EuclideanProjection())::BuyAndHold
     return BuyAndHold(proj)
 end
-function online_update!(alg::BuyAndHold, st, w::AbstractVector, x::AbstractVector, ::Any,
-                        set::AbstractAllocationSet, ::Option{<:AbstractVector} = nothing)
+function rule_state_seed(::BuyAndHold, w::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
+    return AllocationIterateState(0, w)
+end
+function online_update!(alg::BuyAndHold, st::AllocationIterateState, w::AbstractVector,
+                        x::AbstractVector, ::Any, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
+    imsk = investable_mask(x)
     wh = price_adjusted_allocation(w, x)
-    return st, project(alg.proj, set, wh, wh)
+    wn = project(alg.proj, set, price_adjusted_iterate(st, w, wh, x, imsk), wh, imsk)
+    return AllocationIterateState(st.n + 1, parked_iterate(st.u, wn, imsk)), wn
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -112,6 +191,8 @@ On the simplex the projection returns ``\\boldsymbol{b}``, so the rule holds ``\
 
  1. Set `q` to `alg.w`, or to the uniform allocation over the assets of `w` when `alg.w` is `nothing`.
  2. Project `q` onto `set` with `alg.proj`, from the Price-Adjusted Allocation of `w` over `x`. Return `st` unchanged, and the projection. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing.
+
+At a row with an inactive asset, the steps run on the active assets alone, and the new allocation holds a zero at every other asset, see [`online_update!`](@ref). The target is then `q` on the active assets, renormalised, or the uniform allocation over them when `q` has no mass there.
 
 # Fields
 
@@ -191,8 +272,11 @@ end
 function online_update!(alg::ConstantRebalancedPortfolio, st, w::AbstractVector,
                         x::AbstractVector, ::Any, set::AbstractAllocationSet,
                         ::Option{<:AbstractVector} = nothing)
-    q = isnothing(alg.w) ? fill(one(eltype(w)) / length(w), length(w)) : alg.w
-    return st, project(alg.proj, set, q, price_adjusted_allocation(w, x))
+    imsk = investable_mask(x)
+    b = isnothing(alg.w) ? fill(one(eltype(w)) / length(w), length(w)) : alg.w
+    return st,
+           project(alg.proj, set, investable_book(b, imsk), price_adjusted_allocation(w, x),
+                   imsk)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -285,6 +369,8 @@ Theorem 1 of [agarwal2006](@cite) bounds the regret against the best constant re
  6. Bind `st.A` onto `alg.proj` with [`gram_geometry`](@ref). Project `q` onto `set` in that geometry, from the Price-Adjusted Allocation of `w` over `x`, giving `wn`.
  7. Return a new state of the rule with the count raised by one, which holds the same `A` and `b`, and `wn`.
 
+At a row with an inactive asset, the steps run on the active assets alone, and the new allocation holds a zero at every other asset, see [`online_update!`](@ref). The gradient of an inactive asset is zero, so the asset adds nothing to `A` and `b`, and the system is solved on the rows and the columns of the active assets.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -370,14 +456,20 @@ end
 function online_update!(alg::NewtonStep, st::NewtonStepState, w::AbstractVector,
                         x::AbstractVector, ::Any, set::AbstractAllocationSet,
                         ::Option{<:AbstractVector} = nothing)
-    g = x ./ LinearAlgebra.dot(w, x)
+    imsk = investable_mask(x)
+    xr = investable_weights_view(imsk, x)
+    # An inactive asset adds a zero to the sums, so the Newton point solves over the others.
+    g = expand_investable_weights(imsk,
+                                  xr ./ LinearAlgebra.dot(renormalised_view(w, imsk), xr))
     st.A .+= g * transpose(g)
     st.b .+= (1 + inv(alg.beta)) .* g
-    q = alg.delta .* (LinearAlgebra.Symmetric(st.A) \ st.b)
+    A, b = isnothing(imsk) ? (st.A, st.b) : (st.A[imsk, imsk], st.b[imsk])
+    q = alg.delta .* (LinearAlgebra.Symmetric(A) \ b)
     if !iszero(alg.eta)
         q .= (1 - alg.eta) .* q .+ alg.eta / length(q)
     end
-    wn = project(gram_geometry(alg.proj, st.A), set, q, price_adjusted_allocation(w, x))
+    wn = project(gram_geometry(alg.proj, st.A), set, expand_investable_weights(imsk, q),
+                 price_adjusted_allocation(w, x), imsk)
     return NewtonStepState(st.n + 1, st.A, st.b), wn
 end
 """
@@ -689,6 +781,8 @@ Section 3.3.2 of [lihoi2014](@cite) restates the problem of PAMR as Equation 7, 
  5. Compute `q = w .- tau .* dev`.
  6. Project `q` onto `set` with `alg.proj`, from the Price-Adjusted Allocation of `w` over `x`. Return `st` unchanged, and the projection. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing.
 
+At a row with an inactive asset, the steps run on the active assets alone, and the new allocation holds a zero at every other asset, see [`online_update!`](@ref).
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -758,12 +852,16 @@ end
 function online_update!(alg::PassiveAggressiveMeanReversion, st, w::AbstractVector,
                         x::AbstractVector, ::Any, set::AbstractAllocationSet,
                         ::Option{<:AbstractVector} = nothing)
-    dev = x .- Statistics.mean(x)
+    imsk = investable_mask(x)
+    wr, xr = renormalised_view(w, imsk), investable_weights_view(imsk, x)
+    dev = xr .- Statistics.mean(xr)
     denom = sum(abs2, dev)
-    loss = max(zero(eltype(w)), LinearAlgebra.dot(w, x) - alg.eps)
+    loss = max(zero(eltype(w)), LinearAlgebra.dot(wr, xr) - alg.eps)
     tau = iszero(denom) ? zero(loss) : passive_aggressive_step(alg.slack, loss, denom)
-    q = w .- tau .* dev
-    return st, project(alg.proj, set, q, price_adjusted_allocation(w, x))
+    q = wr .- tau .* dev
+    return st,
+           project(alg.proj, set, expand_investable_weights(imsk, q),
+                   price_adjusted_allocation(w, x), imsk)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -951,6 +1049,8 @@ Under [`BlendPoint`](@ref) with [`ExponentiatedGradient`](@ref) as the weighting
  5. Compute the blend `q`, the sum of `p[k] .* h` over the experts.
  6. Project `q` onto `set` with [`blend_projection`](@ref) in `alg.proj`, from the Price-Adjusted Allocation of `w` over `x`, giving `wn`.
  7. Return a new state of the rule with the count raised by one, which holds the new `pst` and `p`, and `wn`.
+
+At a row with an inactive asset, the expert returns and the blend read each expert on the active assets, renormalised with [`investable_book`](@ref), and the projection of the blend is at the active assets.
 
 # Fields
 
@@ -1185,7 +1285,9 @@ end
 function online_update!(alg::ExpertMixture, st::ExpertMixtureState, w::AbstractVector,
                         x::AbstractVector, rows, set::AbstractAllocationSet,
                         ::Option{<:AbstractVector} = nothing)
-    r = [LinearAlgebra.dot(h, x) for h in st.h]
+    imsk = investable_mask(x)
+    xc = cash_relative(x)
+    r = [LinearAlgebra.dot(investable_book(h, imsk), xc) for h in st.h]
     point = gradient_point(alg.grad, w)
     for (k, e) in enumerate(alg.experts)
         st.st[k], st.h[k] = online_update!(e, st.st[k], st.h[k], x, rows, set, point)
@@ -1195,10 +1297,10 @@ function online_update!(alg::ExpertMixture, st::ExpertMixtureState, w::AbstractV
                             resolve_allocation_set(alg.eset, length(r), false, eltype(w)))
     q = zeros(eltype(w), length(w))
     for (k, h) in enumerate(st.h)
-        q .+= p[k] .* h
+        q .+= p[k] .* investable_book(h, imsk)
     end
     # The blend meets the head's set once more, in the mixture's own geometry.
-    wn = blend_projection(alg.proj, set, q, price_adjusted_allocation(w, x))
+    wn = blend_projection(alg.proj, set, q, price_adjusted_allocation(w, x), imsk)
     return ExpertMixtureState(st.n + 1, st.st, st.h, pst, p), wn
 end
 """

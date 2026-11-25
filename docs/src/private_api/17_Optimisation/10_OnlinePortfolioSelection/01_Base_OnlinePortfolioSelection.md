@@ -33,6 +33,7 @@ PortfolioOptimisers.rule_tree_fields
 PortfolioOptimisers.is_time_dependent(alg::PortfolioOptimisers.AbstractOnlinePortfolioSelectionAlgorithm)
 PortfolioOptimisers.rule_state_view
 PortfolioOptimisers.price_adjusted_allocation
+PortfolioOptimisers.cash_relative
 PortfolioOptimisers.project_start
 PortfolioOptimisers.OnlinePortfolioSelectionState
 Base.copy(x::PortfolioOptimisers.OnlinePortfolioSelectionState)

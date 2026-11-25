@@ -9,7 +9,7 @@ The rule is the only part of the online portfolio selection family that changes 
 
 To implement a new rule, subtype `AbstractOnlinePortfolioSelectionAlgorithm` with the parameters that the rule needs and a `proj` field, and implement the following methods:
 
-  - `online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet, point::Option{<:AbstractVector} = nothing) -> Tuple`: The Online Update. It reads the state `st` of the rule, the allocation `w` held during the period, the finite price relative `x` of the period and the rows that the head holds through the period. It returns `(st', w')`, the state of the rule and the allocation for the next period. It may write `st` in place, and it always returns a new vector for `w'`. The last slot is the Gradient Point that an [`ExpertMixture`](@ref) gives its experts. A first-order rule evaluates its gradient there, and reads `nothing` as its own point. Every other rule ignores the slot, and it still takes it, because the mixture passes it to every expert.
+  - `online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet, point::Option{<:AbstractVector} = nothing) -> Tuple`: The Online Update. It reads the state `st` of the rule, the allocation `w` held during the period, the price relative `x` of the period and the rows that the head holds through the period. It returns `(st', w')`, the state of the rule and the allocation for the next period. It may write `st` in place, and it always returns a new vector for `w'`. The last slot is the Gradient Point that an [`ExpertMixture`](@ref) gives its experts. A first-order rule evaluates its gradient there, and reads `nothing` as its own point. Every other rule ignores the slot, and it still takes it, because the mixture passes it to every expert.
   - `rule_state_seed(alg::AbstractOnlinePortfolioSelectionAlgorithm, w::AbstractVector, set::Option{<:AbstractAllocationSet} = nothing)`: The state of the rule before the first update, or `nothing` for a rule that keeps no state. `w` is the Start Allocation, and the state takes its length and its element type. The head calls the method with its Allocation Set. A rule whose state reads only `w` ignores the slot. A rule that holds allocations of its own over the assets, as the experts of an [`ExpertMixture`](@ref) are, projects them onto `set`.
   - `rows_needed(alg::AbstractOnlinePortfolioSelectionAlgorithm) -> Union{Nothing, Integer}`: The number of rows that the rule reads at a step. It is `0` for a rule that reads none, and `nothing` for a rule that reads every row folded so far.
   - `projection_geometry(alg::AbstractOnlinePortfolioSelectionAlgorithm) -> AbstractProjectionGeometry`: The geometry in which the head projects the Start Allocation. It is the rule's `proj` field by default.
@@ -21,7 +21,7 @@ A rule whose state has a per-asset axis also implements `port_opt_view(st, i, ar
   - `alg`: The concrete rule.
   - `st`: The state of the rule: what the rule keeps from one update to the next, such as a Gram matrix, a belief covariance or the Rule States of its experts. It is `nothing` for a rule that keeps nothing.
   - `w`: The allocation held during the period. It covers the full pinned universe and sums to one.
-  - `x`: The price relative of the period, [`price_relative`](@ref) of the row. It is `1 .+ r`, and one at a gap, so it is finite at every asset.
+  - `x`: The price relative of the period. It is `1 .+ r`, one at a gap of an active asset through [`price_relative`](@ref), and `NaN` at an asset that the panel marks inactive. [`investable_mask`](@ref) of `x` is the mask of the active assets, or `nothing` when every asset is active. A rule takes its step on the active assets and passes the mask to [`project`](@ref) as the last argument.
   - `rows`: The rows that the head holds through the period, or `nothing` when the rule reads no rows. It is a [`ReturnsResult`](@ref) whose `X` holds the rows of returns as they arrived, with `NaN` where there was no return, under the pinned names and the Asset Panel of the buffer. A statistic over it, such as the mean of a forecaster, a prior or a re-solve, reads it as the batch verb reads a Returns Result, and reduces to its own Coverage Universe. A kernel over the price relatives reads a gap as one through [`price_relative`](@ref).
   - `set`: The head's Allocation Set. The rule projects onto it through [`project`](@ref).
 
@@ -1105,9 +1105,9 @@ end
 
 Runs the Online Update, one row of the online portfolio selection recursion, which each rule writes once.
 
-The function reads the rule, the state `st` of the rule, the allocation `w` held during the period, the finite price relative `x` of that period, the rows that the head holds through the period, and the head's Allocation Set. It returns `(st', w')`, the state of the rule and the allocation for the next period. A rule can write its state in place, and `nothing` is a legal state. `w'` is always a new vector, because the projection makes one, so the update never writes a `w` that is a view after [`port_opt_view`](@ref).
+The function reads the rule, the state `st` of the rule, the allocation `w` held during the period, the price relative `x` of that period, the rows that the head holds through the period, and the head's Allocation Set. It returns `(st', w')`, the state of the rule and the allocation for the next period. A rule can write its state in place, and `nothing` is a legal state. `w'` is always a new vector, because the projection makes one, so the update never writes a `w` that is a view after [`port_opt_view`](@ref).
 
-Every rule makes the same two steps. It takes an unconstrained step to a raw vector, and it then calls [`project`](@ref) onto the set in its geometry. A rule that reads `w` continues from the allocation it gets, which is the Start Allocation on the first row.
+Every rule makes the same two steps. It takes an unconstrained step to a raw vector, and it then calls [`project`](@ref) onto the set in its geometry. At a row with an inactive asset, every rule of the library takes both steps on the active assets alone, from its allocation on them, renormalised with [`renormalised_view`](@ref). The new allocation holds a zero at every other asset. So on a panel with an asset that never lists, the allocation of a rule is the allocation of the same rule over the other assets. A rule that reads `w` continues from the allocation it gets, which is the Start Allocation on the first row.
 
 The last slot is the **Gradient Point**, and each method takes it as a defaulted positional slot, `point::Option{<:AbstractVector} = nothing`. An [`ExpertMixture`](@ref) under [`BlendPoint`](@ref) gives every expert its played blend as `point`. A first-order rule then evaluates its gradient at that point and steps from its own iterate, so every expert reads the one gradient on which the dynamic-regret mixtures state their bounds. A rule with no gradient ignores the slot. A `nothing` point, which the head and the mixture under [`OwnPoint`](@ref) give, is the rule's own point. [`MirrorDescent`](@ref), with or without a predictor, and [`AdaptiveSubgradient`](@ref) read a given point.
 
@@ -1135,7 +1135,7 @@ Where:
   - `alg`: The rule.
   - `st`: The state of the rule: what the rule keeps from one update to the next, such as a Gram matrix, a belief covariance or the Rule States of its experts. It is `nothing` for a rule that keeps nothing.
   - `w`: The allocation held during the period.
-  - `x`: The price relative of the period, `1 .+ r`, one at a gap.
+  - `x`: The price relative of the period, `1 .+ r`, one at a gap of an active asset, and `NaN` at an inactive asset.
   - `rows`: The rows that the head holds through the period, a [`ReturnsResult`](@ref) of the rows as they arrived, or `nothing`.
   - `set`: The Allocation Set, resolved.
   - `point`: The Gradient Point, the allocation a first-order rule evaluates its gradient at, or `nothing` for its own iterate.
@@ -1157,7 +1157,7 @@ function online_update! end
 
 Returns the price relative of one return, `1 + r`, and one at a gap.
 
-A non-finite return is a period in which the leg held cash, which is how the Held Gap reads it. So the Online Update sees a finite `x` at every asset, and a kernel over the rows reads the same number at the gap.
+A non-finite return is a period in which the leg held cash, which is how the Held Gap reads it. A kernel over the rows reads the same number at the gap. [`row_relatives`](@ref) applies the function to a row, and marks the inactive assets.
 
 # Mathematical definition
 
@@ -1175,7 +1175,7 @@ Where:
 # Related
 
   - [`online_update!`](@ref)
-  - [`online_selection_row!`](@ref)
+  - [`row_relatives`](@ref)
 """
 function price_relative(r::Number)
     return isfinite(r) ? one(r) + r : one(r)
@@ -1411,7 +1411,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns the Price-Adjusted Allocation, the book that the fund holds at the end of a period before it trades.
 
-It is one row of the self-financing Weight Drift at budget one. Every trade of the family starts from it. The update of [`BuyAndHold`](@ref) returns this vector, a turnover ceiling on a [`ProgrammeAllocationSet`](@ref) bounds the distance from it, and every projection gets it as its `w` argument.
+It is one row of the self-financing Weight Drift at budget one. Every trade of the family starts from it. The update of [`BuyAndHold`](@ref) projects this vector, a turnover ceiling on a [`ProgrammeAllocationSet`](@ref) bounds the distance from it, and every projection gets it as its `w` argument.
 
 # Mathematical definition
 
@@ -1431,7 +1431,7 @@ Where:
 # Arguments
 
   - `w`: The allocation held during the period.
-  - `x`: The price relative of the period.
+  - `x`: The price relative of the period. A `NaN`, at an inactive asset, reads as one through [`cash_relative`](@ref).
 
 # Returns
 
@@ -1444,7 +1444,27 @@ Where:
   - [`SelfFinancingDrift`](@ref)
 """
 function price_adjusted_allocation(w::AbstractVector, x::AbstractVector)
-    return w .* x ./ LinearAlgebra.dot(w, x)
+    xc = cash_relative(x)
+    return w .* xc ./ LinearAlgebra.dot(w, xc)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Reads the mark of an inactive asset in a price relative as one, the price relative of cash.
+
+A leg that departs earns nothing in the period of its departure, so the book that the fund holds at the end of the period values it at one. A price relative with no mark passes unchanged.
+
+# Related
+
+  - [`price_adjusted_allocation`](@ref)
+  - [`row_relatives`](@ref)
+"""
+function cash_relative(x::AbstractVector)
+    # A finite sum has no `NaN` in it, and the sum is the cheap check.
+    if isfinite(sum(x)) || !any(isnan, x)
+        return x
+    end
+    return map(v -> ifelse(isnan(v), one(v), v), x)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1646,7 +1666,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the Partial Fit State of an online portfolio selection head: the Rule State, the rows, the Fold Context and every folded timestamp.
 
-The pair `(st, w)` is the Rule State, the unit over which the family recurses. The state holds once the rows that any rule of the tree reads, as a [`ReturnsBufferState`](@ref) that owns the returns. The buffer keeps the rows of the Returns Result as they arrived, with `NaN` where there was no return, and under a time-varying panel it keeps the active mask of each row beside it. It keeps every other field of the Returns Result too, such as the benchmark and the factor returns, so the rows that a rule reads drop no field. [`rows_needed`](@ref) of the rule tree caps the buffer, and the buffer is `nothing` for a tree that reads no rows. At every row the head reads the buffer out as a [`ReturnsResult`](@ref) through [`buffer_returns_result`](@ref), so a statistic over the rows reduces to its Coverage Universe as a batch fit over the same window does. No cap applies to the timestamps, so [`Resume`](@ref) works for a rule with no state. The active mask of the last folded row is the Investable Mask on which `optimise(opt)` with no data reduces the allocation, and it is `nothing` under a static panel. The recursion keeps the full `w` and never carries a forced zero.
+The pair `(st, w)` is the Rule State, the unit over which the family recurses. The state holds once the rows that any rule of the tree reads, as a [`ReturnsBufferState`](@ref) that owns the returns. The buffer keeps the rows of the Returns Result as they arrived, with `NaN` where there was no return, and under a time-varying panel it keeps the active mask of each row beside it. It keeps every other field of the Returns Result too, such as the benchmark and the factor returns, so the rows that a rule reads drop no field. [`rows_needed`](@ref) of the rule tree caps the buffer, and the buffer is `nothing` for a tree that reads no rows. At every row the head reads the buffer out as a [`ReturnsResult`](@ref) through [`buffer_returns_result`](@ref), so a statistic over the rows reduces to its Coverage Universe as a batch fit over the same window does. No cap applies to the timestamps, so [`Resume`](@ref) works for a rule with no state. The active mask of the last folded row is the Investable Mask on which `optimise(opt)` with no data reduces the allocation, and it is `nothing` under a static panel. The recursion keeps `w` over the full universe, with a zero at an asset that was inactive at the last row.
 
 # Fields
 
@@ -1848,7 +1868,7 @@ end
     renormalised_view(w::Nothing, i)
     renormalised_view(w::AbstractVector, i)
 
-Slices an allocation to the selected assets and renormalises it to sum to one, as a copy. A `nothing` allocation stays `nothing`.
+Slices an allocation to the selected assets and renormalises it to sum to one, as a copy. A `nothing` allocation stays `nothing`, and a `nothing` selection, the mask of a row with no inactive asset, returns the allocation.
 
 The function spreads the mass that the selection leaves out over the kept assets in proportion. Every per-asset view of an allocation in the family reads it this way, the Recursion Result under a time-varying panel and the view of a rule's own allocation among them. A selection that keeps none of the mass, such as a view of a one-hot allocation to the other assets, has no proportion. It returns the uniform allocation over the kept assets, the Start Allocation of the family.
 
@@ -1873,6 +1893,9 @@ Where:
 """
 function renormalised_view(::Nothing, ::Any)
     return nothing
+end
+function renormalised_view(w::AbstractVector, ::Nothing)
+    return w
 end
 function renormalised_view(w::AbstractVector, i)
     v = w[i]

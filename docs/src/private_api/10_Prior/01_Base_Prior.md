@@ -20,7 +20,6 @@ PortfolioOptimisers.field_states_nothing
 PortfolioOptimisers.assert_moment_counts
 PortfolioOptimisers.moment_observation_count
 PortfolioOptimisers.moment_count_entry
-investable_mask
 investable_views
 investable_prior
 investable_universe_names

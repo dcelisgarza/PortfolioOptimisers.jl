@@ -1598,15 +1598,16 @@ function online_update!(alg::ForecastReadingRule, st, w::AbstractVector, x::Abst
                         rows, set::AbstractAllocationSet,
                         ::Option{<:AbstractVector} = nothing)
     st, xhat = forecast_relative(alg.me, st, x, rows)
-    imsk = investable_mask(xhat)
+    imsk = investable_intersection(investable_mask(x), investable_mask(xhat))
     wh = price_adjusted_allocation(w, x)
     if isnothing(imsk)
         q = forecast_step(alg, w, wh, xhat, nothing, x, rows)
         return st, project(alg.proj, set, q, wh)
     end
-    # The step of the rule runs on the assets that the forecaster prices alone.
+    # The step of the rule runs on the active assets that the forecaster prices alone. It is
+    # flat on the active assets when the forecaster prices none of them.
     q = forecast_step(alg, renormalised_view(w, imsk), renormalised_view(wh, imsk),
-                      xhat[imsk], imsk, x, rows)
+                      forecast_where_defined(xhat[imsk]), imsk, x, rows)
     return st, project(alg.proj, set, expand_investable_weights(imsk, q), wh, imsk)
 end
 export ForecastReversion, MovingAverageReversion, ExponentialMovingAverageReversion,

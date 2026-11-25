@@ -805,9 +805,9 @@ end
         # returned as it is, aliasing nothing.
         qb = [0.55, 0.45]
         @test po.blend_projection(EuclideanProjection(), resolve(BoundedAllocationSet(), 2),
-                                  qb, w) === qb
-        @test po.blend_projection(EuclideanProjection(), tn, [0.9, 0.1], [0.6, 0.4]) ≈
-              [0.7, 0.3] atol = 1e-6
+                                  qb, w, nothing) === qb
+        @test po.blend_projection(EuclideanProjection(), tn, [0.9, 0.1], [0.6, 0.4],
+                                  nothing) ≈ [0.7, 0.3] atol = 1e-6
     end
 
     @testset "Any risk measure as the ceiling (#1163)" begin

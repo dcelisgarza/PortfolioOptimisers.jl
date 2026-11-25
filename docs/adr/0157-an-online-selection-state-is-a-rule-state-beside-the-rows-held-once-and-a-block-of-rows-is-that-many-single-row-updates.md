@@ -205,3 +205,14 @@ beside an allocation that is not, and the family's parallel route is the Causal 
 - `test/test_24b_optimiser_partial_fit.jl` gains the identity at `test_size = 5`;
   `test/test_62_partial_fit_state_interface_census.jl` gains the state; the Held Gap tests
   gain the step's warning and refusal.
+
+## Amendment (2026-11-25): an inactive asset leaves the step of every rule
+
+Issue #2346. The Decision let the step of a rule read an inactive leg at `x = 1`, over the whole
+pinned universe, with no forced zero in the allocation.
+[ADR 0170](0170-an-online-selection-head-keeps-a-non-finite-return-and-the-active-mask-in-its-rows-buffer-and-every-statistic-over-the-rows-reduces-to-its-coverage-universe.md) records the reversal: the step runs on the assets that are active at the row, and the
+book holds a zero at every other one. Option 8, *run the update on the row's active sub-universe and
+expand with zeros*, is now the decision, and its two costs have an answer. A multiplicative rule keeps
+the weight of the leg on its iterate, so no rule needs a re-entry policy of its own. A state keeps its
+full length, and the update reads and writes its entries at the active assets, so no state is cut and
+grown again.

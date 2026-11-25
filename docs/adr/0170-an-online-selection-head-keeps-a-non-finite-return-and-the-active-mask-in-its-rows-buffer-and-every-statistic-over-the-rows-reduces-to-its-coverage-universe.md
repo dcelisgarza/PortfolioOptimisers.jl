@@ -256,3 +256,50 @@ Rejected alternatives:
 2. **Reduce the head to the active mask once per row.** Every Rule State then needs an inverse of
    its view, and the state of a folding forecaster has none. It also removes the cash reading of
    every kernel, which ADR 0162 rules.
+
+## Amendment (2026-11-25): an inactive asset leaves the step of a kernel too
+
+Issue #2346. *The step reads a gap as cash* held for a kernel over the price relatives, at an inactive
+asset as at a Held Gap. A step could then buy cash: on the fixture of the amendment above, at row 242
+every priced asset fell, so a `GradientProjection(; eta = 1e5)` on log wealth put the whole book on the
+asset that the panel marks inactive at every row, and the Recursion Result was an
+`OptimisationFailure` with `NaN` weights. The same reading made the fund of most rules differ from the
+fund over the listed names, and it read a stale finite return of an inactive asset as a real one.
+
+- **The price relative holds `NaN` at an inactive asset** (`row_relatives`), the mark that the amendment
+  above gave to a gradient and to a forecast, so `investable_mask` of `x` is the mask of the active
+  assets. A row with no active asset states no universe and holds no mark. A gap at an active asset
+  stays a Held Gap and reads as one.
+- **Every rule steps on the mask.** It reads its allocation on the active assets, renormalised, and the
+  projection takes the mask in its last slot. A rule that reads a forecast or a Risk Loss intersects the
+  two masks. A `FollowTheLeader` marks a departed asset inactive at every row of its sample, because a
+  sample of past rows can hold every return of it. The two mixtures read each expert on the
+  mask.
+- **A state keeps its entry at an inactive asset.** The gradient sums of the Newton step, the wealth of
+  `TopK` and of the weak aggregating algorithm, and the belief of the confidence-weighted reversion do
+  not move there. A rule that multiplies its own allocation keeps the weight of the asset on its iterate
+  (`parked_iterate`), as the `MirrorDescent` did. So `BuyAndHold`, `AggregatingAlgorithm` and
+  `SwitchingWeighting` hold an `AllocationIterateState`, where they held no state, and the state of
+  `ExpectationMaximisation` holds the iterate beside the start.
+- **The Price-Adjusted Allocation reads the mark as one.** It is the book of the fund, and a leg that
+  departs is sold at that value.
+- **A programme set that reads no rows takes a mask.** A kernel keeps no rows, so the set reads the names
+  outside the mask off its own universe.
+- **A step from an allocation with no mass on an active asset starts from the uniform allocation over
+  the active assets**, the reading of `renormalised_view` and of the amendment above. So a step that is
+  not held gives mass to an active asset. The `OptimisationFailure` stays for a last row with no active
+  asset, and for a hold on a book of departed assets, and the fallback answers both.
+
+So on a panel with an asset that never lists, the book of every rule is the book of the same rule over
+the other assets, to rounding. Rejected alternatives:
+
+1. **Keep the cash reading, and project the raw step at the mask alone.** The whole book could not move
+   to the asset, but the gross return, the mean and the variance of the step would still read it, and
+   the book of a rule would depend on how many unlisted names are pinned.
+2. **Keep the cash reading, and read out the uniform allocation when no active asset has mass.** The
+   recursion then holds a book that the fund does not, and the next step starts from it.
+3. **Keep the whole weight of the multiplicative rules in the allocation of the head, and slice it when
+   the Result is read.** The fund does not hold that weight, so every turnover ceiling would measure the
+   trade from a book that does not exist.
+4. **Pass the mask in a slot of its own.** Every rule of a user then takes a new slot, and two sources
+   of one fact can disagree.

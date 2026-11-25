@@ -1137,6 +1137,17 @@ A `ConstraintBlock` holds concentration rules, such as the UCITS 5/10/40 rule, i
 
 ## From v0.34 to v0.35
 
+### [Online steps at an inactive asset](@id migration-0-35-inactive)
+
+An online step removes an asset that the asset panel marks inactive at the row, and the allocation holds a zero there. v0.34 read the asset as cash, with a price relative of one, so a step could move the book to it and the Result then held `NaN` weights. A finite return of an inactive asset is not read either, where v0.34 read it. On a panel with an asset that never lists, the book of every rule is now the book of the same rule over the other assets. Runs on a panel with no inactive asset, and runs with no panel, do not move, except the restart below.
+
+- **Every rule of an `OnlinePortfolioSelection` head** moves on a panel with an inactive asset. `BuyAndHold` on the default set moves only when an asset lists again: it enters at the weight that the iterate kept, where v0.34 compared that weight with the growth of the other assets.
+- **A `FollowTheLeader`** holds no asset that is inactive at the row, also when the sample has every return of it.
+- **`SelfConfidentRate`** reads the log of the number of active assets.
+- **A rule of your own** gets `NaN` in `x` at an inactive asset, where v0.34 gave one. Take `imsk = PortfolioOptimisers.investable_mask(x)`, take the step on the assets of the mask, and pass the mask to `PortfolioOptimisers.project` as the last argument. `PortfolioOptimisers.price_adjusted_allocation` reads the `NaN` as one. A `NaN` that the rule does not remove gives an `OptimisationFailure`.
+- **`online_update!` of `BuyAndHold`, `AggregatingAlgorithm` and `SwitchingWeighting`** reads a state. Write `PortfolioOptimisers.rule_state_seed(alg, w)` where you wrote `nothing`.
+- **A restart of an `ExpectationMaximisation` on a `DoublingTrickRate`** projects the start onto the set again, as the restart of a `MirrorDescent` does. So it meets a turnover ceiling of a `ProgrammeAllocationSet`.
+
 ### [Online steps that cannot price an asset](@id migration-0-35-unpriced)
 
 An online step removes an asset that its loss or its forecaster cannot price, and the allocation holds a zero there, as a batch optimiser does. This happens under a `RiskLoss`, and under a rule that reads a forecast, when the rows hold no return of the asset or a gap that the prior or the forecaster does not read. Runs on rows with no gap do not move.
