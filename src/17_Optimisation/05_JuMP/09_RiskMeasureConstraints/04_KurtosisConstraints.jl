@@ -357,6 +357,7 @@ $(val_dict[:relax])
 
 # Keyword arguments
 
+  - $(arg_dict[:term_rm])
   - `prefix::Symbol`: Model State namespace of the build (default: empty, i.e. the bare key).
 
 # Validation
@@ -384,6 +385,7 @@ $(val_dict[:relax])
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::Kurtosis{<:Any, <:Any, <:Integer, <:Any, <:Any},
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               term::RiskMeasureSettings = r.settings,
                                prefix::Symbol = Symbol(""), kwargs...)
     assert_high_order_quantity(r.kt, pr, :Kurtosis, :kt, :CokurtosisEstimator)
     sc = get_constraint_scale(model)
@@ -400,7 +402,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
           for j in 0:(Nf - 1)]
     bounded = !isnothing(r.settings.ub)
     (sqrt_kurtosis_risk, x_kurt), (bound, _) = set_risk_epigraphs!(model,
-                                                                   reads_risk_term(r.settings),
+                                                                   reads_risk_term(term),
                                                                    bounded; prefix = prefix
                                                                    ) do k, p
         W = set_sdp_constraints!(model, k; prefix = prefix)
@@ -497,6 +499,7 @@ $(val_dict[:relax])
 
 # Keyword arguments
 
+  - $(arg_dict[:term_rm])
   - `prefix::Symbol`: Model State namespace of the build (default: empty, i.e. the bare key).
 
 # Validation
@@ -524,6 +527,7 @@ $(val_dict[:relax])
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::Kurtosis{<:Any, <:Any, Nothing, <:Any, <:Any},
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               term::RiskMeasureSettings = r.settings,
                                prefix::Symbol = Symbol(""), kwargs...)
     assert_high_order_quantity(r.kt, pr, :Kurtosis, :kt, :CokurtosisEstimator)
     sc = get_constraint_scale(model)
@@ -535,7 +539,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     end
     bounded = !isnothing(r.settings.ub)
     (sqrt_kurtosis_risk, x_kurt), (bound, _) = set_risk_epigraphs!(model,
-                                                                   reads_risk_term(r.settings),
+                                                                   reads_risk_term(term),
                                                                    bounded; prefix = prefix
                                                                    ) do k, p
         W = set_sdp_constraints!(model, k; prefix = prefix)

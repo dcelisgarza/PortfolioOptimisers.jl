@@ -879,6 +879,26 @@ end
         @test isempty(hm)
         @test expected_risk(mdd, wm, R) <= 0.05 * (1 + 1e-4)
         @test !isapprox(wm, free; atol = 1e-3)
+        # A range with a ceiling asks each tail for the expression of its bound, and the
+        # ceiling of a tail stays a row of its own (#2345).
+        tail(a; kw...) = ConditionalValueatRisk(; alpha = a,
+                                                settings = RiskMeasureSettings(; kw...))
+        ranged(l; kw...) = GenericValueatRiskRange(;
+                                                   settings = RiskMeasureSettings(; kw...),
+                                                   loss = l, gain = tail(0.2))
+        value = expected_risk(ranged(tail(0.1)), free, R)
+        for r in
+            (ranged(tail(0.1); ub = 0.8 * value), ranged(tail(0.1; ub = 0.02); ub = value))
+            rset = resolve(ProgrammeAllocationSet(; slv = slv, r = r), 4)
+            (wr, hr) = po.with_projection_step(() -> po.project(EuclideanProjection(), rset,
+                                                                q4, w4), rdR, 1)
+            @test isempty(hr)
+            if isnothing(r.loss.settings.ub)
+                @test isapprox(expected_risk(r, wr, R), 0.8 * value; rtol = 1e-4)
+            else
+                @test isapprox(expected_risk(tail(0.1), wr, R), 0.02; rtol = 1e-4)
+            end
+        end
         S = cov(R)
         vub = 0.5 * dot(free, S, free)
         vfit = resolve(ProgrammeAllocationSet(; slv = slv,

@@ -69,7 +69,7 @@ Where:
 
   - $(arg_dict[:model])
   - `prefix`: The Model State namespace of the build. The mark goes to its owner, [`weights_prefix`](@ref).
-  - `settings`: The variance's settings. The mark needs `settings.rke` and `settings.scale > 0`.
+  - `settings`: The settings of the term that holds the variance, which are the settings of its range when the variance is a tail. The mark needs `settings.rke` and `settings.scale > 0`.
 
 # Returns
 
@@ -394,7 +394,7 @@ The term needs that lift only when it is a positive term of the objective of a [
 
   - $(arg_dict[:model])
   - `ratio_alg`: The `ratio_alg` of the measure.
-  - `settings`: The settings of the measure.
+  - `settings`: The settings of the term that holds the measure, which are the settings of its range when the measure is a tail.
 
 # Returns
 

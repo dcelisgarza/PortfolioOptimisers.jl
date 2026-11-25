@@ -792,6 +792,142 @@ end
     end
     @test isapprox(risks[1], risks[2]; rtol = 1e-6)
 end
+# A range rebuilds a tail to ask for its bound, so a range that is a tail needs this constructor.
+MrsRange(; settings, loss, gain) = MrsRange(settings, loss, gain)
+# A measure of a user's own whose builder states no bound, so it answers no request for one.
+struct MrsUnboundedRisk{T1} <: PO.RiskMeasure
+    settings::T1
+end
+MrsUnboundedRisk(; settings) = MrsUnboundedRisk(settings)
+PO.risk_input_kind(::MrsUnboundedRisk) = PO.NetReturnsInput()
+function PO.set_risk_constraints!(model::JuMP.Model, i::Any, ::MrsUnboundedRisk,
+                                  ::PO.RiskConstraintOwner, pr::PO.AbstractPriorResult,
+                                  args...; prefix::Symbol = Symbol(""), kwargs...)
+    return PO.state_set!(model, prefix, :mrs_unbounded_, i,
+                         JuMP.@expression(model, sum(PO.get_w(model, prefix)) / 10))
+end
+
+@testset "MeanRisk sweep: the objective and the bound of a range read each tail" begin
+    # A tail carries `rke = false`, and the builder of a tail read that as a measure that is
+    # only a bound. Under `RiskBudgeting` the range then added the model of the bound to the
+    # objective, and the weights moved with a bound that does not bind (#2345). A range with
+    # `NoRisk` as its other tail is the measure of the first tail, so each head must give the
+    # answer of that measure alone.
+    pr = prior(HighOrderPriorEstimator(), MRS_X[1:40, :])
+    opt(; kw...) = JuMPOptimiser(; pe = pr, slv = MRS_SLV, kw...)
+    on(; kw...) = RiskMeasureSettings(; kw...)
+    off(; kw...) = RiskMeasureSettings(; rke = false, kw...)
+    none = NoRisk(; settings = off())
+    function range_of(t, side; kw...)
+        loss, gain = side == :loss ? (t, none) : (none, t)
+        return MrsRange{RiskMeasureSettings, PO.RiskMeasure, PO.RiskMeasure}(on(; kw...),
+                                                                             loss, gain)
+    end
+    ucs = sigma_ucs(NormalUncertaintySet(; pe = nothing, rng = StableRNG(1), seed = 1,
+                                         alg = EllipsoidalUncertaintySetAlgorithm()), pr)
+    kurt(s) = Kurtosis(; settings = s)
+    even(s) = LowOrderMoment(; settings = s, alg = EvenMoment())
+    semi(s) = LowOrderMoment(; settings = s, alg = SecondMoment(; alg1 = SemiMoment()))
+    worst(s) = UncertaintySetVariance(; settings = s, ucs = ucs)
+    var(s) = Variance(; settings = s)
+    vsk(s) = VarianceSkewKurtosis(; settings = s, vr = Variance(), sk = Skewness(),
+                                  kt = Kurtosis())
+    rb(r) = optimise(RiskBudgeting(; opt = opt(), r = r))
+    mr(r, obj; kw...) = optimise(MeanRisk(; opt = opt(; kw...), r = r, obj = obj))
+    ok(res) = isa(res.retcode, OptimisationSuccess)
+    value(m, w) = expected_risk(factory(m(on()), pr, MRS_SLV), w, pr)
+    # A bound that does not bind moves no weight, on the tail, on the range, and on both.
+    @testset "free $m" for (m, side) in
+                           ((kurt, :loss), (kurt, :gain), (even, :gain), (worst, :loss),
+                            (var, :gain), (vsk, :loss))
+        free = rb(m(on()))
+        @test ok(free)
+        v = value(m, free.w)
+        for r in (range_of(m(off()), side), range_of(m(off(; ub = 3 * v)), side),
+                  range_of(m(off()), side; ub = 3 * v),
+                  range_of(m(off(; ub = 4 * v)), side; ub = 3 * v))
+            res = rb(r)
+            @test ok(res)
+            @test isapprox(res.w, free.w; rtol = 5e-4)
+        end
+    end
+    # A bound that binds holds the range at its value under the heads that scale the weights.
+    ratio(r) = mr(r, MaximumRatio())
+    heads = (rb, ratio)
+    @testset "binding $m $head" for (m, side) in
+                                    ((kurt, :loss), (semi, :loss), (worst, :gain),
+                                     (var, :loss)), head in heads
+
+        lo = value(m, mr(m(on()), MinimumRisk()).w)
+        ub = (lo + value(m, head(m(on())).w)) / 2
+        alone = head(m(on(; ub = ub)))
+        @test ok(alone)
+        @test isapprox(value(m, alone.w), ub; rtol = 1e-3)
+        for r in (range_of(m(off()), side; ub = ub), range_of(m(off(; ub = ub)), side),
+                  range_of(m(off(; ub = 2 * ub)), side; ub = ub),
+                  range_of(MrsRange(off(; ub = 2 * ub), m(off()), none), side; ub = ub))
+            res = head(r)
+            @test ok(res)
+            @test isapprox(res.w, alone.w; rtol = 2e-3)
+        end
+    end
+    # Under `MaximumRatio` a lifted variance that the objective reads states its term on the
+    # lift of the objective, and the bound of the range reads the first lift.
+    ple = SemiDefinitePhylogeny(; A = zeros(5, 5), p = 1.0)
+    alone = mr(var(on()), MaximumRatio(); ple = ple)
+    ub = 0.5 * (value(var, alone.w) + value(var, mr(var(on()), MinimumRisk()).w))
+    for b in (nothing, ub)
+        alone = mr(var(on(; ub = b)), MaximumRatio(); ple = ple)
+        res = mr(range_of(var(off()), :loss; ub = b), MaximumRatio(); ple = ple)
+        @test haskey(res.model, :lift_W) && haskey(res.model, :variance_flag)
+        @test haskey(res.model, :W) == !isnothing(b)
+        @test isapprox(res.w, alone.w; rtol = 2e-3)
+    end
+    # A tail of a range that no objective reads is only a bound.
+    res = mr([StandardDeviation(), MrsRange(off(; ub = 1.0), var(off()), none)],
+             MaximumRatio(); ple = ple)
+    @test !haskey(res.model, :lift_W) && !haskey(res.model, :variance_flag)
+    m = rb([StandardDeviation(), MrsRange(off(; ub = 1.0), kurt(off()), none)]).model
+    @test !haskey(m, :kurtosis_risk_loss_2) && haskey(m, :bound_kurtosis_risk_loss_2)
+    # A tail of degree one costs a bound of the range nothing.
+    size_of(r) =
+        let m = rb(r).model
+            (num_variables(m), num_constraints(m; count_variable_in_set_constraints = true))
+        end
+    cvar = ConditionalValueatRisk(; settings = off(), alpha = 0.2)
+    a, b = size_of(range_of(cvar, :loss)), size_of(range_of(cvar, :loss; ub = 1.0))
+    @test b == a .+ (0, 1)
+    # A measure with no index takes its request before the rule for the first measure, so a
+    # tail does not take the place of a later measure.
+    m = rb([range_of(Range(; settings = off()), :loss; ub = 1.0),
+            Range(; settings = off(; ub = 2.0))]).model
+    @test haskey(m, :mrs_range_risk_1_ub) && haskey(m, :range_risk_ub)
+    # A sweep on a tail of a range with a bound keeps its entry, its owner and its units.
+    swept = range_of(var(off(; ub = Frontier(; N = 2))), :loss; ub = 1.0)
+    res = mr(swept, MaximumReturn())
+    entry = only(res.model[:risk_frontier])
+    @test isa(entry.second[4], Variance)
+    corners = [value(var, mr(var(on()), obj).w) for obj in (MinimumRisk(), MaximumReturn())]
+    @test isapprox([value(var, w) for w in res.w], corners; rtol = 1e-3)
+    # A tracked measure reads the term of the range that holds its tracking measure.
+    track(s) = RiskTrackingRiskMeasure(; settings = s, r = Kurtosis(),
+                                       tr = WeightsTracking(; w = fill(0.2, 5)),
+                                       alg = IndependentVariableTracking())
+    model_of(s) = rb([StandardDeviation(), MrsRange(s, track(off(; ub = 1.0)), none)]).model
+    m = model_of(on())
+    @test haskey(m, :tr_iv_loss_2_kurtosis_risk_1)
+    @test haskey(m, :tr_iv_loss_2_bound_kurtosis_risk_1)
+    m = model_of(off())
+    @test !haskey(m, :tr_iv_loss_2_kurtosis_risk_1)
+    @test haskey(m, :tr_iv_loss_2_bound_kurtosis_risk_1)
+    # A builder that states no bound gives the range its risk expression.
+    u = MrsUnboundedRisk(off())
+    sd = StandardDeviation(; settings = off())
+    v = sqrt(value(var, mr(var(on()), MinimumRisk()).w))
+    res = mr(MrsRange(on(; ub = 1.1 * v + 0.1), u, sd), MaximumReturn())
+    @test ok(res)
+    @test isapprox(sqrt(value(var, res.w)), 1.1 * v; rtol = 1e-5)
+end
 
 @testset "MeanRisk sweep: a Frontier needs two points" begin
     # `range(a, b; length = 1)` throws when `a != b`, so every sweep of one point failed

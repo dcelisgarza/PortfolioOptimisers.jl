@@ -462,6 +462,11 @@ free of collisions.
   - $(arg_dict[:pl_opt])
   - $(arg_dict[:fees_opt])
 
+# Keyword arguments
+
+  - $(arg_dict[:term_rm])
+  - `prefix::Symbol`: Model State namespace of the build (default: empty, i.e. the bare key).
+
 # Returns
 
   - The tracking risk JuMP expression.
@@ -479,6 +484,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                           <:IndependentVariableTracking},
                                opt::RiskConstraintOwner, pr::AbstractPriorResult,
                                pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, args...;
+                               term::RiskMeasureSettings = r.settings,
                                prefix::Symbol = Symbol(""), kwargs...)
     settings = r.settings
     wb = r.tr.w
@@ -494,7 +500,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
         return tracking_risk
     end
     level, exact = risk_bound_level(settings.ub)
-    ask = TrackedRiskBound(tprefix, reads_risk_term(settings), level, exact)
+    ask = TrackedRiskBound(tprefix, reads_risk_term(term), level, exact)
     tracking_risk, expr, map = set_tracked_risk_constraints!(model, r.r, ask, opt, pr, pl,
                                                              fees, args...; kwargs...)
     ub = variance_risk_bounds_val(map, settings.ub)
@@ -576,6 +582,11 @@ Where:
   - $(arg_dict[:pl_opt])
   - $(arg_dict[:fees_opt])
 
+# Keyword arguments
+
+  - $(arg_dict[:term_rm]) The method does not read it, because the term of the tracked measure is the row of the tracking risk. It takes the keyword, so the tracked measure does not read the term of the range.
+  - `prefix::Symbol`: Model State namespace of the build (default: empty, i.e. the bare key).
+
 # Returns
 
   - The tracking risk JuMP expression.
@@ -594,6 +605,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                           <:DependentVariableTracking},
                                opt::RiskConstraintOwner, pr::AbstractPriorResult,
                                pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, args...;
+                               term::RiskMeasureSettings = r.settings,
                                prefix::Symbol = Symbol(""), kwargs...)
     # `r` reached here through `set_risk_constraints!`, which resolved it. `deferred_slots`
     # declares `r` as this container's child, so the derived recursion has already run and

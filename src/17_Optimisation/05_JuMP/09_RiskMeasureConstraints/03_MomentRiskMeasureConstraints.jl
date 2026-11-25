@@ -424,6 +424,11 @@ Under a unit budget the moment has degree two in the unscaled weights, and the r
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr])
 
+# Keyword arguments
+
+  - $(arg_dict[:term_rm])
+  - `prefix::Symbol`: Model State namespace of the build (default: empty, i.e. the bare key).
+
 # Returns
 
   - `risk`: The epigraph variable of the even moment, the risk expression. Under a unit budget it is the expression that the bound acts on when the measure is only a bound.
@@ -442,6 +447,7 @@ Under a unit budget the moment has degree two in the unscaled weights, and the r
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any, <:EvenMoment},
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               term::RiskMeasureSettings = r.settings,
                                prefix::Symbol = Symbol(""), kwargs...)
     w = get_w(model, prefix)
     # The target is subtracted from the returns of the unscaled weights, so it scales with
@@ -477,15 +483,15 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
         end
         ub = even_moment_bound_val(ub)
         # A measure that is only a bound has no term to build.
-        risk = if reads_risk_term(r.settings)
+        risk = if reads_risk_term(term)
             set_even_moment_risk!(model, i, r.alg, even_moment, rows, wi, Td,
                                   effective_k(model); prefix = prefix)
         else
             bound
         end
     else
-        risk, bound = set_risk_epigraphs!(model, reads_risk_term(r.settings),
-                                          !isnothing(ub); prefix = prefix) do k, p
+        risk, bound = set_risk_epigraphs!(model, reads_risk_term(term), !isnothing(ub);
+                                          prefix = prefix) do k, p
             return set_even_moment_risk!(model, i, r.alg, even_moment, rows, wi, Td, k;
                                          prefix = p)
         end

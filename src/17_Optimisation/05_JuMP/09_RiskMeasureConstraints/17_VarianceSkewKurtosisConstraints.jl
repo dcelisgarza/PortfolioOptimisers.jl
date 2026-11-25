@@ -98,6 +98,7 @@ $(val_dict[:relax])
 
 # Keyword arguments
 
+  - $(arg_dict[:term_rm])
   - `prefix::Symbol`: Model State namespace of the build (default: empty, i.e. the bare key).
 
 # Validation
@@ -124,6 +125,7 @@ $(val_dict[:relax])
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::VarianceSkewKurtosis,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               term::RiskMeasureSettings = r.settings,
                                prefix::Symbol = Symbol(""), kwargs...)
     assert_high_order_quantity(r.sk.sk, pr, :VarianceSkewKurtosis, :sk,
                                :CoskewnessEstimator)
@@ -145,7 +147,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::VarianceSkewKurtosi
                                                LinearBound(), SquaredBound()),
                                         r.kt.settings.ub)
     bounded = !all(isnothing, (vr_bound, sk_bound, kt_bound, r.settings.ub))
-    objective, bounds = set_risk_epigraphs!(model, reads_risk_term(r.settings), bounded;
+    objective, bounds = set_risk_epigraphs!(model, reads_risk_term(term), bounded;
                                             prefix = prefix) do k, p
         W1 = state_build!(model, p, :W1_vr_sk_kt) do
             W1_vr_sk_kt = JuMP.@variable(model, [1:N, 1:N], Symmetric)
