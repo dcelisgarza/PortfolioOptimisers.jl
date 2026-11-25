@@ -209,8 +209,8 @@ function PipelineUncertaintySets(; mu::Option{<:AbstractUncertaintySetResult} = 
 end
 """
     const PIPELINE_ROUTING_TARGETS = (:pe, :cle, :wb, :lcse, :cte, :ple, :lt, :st, :slt,
-                                     :sst, :sglt, :sgst, :smtx, :sgmtx, :rkb, :mu_ucs,
-                                     :sigma_ucs)
+                                     :sst, :sglt, :sgst, :smtx, :sgmtx, :conc, :rkb,
+                                     :mu_ucs, :sigma_ucs)
 
 The destinations [`inject_context`](@ref) can deliver a computed slot to.
 
@@ -221,7 +221,7 @@ The fan-out from slots to targets is the [`Pipeline`](@ref)'s job, and it is whe
   - `prior` → `:pe`.
   - `phylogeny` → `:cle`, when the result is a clustering structure.
   - `uncertainty` → `:mu_ucs` and `:sigma_ucs`, one per populated half of the [`PipelineUncertaintySets`](@ref) pair.
-  - `constraints` → the target the element carries when it is a [`TargetedConstraint`](@ref), and otherwise the one its result type names: `:wb`, `:lcse`, `:ple` or `:rkb`. Elements reaching an [accumulating](@ref PIPELINE_ACCUMULATING_TARGETS) target are packed into a vector in write order; a second element reaching any other target is an error.
+  - `constraints` → the target the element carries when it is a [`TargetedConstraint`](@ref), and otherwise the one its result type names: `:wb`, `:lcse`, `:ple`, `:conc` or `:rkb`. Elements reaching an [accumulating](@ref PIPELINE_ACCUMULATING_TARGETS) target are packed into a vector in write order; a second element reaching any other target is an error.
 
 All but `:mu_ucs` and `:sigma_ucs` are named after the field they land in, using this package's shared field vocabulary (see `field_dict`), so [`pipe_route`](@ref) needs no per-optimiser declaration — the target lands in the like-named field of whichever optimiser has one. The two exceptions carry validation policy and name no plain field. `:rkb` names a field one level down (`rba.rkb`) and is declared per optimiser by [`@pipe_route_rkb`](@ref).
 
@@ -237,7 +237,8 @@ Internal machinery — not part of the user-facing API.
   - [`inject_context`](@ref)
 """
 const PIPELINE_ROUTING_TARGETS = (:pe, :cle, :wb, :lcse, :cte, :ple, :lt, :st, :slt, :sst,
-                                  :sglt, :sgst, :smtx, :sgmtx, :rkb, :mu_ucs, :sigma_ucs)
+                                  :sglt, :sgst, :smtx, :sgmtx, :conc, :rkb, :mu_ucs,
+                                  :sigma_ucs)
 """
     const PIPELINE_OPTIONAL_TARGETS = (:pe, :cle)
 
@@ -266,7 +267,7 @@ function unroutable_target(x, ::Val{target}, _) where {target}
 end
 """
     const PIPELINE_ACCUMULATING_TARGETS = (:lcse, :cte, :ple, :slt, :sst, :sglt, :sgst,
-                                          :smtx, :sgmtx)
+                                          :smtx, :sgmtx, :conc)
 
 The [routing targets](@ref PIPELINE_ROUTING_TARGETS) that accept more than one computed result.
 
@@ -274,7 +275,7 @@ Two steps writing one of these compose, and [`accumulate_constraint_values`](@re
 
 The rule for membership is that one step per estimator must reach the optimiser with the value the estimator vector would have produced, so what a target accepts is read off what constraint generation does when handed several estimators at once. That gives two shapes:
 
-  - **Packed.** `:lcse`, `:ple`, `:slt`, `:sst`, `:sglt`, `:sgst`, `:smtx` and `:sgmtx` hold a vector, and generation returns one result per estimator. `:lcse` and `:ple` are *order-free* blocks. The other six are *positional*: entry `i` belongs to scenario or group block `i`, paired with the corresponding entry of `scard` or `sgcarde`, so write order is block order. A count that does not match is not a silent mis-pairing — [`JuMPOptimiser`](@ref) validates those lengths against each other when the routed value is absorbed, so a wrong number of steps fails at injection with a `DimensionMismatch`.
+  - **Packed.** `:lcse`, `:ple`, `:conc`, `:slt`, `:sst`, `:sglt`, `:sgst`, `:smtx` and `:sgmtx` hold a vector, and generation returns one result per estimator. `:lcse`, `:ple` and `:conc` are *order-free* blocks. The other six are *positional*: entry `i` belongs to scenario or group block `i`, paired with the corresponding entry of `scard` or `sgcarde`, so write order is block order. A count that does not match is not a silent mis-pairing — [`JuMPOptimiser`](@ref) validates those lengths against each other when the routed value is absorbed, so a wrong number of steps fails at injection with a `DimensionMismatch`.
   - **Folded.** `:cte` holds one [`LinearConstraint`](@ref). Its field does take a vector, but a vector of [`CentralityConstraint`](@ref) *estimators*, and [`centrality_constraints`](@ref) appends every row of every estimator into a single result. Separate steps therefore merge rather than pack, which is what makes a pipeline of *n* centrality steps agree with one `cte` field holding *n* estimators.
 
 Internal machinery — not part of the user-facing API.
@@ -286,7 +287,7 @@ Internal machinery — not part of the user-facing API.
   - [`constraint_targets`](@ref)
 """
 const PIPELINE_ACCUMULATING_TARGETS = (:lcse, :cte, :ple, :slt, :sst, :sglt, :sgst, :smtx,
-                                       :sgmtx)
+                                       :sgmtx, :conc)
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -645,6 +646,7 @@ pipe_constraint_targets(::AbstractPhylogenyConstraintEstimator) = (:ple,)
 pipe_constraint_targets(::RiskBudgetEstimator) = (:rkb,)
 pipe_constraint_targets(::ThresholdEstimator) = PIPELINE_THRESHOLD_TARGETS
 pipe_constraint_targets(::AssetSetsMatrixEstimator) = PIPELINE_ASSET_SETS_MATRIX_TARGETS
+pipe_constraint_targets(::ConcentrationLimitEstimator) = (:conc,)
 """
     const PIPELINE_STEP_TARGETS = (:mu, :sigma, :both, :lt, :st, :slt, :sst, :sglt, :sgst,
                                   :smtx, :sgmtx)

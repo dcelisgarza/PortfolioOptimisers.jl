@@ -202,6 +202,16 @@ commit = "391be5e"
 "src/05_Moments/37_GeodesicShrinkageCovariance.jl" = { lines = 127, misses = 0 }
 "src/05_Moments/38_ElasticNet.jl" = { lines = 164, misses = 0 }
 "src/05_Moments/39_WeightedAvailableCase.jl" = { lines = 120, misses = 0 }
+"src/05_Moments/40_RobustCovariance/01_Base_RobustCovariance.jl" = { lines = 19, misses = 0 }
+"src/05_Moments/40_RobustCovariance/02_QnScale.jl" = { lines = 63, misses = 0 }
+"src/05_Moments/40_RobustCovariance/03_RobustShrinkage.jl" = { lines = 43, misses = 0 }
+"src/05_Moments/40_RobustCovariance/04_MCDSearch.jl" = { lines = 113, misses = 0 }
+"src/05_Moments/40_RobustCovariance/05_DetMCDStarts.jl" = { lines = 35, misses = 0 }
+"src/05_Moments/40_RobustCovariance/06_MCDFactors.jl" = { lines = 34, misses = 0 }
+"src/05_Moments/40_RobustCovariance/07_MCDCovariance.jl" = { lines = 94, misses = 0 }
+"src/05_Moments/40_RobustCovariance/08_TylerShrinkage.jl" = { lines = 111, misses = 0 }
+"src/05_Moments/40_RobustCovariance/09_TylerCovariance.jl" = { lines = 71, misses = 0 }
+"src/05_Moments/40_RobustCovariance/10_RobustExpectedReturns.jl" = { lines = 11, misses = 0 }
 "src/06_Distance/01_Base_Distance.jl" = { lines = 12, misses = 0 }
 "src/06_Distance/02_Distance.jl" = { lines = 73, misses = 0 }
 "src/06_Distance/03_DistanceDistance.jl" = { lines = 15, misses = 0 }
@@ -250,6 +260,7 @@ commit = "391be5e"
 "src/09_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { lines = 55, misses = 0 }
 "src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { lines = 43, misses = 0 }
 "src/09_ConstraintGeneration/10_LotUnitConstraintGeneration.jl" = { lines = 20, misses = 0 }
+"src/09_ConstraintGeneration/11_ConcentrationLimitGeneration.jl" = { lines = 53, misses = 0 }
 "src/10_Prior/01_Base_Prior.jl" = { lines = 238, misses = 0 }
 "src/10_Prior/02_EmpiricalPrior.jl" = { lines = 50, misses = 0 }
 "src/10_Prior/03_FactorPrior.jl" = { lines = 68, misses = 1 }
@@ -383,6 +394,7 @@ commit = "391be5e"
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl" = { lines = 151, misses = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl" = { lines = 68, misses = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/14_ConstraintBlock.jl" = { lines = 46, misses = 0 }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/15_ConcentrationConstraints.jl" = { lines = 58, misses = 0 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl" = { lines = 97, misses = 0 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl" = { lines = 116, misses = 3 }
 "src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { lines = 167, misses = 0 }

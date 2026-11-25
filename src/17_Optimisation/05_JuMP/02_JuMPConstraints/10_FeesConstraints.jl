@@ -740,7 +740,7 @@ Add the fixed fees of the held positions to the one-off fee of the JuMP model.
 
 A fixed fee charges each position that the portfolio holds, whatever its size. So it cannot be written against the weights, and it reads the held binaries of `ind`. That is the reason a MIP builder calls it.
 
-The fee charges the gate of each binary, which is the binary times `k`, and not the binary. Under [`MaximumRatio`](@ref) the weights are the homogenised ``k \\boldsymbol{w}`` and `k` is a variable, so the fee scales with the weights, as every other fee does, and the weights do not depend on `ohf`. When `k` is a constant, or the long-short asset space runs on a unit budget, the gate is the binary itself. [`HeldIndicators`](@ref) has no short side, so it charges `ffl` alone. Each method writes the charge of `ffl` in the same form from the gate of its bundle, so the two methods agree on the long side.
+The fee charges the gate of each binary, which is the binary times `k`, and not the binary. Under [`MaximumRatio`](@ref) the weights are the homogenised ``k \\boldsymbol{w}`` and `k` is a variable, so the fee scales with the weights, as every other fee does, and the weights do not depend on `ohf`. When `k` is a constant, the gate is the binary itself. [`HeldIndicators`](@ref) has no short side, so it charges `ffl` alone. Each method writes the charge of `ffl` in the same form from the gate of its bundle, so the two methods agree on the long side.
 
 # Mathematical definition
 

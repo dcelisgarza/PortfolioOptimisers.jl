@@ -78,7 +78,10 @@ throw with no plan written:
 3. A row names a map that `[map]` does not list.
 4. An open `sweep` issue names a `.jl` file that has no row. Its file moved, or the title names it
    by its bare name. Retitle the issue to name the current path of every file it sweeps, then run
-   the triage again. Do not file a second ticket for a file that moved.
+   the triage again. Do not file a second ticket for a file that moved. A path with a row on
+   another branch of `origin`, or in another worktree of this clone, is a note and not a refusal,
+   unless the history of `HEAD` held that path. If another machine pushed the branch, run
+   `git fetch origin` first.
 
 The refusal is correct. A sub-issue under a wrong parent is work that somebody must undo by hand.
 

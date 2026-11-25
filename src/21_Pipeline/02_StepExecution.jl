@@ -378,6 +378,9 @@ end
 function constraint_step_value(ce::AssetSetsMatrixEstimator, ctx::PipelineContext)
     return asset_sets_matrix(ce, pipeline_asset_sets(ctx, ce))
 end
+function constraint_step_value(ce::ConcentrationLimitEstimator, ctx::PipelineContext)
+    return concentration_limit_constraints(ce, pipeline_asset_sets(ctx, ce))
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

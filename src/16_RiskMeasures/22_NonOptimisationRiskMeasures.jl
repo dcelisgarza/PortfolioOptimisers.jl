@@ -467,7 +467,7 @@ The second value is the first divided by the cube of the standard deviation of `
     """
     @pprop @vprop mu
     """
-    Variance estimator of the standard deviation that divides the moment, or `nothing` for the moment as it is. The estimator reads the deviations about zero, so its own `me` does not enter.
+    Variance estimator of the standard deviation that divides the moment, or `nothing` for the moment as it is. The estimator reads the deviations about zero, so its own `me` does not enter. A covariance estimator has no variance of one vector of returns, so the slot takes an [`AbstractVarianceEstimator`](@ref) alone.
     """
     ve
     function ThirdCentralMoment(settings::HierarchicalRiskMeasureSettings,

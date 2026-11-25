@@ -51,10 +51,13 @@ jobs:
       # The job reads `main`, the default branch, because each addition lands there through its own
       # pull request, and there `code_health/sweep_manifest.toml` is current (ADR 0240).
       #
-      # `fetch-depth: 0` is NOT needed. `CodeHealth.yml` fetches the full history because its refile
-      # clause reads a baseline row at a past commit. This job's trigger is a flag in the checked-out
-      # tree, so the default shallow clone answers everything it asks.
+      # `fetch-depth: 0` is REQUIRED. It fetches every branch and the full history. An open sweep
+      # issue can name a file that only `dev` or an `agents/` branch holds, and the job reads the
+      # manifests of those branches. It reads the history to tell such a file from one that moved
+      # (#2261). A shallow clone refuses every such title, and the job then plans nothing.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - name: Read the Julia pin from the Manifest
         id: pin
         run: |

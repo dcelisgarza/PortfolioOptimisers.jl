@@ -226,3 +226,42 @@ The maintainer changed the names of the branches.
    a push to `refs/heads/dev`, `refs/heads/dev-*` and `refs/heads/agents/*`.
 4. **The old prefix.** No session makes a new `agents/` branch. A branch that has the prefix keeps
    its name until it merges, so the filter `agents/**` and the glob of the guard stay until then.
+
+## Amendment (2026-11-23, issues from a review)
+
+The maintainer ruled that an issue from the review of a pull request does not land on `dev`
+without a check of what the issue belongs to. The table of § *The routes* sorts by the kind of
+the change. A review of an open pull request often files a small fix of code that only the pull
+request has. The table sends that fix to `dev`, and `dev` does not have the code. The pull request
+then merges with a known defect, and its fix waits for the next batch.
+
+1. **The fourth value.** The `**Lands on:**` line can hold `#<pr>`, the number of an open pull
+   request. The work lands on the head branch of that pull request.
+2. **The test.** An issue from the review of an open pull request is a part of that pull request
+   when one of these is true:
+   - The fix changes code, text or a test that the pull request adds or changes.
+   - The pull request makes the defect, makes it worse, or makes it reachable.
+   - The pull request is wrong or incomplete without the fix.
+
+   Such an issue takes `#<pr>`, whatever its size and its kind.
+3. **An independent issue.** An issue that passes none of the three takes `own branch`, also when
+   its kind is in the `dev` row of the table. The fix starts from `origin/main`.
+4. **The reason.** The author of the issue writes the reason for the route below the line. The
+   maintainer's word still wins.
+5. **The work.** The head branch is then a shared branch. A session resets its worktree to
+   `origin/<head branch>`, stores that ref as its landing base, rebases, and pushes as a
+   fast-forward. It never force-pushes. The issue closes at the push, as on every route.
+6. **The merge.** The pull request does not merge while such an issue is open. The session that
+   files the issue writes `Waits for #<issue>` in the body of the pull request, and turns off
+   auto-merge with `gh pr merge <pr> --disable-auto`. A `Closes #<issue>` at that time would close
+   the issue with no fix, when a person merges the pull request. The session that pushes the fix
+   changes the words to `Closes #<issue>`. After the last one, it turns auto-merge on again, unless
+   the pull request is a draft or the maintainer merges it.
+7. **After the merge.** When the pull request merged before the fix, the code is on `main`, and
+   the route becomes `own branch`. The session that takes the issue changes the line.
+8. **The limits.** When the head branch of the pull request is `dev`, a part of it lands on `dev`.
+   A sweep sub-issue of #404 keeps the route that `code_health/sweep_issues.sh` writes.
+
+Two other forms were rejected. With `dev` for every small issue, the pull request merges without
+its fix. With the pull request for every issue, it grows past its one feature, and a fix that
+`main` needs waits for its review.

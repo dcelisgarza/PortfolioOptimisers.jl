@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the rules that build a covariance shrinkage target from the matrix being shrunk.
 
-Each rule builds one of the targets of Table 2 of [schaferstrimmer2005](@cite). The target is positive definite when the matrix being shrunk is, so a geodesic reaches it. Target E of that table has perfect positive correlation and rank one, so no rule builds it. [`DiagonalTarget`](@ref) builds target D of the same table. It is a [`RegimeAdjustedTarget`](@ref), so it joins the rules through [`GeodesicShrinkageTarget`](@ref) and not through this type.
+Each rule builds one of the targets of Table 2 of [schaferstrimmer2005](@cite). The target is positive definite when the matrix being shrunk is, so a geodesic reaches it. Target E of that table has perfect positive correlation and rank one, so no rule builds it. [`DiagonalTarget`](@ref) builds target D of the same table. It is a [`RegimeAdjustedTarget`](@ref), so it joins the rules through [`CovarianceShrinkageTarget`](@ref) and not through this type.
 
 # Interfaces
 
@@ -46,7 +46,7 @@ julia> cov(ce, [1.0 2.0; 2.0 1.0; 0.0 0.5])
   - [`ScaledIdentityTarget`](@ref)
   - [`CommonCovarianceTarget`](@ref)
   - [`ConstantCorrelationTarget`](@ref)
-  - [`GeodesicShrinkageTarget`](@ref)
+  - [`CovarianceShrinkageTarget`](@ref)
   - [`shrinkage_target`](@ref)
 
 # References
@@ -229,12 +229,12 @@ ConstantCorrelationTarget()
 """
 struct ConstantCorrelationTarget <: AbstractCovarianceShrinkageTarget end
 """
-    const GeodesicShrinkageTarget = Union{AbstractCovarianceShrinkageTarget,
-                                          DiagonalTarget, MatNum}
+    const CovarianceShrinkageTarget = Union{AbstractCovarianceShrinkageTarget,
+                                            DiagonalTarget, MatNum}
 
-Groups the targets a [`GeodesicShrinkageCovariance`](@ref) accepts: the rules that build the target from the matrix being shrunk, and a fixed positive definite matrix.
+Groups the targets that a covariance shrinkage accepts: the rules that build the target from a matrix, and a fixed positive definite matrix.
 
-The members share no supertype. [`DiagonalTarget`](@ref) is also a [`RegimeAdjustedTarget`](@ref), and a matrix is data. So this union bounds the `tgt` field, and [`shrinkage_target`](@ref) dispatches on its members.
+The members share no supertype. [`DiagonalTarget`](@ref) is also a [`RegimeAdjustedTarget`](@ref), and a matrix is data. So this union bounds the `tgt` field of [`GeodesicShrinkageCovariance`](@ref), of [`MCDShrinkage`](@ref) and of [`TylerShrinkage`](@ref), and [`shrinkage_target`](@ref) dispatches on its members.
 
 # Related
 
@@ -242,8 +242,8 @@ The members share no supertype. [`DiagonalTarget`](@ref) is also a [`RegimeAdjus
   - [`DiagonalTarget`](@ref)
   - [`MatNum`](@ref)
 """
-const GeodesicShrinkageTarget = Union{AbstractCovarianceShrinkageTarget, DiagonalTarget,
-                                      MatNum}
+const CovarianceShrinkageTarget = Union{AbstractCovarianceShrinkageTarget, DiagonalTarget,
+                                        MatNum}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -273,7 +273,7 @@ Each rule states its target under `# Mathematical definition`. The function retu
 # Related
 
   - [`AbstractCovarianceShrinkageTarget`](@ref)
-  - [`GeodesicShrinkageTarget`](@ref)
+  - [`CovarianceShrinkageTarget`](@ref)
 """
 function shrinkage_target(::IdentityTarget, sigma::MatNum)
     return LinearAlgebra.Diagonal(fill(one(eltype(sigma)), size(sigma, 1)))
@@ -344,7 +344,7 @@ function assert_shrinkage_target(tgt::MatNum)::Nothing
                           "`tgt` is not symmetric. A covariance target is symmetric, and the shrinkage reads the upper triangle of the target alone, so an asymmetric matrix states two targets. State a symmetric matrix."))
     @argcheck(LinearAlgebra.isposdef(LinearAlgebra.Symmetric(tgt)),
               DomainError(tgt,
-                          "`tgt` is not positive definite. The shrinkage computes the geodesic from the target end, which exists only when that end is positive definite. State a positive definite matrix, or repair it with `posdef`."))
+                          "`tgt` is not positive definite. The shrinkage reads the inverse of the target, which exists only when the target is positive definite. State a positive definite matrix, or repair it with `posdef`."))
     return nothing
 end
 """
@@ -401,7 +401,7 @@ $(DocStringExtensions.FIELDS)
     GeodesicShrinkageCovariance(;
         ce::StatsBase.CovarianceEstimator = Covariance(),
         pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
-        tgt::GeodesicShrinkageTarget = ScaledIdentityTarget(),
+        tgt::CovarianceShrinkageTarget = ScaledIdentityTarget(),
         alpha::Number = 0.1,
         cache::Option{<:AbstractPartialFitState} = nothing
     ) -> GeodesicShrinkageCovariance
@@ -457,7 +457,7 @@ true
 # Related
 
   - [`AbstractCovarianceShrinkageTarget`](@ref)
-  - [`GeodesicShrinkageTarget`](@ref)
+  - [`CovarianceShrinkageTarget`](@ref)
   - [`Covariance`](@ref)
   - [`Posdef`](@ref)
   - [`factory`](@ref)
@@ -478,7 +478,7 @@ true
     """
     pdm
     """
-    $(field_dict[:mutgt]) A rule of [`GeodesicShrinkageTarget`](@ref), or a fixed positive definite matrix.
+    $(field_dict[:mutgt]) A rule of [`CovarianceShrinkageTarget`](@ref), or a fixed positive definite matrix.
     """
     tgt
     """
@@ -491,7 +491,7 @@ true
     @fprop cache
     function GeodesicShrinkageCovariance(ce::StatsBase.CovarianceEstimator,
                                          pdm::Option{<:AbstractPosdefEstimator},
-                                         tgt::GeodesicShrinkageTarget, alpha::Number,
+                                         tgt::CovarianceShrinkageTarget, alpha::Number,
                                          cache::Option{<:AbstractPartialFitState})
         assert_covariance_estimator(ce, :ce)
         assert_shrinkage_target(tgt)
@@ -505,7 +505,7 @@ true
 end
 function GeodesicShrinkageCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                                      pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
-                                     tgt::GeodesicShrinkageTarget = ScaledIdentityTarget(),
+                                     tgt::CovarianceShrinkageTarget = ScaledIdentityTarget(),
                                      alpha::Number = 0.1,
                                      cache::Option{<:AbstractPartialFitState} = nothing)::GeodesicShrinkageCovariance
     return GeodesicShrinkageCovariance(ce, pdm, tgt, alpha, cache)
@@ -675,7 +675,7 @@ function geodesic_point(::ScaledIdentityTarget, sigma::MatNum, alpha::Number)
     sigma_alpha = vecs * LinearAlgebra.Diagonal(vals) * transpose(vecs)
     return (sigma_alpha + transpose(sigma_alpha)) / 2
 end
-function geodesic_point(tgt::GeodesicShrinkageTarget, sigma::MatNum, alpha::Number)
+function geodesic_point(tgt::CovarianceShrinkageTarget, sigma::MatNum, alpha::Number)
     tgt_mat = shrinkage_target(tgt, sigma)
     if isone(alpha)
         return copy(tgt_mat)
@@ -867,6 +867,92 @@ The shrinkage reads the matrix that `ce.ce` returns and no cell of the sample. S
 """
 function gap_fill_value(ce::GeodesicShrinkageCovariance)
     return gap_fill_value(ce.ce)
+end
+"""
+    Statistics.var(ce::GeodesicShrinkageCovariance, X::MatNum,
+                   pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...) -> MatNum
+    Statistics.std(ce::GeodesicShrinkageCovariance, X::MatNum,
+                   pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...) -> MatNum
+
+Take the variance or the standard deviation of the estimator over an Asset Panel from the diagonal of its shrunk covariance over the same panel.
+
+The variance of the estimator is the diagonal of its covariance, as the matrix method of `var` states. Over an Asset Panel, the covariance gives the panel to `ce.ce`, which reads the gaps of the sample when it is mask-aware. The reduce-and-expand root of `var` would reduce the window to its Coverage Universe whatever `ce.ce` is, so this method overrides it.
+
+# Algorithm
+
+ 1. Compute the shrunk covariance with the panel method of [`Statistics.cov`](@ref) of the estimator, with `dims` and the keywords.
+ 2. Read its diagonal, and take its square root for `std`.
+ 3. Reshape it to a `1 × N` row vector when `dims == 1`, and to an `N × 1` column vector otherwise.
+
+# Arguments
+
+  - `ce`: The geodesic shrinkage covariance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to `ce.ce`.
+
+# Validation
+
+  - $(val_dict[:dims])
+  - Every check of [`geodesic_shrinkage!`](@ref) applies.
+
+# Returns
+
+  - `val::Matrix{<:Number}`: The variance or the standard deviation of each asset, `NaN` outside the assets that `ce.ce` fits. Its shape is `(1, N)` if `dims == 1`, or `(N, 1)` if `dims == 2`.
+
+# Related
+
+  - [`GeodesicShrinkageCovariance`](@ref)
+  - [`reads_active_mask`](@ref)
+"""
+function Statistics.var(ce::GeodesicShrinkageCovariance, X::MatNum,
+                        pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    val = LinearAlgebra.diag(Statistics.cov(ce, X, pnl; dims = dims, kwargs...))
+    return isone(dims) ? reshape(val, 1, length(val)) : reshape(val, length(val), 1)
+end
+function Statistics.std(ce::GeodesicShrinkageCovariance, X::MatNum,
+                        pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    return sqrt.(Statistics.var(ce, X, pnl; dims = dims, kwargs...))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the point-in-time variance series of a [`GeodesicShrinkageCovariance`](@ref) over an Asset Panel.
+
+When `ce.ce` is mask-aware, by [`reads_active_mask`](@ref), each row fits the panel method of `var` on the observations `1` to `t`, so it reads the gaps of the window. When `ce.ce` is plain, the series is the reduce-and-expand series of [`coverage_variance_series`](@ref).
+
+# Arguments
+
+  - `ce`: The geodesic shrinkage covariance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to `ce.ce`.
+
+# Returns
+
+  - `val::Matrix{<:Number}`: The variance series. Its shape is `(T, N)` if `dims == 1`, or `(N, T)` if `dims == 2`.
+
+# Related
+
+  - [`GeodesicShrinkageCovariance`](@ref)
+  - [`reads_active_mask`](@ref)
+  - [`variance_series(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt}, X::MatNum, pnl::Option{<:AssetPanel})`](@ref)
+"""
+function variance_series(ce::GeodesicShrinkageCovariance, X::MatNum,
+                         pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    return if reads_active_mask(ce)
+        variance_series(ce, nothing, nothing, X, pnl; dims = dims, kwargs...)
+    else
+        coverage_variance_series(ce, X, pnl; dims = dims, kwargs...)
+    end
+end
+function reads_active_mask(ce::GeodesicShrinkageCovariance)
+    return reads_active_mask(ce.ce)
+end
+function fold_mask_keywords(ce::GeodesicShrinkageCovariance, amsk, emsk)
+    return fold_mask_keywords(ce.ce, amsk, emsk)
 end
 """
     partial_fit!(ce::GeodesicShrinkageCovariance{<:Any, <:Any, <:Any, <:Any, Nothing},

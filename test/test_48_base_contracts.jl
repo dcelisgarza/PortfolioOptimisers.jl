@@ -1169,6 +1169,24 @@ end
     @test cor(pc.ce) ≈ cor(sw, X)
     wv = WindowedVariance(; window = 50, rule = SeedWindow())
     @test std(partial_fit!(wv, X)) ≈ vec(std(wv, X))
+    # A covariance estimator with no data gives the diagonal of its covariance (#2285).
+    @test var(pc.ce) ≈ vec(var(sw, X))
+    @test std(pc) ≈ vec(std(PortfolioOptimisersCovariance(; ce = sw), X))
+    gc = GeneralCovariance()
+    @test var(partial_fit!(gc, X)) ≈ vec(var(gc, X))
+    # `GeneralCovariance` folds an inactive cell as a `NaN`, as `Covariance` does.
+    amsk = trues(size(X))
+    amsk[60:end, 2] .= false
+    fg = partial_fit!(gc, permutedims(X); dims = 2, active_mask = permutedims(amsk))
+    @test isapprox(cov(fg), cov(partial_fit!(Covariance(), X; active_mask = amsk));
+                   rtol = 1e-12, nans = true)
+    @test isnan(cov(fg)[2, 2]) && isfinite(cov(fg)[1, 3])
+    @test_throws DimensionMismatch partial_fit!(gc, X; active_mask = amsk[1:5, :])
+    pnl = AssetPanel(; amsk = amsk, emsk = amsk)
+    rd = ReturnsResult(; nx = ["a", "b", "c"], X = X, pnl = pnl)
+    ep = EmpiricalPrior(; ce = gc)
+    @test isapprox(prior(partial_fit!(ep, rd)).sigma, prior(ep, rd).sigma; rtol = 1e-10,
+                   nans = true)
     pc = partial_fit!(pc, X[1:7, :])
     @test pe.observation_count(pc) == 57
     # The shape route reads no count where no step reads one, and a denoiser refuses a

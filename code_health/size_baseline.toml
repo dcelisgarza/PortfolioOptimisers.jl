@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.4"
 julia_syntax = "1.0.2"
-commit = "d58da120a2"
+commit = "d3a7fe37e9"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { code = 35, doc = 0, comment = 5, blank = 4, total = 44 }
@@ -27,18 +27,18 @@ commit = "d58da120a2"
 "ext/PortfolioOptimisersPlotsExt/15_ExogenousGraphPlots.jl" = { code = 191, doc = 0, comment = 30, blank = 0, total = 221 }
 "ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { code = 45, doc = 0, comment = 8, blank = 5, total = 58 }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { code = 17, doc = 122, comment = 0, blank = 44, total = 183 }
-"src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { code = 218, doc = 0, comment = 24, blank = 0, total = 242 }
+"src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { code = 250, doc = 0, comment = 25, blank = 0, total = 275 }
 "src/01_Base/01_DocstringDictionaries/03_ArgPriorsAndUncertaintySets.jl" = { code = 140, doc = 0, comment = 14, blank = 0, total = 154 }
 "src/01_Base/01_DocstringDictionaries/04_ArgPhylogenyAndConstraints.jl" = { code = 106, doc = 0, comment = 19, blank = 0, total = 125 }
-"src/01_Base/01_DocstringDictionaries/05_ArgRiskMeasuresAndCosts.jl" = { code = 119, doc = 0, comment = 25, blank = 0, total = 144 }
-"src/01_Base/01_DocstringDictionaries/06_ArgOptimisation.jl" = { code = 272, doc = 0, comment = 29, blank = 0, total = 301 }
+"src/01_Base/01_DocstringDictionaries/05_ArgRiskMeasuresAndCosts.jl" = { code = 120, doc = 0, comment = 25, blank = 0, total = 145 }
+"src/01_Base/01_DocstringDictionaries/06_ArgOptimisation.jl" = { code = 275, doc = 0, comment = 29, blank = 0, total = 304 }
 "src/01_Base/01_DocstringDictionaries/07_FieldDict.jl" = { code = 3, doc = 0, comment = 2, blank = 0, total = 5 }
 "src/01_Base/01_DocstringDictionaries/08_ValidationsAndReturns.jl" = { code = 92, doc = 0, comment = 4, blank = 0, total = 96 }
-"src/01_Base/01_DocstringDictionaries/09_MathDataAndMoments.jl" = { code = 216, doc = 0, comment = 62, blank = 0, total = 278 }
+"src/01_Base/01_DocstringDictionaries/09_MathDataAndMoments.jl" = { code = 221, doc = 0, comment = 66, blank = 0, total = 287 }
 "src/01_Base/01_DocstringDictionaries/10_MathPriorsAndNetworks.jl" = { code = 57, doc = 0, comment = 37, blank = 0, total = 94 }
 "src/01_Base/01_DocstringDictionaries/11_MathRiskAndOptimisation.jl" = { code = 229, doc = 0, comment = 80, blank = 0, total = 309 }
-"src/01_Base/01_DocstringDictionaries/12_MathOnlineSelection.jl" = { code = 88, doc = 0, comment = 16, blank = 0, total = 104 }
-"src/01_Base/01_DocstringDictionaries/13_References.jl" = { code = 306, doc = 0, comment = 3, blank = 0, total = 309 }
+"src/01_Base/01_DocstringDictionaries/12_MathOnlineSelection.jl" = { code = 91, doc = 0, comment = 16, blank = 0, total = 107 }
+"src/01_Base/01_DocstringDictionaries/13_References.jl" = { code = 320, doc = 0, comment = 3, blank = 0, total = 323 }
 "src/01_Base/02_TypeRoots.jl" = { code = 30, doc = 336, comment = 0, blank = 168, total = 534 }
 "src/01_Base/03_PrettyShow.jl" = { code = 121, doc = 139, comment = 0, blank = 77, total = 337 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 213, doc = 620, comment = 2, blank = 278, total = 1113 }
@@ -106,9 +106,9 @@ commit = "d58da120a2"
 "src/05_Moments/03_Covariance.jl" = { code = 494, doc = 1096, comment = 13, blank = 442, total = 2045 }
 "src/05_Moments/04_SimpleVariance.jl" = { code = 290, doc = 762, comment = 4, blank = 305, total = 1361 }
 "src/05_Moments/05_Gerber/01_GerberCovariance.jl" = { code = 100, doc = 531, comment = 6, blank = 212, total = 849 }
-"src/05_Moments/05_Gerber/02_SmythBrobyCovariance.jl" = { code = 235, doc = 1034, comment = 0, blank = 447, total = 1716 }
+"src/05_Moments/05_Gerber/02_SmythBrobyCovariance.jl" = { code = 267, doc = 1101, comment = 0, blank = 459, total = 1827 }
 "src/05_Moments/05_Gerber/03_GerberIQCovariance_a.jl" = { code = 458, doc = 1259, comment = 0, blank = 490, total = 2207 }
-"src/05_Moments/05_Gerber/03_GerberIQCovariance_b.jl" = { code = 130, doc = 304, comment = 0, blank = 129, total = 563 }
+"src/05_Moments/05_Gerber/03_GerberIQCovariance_b.jl" = { code = 141, doc = 302, comment = 6, blank = 125, total = 574 }
 "src/05_Moments/06_DistanceCovariance.jl" = { code = 102, doc = 354, comment = 0, blank = 158, total = 614 }
 "src/05_Moments/07_LowerTailDependenceCovariance.jl" = { code = 51, doc = 158, comment = 5, blank = 74, total = 288 }
 "src/05_Moments/08_RankCovariance.jl" = { code = 46, doc = 227, comment = 0, blank = 104, total = 377 }
@@ -204,6 +204,16 @@ commit = "d58da120a2"
 "src/05_Moments/37_GeodesicShrinkageCovariance.jl" = { code = 204, doc = 557, comment = 1, blank = 260, total = 1022 }
 "src/05_Moments/38_ElasticNet.jl" = { code = 266, doc = 745, comment = 2, blank = 311, total = 1324 }
 "src/05_Moments/39_WeightedAvailableCase.jl" = { code = 195, doc = 258, comment = 2, blank = 118, total = 573 }
+"src/05_Moments/40_RobustCovariance/01_Base_RobustCovariance.jl" = { code = 50, doc = 131, comment = 0, blank = 55, total = 236 }
+"src/05_Moments/40_RobustCovariance/02_QnScale.jl" = { code = 119, doc = 134, comment = 0, blank = 74, total = 327 }
+"src/05_Moments/40_RobustCovariance/03_RobustShrinkage.jl" = { code = 90, doc = 401, comment = 1, blank = 195, total = 687 }
+"src/05_Moments/40_RobustCovariance/04_MCDSearch.jl" = { code = 185, doc = 397, comment = 1, blank = 185, total = 768 }
+"src/05_Moments/40_RobustCovariance/05_DetMCDStarts.jl" = { code = 45, doc = 83, comment = 0, blank = 50, total = 178 }
+"src/05_Moments/40_RobustCovariance/06_MCDFactors.jl" = { code = 65, doc = 116, comment = 0, blank = 67, total = 248 }
+"src/05_Moments/40_RobustCovariance/07_MCDCovariance.jl" = { code = 164, doc = 369, comment = 2, blank = 167, total = 702 }
+"src/05_Moments/40_RobustCovariance/08_TylerShrinkage.jl" = { code = 179, doc = 201, comment = 2, blank = 105, total = 487 }
+"src/05_Moments/40_RobustCovariance/09_TylerCovariance.jl" = { code = 119, doc = 259, comment = 0, blank = 117, total = 495 }
+"src/05_Moments/40_RobustCovariance/10_RobustExpectedReturns.jl" = { code = 24, doc = 59, comment = 2, blank = 29, total = 114 }
 "src/06_Distance/01_Base_Distance.jl" = { code = 24, doc = 228, comment = 0, blank = 93, total = 345 }
 "src/06_Distance/02_Distance.jl" = { code = 162, doc = 350, comment = 0, blank = 157, total = 669 }
 "src/06_Distance/03_DistanceDistance.jl" = { code = 39, doc = 132, comment = 0, blank = 58, total = 229 }
@@ -252,6 +262,7 @@ commit = "d58da120a2"
 "src/09_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { code = 132, doc = 368, comment = 1, blank = 181, total = 682 }
 "src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { code = 64, doc = 111, comment = 2, blank = 57, total = 234 }
 "src/09_ConstraintGeneration/10_LotUnitConstraintGeneration.jl" = { code = 44, doc = 190, comment = 0, blank = 86, total = 320 }
+"src/09_ConstraintGeneration/11_ConcentrationLimitGeneration.jl" = { code = 146, doc = 454, comment = 0, blank = 191, total = 791 }
 "src/10_Prior/01_Base_Prior.jl" = { code = 484, doc = 1162, comment = 69, blank = 503, total = 2218 }
 "src/10_Prior/02_EmpiricalPrior.jl" = { code = 108, doc = 318, comment = 14, blank = 131, total = 571 }
 "src/10_Prior/03_FactorPrior.jl" = { code = 145, doc = 406, comment = 32, blank = 143, total = 726 }
@@ -385,6 +396,7 @@ commit = "d58da120a2"
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl" = { code = 238, doc = 549, comment = 11, blank = 260, total = 1058 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl" = { code = 86, doc = 241, comment = 0, blank = 108, total = 435 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/14_ConstraintBlock.jl" = { code = 454, doc = 681, comment = 10, blank = 241, total = 1386 }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/15_ConcentrationConstraints.jl" = { code = 76, doc = 97, comment = 1, blank = 42, total = 216 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl" = { code = 198, doc = 305, comment = 26, blank = 122, total = 651 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl" = { code = 144, doc = 329, comment = 43, blank = 126, total = 642 }
 "src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { code = 272, doc = 571, comment = 5, blank = 193, total = 1041 }
@@ -467,4 +479,4 @@ commit = "d58da120a2"
 "src/24_Report/08_DependencyExposureMethods.jl" = { code = 149, doc = 206, comment = 0, blank = 91, total = 446 }
 "src/24_Report/09_DependencyReport.jl" = { code = 97, doc = 79, comment = 1, blank = 44, total = 221 }
 "src/24_Report/10_DependencySpace.jl" = { code = 59, doc = 116, comment = 3, blank = 56, total = 234 }
-"src/PortfolioOptimisers.jl" = { code = 452, doc = 3, comment = 29, blank = 5, total = 489 }
+"src/PortfolioOptimisers.jl" = { code = 470, doc = 3, comment = 29, blank = 5, total = 507 }

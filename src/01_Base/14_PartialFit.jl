@@ -518,5 +518,50 @@ function shared_series_member_rows(X::MatNum, gaps::AbstractVector{Bool};
     end
     return view(X, rows, :), kw
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Folds every row of a block into an estimator, one observation at a time, together with its row of the active mask.
+
+A Welford update reads one observation at a time, so the block arm of [`partial_fit!`](@ref) of each estimator that folds by it calls this function. The result equals the result of the same rows given one at a time.
+
+# Algorithm
+
+ 1. Orient `X` and `active_mask` to `observations × assets` with [`dims_oriented`](@ref), and check that their sizes agree.
+ 2. Fold each row in order with the single-observation arm of [`partial_fit!`](@ref). Rebind the estimator after each row.
+
+# Arguments
+
+  - `est`: The estimator whose state the function folds.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `active_mask`: The active mask of the Asset Panel, with the same size as `X`, or `nothing`.
+
+# Validation
+
+  - $(val_dict[:dims])
+  - If `active_mask` is not `nothing`, its size is the size of `X`. A `DimensionMismatch` is thrown otherwise.
+
+# Returns
+
+  - `est`: The estimator that holds the state after the last row.
+
+# Related
+
+  - [`partial_fit!`](@ref)
+"""
+function fold_rows(est, X::MatNum, dims::Integer,
+                   active_mask::Option{<:AbstractMatrix{<:Bool}})
+    X, amsk = dims_oriented(dims, X, active_mask)
+    if !isnothing(amsk)
+        @argcheck(size(amsk) == size(X),
+                  DimensionMismatch("size(X) ($(size(X))) must match size(active_mask) ($(size(amsk)))"))
+    end
+    for i in axes(X, 1)
+        est = partial_fit!(est, view(X, i, :);
+                           active_mask = isnothing(amsk) ? nothing : view(amsk, i, :))
+    end
+    return est
+end
 export partial_fit!, partial_fit
 public merge_states, assert_mergeable_states, chan_merge

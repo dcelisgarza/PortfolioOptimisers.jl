@@ -53,7 +53,7 @@ function port_opt_view(::NonFiniteAllocationOptimisationResult, ::Any, args...)
 end
 # A precomputed fallback answers on the universe it was solved on, so the view of its
 # holder keeps it. See `view_child`.
-function view_child(res::NonFiniteAllocationOptimisationResult, ::Any, args...)
+function view_child(res::OptimisationResult, ::Any, args...)
     return res
 end
 """

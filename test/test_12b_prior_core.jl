@@ -1553,11 +1553,28 @@ end
     @test !iszero(linz[3])
     @test isapprox(sum(lgz), 1)
 
-    # A zero *opinion* weight against that zero scenario weight makes `0 * log(0)`, which is
-    # `NaN`, and `StatsBase.pweights` refuses it. This is the case the closed form does not
-    # cover; the docstring of `compute_pooling` states it under `# Validation`.
-    @test_throws ArgumentError PortfolioOptimisers.compute_pooling(LogarithmicOpinionPooling(),
-                                                                   [0.0, 0.5, 0.5], Pz)
+    # An opinion of zero probability does not change the pool, also when it gives a scenario
+    # a zero weight. `0 * log(0)` made the pool `NaN`, and `StatsBase.aweights` refused it.
+    for a0 in ([0.0, 0.5, 0.5], [0.0, 1.0, 0.0])
+        lg0 = PortfolioOptimisers.compute_pooling(LogarithmicOpinionPooling(), a0, Pz)
+        lg1 = PortfolioOptimisers.compute_pooling(LogarithmicOpinionPooling(), a0[2:3],
+                                                  Pz[:, 2:3])
+        @test isapprox(collect(lg0), collect(lg1))
+        @test all(>(0), lg0)
+    end
+    # Opinions of positive probability that share no scenario have no logarithmic pool.
+    Pd = [0.5 0.0
+          0.5 0.0
+          0.0 1.0]
+    err = try
+        PortfolioOptimisers.compute_pooling(LogarithmicOpinionPooling(), [0.5, 0.5], Pd)
+    catch e
+        e
+    end
+    @test isa(err, ArgumentError)
+    @test occursin("none of the 3 scenarios", err.msg)
+    @test isapprox(collect(PortfolioOptimisers.compute_pooling(LogarithmicOpinionPooling(),
+                                                               [1.0, 0.0], Pd)), Pd[:, 1])
 
     # The robustness penalty against a hand-computed `alpha_k * exp(-p * D_k)`.
     p = 2.0
@@ -1577,6 +1594,17 @@ end
               for pp in (1.0, 10.0, 100.0, 1000.0)]
     @test issorted(masses)
     @test isapprox(masses[end], 1)
+    # A penalty that underflows `exp(-p * D)` for every opinion gives the same limit. The
+    # quotient by the sum was `0 / 0`.
+    @test PortfolioOptimisers.robust_probabilities(a, P, 1e6) == [1.0, 0.0, 0.0]
+    # An opinion of zero probability keeps it, also off the support of the consensus, where
+    # its divergence is infinite.
+    Pd = [0.5 0.0
+          0.5 0.0
+          0.0 1.0]
+    for pp in (0.5, 2e4)
+        @test PortfolioOptimisers.robust_probabilities([1.0, 0.0], Pd, pp) == [1.0, 0.0]
+    end
 
     # The linear pool is a mixture, so its entropy is at least the opinion-weighted mean of
     # the entropies of the opinions, and it can be less than the largest one. A uniform
@@ -1598,6 +1626,29 @@ end
               for _ in 1:200)
 end
 
+@testset "An opinion of zero probability does not change the pool" begin
+    # The second opinion gives its first rows a zero weight, and its probability is zero, or
+    # the penalty makes it zero. The logarithmic pool was `NaN` in each case.
+    T = size(rd.X, 1)
+    v = vcat(zeros(20), ones(T - 20))
+    w0 = StatsBase.pweights(v ./ sum(v))
+    pes = [EntropyPoolingPrior(; sets = sets,
+                               mu_views = LinearConstraintEstimator(;
+                                                                    val = "AAPL == prior(AAPL)*1.5")),
+           EntropyPoolingPrior(; sets = sets, w = w0,
+                               mu_views = LinearConstraintEstimator(;
+                                                                    val = "AAPL == prior(AAPL)*2"))]
+    ref = prior(pes[1], rd)
+    for alg in (LinearOpinionPooling(), LogarithmicOpinionPooling()),
+        (w, p) in (([1.0, 0.0], nothing), ([1.0, 0.0], 0.5), ([0.7, 0.3], 1e6))
+
+        pr = prior(OpinionPoolingPrior(; pes = pes, w = w, p = p, alg = alg), rd)
+        @test pr.ow == [1.0, 0.0]
+        @test isapprox(pr.w, ref.w)
+        @test isapprox(pr.mu, ref.mu)
+    end
+end
+
 @testset "OpinionPoolingPrior constructor guards" begin
     ep = EntropyPoolingPrior()
     @test_throws PortfolioOptimisers.IsEmptyError OpinionPoolingPrior(;
@@ -1605,6 +1656,9 @@ end
     # `p` is bounded below by zero strictly: there is no `p = 0`.
     @test_throws DomainError OpinionPoolingPrior(; pes = [ep], p = 0.0)
     @test_throws DomainError OpinionPoolingPrior(; pes = [ep], p = -1.0)
+    # An infinite penalty has no answer, because `Inf * 0` is `NaN`.
+    @test_throws DomainError OpinionPoolingPrior(; pes = [ep], p = Inf)
+    @test_throws DomainError OpinionPoolingPrior(; pes = [ep], p = NaN)
     @test_throws PortfolioOptimisers.IsEmptyError OpinionPoolingPrior(; pes = [ep],
                                                                       w = Float64[])
     @test_throws DimensionMismatch OpinionPoolingPrior(; pes = [ep, ep], w = [1.0])

@@ -174,6 +174,8 @@ Add the positive semidefinite (PSD) cone that lifts the portfolio weights to a m
 
 The matrix belongs to the namespace that owns the weights under `prefix`, [`weights_prefix`](@ref), so weights registered twice have one ``\\mathbf{W}``. A second call for the same owner returns the first call's matrix and adds nothing.
 
+Under a unit budget the default corner is `1`, and a bound needs the corner ``k``. [`set_risk_epigraphs!`](@ref) then asks for the matrix with the corner [`get_k`](@ref). That matrix goes under the namespace `bound_` nested in the owner, so every bounded measure on the weights reads one matrix. Under every other head the two corners are one, and the function builds one matrix.
+
 # Mathematical definition
 
 ```math
@@ -190,14 +192,14 @@ Where:
   - ``\\mathbf{M}``: The bordered ``(N + 1) \\times (N + 1)`` matrix.
   - ``\\mathbf{W}``: The symmetric ``N \\times N`` lifted matrix of the weights.
   - $(math_dict[:w_port])
-  - $(math_dict[:k_budget]) It is ``1`` under a unit budget, [`effective_k`](@ref).
+  - $(math_dict[:k_budget]) The default is ``1`` under a unit budget, [`effective_k`](@ref).
 
 # JuMP formulation
 
 ## Variables
 
   - `w`: read, the weights under the owner's namespace.
-  - `k`: read through [`effective_k`](@ref).
+  - `k`: read, the corner.
   - `W`: created, a symmetric ``N \\times N`` matrix, registered as `W` under the owner's namespace.
 
 ## Expressions
@@ -217,7 +219,11 @@ Where:
 # Arguments
 
   - $(arg_dict[:model])
-  - `prefix`: The Model State namespace of the build. The entries go to its owner, [`weights_prefix`](@ref).
+  - `k`: The corner, [`effective_k`](@ref) by default or [`get_k`](@ref).
+
+# Keyword arguments
+
+  - `prefix::Symbol`: The Model State namespace of the build. The entries go to its owner, [`weights_prefix`](@ref).
 
 # Returns
 
@@ -225,21 +231,23 @@ Where:
 
 # Related
 
+  - [`set_risk_epigraphs!`](@ref)
   - [`set_sdp_frc_constraints!`](@ref)
   - [`set_sdp_phylogeny_constraints!`](@ref)
   - [`SemiDefinitePhylogeny`](@ref)
 """
-function set_sdp_constraints!(model::JuMP.Model; prefix::Symbol = Symbol(""))
-    prefix = weights_prefix(model, prefix)
-    return state_build!(model, prefix, :W) do
-        w = get_w(model, prefix)
-        k = effective_k(model)
+function set_sdp_constraints!(model::JuMP.Model, k = effective_k(model);
+                              prefix::Symbol = Symbol(""))
+    owner = weights_prefix(model, prefix)
+    lp = k === effective_k(model) ? owner : nested_prefix(owner, :bound_)
+    return state_build!(model, lp, :W) do
+        w = get_w(model, owner)
         sc = get_constraint_scale(model)
         N = length(w)
         W = JuMP.@variable(model, [1:N, 1:N], Symmetric)
-        M = state_set!(model, prefix, :M,
+        M = state_set!(model, lp, :M,
                        JuMP.@expression(model, hcat(vcat(W, transpose(w)), vcat(w, k))))
-        state_set!(model, prefix, :M_PSD, JuMP.@constraint(model, sc * M in JuMP.PSDCone()))
+        state_set!(model, lp, :M_PSD, JuMP.@constraint(model, sc * M in JuMP.PSDCone()))
         return W
     end
 end

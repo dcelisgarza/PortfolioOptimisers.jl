@@ -34,7 +34,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     MutualInfoCovariance(;
-        ve::AbstractVarianceEstimator = SimpleVariance(),
+        ve::StatsBase.CovarianceEstimator = SimpleVariance(),
         bins::Int_Bin = HacineGharbiRavier(),
         normalise::Bool = true,
         cache::Option{<:AbstractPartialFitState} = nothing
@@ -77,6 +77,7 @@ MutualInfoCovariance
 # Related
 
   - [`AbstractVarianceEstimator`](@ref)
+  - [`library_covariance_estimator`](@ref)
   - [`AbstractBins`](@ref)
   - [`mutual_info`](@ref)
   - [`factory`](@ref)
@@ -90,7 +91,7 @@ MutualInfoCovariance
 """
 @propagatable @concrete struct MutualInfoCovariance <: AbstractCovarianceEstimator
     """
-    $(field_dict[:ve])
+    $(field_dict[:ve_slot])
     """
     @fprop @vprop ve
     """
@@ -105,7 +106,7 @@ MutualInfoCovariance
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
-    function MutualInfoCovariance(ve::AbstractVarianceEstimator, bins::Int_Bin,
+    function MutualInfoCovariance(ve::StatsBase.CovarianceEstimator, bins::Int_Bin,
                                   normalise::Bool, cache::Option{<:AbstractPartialFitState})
         if isa(bins, Integer)
             @argcheck(zero(bins) < bins, DomainError(bins, "bins must be positive"))
@@ -116,7 +117,7 @@ MutualInfoCovariance
                                                                                cache)
     end
 end
-function MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
+function MutualInfoCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
                               bins::Int_Bin = HacineGharbiRavier(), normalise::Bool = true,
                               cache::Option{<:AbstractPartialFitState} = nothing)::MutualInfoCovariance
     return MutualInfoCovariance(ve, bins, normalise, cache)

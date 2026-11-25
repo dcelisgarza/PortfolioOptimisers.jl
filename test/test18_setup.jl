@@ -510,12 +510,12 @@ function mr_block2(idx)
         mr = MeanRisk(; r = r1, obj = MaximumRatio(; rf = rf), opt = opt)
         @test PortfolioOptimisers.needs_previous_weights(mr)
         res = optimise(mr, rd)
+        @test isa(res.retcode, OptimisationSuccess)
+        # The reference file holds no weights for a measure whose expression is quadratic. It
+        # solves since #2283, which states its risk at degree one.
         if isa(r, PortfolioOptimisers.QuadExpressionRiskMeasures)
-            @test isa(res.retcode, OptimisationFailure)
             i += 1
             continue
-        else
-            @test isa(res.retcode, OptimisationSuccess)
         end
         # 12, 15, 27 and 46 are host-sensitive rather than version-sensitive: they reproduce
         # on a developer machine at the tolerances below them and disagree on the CI runner,

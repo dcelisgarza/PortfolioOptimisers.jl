@@ -10,7 +10,7 @@ A window that is an `Int` or an index vector cuts `iv`, `active_mask` and `estim
  1. Check `dims` with [`assert_dims`](@ref).
  2. Resolve `window` to `win` with [`get_window`](@ref). `nothing` resolves to a `Colon`, an `Int` to the range of the last `window` observations, and an index vector to itself.
  3. Cut `X` to `win`, and resolve the observation weights `w_new` over the cut `X`, with [`moment_window_and_weights`](@ref).
- 4. Make `inner`, the inner estimator of the window, with [`windowed_inner`](@ref). It holds `w_new` when the wrapper holds weights. Otherwise it holds its own weights, cut to `win`.
+ 4. Make `inner`, the inner estimator of the window, with [`windowed_inner`](@ref). It holds `w_new` when the wrapper holds weights. Otherwise it holds its own weights, cut to `win`. [`library_covariance_estimator`](@ref) then wraps a covariance estimator of another package, which takes no weights.
  5. Cut `iv` to `win` with [`windowed_rows`](@ref).
  6. Cut the two universe masks in `kwargs` to `win` with [`windowed_keywords`](@ref). The result is `kw`.
  7. Return `inner`, the cut `X`, the cut `iv` and `kw`.
@@ -54,6 +54,9 @@ function windowed_preamble(est, w::Option{<:ObsWeights}, window::Option{<:Int_Ve
     win = get_window(window, X, dims)
     X, w_new = moment_window_and_weights(X, w, win; dims = dims, kwargs...)
     inner = windowed_inner(est, w_new, win)
+    if isa(inner, StatsBase.CovarianceEstimator)
+        inner = library_covariance_estimator(inner)
+    end
     return inner, X, windowed_rows(iv, win, dims), windowed_keywords(win, dims; kwargs...)
 end
 """
@@ -450,8 +453,11 @@ end
 function reads_active_mask(est::Union{WindowedVariance, WindowedCovariance})
     return reads_active_mask(getfield(est, 1))
 end
+function fold_mask_keywords(est::Union{WindowedVariance, WindowedCovariance}, amsk, emsk)
+    return fold_mask_keywords(getfield(est, 1), amsk, emsk)
+end
 """
-    reduces_each_window(est::AbstractCovarianceEstimator) -> Bool
+    reduces_each_window(est::StatsBase.CovarianceEstimator) -> Bool
     reduces_each_window(est::Union{WindowedVariance, WindowedCovariance}) -> Bool
     reduces_each_window(est::PortfolioOptimisersCovariance) -> Bool
 
@@ -478,7 +484,7 @@ The variance series of a [`PortfolioOptimisersCovariance`](@ref) over an Asset P
   - [`panel_series_row`](@ref)
   - [`reads_active_mask`](@ref)
 """
-function reduces_each_window(est::AbstractCovarianceEstimator)
+function reduces_each_window(est::StatsBase.CovarianceEstimator)
     return !reads_active_mask(est)
 end
 function reduces_each_window(::Union{WindowedVariance, WindowedCovariance})
