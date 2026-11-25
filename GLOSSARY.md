@@ -1082,7 +1082,7 @@ The unit for which a meta-optimiser solves one inner problem. It is also one ass
 
 **Dropped Sub-Portfolio**
 A sub-portfolio whose inner solve failed, its own fallback included, in a run where enough of the others solved for `min_solved`. For NCO and Stacking it is a synthetic asset with no returns, so the Investable Mask of the outer prior gives it zero weight. SubsetResampling averages the other subsets. The return code is an `OptimisationSuccess` whose `res` holds the code of each sub-portfolio.
-*Avoid*: failed cluster as a substitution. A fallback on the inner optimiser substitutes a portfolio, and a drop holds none (ADR 0245).
+*Avoid*: failed cluster as a substitution. A fallback on the inner optimiser substitutes a portfolio, and a drop holds none (ADR 0247).
 
 **Panel Collapse**
 The Asset Panel of the outer problem of a meta-optimiser. It holds each Panel Field of the inner panel, and `iv` and `ivpa`, collapsed onto the sub-portfolios with the normalised inner weights. These weights divide out the gross exposure of each sub-portfolio. `collapse_asset_panel` and `prepare_outer_rd` do the collapse.
