@@ -195,6 +195,7 @@ end
         # The subsets must agree on the number of points.
         @test_throws DimensionMismatch PO.subset_resampling_finaliser(6, 5, mix.idx, mix.wb,
                                                                       IterativeWeightFinaliser(),
+                                                                      FractionOf(1),
                                                                       mix.ress,
                                                                       [zeros(4)
                                                                        for _ in 1:3])
@@ -324,6 +325,60 @@ end
         @test maximum(rn.idx) <= 7
         @test PO.result_investable_mask(rn) === rn.imsk
     end
+    @testset "min_solved averages the subsets that solved" begin
+        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                     check_sol = (; allow_local = true, allow_almost = true),
+                     settings = Dict("verbose" => false))
+        mu = vec(mean(X[:, 1:6]; dims = 1))
+        function swept(lb, min_solved; kwargs...)
+            ret = ArithmeticReturn(; settings = JuMPReturnsSettings(; lb = lb))
+            mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv, ret = ret))
+            return optimise(SubsetResampling(; opt = mr, subset_size = 4, n_subsets = 5,
+                                             ex = seq, seed = 4, min_solved = min_solved,
+                                             kwargs...), rd6)
+        end
+        all5 = swept(-1.0, FractionOf(1))
+        @test isnothing(all5.retcode.res)
+        # The subsets are the same in each run, so a run with no drop is the same run.
+        @test swept(-1.0, CountOf(1)).w == all5.w
+        tops = [maximum(mu[all5.idx[:, i]]) for i in axes(all5.idx, 2)]
+        @test !allequal(tops)
+        level = (minimum(tops) + maximum(tops)) / 2
+        ok = tops .> level
+        n = count(ok)
+        @test 0 < n < 5
+        # By default the one failed subset fails the average, and its fallback replaces it.
+        @test isa(swept(level, FractionOf(1)).retcode, OptimisationFailure)
+        fbr = swept(level, FractionOf(1); fb = EqualWeighted())
+        @test fbr.w ≈ fill(1 / 6, 6) && !isnothing(fbr.fb)
+        res = @test_logs (:warn, r"meta-optimiser drops") match_mode = :any swept(level,
+                                                                                  CountOf(n))
+        @test isa(res.retcode, OptimisationSuccess)
+        @test res.retcode.res.msg == "opti failed.\n"
+        @test PO.any_solved.(res.retcode.res.opti) == ok
+        avg = zeros(6)
+        for m in findall(ok)
+            avg[res.idx[:, m]] .+= res.ress[m].w
+        end
+        @test res.w ≈ avg / n && sum(res.w) ≈ 1
+        # A fraction compares the share, and one more subset than solved is too many.
+        @test swept(level, n / 5).w == res.w
+        @test isa(swept(level, CountOf(n + 1)).retcode, OptimisationFailure)
+        # Each point of a frontier drops its own subsets, and no value accepts none.
+        fr = swept([-1.0, level, 1.0], CountOf(1))
+        @test [PO.any_solved(rc) for rc in fr.retcode] == [true, true, false]
+        @test isnothing(fr.retcode[1].res)
+        @test isapprox(fr.w[2], res.w; rtol = 1e-3)
+        @test sum(fr.w[1]) ≈ 1 && sum(fr.w[2]) ≈ 1
+        @test fr.retcode[3].res.msg == "opti failed.\nweight bounds finalisation failed.\n"
+        # The field takes a schedule, and a view keeps it.
+        sr = SubsetResampling(; opt = EqualWeighted(),
+                              min_solved = TimeDependent([CountOf(1), 0.5]))
+        @test PO.reset_time_dependent_estimator(sr).min_solved == FractionOf(1)
+        sr = SubsetResampling(; opt = EqualWeighted(), min_solved = 2)
+        @test PO.port_opt_view(sr, 1:3, X).min_solved == CountOf(2)
+        @test_throws DomainError SubsetResampling(; opt = EqualWeighted(), min_solved = 1.0)
+    end
     @testset "the return codes and the fallback chain" begin
         # No weights meet `sum(w) == 1` under an upper bound of 0.1 on six assets.
         sr = SubsetResampling(; opt = InverseVolatility(),
@@ -335,13 +390,16 @@ end
         @test all(x -> isa(x, OptimisationSuccess), res.retcode.res.opti)
         fail = OptimisationFailure(; res = "x")
         @test PO.subset_resampling_retcode([x.retcode for x in res.ress],
-                                           OptimisationSuccess()) == OptimisationSuccess()
+                                           OptimisationSuccess(), false) ==
+              OptimisationSuccess()
         bad = PO.set_retcode(res, fail)
-        rc = PO.subset_resampling_retcode([bad.retcode, res.ress[2].retcode], fail)
+        rc = PO.subset_resampling_retcode([bad.retcode, res.ress[2].retcode], fail, true)
+        @test isa(rc, OptimisationFailure)
         @test rc.res.msg == "opti failed.\nweight bounds finalisation failed.\n"
         @test rc.res.opti[1] === fail && rc.res.wb === fail
         @test_throws MethodError PO.subset_resampling_finaliser(6, 3, res.idx, nothing,
-                                                                sr.wf, res.ress, 1)
+                                                                sr.wf, sr.min_solved,
+                                                                res.ress, 1)
         rs = PO.set_retcode(res, OptimisationSuccess())
         @test rs.retcode == OptimisationSuccess() && rs.w === res.w && rs.idx === res.idx
         fb = Tuple{PO.OptimisationEstimator, PO.OptimisationResult}[(sr, res)]
@@ -394,7 +452,7 @@ end
                                                                                                                        EqualWeighted()],
                                                                                                                       :outermost)))
         @test keys(PO.time_dependent_field_defaults(sr)) ==
-              (:pe, :opt, :wf, :subset_size, :n_subsets)
+              (:pe, :opt, :wf, :min_solved, :subset_size, :n_subsets)
     end
     @testset "the view" begin
         pr6 = prior(EmpiricalPrior(), rd6)

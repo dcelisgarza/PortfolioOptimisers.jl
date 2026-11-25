@@ -81,7 +81,7 @@ A quantity beside the returns is extensive or intensive. An extensive quantity, 
 ```math
 \\begin{align}
 s_{k} &= \\sum_{i=1}^{N} \\lvert W_{ik} \\rvert\\,,\\\\
-\\tilde{W}_{ik} &= \\begin{cases} \\lvert W_{ik} \\rvert / s_{k} & s_{k} > 0\\,,\\\\ 0 & s_{k} = 0\\,. \\end{cases}
+\\tilde{W}_{ik} &= \\begin{cases} \\lvert W_{ik} \\rvert / s_{k} & 0 < s_{k} < \\infty\\,,\\\\ 0 & \\text{otherwise}\\,. \\end{cases}
 \\end{align}
 ```
 
@@ -92,7 +92,7 @@ Where:
   - ``s_{k}``: Gross exposure of sub-portfolio ``k``.
   - $(math_dict[:N])
 
-Each column of ``\\tilde{\\mathbf{W}}`` sums to one, except a column of zeros, which stays a column of zeros.
+Each column of ``\\tilde{\\mathbf{W}}`` sums to one, except the column of a sub-portfolio with no position, which is a column of zeros. Such a sub-portfolio has weights of zero, or weights that are not finite, as a failed solve gives.
 
 # Arguments
 
@@ -110,12 +110,13 @@ Each column of ``\\tilde{\\mathbf{W}}`` sums to one, except a column of zeros, w
 function synthetic_asset_weights(w::VecNum)
     w = abs.(w)
     s = sum(w)
-    return iszero(s) ? w : w / s
+    return iszero(s) || !isfinite(s) ? zero(w) : w / s
 end
 function synthetic_asset_weights(w::MatNum)
     w = abs.(w)
     s = sum(w; dims = 1)
-    return w ./ map(x -> iszero(x) ? one(x) : x, s)
+    d = map(x -> iszero(x) || !isfinite(x) ? one(x) : x, s)
+    return ifelse.(isfinite.(s), w, zero(eltype(w))) ./ d
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -903,7 +904,8 @@ The method that Julia selects is the algorithm.
 
  1. `nothing` and a scalar stay as they are.
  2. A matrix collapses through [`collapse_panel_numeric`](@ref), with the divisors of [`active_weight_divisor`](@ref). It reads the cells of [`finite_read_mask`](@ref): an implied volatility that is not finite counts as an inactive member of its row, so a gap in `iv` does not poison the row.
- 3. A vector collapses as `transpose(W) * a` with no mask. With a mask, the value of each member that is inactive at the last row of `m` becomes zero, the vector collapses in the same way, and the answer divides by the divisors of that row. A sub-portfolio with no member with weight active at that row has no value to read there, so it collapses as `transpose(W) * a`: a zero is not a rate, and a Returns Result refuses an `ivpa` of zero.
+ 3. A vector collapses as `transpose(W) * a` with no mask. With a mask, the value of each member that is inactive at the last row of `m` becomes zero, the vector collapses in the same way, and the answer divides by the divisors of that row. A sub-portfolio with no member with weight active at that row has no value to read there, so it collapses as it does with no mask: a zero is not a rate, and a Returns Result refuses an `ivpa` of zero.
+ 4. A sub-portfolio with a column of zeros in `W` has no rate. Its entry of a collapsed vector is the mean of `a`, for the same reason.
 
 # Arguments
 
@@ -934,7 +936,10 @@ function collapse_rate(a::MatNum, W::MatNum, m::Option{<:AbstractMatrix{Bool}},
     return collapse_panel_numeric(a, W, r, active_weight_divisor(alg, r, W))
 end
 function collapse_rate(a::VecNum, W::MatNum, ::Nothing, ::AbstractPanelCollapseAlgorithm)
-    return collapse_panel_numeric(a, W)
+    c = collapse_panel_numeric(a, W)
+    #! A Returns Result refuses an `ivpa` of zero, which a column with no weight gives.
+    return ifelse.(vec(any(!iszero, W; dims = 1)), c,
+                   convert(eltype(c), Statistics.mean(a)))
 end
 function collapse_rate(a::VecNum, W::MatNum, m::AbstractMatrix{Bool},
                        alg::AbstractPanelCollapseAlgorithm)
@@ -947,7 +952,7 @@ function collapse_rate(a::VecNum, W::MatNum, m::AbstractMatrix{Bool},
     #! there, and a Returns Result refuses an `ivpa` of zero, so it reads every member, as
     #! the static collapse does.
     h = vec(any(view(m, t, :) .& .!iszero.(W); dims = 1))
-    return ifelse.(h, isnothing(d) ? c : c ./ vec(d), collapse_panel_numeric(a, W))
+    return ifelse.(h, isnothing(d) ? c : c ./ vec(d), collapse_rate(a, W, nothing, alg))
 end
 """
     finite_read_mask(a::MatNum, m::Nothing) -> Option{BitMatrix}

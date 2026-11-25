@@ -281,6 +281,8 @@ Where:
 
 The subsets are distinct, so ``M \\leq \\binom{N}{k}``. When each ``\\boldsymbol{w}_{S_m}`` sums to one, ``\\boldsymbol{w}^*`` sums to one. An asset that is in no subset has zero weight.
 
+A subset whose solve fails is dropped when enough of the others solve, see `min_solved`. The average is then over the ``M'`` subsets that solved, with ``1 / M'`` in place of ``1 / M``, so it keeps the budget. Each point of an efficient frontier drops its own subsets.
+
 ``\\mathrm{round}`` gives the nearest integer, and the even integer at a tie. So ``s = 0.8`` on ``N = 12`` assets gives ``k = 10``, and ``s = 0.5`` on ``N = 5`` assets gives ``k = 2``.
 
 # Fields
@@ -296,6 +298,7 @@ $(DocStringExtensions.FIELDS)
         sets::TD_Option{<:UniverseSets} = nothing,
         opt::OptE_TD,
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
+        min_solved::TD{<:Real_CountFraction} = FractionOf(1),
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
         subset_size::TD{<:SubsetSizeE} = PowerSubsetSize(),
         n_subsets::TD{<:NumberSubsetsE} = 2,
@@ -311,16 +314,16 @@ Keywords correspond to the struct's fields. The default `subset_size` is the sub
 
 ## Time-dependent fields
 
-`pe`, `wb`, `fees`, `sets`, `opt`, `wf`, `subset_size`, `n_subsets` and `fb` can hold a [`TimeDependent`](@ref) schedule with one entry for each fold. The other fields cannot hold a schedule.
+`pe`, `wb`, `fees`, `sets`, `opt`, `wf`, `min_solved`, `subset_size`, `n_subsets` and `fb` can hold a [`TimeDependent`](@ref) schedule with one entry for each fold. The other fields cannot hold a schedule.
 
-The loop inside `SubsetResampling` is over asset subsets, not over time folds. No inner fold loop exists for a `bind = :nearest` schedule in `opt` or `fb`, so the constructor refuses one. A fold loop that reaches the estimator resolves each schedule. A solve with no fold loop resets each schedule to its own `default`. A schedule with no `default` resets `pe`, `wf`, `subset_size` and `n_subsets` to their keyword defaults, and `wb`, `fees`, `sets` and `fb` to `nothing`. A schedule in `opt` with no `default` throws a [`TimeDependentDefaultError`](@ref).
+The loop inside `SubsetResampling` is over asset subsets, not over time folds. No inner fold loop exists for a `bind = :nearest` schedule in `opt` or `fb`, so the constructor refuses one. A fold loop that reaches the estimator resolves each schedule. A solve with no fold loop resets each schedule to its own `default`. A schedule with no `default` resets `pe`, `wf`, `min_solved`, `subset_size` and `n_subsets` to their keyword defaults, and `wb`, `fees`, `sets` and `fb` to `nothing`. A schedule in `opt` with no `default` throws a [`TimeDependentDefaultError`](@ref).
 
 ## Validation
 
   - `opt` passes [`assert_internal_optimiser`](@ref). A schedule applies the check to each entry and to its `default`.
   - If `wb` is keyed by name ([`name_keyed`](@ref)), `sets` is not `nothing`. The constructor throws an [`IsNothingError`](@ref) otherwise.
   - If `fees` is a [`FeesEstimator`](@ref), `sets` is not `nothing`. The constructor throws an [`IsNothingError`](@ref) otherwise.
-  - A plain number in `subset_size` passes [`count_or_fraction`](@ref), and the field then holds a [`CountOf`](@ref) or a [`FractionOf`](@ref).
+  - A plain number in `min_solved` or `subset_size` passes [`count_or_fraction`](@ref), and the field then holds a [`CountOf`](@ref) or a [`FractionOf`](@ref).
   - If `n_subsets` is an `Integer`: `n_subsets >= 2`.
   - `max_comb > 0` and finite.
   - A schedule in `opt` or `fb` has `bind !== :nearest`. Each entry of a schedule passes the check of its field.
@@ -398,6 +401,10 @@ $(val_dict[:count_fraction_grid])
     """
     wf
     """
+    $(field_dict[:min_solved])
+    """
+    min_solved
+    """
     $(field_dict[:ex])
     """
     ex
@@ -436,7 +443,9 @@ $(val_dict[:count_fraction_grid])
     function SubsetResampling(pe::Onl{<:TD{<:PrE_Pr}}, wb::TD_Option{<:WbE_Wb},
                               fees::TD_Option{<:FeesE_Fees},
                               sets::TD_Option{<:UniverseSets}, opt::OptE_TD,
-                              wf::TD{<:WeightFinaliser}, ex::FLoops.Transducers.Executor,
+                              wf::TD{<:WeightFinaliser},
+                              min_solved::TD{<:Real_CountFraction},
+                              ex::FLoops.Transducers.Executor,
                               subset_size::TD{<:SubsetSizeE},
                               n_subsets::TD{<:NumberSubsetsE}, max_comb::Integer,
                               rng::Random.AbstractRNG, seed::Option{<:Integer},
@@ -451,20 +460,23 @@ $(val_dict[:count_fraction_grid])
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
+        min_solved = count_or_fraction(min_solved)
         subset_size = count_or_fraction(subset_size)
         if isa(n_subsets, Integer)
             assert_nonempty_nonneg_finite_val(n_subsets - 2, "n_subsets - 2")
         end
         assert_nonempty_gt0_finite_val(max_comb, :max_comb)
         assert_time_dependent_substitution(SubsetResampling,
-                                           (; pe, wb, fees, sets, opt, wf, ex, subset_size,
-                                            n_subsets, max_comb, rng, seed, fb, strict),
-                                           subset_resampling_td_defaults())
+                                           (; pe, wb, fees, sets, opt, wf, min_solved, ex,
+                                            subset_size, n_subsets, max_comb, rng, seed, fb,
+                                            strict), subset_resampling_td_defaults())
         est = new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(opt),
-                  typeof(wf), typeof(ex), typeof(subset_size), typeof(n_subsets),
-                  typeof(max_comb), typeof(rng), typeof(seed), typeof(fb), typeof(strict),
-                  typeof(cache)}(pe, wb, fees, sets, opt, wf, ex, subset_size, n_subsets,
-                                 max_comb, rng, seed, fb, strict, cache)
+                  typeof(wf), typeof(min_solved), typeof(ex), typeof(subset_size),
+                  typeof(n_subsets), typeof(max_comb), typeof(rng), typeof(seed),
+                  typeof(fb), typeof(strict), typeof(cache)}(pe, wb, fees, sets, opt, wf,
+                                                             min_solved, ex, subset_size,
+                                                             n_subsets, max_comb, rng, seed,
+                                                             fb, strict, cache)
         warn_raw_readers(est)
         return est
     end
@@ -474,6 +486,7 @@ function SubsetResampling(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
                           fees::TD_Option{<:FeesE_Fees} = nothing,
                           sets::TD_Option{<:UniverseSets} = nothing, opt::OptE_TD,
                           wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
+                          min_solved::TD{<:Real_CountFraction} = FractionOf(1),
                           ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                           subset_size::TD{<:SubsetSizeE} = PowerSubsetSize(),
                           n_subsets::TD{<:NumberSubsetsE} = 2,
@@ -482,15 +495,15 @@ function SubsetResampling(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
                           seed::Option{<:Integer} = nothing,
                           fb::TDO_Option{<:OptE_Opt} = nothing, strict::Bool = false,
                           cache::Option{<:ReturnsBufferState} = nothing)::SubsetResampling
-    return SubsetResampling(pe, wb, fees, sets, opt, wf, ex, subset_size, n_subsets,
-                            max_comb, rng, seed, fb, strict, cache)
+    return SubsetResampling(pe, wb, fees, sets, opt, wf, min_solved, ex, subset_size,
+                            n_subsets, max_comb, rng, seed, fb, strict, cache)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the static defaults of the [`SubsetResampling`](@ref) fields that can hold a [`TimeDependent`](@ref).
 
-The constructor passes the defaults to [`assert_time_dependent_substitution`](@ref), and [`time_dependent_field_defaults`](@ref) returns them. `opt` is a required keyword and has no static default, so its entry is [`NoDefault`](@ref). A schedule in `opt` must have its own `default` to run outside a fold loop. `pe`, `wf`, `subset_size` and `n_subsets` take their keyword defaults. The tuple omits `wb`, `fees`, `sets` and `fb`, because their static default is `nothing`.
+The constructor passes the defaults to [`assert_time_dependent_substitution`](@ref), and [`time_dependent_field_defaults`](@ref) returns them. `opt` is a required keyword and has no static default, so its entry is [`NoDefault`](@ref). A schedule in `opt` must have its own `default` to run outside a fold loop. `pe`, `wf`, `min_solved`, `subset_size` and `n_subsets` take their keyword defaults. The tuple omits `wb`, `fees`, `sets` and `fb`, because their static default is `nothing`.
 
 # Related
 
@@ -500,7 +513,7 @@ The constructor passes the defaults to [`assert_time_dependent_substitution`](@r
 """
 function subset_resampling_td_defaults()::NamedTuple
     return (; pe = EmpiricalPrior(), opt = NoDefault(), wf = IterativeWeightFinaliser(),
-            subset_size = PowerSubsetSize(), n_subsets = 2)
+            min_solved = FractionOf(1), subset_size = PowerSubsetSize(), n_subsets = 2)
 end
 function time_dependent_field_defaults(::SubsetResampling)::NamedTuple
     return subset_resampling_td_defaults()
@@ -617,33 +630,36 @@ function port_opt_view(sr::SubsetResampling, i, X::MatNum, args...)::SubsetResam
     sets = port_opt_view(sr.sets, i)
     opt = port_opt_view(sr.opt, i, X)
     return SubsetResampling(; pe = pe, wb = wb, fees = fees, sets = sets, opt = opt,
-                            wf = sr.wf, ex = sr.ex, subset_size = sr.subset_size,
-                            n_subsets = sr.n_subsets, max_comb = sr.max_comb, rng = sr.rng,
-                            seed = sr.seed, fb = view_child(sr.fb, i, X),
-                            strict = sr.strict, cache = port_opt_view(sr.cache, i))
+                            wf = sr.wf, min_solved = sr.min_solved, ex = sr.ex,
+                            subset_size = sr.subset_size, n_subsets = sr.n_subsets,
+                            max_comb = sr.max_comb, rng = sr.rng, seed = sr.seed,
+                            fb = view_child(sr.fb, i, X), strict = sr.strict,
+                            cache = port_opt_view(sr.cache, i))
 end
 function non_investable_universe(sr::SubsetResampling, ni::VecStr)::SubsetResampling
     return rebuild_struct(sr, (; sets = non_investable_sets(sr.sets, ni)))
 end
 """
-    subset_resampling_retcode(resi_retcodes::VecOptRetCode, retcode::OptimisationReturnCode)
+    subset_resampling_retcode(resi_retcodes::VecOptRetCode, retcode::OptimisationReturnCode,
+                              partial::Bool)
 
 Combine the return codes of the subset optimisations with the return code of the weight finaliser.
 
 # Algorithm
 
- 1. Return `retcode` unchanged when no entry of `resi_retcodes` and not `retcode` is an [`OptimisationFailure`](@ref).
+ 1. Return `retcode` unchanged when no entry of `resi_retcodes` and not `retcode` is a failure.
  2. Otherwise build `msg`, with the line `opti failed.` when a subset failed, and then the line `weight bounds finalisation failed.` when the finaliser failed.
- 3. Return an [`OptimisationFailure`](@ref) whose `res` is `(; msg, opti = resi_retcodes, wb = retcode)`. Each return code keeps its own diagnostics.
+ 3. Return a code whose `res` is `(; msg, opti = resi_retcodes, wb = retcode)`. Each return code keeps its own diagnostics. The code is an [`OptimisationSuccess`](@ref) when `partial` holds and the finaliser did not fail, and an [`OptimisationFailure`](@ref) otherwise.
 
 # Arguments
 
   - `resi_retcodes`: Return codes of the subset optimisations. On an efficient frontier they are the codes of one point.
   - `retcode`: Return code of the weight finaliser.
+  - `partial`: Whether the average dropped the subsets that failed, see [`dropped_sub_portfolios`](@ref).
 
 # Returns
 
-  - `retcode::OptimisationReturnCode`: `retcode`, or the failure of step 3.
+  - `retcode::OptimisationReturnCode`: `retcode`, or the code of step 3.
 
 # Related
 
@@ -651,29 +667,35 @@ Combine the return codes of the subset optimisations with the return code of the
   - [`SubsetResampling`](@ref)
 """
 function subset_resampling_retcode(resi_retcodes::VecOptRetCode,
-                                   retcode::OptimisationReturnCode)
-    resi_flag = any(x -> isa(x, OptimisationFailure), resi_retcodes)
-    wb_flag = isa(retcode, OptimisationFailure)
-    return if resi_flag || wb_flag
-        msg = ""
-        if resi_flag
-            msg *= "opti failed.\n"
-        end
-        if wb_flag
-            msg *= "weight bounds finalisation failed.\n"
-        end
-        OptimisationFailure(; res = (; msg = msg, opti = resi_retcodes, wb = retcode))
+                                   retcode::OptimisationReturnCode, partial::Bool)
+    resi_flag = !all(any_solved, resi_retcodes)
+    wb_flag = !any_solved(retcode)
+    if !(resi_flag || wb_flag)
+        return retcode
+    end
+    msg = ""
+    if resi_flag
+        msg *= "opti failed.\n"
+    end
+    if wb_flag
+        msg *= "weight bounds finalisation failed.\n"
+    end
+    res = (; msg = msg, opti = resi_retcodes, wb = retcode)
+    return if partial && !wb_flag
+        OptimisationSuccess(; res = res)
     else
-        retcode
+        OptimisationFailure(; res = res)
     end
 end
 """
     subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
                                 wb::WeightBounds, wf::WeightFinaliser,
-                                ress::VecOpt, j::Integer)
+                                min_solved::AbstractCountOrFraction, ress::VecOpt,
+                                j::Integer)
     subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
                                 wb::WeightBounds, wf::WeightFinaliser,
-                                ress::VecOpt, ws::VecVecNum)
+                                min_solved::AbstractCountOrFraction, ress::VecOpt,
+                                ws::VecVecNum)
 
 Average the subset weights over all the assets, and finalise the average under the weight bounds.
 
@@ -685,13 +707,14 @@ On an efficient frontier, a subset whose every point failed can hold the one por
 
 The method for point `j` does these steps. One portfolio for each subset is the point `1`.
 
- 1. Allocate `w`, a vector of ``N`` zeros with the element type of the weights of the first subset.
- 2. For each subset `i`, add the weights of point `j` of `ress[i]`, from [`member_vector`](@ref), into `w` at the asset indices `asset_idx[:, i]`.
- 3. Divide `w` by `n_subsets`.
- 4. Finalise `w` with `wf` under `wb` through [`finalise_weight_bounds`](@ref), giving `retcode` and the finalised `w`.
- 5. Combine `retcode` with the return codes of point `j` of `ress`, from [`member_retcode`](@ref), through [`subset_resampling_retcode`](@ref).
+ 1. Read the return codes of point `j` of `ress` with [`member_retcode`](@ref), and find the subsets to drop with [`dropped_sub_portfolios`](@ref), giving `dropped`.
+ 2. Allocate `w`, a vector of ``N`` zeros with the element type of the weights of the first subset.
+ 3. For each subset `i` that is not in `dropped`, add the weights of point `j` of `ress[i]`, from [`member_vector`](@ref), into `w` at the asset indices `asset_idx[:, i]`.
+ 4. Divide `w` by the number of these subsets.
+ 5. Finalise `w` with `wf` under `wb` through [`finalise_weight_bounds`](@ref), giving `retcode` and the finalised `w`.
+ 6. Combine `retcode` with the return codes of step 1 through [`subset_resampling_retcode`](@ref).
 
-The method for a vector of vectors runs the steps once for each point. Its point `j` fails only when a subset failed at `j`, or when the finaliser did.
+The method for a vector of vectors runs the steps once for each point. Its point `j` reads the codes of the subsets at `j` alone, so one point can drop a subset that another point keeps.
 
 # Arguments
 
@@ -700,6 +723,7 @@ The method for a vector of vectors runs the steps once for each point. Its point
   - `asset_idx::MatNum`: Asset indices, one column for each subset.
   - `wb::WeightBounds`: Weight bounds of the finaliser.
   - `wf::WeightFinaliser`: Weight finaliser that repairs a bounds violation.
+  - `min_solved::AbstractCountOrFraction`: Number of subsets that must solve.
   - `ress::VecOpt`: Subset optimisation results, in the column order of `asset_idx`.
   - `j::Integer`: The point of the efficient frontier, `1` when no subset holds one.
   - `ws::VecVecNum`: Weights of a subset that holds an efficient frontier. The method reads the number of points from it, and no weight.
@@ -712,37 +736,45 @@ The method for a vector of vectors runs the steps once for each point. Its point
 
   - `retcode`: The return code from [`subset_resampling_retcode`](@ref), or one for each point of an efficient frontier.
   - `w`: The averaged and finalised weights, or one vector for each point of an efficient frontier.
+  - `dropped::BitVector`: The subsets that the average drops, at one or more points of an efficient frontier.
 
 # Related
 
   - [`SubsetResampling`](@ref)
+  - [`dropped_sub_portfolios`](@ref)
   - [`subset_resampling_retcode`](@ref)
   - [`finalise_weight_bounds`](@ref)
   - [`member_vector`](@ref)
   - [`member_retcode`](@ref)
 """
 function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
-                                     wb::WeightBounds, wf::WeightFinaliser, ress::VecOpt,
+                                     wb::WeightBounds, wf::WeightFinaliser,
+                                     min_solved::AbstractCountOrFraction, ress::VecOpt,
                                      j::Integer)
+    resi_retcodes = [member_retcode(res.retcode, j) for res in ress]
+    dropped = dropped_sub_portfolios(min_solved, resi_retcodes)
     w = zeros(eltype(member_vector(ress[1].w, j)), N)
     for i in 1:n_subsets
-        idx = view(asset_idx, :, i)
-        w[idx] .+= member_vector(ress[i].w, j)
+        if !dropped[i]
+            idx = view(asset_idx, :, i)
+            w[idx] .+= member_vector(ress[i].w, j)
+        end
     end
-    w /= n_subsets
+    w /= n_subsets - count(dropped)
     retcode, w = finalise_weight_bounds(wf, wb, w)
-    resi_retcodes = [member_retcode(res.retcode, j) for res in ress]
-    return subset_resampling_retcode(resi_retcodes, retcode), w
+    return subset_resampling_retcode(resi_retcodes, retcode, any(dropped)), w, dropped
 end
 function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
-                                     wb::WeightBounds, wf::WeightFinaliser, ress::VecOpt,
+                                     wb::WeightBounds, wf::WeightFinaliser,
+                                     min_solved::AbstractCountOrFraction, ress::VecOpt,
                                      ws::VecVecNum)
     M = length(ws)
     @argcheck(all(res -> !isa(res.w, VecVecNum) || length(res.w) == M, ress),
               DimensionMismatch("every subset that answers with an efficient frontier must have the same number of points.\nnumber of points of each subset => $([isa(res.w, VecVecNum) ? length(res.w) : 1 for res in ress])"))
-    retcode_w = [subset_resampling_finaliser(N, n_subsets, asset_idx, wb, wf, ress, j)
-                 for j in 1:M]
-    return map(x -> x[1], retcode_w), map(x -> x[2], retcode_w)
+    points = [subset_resampling_finaliser(N, n_subsets, asset_idx, wb, wf, min_solved, ress,
+                                          j) for j in 1:M]
+    return map(x -> x[1], points), map(x -> x[2], points),
+           mapreduce(x -> x[3], (a, b) -> a .| b, points)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -761,7 +793,7 @@ Run the subset resampling optimisation, and return the averaged portfolio.
  6. Draw the subsets with [`sample_unique_assets`](@ref), giving `asset_idx`. When `binomial(N, subset_size)` is at most `max_comb`, the subsets are distinct. Otherwise the function draws each subset alone, and two subsets can be equal.
  7. For each column of `asset_idx`, view `sr.opt` and `rdr` on the subset with [`port_opt_view`](@ref) and optimise the view, giving `ress`. The loop runs on the executor `sr.ex`.
  8. Build the weight bounds `wb` over the ``N`` assets with [`weight_bounds_constraints`](@ref).
- 9. Average and finalise the subset weights with [`subset_resampling_finaliser`](@ref), giving `retcode` and `w`. The first subset result that holds an efficient frontier selects its frontier method.
+ 9. Average and finalise the subset weights with [`subset_resampling_finaliser`](@ref), giving `retcode` and `w`. The first subset result that holds an efficient frontier selects its frontier method. Name the subsets that the average drops in one warning.
 10. Return a [`SubsetResamplingResult`](@ref). Its keyword constructor expands `w` onto the full asset universe.
 
 # Arguments
@@ -779,7 +811,7 @@ Run the subset resampling optimisation, and return the averaged portfolio.
 
 # Returns
 
-  - `res::SubsetResamplingResult`: The averaged portfolio. `retcode` is an [`OptimisationFailure`](@ref) when a subset optimisation fails, or when the weight finaliser fails. On an efficient frontier it holds one code for each point.
+  - `res::SubsetResamplingResult`: The averaged portfolio. `retcode` is an [`OptimisationFailure`](@ref) when fewer subset optimisations solve than `sr.min_solved` asks for, or when the weight finaliser fails. On an efficient frontier it holds one code for each point. When the average of a point drops a subset, the `res` of its code holds the return code of each subset.
 
 # Related
 
@@ -833,8 +865,9 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; branchorder::Symbol 
     # the first subset does not state whether the others hold a frontier.
     i = findfirst(res -> isa(res.w, VecVecNum), ress)
     points = isnothing(i) ? 1 : ress[i].w
-    retcode, w = subset_resampling_finaliser(N, n_subsets, asset_idx, wb, sr.wf, ress,
-                                             points)
+    retcode, w, dropped = subset_resampling_finaliser(N, n_subsets, asset_idx, wb, sr.wf,
+                                                      sr.min_solved, ress, points)
+    warn_dropped_sub_portfolios(dropped)
     return SubsetResamplingResult(; pr = pr, wb = wb, fees = fees, ress = ress,
                                   idx = asset_idx, retcode = retcode, w = w, imsk = imsk,
                                   fb = nothing)

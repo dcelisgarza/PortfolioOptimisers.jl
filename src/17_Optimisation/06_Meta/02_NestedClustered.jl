@@ -512,6 +512,8 @@ Where:
 
 The outer optimiser solves for ``\\boldsymbol{v}`` over ``\\mathbf{X}^{o}``. The weight of asset ``i`` in ``C_k`` is ``w_i = v_k w^{(k)}_{i}``. The sample mean of ``\\mathbf{X}^{o}`` is ``\\mathbf{W}^\\intercal \\hat{\\boldsymbol{\\mu}}`` and its sample covariance is ``\\mathbf{W}^\\intercal \\hat{\\mathbf{\\Sigma}} \\mathbf{W}``, where ``\\hat{\\boldsymbol{\\mu}}`` and ``\\hat{\\mathbf{\\Sigma}}`` are the sample moments of ``\\mathbf{X}``. These are the reduced moments of Snippet 4 of [lopezdeprado2019robust](@cite), so an outer optimiser that estimates sample moments solves its inter-cluster problem.
 
+Cluster ``C_k`` is dropped when its inner solve fails and enough of the others solve, see `min_solved`. Column ``k`` of ``\\mathbf{W}`` is then zero, so each asset of ``C_k`` has zero weight, and column ``k`` of ``\\mathbf{X}^{o}`` holds no return, so ``v_k = 0``. A weight bound that does not let such an asset have zero weight makes the weight finaliser move weight to it, inside the bounds, or fail.
+
 !!! note "One cluster"
 
     The outer optimiser fits also when the clustering finds one cluster. Its problem then has one synthetic asset, and its own constraints set the weight of that asset, so the weight is `1` only under a budget of `1`. An outer estimator that refuses one asset throws in this case. A prior with a [`ShrunkExpectedReturns`](@ref) mean is an example, because its James-Stein intensity is not defined at `N = 1`. A clustering can find one cluster in some folds of a cross-validation and several clusters in other folds. When the data can form one cluster, give the outer optimiser estimators that accept one asset.
@@ -533,6 +535,7 @@ $(DocStringExtensions.FIELDS)
         cv::Option{<:OptCVE_Onl} = nothing,
         scorer::Option{<:PredictionCrossValScorer} = nothing,
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
+        min_solved::TD{<:Real_CountFraction} = FractionOf(1),
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
         fb::TDO_Option{<:OptE_Opt} = nothing,
         strict::Bool = false,
@@ -544,7 +547,7 @@ Keywords correspond to the struct's fields.
 
 ## Time-dependent fields
 
-`pe`, `cle`, `wb`, `fees`, `sets`, `wf`, `opti`, `opto` and `fb` can hold a [`TimeDependent`](@ref) schedule, one value for each fold. A schedule in `opto` or `fb` must bind `:outermost`, because no inner fold loop reads them. A schedule in `opti` can also bind `:nearest`. The inner cross-validation runs `cross_val_predict(opti, …; cols = cl)` for each cluster, so the inner fold loop reads `opti`. A `:nearest` schedule in `opti` resolves in that loop, one time for each cluster. The solve of each cluster outside the folds resolves the schedule to its `default`, so a `:nearest` schedule in `opti` needs an explicit `default` and a `cv` (see [`assert_nearest_optimiser_schedule`](@ref)). `cv` and `scorer` accept no schedule, because `cv` is the inner fold loop itself, and the construction checks read both.
+`pe`, `cle`, `wb`, `fees`, `sets`, `wf`, `min_solved`, `opti`, `opto` and `fb` can hold a [`TimeDependent`](@ref) schedule, one value for each fold. A schedule in `opto` or `fb` must bind `:outermost`, because no inner fold loop reads them. A schedule in `opti` can also bind `:nearest`. The inner cross-validation runs `cross_val_predict(opti, …; cols = cl)` for each cluster, so the inner fold loop reads `opti`. A `:nearest` schedule in `opti` resolves in that loop, one time for each cluster. The solve of each cluster outside the folds resolves the schedule to its `default`, so a `:nearest` schedule in `opti` needs an explicit `default` and a `cv` (see [`assert_nearest_optimiser_schedule`](@ref)). `cv` and `scorer` accept no schedule, because `cv` is the inner fold loop itself, and the construction checks read both.
 
 An entry of a schedule in `opti` or `opto` must be an estimator, as the static value must be. The constructor refuses a vector schedule that holds a precomputed result.
 
@@ -556,8 +559,11 @@ An entry of a schedule in `opti` or `opto` must be an estimator, as the static v
   - `scorer` is `nothing` unless `cv` is a [`CombinatorialCrossValidation`](@ref). The constructor throws an `ArgumentError` otherwise, through [`assert_meta_scorer`](@ref).
   - A schedule in `opto` or `fb` does not bind `:nearest`. A schedule in `opti` that binds `:nearest` has an explicit `default`, and `cv` is present.
   - A `wb` that is keyed by name ([`name_keyed`](@ref)), or a `FeesEstimator` in `fees`, needs `sets`. The constructor throws an `IsNothingError` otherwise.
+  - A plain number in `min_solved` passes [`count_or_fraction`](@ref), and the field then holds a [`CountOf`](@ref) or a [`FractionOf`](@ref).
   - A vector schedule holds no precomputed result, see [`assert_time_dependent_substitution`](@ref).
   - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
+
+$(val_dict[:count_fraction_grid])
 
 ## Propagated parameters
 
@@ -650,6 +656,10 @@ An entry of a schedule in `opti` or `opto` must be an estimator, as the static v
     """
     wf
     """
+    $(field_dict[:min_solved])
+    """
+    min_solved
+    """
     $(field_dict[:ex])
     """
     ex
@@ -674,11 +684,13 @@ An entry of a schedule in `opti` or `opto` must be an estimator, as the static v
                              sets::TD_Option{<:UniverseSets}, opti::OptE_TD, opto::OptE_TD,
                              cv::Option{<:OptCVE_Onl},
                              scorer::Option{<:PredictionCrossValScorer},
-                             wf::TD{<:WeightFinaliser}, ex::FLoops.Transducers.Executor,
-                             fb::TDO_Option{<:OptE_Opt}, strict::Bool,
-                             pcol::AbstractPanelCollapseAlgorithm,
+                             wf::TD{<:WeightFinaliser},
+                             min_solved::TD{<:Real_CountFraction},
+                             ex::FLoops.Transducers.Executor, fb::TDO_Option{<:OptE_Opt},
+                             strict::Bool, pcol::AbstractPanelCollapseAlgorithm,
                              cache::Option{<:ReturnsBufferState})
         assert_meta_scorer(cv, scorer)
+        min_solved = count_or_fraction(min_solved)
         assert_nearest_optimiser_schedule(opti, :opti, cv, :NestedClustered)
         assert_no_nearest_bind_optimiser_schedule(opto, :opto, :NestedClustered)
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :NestedClustered)
@@ -699,25 +711,13 @@ An entry of a schedule in `opti` or `opto` must be an estimator, as the static v
         end
         assert_time_dependent_substitution(NestedClustered,
                                            (; pe, cle, wb, fees, sets, opti, opto, cv,
-                                            scorer, wf, ex, fb, strict, pcol),
+                                            scorer, wf, min_solved, ex, fb, strict, pcol),
                                            nested_clustered_td_defaults())
         est = new{typeof(pe), typeof(cle), typeof(wb), typeof(fees), typeof(sets),
                   typeof(opti), typeof(opto), typeof(cv), typeof(scorer), typeof(wf),
-                  typeof(ex), typeof(fb), typeof(strict), typeof(pcol), typeof(cache)}(pe,
-                                                                                       cle,
-                                                                                       wb,
-                                                                                       fees,
-                                                                                       sets,
-                                                                                       opti,
-                                                                                       opto,
-                                                                                       cv,
-                                                                                       scorer,
-                                                                                       wf,
-                                                                                       ex,
-                                                                                       fb,
-                                                                                       strict,
-                                                                                       pcol,
-                                                                                       cache)
+                  typeof(min_solved), typeof(ex), typeof(fb), typeof(strict), typeof(pcol),
+                  typeof(cache)}(pe, cle, wb, fees, sets, opti, opto, cv, scorer, wf,
+                                 min_solved, ex, fb, strict, pcol, cache)
         warn_raw_readers(est)
         return est
     end
@@ -730,19 +730,20 @@ function NestedClustered(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
                          opto::OptE_TD, cv::Option{<:OptCVE_Onl} = nothing,
                          scorer::Option{<:PredictionCrossValScorer} = nothing,
                          wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
+                         min_solved::TD{<:Real_CountFraction} = FractionOf(1),
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          fb::TDO_Option{<:OptE_Opt} = nothing, strict::Bool = false,
                          pcol::AbstractPanelCollapseAlgorithm = RenormaliseActive(),
                          cache::Option{<:ReturnsBufferState} = nothing)
-    return NestedClustered(pe, cle, wb, fees, sets, opti, opto, cv, scorer, wf, ex, fb,
-                           strict, pcol, cache)
+    return NestedClustered(pe, cle, wb, fees, sets, opti, opto, cv, scorer, wf, min_solved,
+                           ex, fb, strict, pcol, cache)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the static defaults of the [`NestedClustered`](@ref) fields that can hold a [`TimeDependent`](@ref) schedule.
 
-The substitution pass of the constructor and [`time_dependent_field_defaults`](@ref) both read it. `opti` and `opto` have no keyword default, so they map to [`NoDefault`](@ref), and a schedule in them needs its own `default` to run outside a fold loop. `pe`, `cle` and `wf` map to their keyword defaults. The tuple omits `wb`, `fees`, `sets` and `fb`, whose keyword default is `nothing`.
+The substitution pass of the constructor and [`time_dependent_field_defaults`](@ref) both read it. `opti` and `opto` have no keyword default, so they map to [`NoDefault`](@ref), and a schedule in them needs its own `default` to run outside a fold loop. `pe`, `cle`, `wf` and `min_solved` map to their keyword defaults. The tuple omits `wb`, `fees`, `sets` and `fb`, whose keyword default is `nothing`.
 
 # Related
 
@@ -752,7 +753,7 @@ The substitution pass of the constructor and [`time_dependent_field_defaults`](@
 """
 function nested_clustered_td_defaults()::NamedTuple
     return (; pe = EmpiricalPrior(), cle = ClustersEstimator(), opti = NoDefault(),
-            opto = NoDefault(), wf = IterativeWeightFinaliser())
+            opto = NoDefault(), wf = IterativeWeightFinaliser(), min_solved = FractionOf(1))
 end
 function time_dependent_field_defaults(::NestedClustered)::NamedTuple
     return nested_clustered_td_defaults()
@@ -868,9 +869,9 @@ function port_opt_view(nco::NestedClustered, i, X::MatNum, args...)
     opto = port_opt_view(nco.opto, i, X)
     return NestedClustered(; pe = pe, cle = nco.cle, wb = wb, fees = fees, sets = sets,
                            opti = opti, opto = opto, cv = nco.cv, scorer = nco.scorer,
-                           wf = nco.wf, ex = nco.ex, fb = view_child(nco.fb, i, X),
-                           strict = nco.strict, pcol = nco.pcol,
-                           cache = port_opt_view(nco.cache, i))
+                           wf = nco.wf, min_solved = nco.min_solved, ex = nco.ex,
+                           fb = view_child(nco.fb, i, X), strict = nco.strict,
+                           pcol = nco.pcol, cache = port_opt_view(nco.cache, i))
 end
 function non_investable_universe(nco::NestedClustered, ni::VecStr)::NestedClustered
     return rebuild_struct(nco, (; sets = non_investable_sets(nco.sets, ni)))
@@ -944,12 +945,13 @@ Run the nested clustered optimisation.
  7. Reduce `pr`, `nco` and `rd` to the investable assets with [`investable_reduction`](@ref), giving `pr`, `nco` and `rdr`.
  8. Cluster the assets with [`clusterise`](@ref), giving `clr`, and check with [`assert_clustering_universe`](@ref) that `clr` covers every asset. Collect the assets of each cluster, giving `cls`.
  9. For each cluster `k`, view `nco.opti` and `rdr` onto the assets `cls[k]` with [`port_opt_view`](@ref), and optimise, giving `resi[k]`. Write its weights into column `k` of `wi`, which is zero outside the cluster.
-10. Predict the returns of the synthetic assets with [`predict_outer_returns`](@ref), `cfees` and a [`ClusterUniverse`](@ref), giving `rdo`. Without `nco.cv` these are the returns of the cluster portfolios over the observations of `pr`. With `nco.cv` they are the out-of-sample predictions of the folds.
-11. Rebuild the asset sets of `nco.opto` over the names of the synthetic assets with [`_update_asset_sets`](@ref).
-12. Optimise `nco.opto` over `rdo`, giving `reso`.
-13. Resolve the weight bounds of `nco.wb` over the investable assets with [`weight_bounds_constraints`](@ref), giving `wb`.
-14. Combine `wi` and `reso.w` and finalise them with `nco.wf` under `wb`, through [`outer_optimisation_finaliser`](@ref), giving `retcode` and `w`.
-15. Build the [`NestedClusteredResult`](@ref). Its keyword constructor expands `w` to the full asset universe.
+10. Find the clusters to drop with [`dropped_sub_portfolios`](@ref), giving `dropped`, and name them in one warning. Set their columns of `wi` to zero.
+11. Predict the returns of the synthetic assets with [`predict_outer_returns`](@ref), `cfees` and a [`ClusterUniverse`](@ref), giving `rdo`. Without `nco.cv` these are the returns of the cluster portfolios over the observations of `pr`. With `nco.cv` they are the out-of-sample predictions of the folds. Set the columns of the dropped clusters to `NaN`.
+12. Rebuild the asset sets of `nco.opto` over the names of the synthetic assets with [`_update_asset_sets`](@ref).
+13. Optimise `nco.opto` over `rdo`, giving `reso`. When `rdo` holds no finite return, `reso` is the failure of [`failed_outer_result`](@ref).
+14. Resolve the weight bounds of `nco.wb` over the investable assets with [`weight_bounds_constraints`](@ref), giving `wb`.
+15. Combine `wi` and `reso.w` and finalise them with `nco.wf` under `wb`, through [`outer_optimisation_finaliser`](@ref), giving `retcode` and `w`.
+16. Build the [`NestedClusteredResult`](@ref). Its keyword constructor expands `w` to the full asset universe.
 
 # Arguments
 
@@ -968,7 +970,7 @@ Run the nested clustered optimisation.
 
 # Returns
 
-  - `res::NestedClusteredResult`: The combined portfolio. `retcode` is an [`OptimisationFailure`](@ref) when an intra-cluster optimisation, the inter-cluster optimisation or the weight finalisation fails.
+  - `res::NestedClusteredResult`: The combined portfolio. `retcode` is an [`OptimisationFailure`](@ref) when fewer intra-cluster optimisations solve than `nco.min_solved` asks for, or when the inter-cluster optimisation or the weight finalisation fails. When the method drops a cluster, the `res` of `retcode` holds the return code of each cluster.
 
 # Related
 
@@ -1036,13 +1038,23 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol 
         wi[cl, i] = res.w
         resi[i] = res
     end
+    dropped = dropped_sub_portfolios(nco.min_solved, getproperty.(resi, :retcode))
+    warn_dropped_sub_portfolios(dropped)
+    wi[:, dropped] .= zero(Tf)
     rdo = predict_outer_returns(nco.cv, nco, ClusterUniverse(cls), rdr, pr, cfees, wi, resi)
+    # A dropped cluster can hold finite weights, or finite returns in the folds.
+    rdo.X[:, dropped] .= NaN
     nco = _update_asset_sets(nco, rdo)
-    reso = optimise(nco.opto, rdo; branchorder = branchorder, str_names = str_names,
-                    save = save, kwargs...)
+    reso = if any(isfinite, rdo.X)
+        optimise(nco.opto, rdo; branchorder = branchorder, str_names = str_names,
+                 save = save, kwargs...)
+    else
+        failed_outer_result(rdo)
+    end
     wb = weight_bounds_constraints(nco.wb, nco.sets; rd = rdr, N = size(X, 2),
                                    strict = nco.strict, datatype = Tf)
-    retcode, w = outer_optimisation_finaliser(wb, nco.wf, resi, reso.retcode, reso.w, wi)
+    retcode, w = outer_optimisation_finaliser(wb, nco.wf, resi, reso.retcode, reso.w, wi,
+                                              any(dropped))
     return NestedClusteredResult(; pr = pr, clr = clr, wb = wb, fees = fees, resi = resi,
                                  reso = reso, cv = nco.cv, scorer = nco.scorer,
                                  retcode = retcode, w = w, imsk = imsk, fb = nothing)

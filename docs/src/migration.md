@@ -1093,6 +1093,19 @@ A static `TensorPanelField` and a static feature matrix keep `assets × labels` 
 
 ## From v0.34.5 to v0.34.6
 
+### [A field that is new](@id migration-0-34-6-min-solved)
+
+- **`NestedClustered`, `Stacking` and `SubsetResampling` take `min_solved = FractionOf(1)`**, the number of sub-portfolios that must solve. The default asks for every one, as v0.34.5 did. With `min_solved = FractionOf(0.5)` or `CountOf(1)`, a meta-optimiser drops the sub-portfolios that failed and gives an answer from the others. The field is after `wf`, so a positional constructor call takes one more argument. Write the call with keywords.
+
+### [Calls that now answer](@id migration-0-34-6-answers)
+
+| Call | v0.34.5 | v0.34.6 |
+| --- | --- | --- |
+| A fold of a cross-validation whose optimiser failed, or a `NestedClustered` or a `Stacking` with a failed inner solve, when the returns data has `iv` | `DomainError` | A failed fold with a zero `iv`, or a failed result whose fallback runs. |
+| A `NestedClustered` or a `Stacking` under `CombinatorialCrossValidation`, when a candidate has a failed fold in every path | `ArgumentError` that named an empty data vector | The outer problem drops the candidate. |
+| A `NestedClustered` or a `Stacking` whose every inner solve fails | `IsEmptyError` from the prior of the outer optimiser | A failed result whose fallback runs. |
+| A portfolio with no position, when the returns data has a vector `ivpa` | `DomainError` | Its collapsed `ivpa` is the mean of the vector. |
+
 ### [Return codes that change shape](@id migration-0-34-6-retcodes)
 
 - **`NearOptimalCentering` gives one return code for each point of a frontier sweep**, as every other optimiser that sweeps does. `res.retcode` of a sweep was one code, and it failed when one point failed. Write `all(rc -> rc isa OptimisationSuccess, res.retcode)` in place of `res.retcode isa OptimisationSuccess`. A solve of one portfolio keeps its one code. A point whose anchor is infeasible now fails alone. It made every point of the sweep fail in v0.34.5.

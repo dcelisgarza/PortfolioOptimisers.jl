@@ -1927,6 +1927,9 @@ end
         Wn = PO.synthetic_asset_weights([0.5 0.0; -0.5 0.0; 1.0 0.0])
         @test Wn ≈ [0.25 0.0; 0.25 0.0; 0.5 0.0]
         @test PO.synthetic_asset_weights(zeros(3)) == zeros(3)
+        # The weights of a failed solve are not finite, and they normalise to zeros.
+        @test PO.synthetic_asset_weights([0.5, NaN, 0.5]) == zeros(3)
+        @test PO.synthetic_asset_weights([0.5 NaN; 0.5 0.5]) == [0.5 0.0; 0.5 0.0]
         W = PO.synthetic_asset_weights([0.5 0.0; 0.5 1.0; 0.0 0.0])
         @test PO.collapse_panel_numeric([1.0, 2.0, 4.0], W) ≈ [1.5, 2.0]
         # A mask collapses as its support, and a categorical mask repeats over the levels.

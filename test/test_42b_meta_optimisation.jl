@@ -52,12 +52,12 @@
         @test nb == ["_b1", "_b2", "_b3"]
         @test B ≈ Bm * W
         @test ivo ≈ iv * wtilde(W)
-        @test ivpao ≈ transpose(wtilde(W)) * ivpa
+        @test ivpao[1:2] ≈ transpose(wtilde(W))[1:2, :] * ivpa
         # A convex combination stays inside the range of its inputs.
         @test all(minimum(iv) - 1e-12 .<= ivo[:, 1:2] .<= maximum(iv) + 1e-12)
-        # A column of zeros gives a zero column and a zero entry.
+        # A column of zeros gives a zero column, and the mean of `ivpa`: a zero is not a rate.
         @test all(iszero, ivo[:, 3])
-        @test iszero(ivpao[3])
+        @test ivpao[3] ≈ sum(ivpa) / N
         @test isnothing(pnl)
         @test size(Xb) == (T, 3)
         @test eltype(Xb) == eltype(X)
@@ -94,17 +94,27 @@
         resi_bad = PO.NonFiniteAllocationOptimisationResult[r.resi[1], rbad, r.resi[3]]
 
         rc, w = PO.outer_optimisation_finaliser(r.wb, wf, r.resi, OptimisationSuccess(),
-                                                r.reso.w, W)
+                                                r.reso.w, W, false)
         @test rc isa OptimisationSuccess
         @test w ≈ W * r.reso.w
 
         rc, w = PO.outer_optimisation_finaliser(r.wb, wf, resi_bad, OptimisationSuccess(),
-                                                r.reso.w, W)
-        @test rc.res.msg == "opti failed.\n"
+                                                r.reso.w, W, false)
+        @test rc isa OptimisationFailure && rc.res.msg == "opti failed.\n"
+
+        # A dropped inner result leaves a success with the same payload. A failure of the
+        # outer solve or of the finaliser does not.
+        rp, wp = PO.outer_optimisation_finaliser(r.wb, wf, resi_bad, OptimisationSuccess(),
+                                                 r.reso.w, W, true)
+        @test rp isa OptimisationSuccess && rp.res == rc.res && wp == w
+        rp, _ = PO.outer_optimisation_finaliser(r.wb, wf, resi_bad,
+                                                OptimisationFailure(; res = "outer"),
+                                                r.reso.w, W, true)
+        @test rp isa OptimisationFailure && rp.res.msg == "opti failed.\nopto failed.\n"
 
         rc, w = PO.outer_optimisation_finaliser(wbad, wf, resi_bad,
                                                 OptimisationFailure(; res = "outer"),
-                                                r.reso.w, W)
+                                                r.reso.w, W, false)
         @test rc.res.msg ==
               "opti failed.\nopto failed.\nweight bounds finalisation failed.\n"
         @test rc.res.opti[2] isa OptimisationFailure
@@ -117,7 +127,7 @@
         rcs, ws = PO.outer_optimisation_finaliser(r.wb, wf, r.resi,
                                                   [OptimisationSuccess(),
                                                    OptimisationFailure(; res = "outer")],
-                                                  [r.reso.w, reverse(r.reso.w)], W)
+                                                  [r.reso.w, reverse(r.reso.w)], W, false)
         @test rcs[1] isa OptimisationSuccess
         @test rcs[2].res.msg == "opto failed.\n"
         @test ws[2] ≈ W * reverse(r.reso.w)
@@ -427,7 +437,7 @@ end
                                                   scale = [1.0, NaN])
         @test PO.stacking_td_defaults() ==
               (; pe = EmpiricalPrior(), opti = PO.NoDefault(), opto = PO.NoDefault(),
-               wf = IterativeWeightFinaliser())
+               wf = IterativeWeightFinaliser(), min_solved = FractionOf(1))
     end
 
     @testset "erase_optimiser_vector" begin
@@ -766,5 +776,175 @@ end
                                    test_idx = [21:40, 41:60])
         @test !PO.is_time_dependent(nco)
         @test PO.update_time_dependent_estimator(nco, ctx) === nco
+    end
+end
+
+@testset "A meta-optimiser drops the sub-portfolios that failed" begin
+    using Test, PortfolioOptimisers, StableRNGs, Statistics, Clarabel
+
+    #=
+    `min_solved` (#2322). A failed sub-portfolio is a synthetic asset with no returns, so a
+    run that drops it is the run of the other sub-portfolios alone. Each testset compares
+    the two.
+    =#
+
+    PO = PortfolioOptimisers
+    rng = StableRNG(1)
+    T, N = 240, 9
+    X = 0.01 .* randn(rng, T, N) .+ 0.0005 .+ 0.004 .* randn(rng, T)
+    nx = ["A$i" for i in 1:N]
+    ts = PO.Dates.Date(2020, 1, 1) .+ PO.Dates.Day.(0:(T - 1))
+    rd = ReturnsResult(; nx = nx, X = X, ts = ts)
+    # Beside the returns: `iv`, a vector `ivpa` and a matrix benchmark.
+    rda = ReturnsResult(; nx = nx, X = X, ts = ts, iv = 0.1 .+ 0.1 .* rand(rng, T, N),
+                        ivpa = 1 .+ rand(rng, N), nb = ["b$i" for i in 1:N], B = 0.2 .* X)
+    seq = PO.FLoops.SequentialEx()
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 settings = Dict("verbose" => false),
+                 check_sol = (; allow_local = true, allow_almost = true))
+    function level(lb; kwargs...)
+        ret = ArithmeticReturn(; settings = JuMPReturnsSettings(; lb = lb))
+        return MeanRisk(; opt = JuMPOptimiser(; slv = slv, ret = ret), kwargs...)
+    end
+    # No long-only portfolio reaches a return of one, so this solve gives `NaN` weights.
+    bad(; kwargs...) = level(1.0; kwargs...)
+    # The bounds fix a total of 1.8, so this solve fails with finite weights.
+    badf = InverseVolatility(; wb = WeightBounds(; lb = 0.2, ub = 0.2))
+    ew, ivo = EqualWeighted(), InverseVolatility()
+    cvs = (nothing, KFold(; n = 3),
+           CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2))
+    stack(opti, opto; kwargs...) = Stacking(; opti = opti, opto = opto, ex = seq, kwargs...)
+
+    @testset "enough_solved" begin
+        @test PO.enough_solved(CountOf(2), 2, 3) && !PO.enough_solved(CountOf(2), 1, 3)
+        # A count above the number of sub-portfolios asks for every one.
+        @test PO.enough_solved(CountOf(5), 3, 3) && !PO.enough_solved(CountOf(5), 2, 3)
+        @test PO.enough_solved(FractionOf(1), 3, 3) &&
+              !PO.enough_solved(FractionOf(1), 2, 3)
+        # `0.07 * 100` is above `7`, and the share of `7` is the fraction.
+        @test PO.enough_solved(FractionOf(0.07), 7, 100)
+        @test PO.enough_solved(FractionOf(0.1f0), 1, 10)
+        @test PO.enough_solved(FractionOf(1 // 3), 1, 3)
+        @test !any(p -> PO.enough_solved(p, 0, 3), (CountOf(1), FractionOf(1e-9)))
+        ok, no = OptimisationSuccess(), OptimisationFailure()
+        @test PO.dropped_sub_portfolios(CountOf(1), [ok, no, ok]) == [false, true, false]
+        @test PO.dropped_sub_portfolios(CountOf(3), [ok, no, ok]) == falses(3)
+        @test PO.dropped_sub_portfolios(CountOf(1), [no, no]) == falses(2)
+    end
+
+    @testset "Stacking is the run of the candidates that solved" begin
+        for r in (rd, rda), cv in cvs, f in (bad(), badf)
+            part = @test_logs (:warn, r"1 of the 4 sub-portfolios failed.*\[2\]") match_mode = :any optimise(stack([ew,
+                                                                                                                    f,
+                                                                                                                    ivo,
+                                                                                                                    level(-1.0)],
+                                                                                                                   ivo;
+                                                                                                                   cv = cv,
+                                                                                                                   min_solved = 0.75),
+                                                                                                             r)
+            whole = optimise(stack([ew, ivo, level(-1.0)], ivo; cv = cv), r)
+            @test part.retcode isa OptimisationSuccess
+            @test part.retcode.res.msg == "opti failed.\n"
+            @test PO.any_solved.(part.retcode.res.opti) == [true, false, true, true]
+            @test iszero(part.reso.w[2])
+            @test part.reso.w[[1, 3, 4]] ≈ whole.reso.w
+            @test part.w ≈ whole.w
+            # The default fails, and it names the stage. It raised with `iv` in the data.
+            fail = optimise(stack([ew, f, ivo, level(-1.0)], ivo; cv = cv), r)
+            @test fail.retcode isa OptimisationFailure
+            @test startswith(fail.retcode.res.msg, "opti failed.\n")
+        end
+    end
+
+    @testset "the three levels of a failure run in order" begin
+        # The inner fallback substitutes, so no sub-portfolio fails.
+        r = optimise(stack([ivo, bad(; fb = ew)], ew; min_solved = CountOf(1)), rd)
+        @test isnothing(r.retcode.res)
+        @test r.resi[2].w ≈ fill(1 / N, N)
+        # The meta-optimiser drops, so its own fallback does not run.
+        r = optimise(stack([ivo, bad()], ew; fb = ew, min_solved = CountOf(1)), rd)
+        @test isnothing(r.fb) && r.w ≈ optimise(ivo, rd).w
+        # Too few solved, so the fallback replaces. With none, no value accepts it, and the
+        # outer problem has no asset.
+        r = optimise(stack([ivo, bad()], ew; fb = ew), rd)
+        @test r.w ≈ fill(1 / N, N) && length(r.fb) == 1
+        for cv in cvs,
+            meta in (stack([bad(), bad()], ew; cv = cv, min_solved = 1),
+                     NestedClustered(; opti = bad(), opto = ew, ex = seq, cv = cv, min_solved = 1))
+
+            r = optimise(meta, rda)
+            @test r.retcode isa OptimisationFailure && all(isnan, r.w)
+            @test startswith(r.retcode.res.msg, "opti failed.\nopto failed.\n")
+            @test occursin("no sub-portfolio has a return", r.retcode.res.opto.res)
+        end
+        r = optimise(stack([bad(), bad()], ew; fb = ew, min_solved = 1), rd)
+        @test r.w ≈ fill(1 / N, N)
+    end
+
+    @testset "the Combination Weight keeps the total of the outer weights" begin
+        r = optimise(stack([ivo, bad(), ew], ew; scale = [1.0, 5.0, 3.0], min_solved = 2),
+                     rd)
+        @test r.w ≈ 0.25 * optimise(ivo, rd).w .+ 0.75 / N
+    end
+
+    @testset "NestedClustered gives a dropped cluster zero weight" begin
+        cle = ClustersEstimator(; onc = OptimalNumberClusters(; alg = 3))
+        ref = optimise(NestedClustered(; opti = ew, opto = ew, cle = cle, ex = seq), rd)
+        cls = [findall(==(k), PO.assignments(ref.clr)) for k in 1:(ref.clr.k)]
+        mu = vec(mean(X; dims = 1))
+        tops = [maximum(mu[c]) for c in cls]
+        k = argmin(tops)
+        opti = level(sum(sort(tops)[1:2]) / 2)
+        nco(opto; kwargs...) = NestedClustered(; opti = opti, opto = opto, cle = cle,
+                                               ex = seq, kwargs...)
+        r = optimise(nco(ew), rda)
+        @test r.retcode isa OptimisationFailure
+        # The weights of the other clusters are those of a run with no drop.
+        @test all(isnan, r.w[cls[k]]) &&
+              all(isfinite, r.w[reduce(vcat, cls[setdiff(1:3, k)])])
+        p = optimise(nco(ew; min_solved = CountOf(2)), rda)
+        @test p.retcode isa OptimisationSuccess
+        @test PO.any_solved.(p.retcode.res.opti) == (1:3 .!= k)
+        @test all(iszero, p.w[cls[k]]) && sum(p.w) ≈ 1
+        for c in cls[setdiff(1:3, k)]
+            @test sum(p.w[c]) ≈ 1 / 2
+        end
+        @test PO.port_opt_view(nco(ew; min_solved = 2), 1:3, X).min_solved == CountOf(2)
+        # A constraint that names a dropped cluster leaves the outer problem, and one that
+        # names another cluster holds.
+        j = first(setdiff(1:3, k))
+        osets = UniverseSets(; dict = Dict("nx" => ["X", "Y", "Z"]))
+        lcse = LinearConstraintEstimator(; val = ["_$j >= 0.7", "_$k >= 0.1"])
+        opto = MeanRisk(; opt = JuMPOptimiser(; slv = slv, sets = osets, lcse = lcse))
+        q = optimise(nco(opto; min_solved = 0.5), rd)
+        @test q.retcode isa OptimisationSuccess
+        @test iszero(q.reso.w[k]) && q.reso.w[j] >= 0.7 - 1e-6
+        # A lower bound on a dropped asset moves weight to it in the finaliser.
+        b = optimise(nco(ew; min_solved = 0.5, wb = WeightBounds(; lb = 0.02, ub = 1.0)),
+                     rd)
+        @test b.retcode isa OptimisationSuccess && b.w[cls[k]] ≈ fill(0.02, length(cls[k]))
+    end
+
+    @testset "a fold reads min_solved, and a schedule resolves in it" begin
+        wf = IndexWalkForward(80, 40)
+        st(ms) = stack([level(-1.0), bad(), ivo], ew; min_solved = ms)
+        pred = cross_val_predict(st(TimeDependent([1, FractionOf(1), CountOf(2), 0.5])),
+                                 rda, wf)
+        @test [PO.any_solved(p.res.retcode) for p in pred.pred] == [true, false, true, true]
+        # A failed fold has no series, and its implied volatility is a finite zero.
+        @test all(isnan, pred.pred[2].rd.X) && all(iszero, pred.pred[2].rd.iv)
+        @test pred.pred[2].rd.ivpa ≈ mean(rda.ivpa)
+        @test PO.reset_time_dependent_estimator(st(TimeDependent([CountOf(1), 0.5]))).min_solved ==
+              FractionOf(1)
+        @test PO.port_opt_view(st(0.5), 1:3, X).min_solved == FractionOf(0.5)
+        @test_throws DomainError st(1.0)
+        # The outer problem prices the exit of a dropped candidate as any other.
+        fees = Fees(; lq = Turnover(; w = fill(1 / 3, 3), val = 0.01))
+        for opt in (JuMPOptimiser(; slv = slv, fees = fees),
+                    JuMPOptimiser(; slv = slv, tn = Turnover(; w = fill(1 / 3, 3), val = 0.7)))
+            r = optimise(stack([ivo, bad(), ew], MeanRisk(; opt = opt); min_solved = 0.5),
+                         rd)
+            @test r.retcode isa OptimisationSuccess && iszero(r.reso.w[2])
+        end
     end
 end
