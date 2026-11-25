@@ -250,6 +250,9 @@
         # side is refused there, and it stays a valid loss tail (#2328).
         for bad in (MaximumDrawdown(; settings = off), UlcerIndex(; settings = off),
                     ConditionalDrawdownatRisk(; settings = off), LowOrderMoment(; settings = off),
+                    LowOrderMoment(; settings = off, alg = MeanAbsoluteDeviation(), mu = 0.0),
+                    LowOrderMoment(; settings = off, alg = SecondMoment(; alg1 = SemiMoment())),
+                    LowOrderMoment(; settings = off, alg = EvenMoment(; alg = SemiMoment())),
                     NegativeSkewness(; settings = off),
                     TurnoverRiskMeasure(; settings = off, w = [0.5, 0.5]))
             @test !PortfolioOptimisers.supports_gain_tail(bad)
@@ -260,6 +263,13 @@
         @test_throws "supports_gain_tail(::MaximumDrawdown) = true" RangeTails(loss,
                                                                                MaximumDrawdown(;
                                                                                                settings = off))
+        # A full moment about the mean has one value on both sides, so it is a gain tail.
+        for alg in (MeanAbsoluteDeviation(), SecondMoment(), EvenMoment()),
+            mu in (nothing, [0.1, 0.2])
+
+            @test RangeTails(loss, LowOrderMoment(; settings = off, alg = alg, mu = mu)).gain.mu ===
+                  mu
+        end
         # A range answers for its loss tail, because that tail moves to the gain side with it.
         for (name, r) in vcat(declaring, fused)
             @test PortfolioOptimisers.supports_gain_tail(r)

@@ -182,15 +182,16 @@ objected. Each such measure now has one of three answers:
     `SortingNetworkOrderedWeightsArray`, and `ValueatRiskRange` under `DistributionValueatRisk`,
     build the side. They take no second block: an OWA builder negates and reverses its weight
     vector, and the parametric range negates the mean and reflects the law over the same cone.
-- `Range`, the variances, `Kurtosis` and `BrownianDistanceVariance` have one value on the two
-    sides, so their builders need no keyword.
+- `Range`, the variances, `Kurtosis`, `BrownianDistanceVariance` and a full `LowOrderMoment`
+    about the mean have one value on the two sides, so their builders need no keyword.
 - Every other measure has no gain tail. `supports_gain_tail` is a public trait with the fallback
     `false` on `RiskMeasure`, and `RangeTails` refuses a gain tail whose answer is `false`. The
     configuration alone decides the refusal, so it is in the constructor.
 
 `NegativeSkewness` has one value on `w` and `-w`, but its matrix reads the negative side of the
-coskewness alone, so it has no gain tail. A range that decomposes answers for its loss tail, which
-moves to the negated portfolio with the range.
+coskewness alone, so it has no gain tail. The matrix of a variance or of a `Kurtosis` is the choice
+of the caller, so a lower semi-moment in that matrix keeps its side. A range that decomposes answers
+for its loss tail, which moves to the negated portfolio with the range.
 
 The trait fails closed. A measure of a user whose builder reads `loss` declares it, where no
 declaration was necessary before. A default of `true` would keep the silent defect for each measure

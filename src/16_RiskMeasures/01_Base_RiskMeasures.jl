@@ -736,7 +736,7 @@ There is no default. A range that fuses throws rather than returning a decomposi
   - [`RiskMeasureSettings`](@ref)
 """
 function range_tails(r::RangeRiskMeasure)
-    return throw(ArgumentError("`range_tails` is not defined for `$(typeof(r))`. Only a range risk measure that is the sum of two point measures decomposes; a measure that fuses its two tails into one formulation declares none."))
+    return throw(ArgumentError("`range_tails` is not defined for `$(typeof(r))`. Only a range risk measure that is the sum of two point measures decomposes; a measure that fuses its two tails into one formulation declares none. To use such a range as the gain tail of a range, declare `PortfolioOptimisers.supports_gain_tail(::$(nameof(typeof(r)))) = true`."))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -804,7 +804,7 @@ Stacktrace:
         @argcheck(!loss.settings.rke && !gain.settings.rke,
                   ArgumentError("Each tail of a range carries `rke = false`, because the range registers its risk expression once. Got\nloss.settings.rke => $(loss.settings.rke)\ngain.settings.rke => $(gain.settings.rke)"))
         @argcheck(supports_gain_tail(gain),
-                  ArgumentError("The gain tail of a range measures the negated portfolio, and `$(nameof(typeof(gain)))` cannot be built on that side. Use a measure that `supports_gain_tail` answers `true` for. For a measure of your own, build it under `loss = false` on the negated portfolio and declare `PortfolioOptimisers.supports_gain_tail(::$(nameof(typeof(gain)))) = true`."))
+                  ArgumentError("The gain tail of a range measures the negated portfolio, and `$(nameof(typeof(gain)))` cannot be built on that side. A range that decomposes answers for its loss tail. Use a measure that `supports_gain_tail` answers `true` for. For a measure of your own, build it under `loss = false` on the negated portfolio and declare `PortfolioOptimisers.supports_gain_tail(::$(nameof(typeof(gain)))) = true`."))
         return new{typeof(loss), typeof(gain)}(loss, gain)
     end
 end

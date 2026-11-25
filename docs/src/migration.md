@@ -1107,8 +1107,14 @@ A `ConstraintBlock` holds concentration rules, such as the UCITS 5/10/40 rule, i
 ### [Results that move](@id migration-0-34-6-range-tail)
 
 - **A `Frontier` in the `ub` of one tail of a `GenericValueatRiskRange`** takes its levels from the value of that tail at the two corner portfolios, in `MeanRisk` and in `NearOptimalCentering`. v0.34.5 took them from the value of the whole range, so the levels were too high and most points of the sweep were one portfolio.
-- **A range of your own whose tail is a range, or an `OrderedWeightsArray` or `ValueatRiskRange` as its gain tail,** builds each tail on its own side. v0.34.5 built both tails of an inner range on one side, and it built the loss side of an OWA measure with `ExactOrderedWeightsArray` or `SortingNetworkOrderedWeightsArray`, and of a `ValueatRiskRange` with `DistributionValueatRisk`. The model then optimised a value that was not the value of the range.
 
-### [If you extend the library](@id migration-0-34-6-range-tail-extending)
+## From v0.34 to v0.35
 
-- **The gain tail of a `PortfolioOptimisers.RangeTails`** must be a measure that `PortfolioOptimisers.supports_gain_tail` answers `true` for. The constructor refuses any other with an `ArgumentError`, such as a drawdown measure, `LowOrderMoment`, `NegativeSkewness`, a tracking measure or `TurnoverRiskMeasure`, whose builder built the loss tail a second time in v0.34.5. A measure of your own whose `set_risk_constraints!` reads the keyword `loss` declares `PortfolioOptimisers.supports_gain_tail(::MyRisk) = true`.
+### [Results that move](@id migration-0-35-range-tail)
+
+- **A range of your own whose tail is a range, or an `OrderedWeightsArray` or `ValueatRiskRange` as its gain tail,** builds each tail on its own side. v0.34 built both tails of an inner range on one side, and it built the loss side of an OWA measure with `ExactOrderedWeightsArray` or `SortingNetworkOrderedWeightsArray`, and of a `ValueatRiskRange` with `DistributionValueatRisk`. The model then optimised a value that was not the value of the range.
+- **A range of your own with an `UncertaintySetVariance` as a tail** takes an estimator as the `ucs` of that tail. v0.34 raised a `MethodError`.
+
+### [If you extend the library](@id migration-0-35-range-tail-extending)
+
+- **The gain tail of a `PortfolioOptimisers.RangeTails`** must be a measure that `PortfolioOptimisers.supports_gain_tail` answers `true` for. The constructor refuses any other with an `ArgumentError`, such as a drawdown measure, a `LowOrderMoment` that reads one side of the deviations or a target that holds a scalar, `NegativeSkewness`, a tracking measure or `TurnoverRiskMeasure`, whose builder built the loss tail a second time in v0.34. A measure of your own whose `set_risk_constraints!` reads the keyword `loss` declares `PortfolioOptimisers.supports_gain_tail(::MyRisk) = true`, and so does a range of your own that fuses its tails.

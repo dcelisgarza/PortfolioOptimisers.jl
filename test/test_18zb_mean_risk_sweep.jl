@@ -576,6 +576,23 @@ PO.risk_input_kind(::MrsRange) = PO.NetReturnsInput()
 PO.range_tails(r::MrsRange) = PO.RangeTails(r.loss, r.gain)
 PO.range_risk_key(::MrsRange) = :mrs_range_risk_
 (r::MrsRange)(x::PO.VecNum) = r.loss(x) + r.gain(-x)
+# A range of a user's own with a tail that reads the weights.
+struct MrsWeightRange{T1, T2, T3} <: PO.RangeRiskMeasure
+    settings::T1
+    loss::T2
+    gain::T3
+end
+PO.risk_input_kind(::MrsWeightRange) = PO.WeightsReturnsFeesInput()
+PO.range_tails(r::MrsWeightRange) = PO.RangeTails(r.loss, r.gain)
+PO.range_risk_key(::MrsWeightRange) = :mrs_weight_range_risk_
+function PO.factory(r::MrsWeightRange, args...; kwargs...)
+    return MrsWeightRange(r.settings, factory(r.loss, args...; kwargs...),
+                          factory(r.gain, args...; kwargs...))
+end
+# A range of a user's own that fuses its tails, so it declares no `range_tails`.
+struct MrsFusedRange{T1} <: PO.RangeRiskMeasure
+    settings::T1
+end
 
 @testset "MeanRisk sweep: a Frontier on a tail of a range spans that tail" begin
     # The sweep took the span of the whole range, so the levels were too high and most points
@@ -673,7 +690,10 @@ end
     even = Any[ValueatRiskRange(; settings = off, alpha = 0.05, beta = 0.3,
                                 alg = vdist(0.5)), Range(; settings = off),
                Variance(; settings = off), StandardDeviation(; settings = off),
-               Kurtosis(; settings = off), BrownianDistanceVariance(; settings = off)]
+               Kurtosis(; settings = off), BrownianDistanceVariance(; settings = off),
+               LowOrderMoment(; settings = off, alg = MeanAbsoluteDeviation()),
+               LowOrderMoment(; settings = off, alg = SecondMoment()),
+               LowOrderMoment(; settings = off, alg = EvenMoment())]
     value(r, w) = expected_risk(factory(r, pr, MRS_SLV), w, pr)
     for g in vcat(sided, even)
         @testset "$(nameof(typeof(g)))" begin
@@ -726,6 +746,51 @@ end
                   optimise(MeanRisk(; r = [free], opt = opt, obj = obj)).w)
             for obj in (MinimumRisk(), MaximumReturn())]
     @test isapprox([value(vb(off, 0.3, 0.2), w) for w in res.w], sort(ends); rtol = 1e-4)
+    # A range that reads the weights is a gain tail through its own tails. A sweep on it spans
+    # the value of the exchanged sides, which the closed form of each tail gives.
+    sd(w) = sqrt(dot(w, pr.sigma, w))
+    z = quantile(Normal(-0.3, 2.0), 0.95)
+    cases = ((var(0.3, 0.05), w -> dot(pr.mu, w) + z * sd(w)),
+             (StandardDeviation(; settings = off), sd))
+    @testset "weights $(nameof(typeof(l)))" for (l, loss_value) in cases
+        swept(s) = MrsRange(RiskMeasureSettings(), cvar(0.1),
+                            MrsWeightRange(s, l, cvar(0.2)))
+        tail_value(w) = loss_value(w) + cvar(0.2)(pr.X * w)
+        res = optimise(MeanRisk(; r = [swept(bnd)], opt = opt, obj = MaximumReturn()))
+        owner = only(res.model[:risk_frontier]).second[4]
+        @test isa(owner, PO.GainTail) && isa(owner.r, MrsWeightRange)
+        ends = [tail_value(optimise(MeanRisk(; r = [swept(off)], opt = opt, obj = obj)).w)
+                for obj in (MinimumRisk(), MaximumReturn())]
+        @test isapprox([tail_value(w) for w in res.w], sort(ends); rtol = 1e-4)
+        # The fees keep their sign, so the owner reads the net series and not that of `-w`.
+        fees = Fees(; l = 0.001)
+        w = last(res.w)
+        rs = factory(owner, pr, MRS_SLV)
+        @test isapprox(rs(w, pr.X, fees),
+                       loss_value(w) + cvar(0.2)(calc_net_returns(w, pr.X, fees));
+                       rtol = 1e-10)
+    end
+    # A full moment about the mean is the same on both sides, with a fee too.
+    mad = factory(LowOrderMoment(; settings = off, alg = MeanAbsoluteDeviation()), pr)
+    w = fill(0.2, 5)
+    fees = Fees(; l = 0.001)
+    @test PO.GainTail(mad)(w, pr.X, fees) == mad(w, pr.X, fees)
+    # A range that fuses must declare the trait to be a gain tail, and the refusal says so.
+    @test_throws "supports_gain_tail(::MrsFusedRange) = true" PO.RangeTails(cvar(0.1),
+                                                                            MrsFusedRange(off))
+    # An estimator of the set fits inside the build of a tail, which gives its side as a keyword.
+    set = NormalUncertaintySet(; pe = nothing, rng = StableRNG(1), seed = 1,
+                               alg = EllipsoidalUncertaintySetAlgorithm())
+    ucs = sigma_ucs(set, pr)
+    risks = map((set, ucs)) do u
+        g = UncertaintySetVariance(; settings = off, ucs = u)
+        @test PO.supports_gain_tail(g)
+        res = optimise(MeanRisk(; r = [MrsRange(RiskMeasureSettings(), cvar(0.1), g)],
+                                opt = opt))
+        @test isa(res.retcode, OptimisationSuccess)
+        return JuMP.value(res.model[:mrs_range_risk_1])
+    end
+    @test isapprox(risks[1], risks[2]; rtol = 1e-6)
 end
 
 @testset "MeanRisk sweep: a Frontier needs two points" begin

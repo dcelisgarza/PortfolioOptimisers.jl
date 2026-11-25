@@ -1,5 +1,5 @@
 ```@meta
-Description = "Generic Value at Risk Range, private API of PortfolioOptimisers.jl: ValueatRiskRMs, range_tail_risk, gain_tail_measure, GainTail."
+Description = "Generic Value at Risk Range, private API of PortfolioOptimisers.jl: ValueatRiskRMs, range_tail_risk, gain_tail_measure, SymmetricLowOrderMoment, …"
 ```
 
 # Generic Value at Risk Range: private API
@@ -8,5 +8,7 @@ Description = "Generic Value at Risk Range, private API of PortfolioOptimisers.j
 ValueatRiskRMs
 range_tail_risk
 gain_tail_measure
+SymmetricLowOrderMoment
+gain_tail_risk
 GainTail
 ```

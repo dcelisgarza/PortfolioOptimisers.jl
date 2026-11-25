@@ -213,21 +213,18 @@ end
 """
     range_tail_risk(r::RiskMeasure, w::VecNum, x::VecNum,
                     kind::RiskInputKind = risk_input_kind(r))
-    range_tail_risk(r::Union{<:ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk},
-                             <:ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
-                                                <:DistributionValueatRisk}},
+    range_tail_risk(r::Union{ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk},
+                             ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
+                                              <:DistributionValueatRisk}},
                     w::VecNum, x::VecNum)
-    range_tail_risk(r::GenericValueatRiskRange, w::VecNum, x::VecNum,
-                    kind::WeightsReturnsFeesInput)
 
 Evaluate one tail of a range on the input that the tail reads.
 
-The functor of a [`GenericValueatRiskRange`](@ref) on the weights calls this function once for each tail. It passes `w` and the net returns `x` for the loss tail, and [`gain_tail_measure`](@ref) of the gain tail, `-w` and `-x` for the gain tail. A [`GainTail`](@ref) calls it for the gain tail of any [`RangeRiskMeasure`](@ref).
+The functor of a [`GenericValueatRiskRange`](@ref) on the weights calls this function once for each tail. It passes `w` and the net returns `x` for the loss tail, and [`gain_tail_measure`](@ref) of the gain tail, `-w` and `-x` for the gain tail. A [`GainTail`](@ref) calls it through [`gain_tail_risk`](@ref) for the gain tail of any [`RangeRiskMeasure`](@ref).
 
   - A tail that reads a return series, [`NetReturnsInput`](@ref), returns `r(x)`.
   - A tail that reads the weights alone, [`WeightsInput`](@ref), returns `r(w)`.
   - A [`ValueatRisk`](@ref) tail with [`DistributionValueatRisk`](@ref), [`WeightsReturnsFeesInput`](@ref), returns `r(w)`. It reads the moments of the prior against the weights. A [`ValueatRiskRange`](@ref) tail with that formulation does the same.
-  - A [`GenericValueatRiskRange`](@ref) that reads the weights returns the sum of its loss tail on `w` and `x`, and of its gain tail on `-w` and `-x`. The functor of the range on the weights is this call, so a range that is itself a tail takes the same path.
 
 The gain tail of a returns measure reads `-x`, not the net returns of `-w`. A fee does not change sign with the weights, so the two series are different when the portfolio pays a fee.
 
@@ -257,31 +254,23 @@ end
 function range_tail_risk(r::RiskMeasure, w::VecNum, ::VecNum, ::WeightsInput)
     return r(w)
 end
-function range_tail_risk(r::Union{<:ValueatRisk{<:Any, <:Any, <:Any,
-                                                <:DistributionValueatRisk},
-                                  <:ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
-                                                     <:DistributionValueatRisk}}, w::VecNum,
+function range_tail_risk(r::Union{ValueatRisk{<:Any, <:Any, <:Any,
+                                              <:DistributionValueatRisk},
+                                  ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
+                                                   <:DistributionValueatRisk}}, w::VecNum,
                          ::VecNum)
     return r(w)
 end
-function range_tail_risk(r::GenericValueatRiskRange, w::VecNum, x::VecNum,
-                         ::WeightsReturnsFeesInput)
-    loss = range_tail_risk(r.loss, w, x)
-    gain = range_tail_risk(gain_tail_measure(r.gain), -w, -x)
-    return loss + gain
-end
 """
     gain_tail_measure(r::RiskMeasure)
-    gain_tail_measure(r::Union{<:ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk},
-                               <:ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
-                                                  <:DistributionValueatRisk}})
-    gain_tail_measure(r::GenericValueatRiskRange)
+    gain_tail_measure(r::Union{ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk},
+                               ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
+                                                <:DistributionValueatRisk}})
 
 Return the measure that the gain tail of a range evaluates on the negated portfolio.
 
   - The method for a [`RiskMeasure`](@ref) returns `r` unchanged. A tail that reads a return series reads the negated returns, and a tail that reads the weights alone reads the negated weights.
   - A [`ValueatRisk`](@ref) tail with [`DistributionValueatRisk`](@ref) is rebuilt with the law that [`gain_tail_distribution`](@ref) gives, the law of the standardised loss of `-w`. On `-w`, the rebuilt tail then equals the gain tail of a [`ValueatRiskRange`](@ref) with the same `dist`, also for a `Normal` with a nonzero mean. A law that is symmetric about zero is its own reflection, so the method returns `r` itself. A [`ValueatRiskRange`](@ref) tail with that formulation is rebuilt in the same way.
-  - A [`GenericValueatRiskRange`](@ref) tail is rebuilt with the measure that this function returns for each of its tails. Its own gain tail then reads the reflected law a second time, which gives the law of the portfolio.
 
 # Arguments
 
@@ -300,17 +289,94 @@ Return the measure that the gain tail of a range evaluates on the negated portfo
   - [`DistributionValueatRisk`](@ref)
 """
 gain_tail_measure(r::RiskMeasure) = r
-function gain_tail_measure(r::Union{<:ValueatRisk{<:Any, <:Any, <:Any,
-                                                  <:DistributionValueatRisk},
-                                    <:ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
-                                                       <:DistributionValueatRisk}})
+function gain_tail_measure(r::Union{ValueatRisk{<:Any, <:Any, <:Any,
+                                                <:DistributionValueatRisk},
+                                    ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
+                                                     <:DistributionValueatRisk}})
     alg = rebuild_with_slots(r.alg, (; dist = gain_tail_distribution(r.alg.dist)))
     return rebuild_with_slots(r, (; alg = alg))
 end
-function gain_tail_measure(r::GenericValueatRiskRange)
-    return rebuild_with_slots(r,
-                              (; loss = gain_tail_measure(r.loss),
-                               gain = gain_tail_measure(r.gain)))
+"""
+    const SymmetricLowOrderMoment = LowOrderMoment{<:Any, <:Any, <:Option{<:VecNum},
+                                                   <:Union{MeanAbsoluteDeviation,
+                                                           SecondMoment{<:Any, <:FullMoment},
+                                                           EvenMoment{<:Any, <:Any, <:FullMoment}}}
+
+Alias for a [`LowOrderMoment`](@ref) that has one value on a portfolio and on the negated portfolio.
+
+A moment of this kind reads the deviations of both signs alike, and its target, the mean of the portfolio, changes sign with the portfolio. A moment of the deviations below the target, and a moment about a target that holds a scalar, have two values.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`MeanAbsoluteDeviation`](@ref)
+  - [`SecondMoment`](@ref)
+  - [`EvenMoment`](@ref)
+  - [`FullMoment`](@ref)
+  - [`supports_gain_tail`](@ref)
+  - [`gain_tail_risk`](@ref)
+"""
+const SymmetricLowOrderMoment = LowOrderMoment{<:Any, <:Any, <:Option{<:VecNum},
+                                               <:Union{MeanAbsoluteDeviation,
+                                                       SecondMoment{<:Any, <:FullMoment},
+                                                       EvenMoment{<:Any, <:Any,
+                                                                  <:FullMoment}}}
+"""
+    gain_tail_risk(r::RiskMeasure, w::VecNum, X::MatNum, fees::Option{<:Fees},
+                   kind::RiskInputKind = risk_input_kind(r))
+    gain_tail_risk(r::SymmetricLowOrderMoment, w::VecNum, X::MatNum, fees::Option{<:Fees},
+                   kind::WeightsReturnsFeesInput)
+    gain_tail_risk(r::RangeRiskMeasure, w::VecNum, X::MatNum, fees::Option{<:Fees},
+                   kind::WeightsReturnsFeesInput)
+    gain_tail_risk(r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:DistributionValueatRisk},
+                   w::VecNum, X::MatNum, fees::Option{<:Fees},
+                   kind::WeightsReturnsFeesInput)
+
+Evaluate the measure `r` as the gain tail of a range, on the portfolio `w`.
+
+  - The method for a [`RiskMeasure`](@ref) evaluates [`gain_tail_measure`](@ref) of `r` on `-w` and on the negated net returns, with [`range_tail_risk`](@ref).
+  - A [`SymmetricLowOrderMoment`](@ref) has one value on both sides, so the method evaluates `r` on `w`.
+  - A range that reads the weights exchanges the sides of its tails, as the builder of a [`RangeRiskMeasure`](@ref) does. The method returns the sum of the value of its loss tail as a gain tail and of the value of its gain tail on the portfolio.
+  - A [`ValueatRiskRange`](@ref) with [`DistributionValueatRisk`](@ref) declares no tails, so the method evaluates [`gain_tail_measure`](@ref) of `r` on `-w`.
+
+# Arguments
+
+  - $(arg_dict[:r])
+  - `w::VecNum`: Portfolio weights vector `assets × 1`, not negated.
+  - `X::MatNum`: Returns matrix `observations × assets`.
+  - `fees::Option{<:Fees}`: The fees that the net returns pay, or `nothing`.
+  - `kind::RiskInputKind`: Input kind of `r`, which selects the method.
+
+# Returns
+
+  - `rk::Number`: The value of the gain tail.
+
+# Related
+
+  - [`GainTail`](@ref)
+  - [`RangeTails`](@ref)
+  - [`range_tails`](@ref)
+  - [`gain_tail_measure`](@ref)
+  - [`range_tail_risk`](@ref)
+  - [`risk_input_kind`](@ref)
+"""
+function gain_tail_risk(r::RiskMeasure, w::VecNum, X::MatNum, fees::Option{<:Fees},
+                        ::RiskInputKind = risk_input_kind(r))
+    return range_tail_risk(gain_tail_measure(r), -w, -calc_net_returns(w, X, fees))
+end
+function gain_tail_risk(r::SymmetricLowOrderMoment, w::VecNum, X::MatNum,
+                        fees::Option{<:Fees}, ::WeightsReturnsFeesInput)
+    return r(w, X, fees)
+end
+function gain_tail_risk(r::RangeRiskMeasure, w::VecNum, X::MatNum, fees::Option{<:Fees},
+                        ::WeightsReturnsFeesInput)
+    (; loss, gain) = range_tails(r)
+    return gain_tail_risk(loss, w, X, fees) + expected_risk(gain, w, X, fees)
+end
+function gain_tail_risk(r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
+                                            <:DistributionValueatRisk}, w::VecNum, ::MatNum,
+                        ::Option{<:Fees}, ::WeightsReturnsFeesInput)
+    return gain_tail_measure(r)(-w)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -362,7 +428,7 @@ Keywords correspond to the struct's fields.
 
     (r::GainTail)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
 
-Computes the net returns `x` of `w`, and evaluates [`gain_tail_measure`](@ref) of the tail on `-w` and `-x` with [`range_tail_risk`](@ref). The value of the range is the sum of the value of the loss tail and of this value.
+Evaluates the tail on the negated portfolio with [`gain_tail_risk`](@ref). The value of the range is the sum of the value of the loss tail and of this value.
 
 ## Arguments
 
@@ -386,6 +452,7 @@ julia> r([1.0], [-0.1; 0.25; 0.5;;])
   - [`RangeTails`](@ref)
   - [`GenericValueatRiskRange`](@ref)
   - [`set_risk_frontier_owner!`](@ref)
+  - [`gain_tail_risk`](@ref)
   - [`gain_tail_measure`](@ref)
   - [`range_tail_risk`](@ref)
 """
@@ -409,25 +476,25 @@ calibration_slots(r::GainTail) = (; r = r.r)
 risk_input_kind(::GainTail) = WeightsReturnsFeesInput()
 supports_precomputed_returns(::GainTail)::Bool = false
 function (r::GainTail)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
-    return range_tail_risk(gain_tail_measure(r.r), -w, -calc_net_returns(w, X, fees))
+    return gain_tail_risk(r.r, w, X, fees)
 end
 """
     supports_gain_tail(r::RiskMeasure) -> Bool
     supports_gain_tail(r::RangeRiskMeasure) -> Bool
-    supports_gain_tail(r::Union{<:ValueatRiskRMs, <:OrderedWeightsArray, <:NoRisk}) -> Bool
-    supports_gain_tail(r::Union{<:Variance, <:StandardDeviation, <:UncertaintySetVariance,
-                                <:Kurtosis, <:BrownianDistanceVariance}) -> Bool
-    supports_gain_tail(r::Union{<:Range, <:OrderedWeightsArrayRange, <:ValueatRiskRange}) -> Bool
+    supports_gain_tail(r::Union{ValueatRiskRMs, OrderedWeightsArray, NoRisk}) -> Bool
+    supports_gain_tail(r::Union{Variance, StandardDeviation, UncertaintySetVariance, Kurtosis,
+                                BrownianDistanceVariance, SymmetricLowOrderMoment}) -> Bool
+    supports_gain_tail(r::Union{Range, OrderedWeightsArrayRange, ValueatRiskRange}) -> Bool
 
 Return whether the risk measure `r` can be the gain tail of a [`RangeRiskMeasure`](@ref).
 
 A gain tail measures the negated portfolio. Its value reads the negated net returns, or the negated weights, as its [`risk_input_kind`](@ref) states, and its builder must build that value under `loss = false`. A builder that ignores the keyword builds the loss tail a second time, and the model then optimises a value that is not the value of the range. So [`RangeTails`](@ref) refuses a gain tail whose answer is `false`.
 
   - A measure answers `true` when its builder reads the side of its `loss` keyword. The tail measures of the returns, such as [`ConditionalValueatRisk`](@ref), [`WorstRealisation`](@ref) and [`OrderedWeightsArray`](@ref), do so.
-  - A measure answers `true` when its value is the same on the negated portfolio, so that its builder needs no side. [`Variance`](@ref), [`StandardDeviation`](@ref), [`UncertaintySetVariance`](@ref), [`Kurtosis`](@ref), [`BrownianDistanceVariance`](@ref) and [`Range`](@ref) do so.
+  - A measure answers `true` when its value is the same on the negated portfolio, so that its builder needs no side. [`Variance`](@ref), [`StandardDeviation`](@ref), [`UncertaintySetVariance`](@ref), [`Kurtosis`](@ref), [`BrownianDistanceVariance`](@ref), [`Range`](@ref) and a [`SymmetricLowOrderMoment`](@ref) do so. A measure that reads a matrix reads the same matrix on both sides, so a lower semi-moment in the matrix keeps its side.
   - [`OrderedWeightsArrayRange`](@ref) and [`ValueatRiskRange`](@ref) answer `true`. A formulation of them that fuses its two tails builds the side that the keyword states, and a formulation that decomposes has tails with a side.
   - Any other range that decomposes answers for its loss tail, which it builds on the negated portfolio when the range is a gain tail. Its gain tail is then built on the portfolio, which each measure supports.
-  - Every other measure answers `false`, such as a drawdown measure, a moment about a target, a tracking measure and [`TurnoverRiskMeasure`](@ref).
+  - Every other measure answers `false`, such as a drawdown measure, a [`LowOrderMoment`](@ref) of any other kind, [`NegativeSkewness`](@ref), a tracking measure and [`TurnoverRiskMeasure`](@ref).
 
 # Arguments
 
@@ -451,25 +518,27 @@ function supports_gain_tail(r::RangeRiskMeasure)::Bool
     return supports_gain_tail(range_tails(r).loss)
 end
 # The builder of each of these measures reads the side of its `loss` keyword.
-function supports_gain_tail(::Union{<:ValueatRiskRMs, <:OrderedWeightsArray, <:NoRisk})::Bool
+function supports_gain_tail(::Union{ValueatRiskRMs, OrderedWeightsArray, NoRisk})::Bool
     return true
 end
 # The value of each of these measures is the same on the negated portfolio.
-function supports_gain_tail(::Union{<:Variance, <:StandardDeviation,
-                                    <:UncertaintySetVariance, <:Kurtosis,
-                                    <:BrownianDistanceVariance})::Bool
+function supports_gain_tail(::Union{Variance, StandardDeviation, UncertaintySetVariance,
+                                    Kurtosis, BrownianDistanceVariance,
+                                    SymmetricLowOrderMoment})::Bool
     return true
 end
 # A formulation that fuses declares no `range_tails`, so these ranges answer for their type.
-function supports_gain_tail(::Union{<:Range, <:OrderedWeightsArrayRange,
-                                    <:ValueatRiskRange})::Bool
+function supports_gain_tail(::Union{Range, OrderedWeightsArrayRange, ValueatRiskRange})::Bool
     return true
 end
 # A range with a tail that reads the weights reads the weights, the returns and the fees. The
 # loss tail reads `w` and `x`, and the gain tail reads `-w` and `-x`, as the model builds them.
 # The gain tail of a `DistributionValueatRisk` reads the law of the negated standardised loss.
 function (r::GenericValueatRiskRange)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
-    return range_tail_risk(r, w, calc_net_returns(w, X, fees), WeightsReturnsFeesInput())
+    x = calc_net_returns(w, X, fees)
+    loss = range_tail_risk(r.loss, w, x)
+    gain = range_tail_risk(gain_tail_measure(r.gain), -w, -x)
+    return loss + gain
 end
 # Expected-risk input kind — see `risk_input_kind`. The kind follows the tails: a range whose
 # tails both read a return series reads the net returns, and a range with a `ValueatRisk` tail
