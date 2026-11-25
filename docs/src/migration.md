@@ -1103,3 +1103,7 @@ A `ConstraintBlock` holds concentration rules, such as the UCITS 5/10/40 rule, i
 - **`AssetSetsMatrixEstimator`** has the field `on` after `val`, with the default `nothing`, so its type gains a second parameter. `AssetSetsMatrixEstimator(val)` still gives the v0.34.5 estimator. Its show prints the row `on ┴ nothing` last.
 - **`asset_sets_matrix`** of an estimator takes the keyword `strict`, with the default `false`, and gives it to the names of `on`. A method of your own for a precomputed matrix that `asset_sets_matrix` reads must take keywords.
 - **The exact cost budget**, a `BudgetCosts` with `xbgt = true`, names two rows of its model `cost_bgt_gd_ub` and `cost_bgt_gd_lb`, where v0.34.5 named them `cost_bgt_gz_ub` and `cost_bgt_gz_lb`. Under an objective that is not a ratio, the model holds no entry `cost_bgt_g`. Read the binaries from `cost_bgt_z` there.
+
+### [Results that move](@id migration-0-34-6-range-tail)
+
+- **A `Frontier` in the `ub` of one tail of a `GenericValueatRiskRange`** takes its levels from the value of that tail at the two corner portfolios, in `MeanRisk` and in `NearOptimalCentering`. v0.34.5 took them from the value of the whole range, so the levels were too high and most points of the sweep were one portfolio.
