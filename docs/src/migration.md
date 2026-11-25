@@ -1103,3 +1103,14 @@ A `ConstraintBlock` holds concentration rules, such as the UCITS 5/10/40 rule, i
 - **`AssetSetsMatrixEstimator`** has the field `on` after `val`, with the default `nothing`, so its type gains a second parameter. `AssetSetsMatrixEstimator(val)` still gives the v0.34.5 estimator. Its show prints the row `on ┴ nothing` last.
 - **`asset_sets_matrix`** of an estimator takes the keyword `strict`, with the default `false`, and gives it to the names of `on`. A method of your own for a precomputed matrix that `asset_sets_matrix` reads must take keywords.
 - **The exact cost budget**, a `BudgetCosts` with `xbgt = true`, names two rows of its model `cost_bgt_gd_ub` and `cost_bgt_gd_lb`, where v0.34.5 named them `cost_bgt_gz_ub` and `cost_bgt_gz_lb`. Under an objective that is not a ratio, the model holds no entry `cost_bgt_g`. Read the binaries from `cost_bgt_z` there.
+
+## From v0.34.6 to v0.34.7
+
+### [Views of a finite allocator](@id migration-0-34-7-allocators)
+
+`DiscreteAllocation` and `GreedyAllocation` have the field `idx` after `sets`, with the default `nothing`. Code that builds them by keyword does not change.
+
+- **`DiscreteAllocation`** takes nine positional arguments, where v0.34.6 took eight, because `fb` is now the ninth field. Pass `nothing` after `sets`, or use the keyword constructor. The type parameters gain one entry after the one of `sets`.
+- **`GreedyAllocation`** takes five positional arguments, where v0.34.6 took three or four, because `fb` is now the fifth field and has no default. Pass `nothing` after `sets`, or use the keyword constructor. The type parameters gain one entry after the one of `sets`.
+- **The show** of both types prints the row `idx ┼ nothing` after `sets`. A doctest of your own that prints an allocator gains the row.
+- **An allocator with a `LotUnitEstimator`, after a selection.** `optimise` on the selected assets raised a `DimensionMismatch`, and with the `sets` viewed by hand it raised an `ArgumentError` under `strict`. Give `PortfolioOptimisers.port_opt_view(allocator, idx)` the index of the selection, and it buys the lots of the assets that remain.
