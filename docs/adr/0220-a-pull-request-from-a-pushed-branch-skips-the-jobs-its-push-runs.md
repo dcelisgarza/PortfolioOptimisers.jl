@@ -151,4 +151,5 @@ The queue held 31 runs, and the runs of three merged branches and of an old head
    workflow, so that head gets its checks at the next push of a session. A rewind of `main` turns the
    run red too, because `dev` still holds the commits that `main` lost.
 
-Item 1 replaces the sentence of ADR 0240, § *Own branch*, that each commit of a branch keeps a run.
+Item 1 replaces two sentences of ADR 0240, and item 5 adds a step to it. The amendment of ADR 0240 on
+the runs of an old head names them.

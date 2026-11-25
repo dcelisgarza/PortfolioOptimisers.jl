@@ -265,3 +265,21 @@ then merges with a known defect, and its fix waits for the next batch.
 Two other forms were rejected. With `dev` for every small issue, the pull request merges without
 its fix. With the pull request for every issue, it grows past its one feature, and a fix that
 `main` needs waits for its review.
+
+## Amendment (2026-11-25, the runs of an old head)
+
+The amendment of 2026-11-24 of ADR 0220 changes what happens to the runs of a branch. It replaces
+two sentences of this decision, and it adds one step to the life of `dev`.
+
+1. **Own branch.** Item 2 of § *Own branch* says that each commit of the branch keeps a run that a
+   reader can trace. A newer push to a `dev-` branch now cancels the runs of the old head, so the new
+   head alone keeps its runs. A map branch has the same prefix, and the same rule holds for it.
+2. **The concurrency group.** § *Consequences* says that `Test.yml` has no concurrency group. It has
+   one for each `dev-` branch now, and so has `Aqua.yml`. On `main` and `dev`, each commit keeps its
+   run of both.
+3. **`dev` follows `main`.** `SyncDev.yml` merges `main` into `dev` after each push to `main`, and it
+   turns red on a conflict. A session on `dev` still rebases onto `origin/dev` and pushes a
+   fast-forward. The maintainer can still move `dev` to the squash commit of a batch, as the amendment
+   of 2026-11-21 says.
+
+ADR 0220 owns the rules of the runs and of the sync, so this section does not repeat them.
