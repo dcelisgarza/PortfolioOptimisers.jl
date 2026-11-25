@@ -22,6 +22,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :ub_rms => "`ub`: Upper bound(s) on the measure's own risk expression. A scalar bounds one model. A vector and a [`Frontier`](@ref) are sweep axes, one solve per entry, so the optimisation returns one portfolio per bound value.",#
                  :lb_rms => "`lb`: Lower bound(s) on the measure's own risk expression, for a quantity the optimisation maximises. A scalar bounds one model. A vector and a [`Frontier`](@ref) are sweep axes, one solve per entry. A **negative** value is meaningful, because the quantity it bounds may be negative.",#
                  :rke => "`rke`: Whether to include the risk measure value in the `JuMP` risk expression.",#
+                 :term_rm => "`term::RiskMeasureSettings`: The settings of the term that an objective reads, as [`reads_risk_term`](@ref) states. They are the settings of the measure, or those of the range when the measure is a tail of a range.",#
                  # Return term settings.
                  :settings_rt => "`settings`: Return term settings.",#
                  :scale_rt => "`scale`: Weight of this return term in the weighted sum that forms the `JuMP` return expression. It weighs one term against the others, so it has no effect on a single term. An optimiser given one term drops it before it builds the return expression, and the value-level readers ignore it too. The lower bound in `lb` binds on the term's own expression, before `scale` applies.",#

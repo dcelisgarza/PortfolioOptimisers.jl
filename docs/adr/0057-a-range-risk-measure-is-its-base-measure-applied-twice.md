@@ -196,3 +196,24 @@ for its loss tail, which moves to the negated portfolio with the range.
 The trait fails closed. A measure of a user whose builder reads `loss` declares it, where no
 declaration was necessary before. A default of `true` would keep the silent defect for each measure
 that a user or a later ticket adds.
+
+## Amendment (2026-11-25) — the objective reads a tail, and the bound of a range reads expressions of degree one
+
+A tail carries `rke = false`, because the range registers the sum once. Some builders read `rke` to
+choose between the model of the objective and the model of the bound, so they took a tail for a
+measure that is only a bound (#2345). Under `RiskBudgeting` the weights moved with a bound of a tail
+that did not bind, and a lifted variance in a tail took no lift of the objective under
+`MaximumRatio`. The range builder now gives its tails the keyword `term`, the settings of the term
+that an objective reads. A range that is a tail passes on the settings of the outer range. The
+builders that choose a model read `term` in place of `r.settings`. A boolean keyword was rejected,
+because a variance reads the `scale` of the term too. A tracking builder takes the keyword and
+does not pass it on, because the tracked measure has its own request.
+
+The bound of the range has the twin of the same defect. The range bounded the sum of the two
+expressions of the objective, and the bound row needs degree one in the weights and `k`. Under
+`RiskBudgeting` a bound at twice the value of the range was infeasible. A range with a bound now
+puts a `TrackedRiskBound` into the bound slot of each tail, as a tracking builder does (ADR 0033),
+and bounds the sum of the two expressions of degree one. The request carries the own bound of the
+tail in its `ub` field, and `set_risk_upper_bound!` states that bound too. A tail of degree one
+answers with its risk expression, so no range of the library gains a row or a variable. A second
+build of each tail was rejected, because it doubles the model of a tail of degree one.

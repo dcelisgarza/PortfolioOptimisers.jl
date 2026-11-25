@@ -397,7 +397,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Build the variance expression of the formulation that `flag` or `r.alg` selects.
 
-The methods on [`LinearBound`](@ref) build the semidefinite formulation, and the next docstring states them. The methods on [`SquareRootBound`](@ref) dispatch on `r.alg`. Both second-order cone methods build the deviation ``\\sigma`` with its cone, because the bound acts on ``\\sigma`` in the units of a standard deviation. [`SquaredSOCRiskExpr`](@ref) states the variance as ``\\sigma^2``, and [`QuadRiskExpr`](@ref) states it as the quadratic form.
+The methods on [`LinearBound`](@ref) build the semidefinite formulation, and the next docstring states them. The methods on [`SquareRootBound`](@ref) dispatch on `r.alg`, and they ignore the keyword `term`. Both second-order cone methods build the deviation ``\\sigma`` with its cone, because the bound acts on ``\\sigma`` in the units of a standard deviation. [`SquaredSOCRiskExpr`](@ref) states the variance as ``\\sigma^2``, and [`QuadRiskExpr`](@ref) states it as the quadratic form.
 
 # JuMP formulation
 
@@ -459,14 +459,14 @@ $(val_dict[:relax])
 function set_variance_risk!(model::JuMP.Model, i::Any,
                             r::Variance{<:Any, <:Any, <:Any, <:Any, <:SquaredSOCRiskExpr},
                             pr::Option{<:AbstractPriorResult}, ::SquareRootBound;
-                            prefix::Symbol = Symbol(""))
+                            prefix::Symbol = Symbol(""), kwargs...)
     dev = set_variance_deviation!(model, i, r, pr; prefix = prefix)
     return state_set!(model, prefix, :variance_risk_, i, JuMP.@expression(model, dev^2))
 end
 function set_variance_risk!(model::JuMP.Model, i::Any,
                             r::Variance{<:Any, <:Any, <:Any, <:Any, <:QuadRiskExpr},
                             pr::Option{<:AbstractPriorResult}, ::SquareRootBound;
-                            prefix::Symbol = Symbol(""))
+                            prefix::Symbol = Symbol(""), kwargs...)
     w = get_w(model, prefix)
     sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
     set_variance_deviation!(model, i, r, pr; prefix = prefix)
@@ -478,7 +478,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Build the semidefinite variance expression, the trace of the covariance matrix times the lifted weight matrix.
 
-The trace on the lift of [`set_sdp_constraints!`](@ref) has degree one in the weights and ``k``, where the second-order cone expressions have degree two. So when [`sdp_objective_lift_flag`](@ref) is `true`, under [`MaximumRatio`](@ref) with [`SquareRootRatio`](@ref), the objective term reads the lift with a constant corner of [`set_sdp_objective_lift!`](@ref), which has degree two, and the model maximises the Sharpe ratio. The bound then reads the trace on the first lift, and the method builds that trace only when `settings.ub` holds a bound. Otherwise the term and the bound read one trace. The slot `ratio_alg` defaults to `r.ratio_alg`, and the method dispatches on it: under [`LinearRatio`](@ref) the term never reads the lift with a constant corner, so that method builds the one trace. The `# Mathematical definition` of [`MaximumRatio`](@ref) states the rule. The bound acts on the trace in the units of a variance.
+The trace on the lift of [`set_sdp_constraints!`](@ref) has degree one in the weights and ``k``, where the second-order cone expressions have degree two. So when [`sdp_objective_lift_flag`](@ref) is `true` for `term`, under [`MaximumRatio`](@ref) with [`SquareRootRatio`](@ref), the objective term reads the lift with a constant corner of [`set_sdp_objective_lift!`](@ref), which has degree two, and the model maximises the Sharpe ratio. The bound then reads the trace on the first lift, and the method builds that trace only when `settings.ub` holds a bound. Otherwise the term and the bound read one trace. The slot `ratio_alg` defaults to `r.ratio_alg`, and the method dispatches on it: under [`LinearRatio`](@ref) the term never reads the lift with a constant corner, so that method builds the one trace. The `# Mathematical definition` of [`MaximumRatio`](@ref) states the rule. The bound acts on the trace in the units of a variance.
 
 # JuMP formulation
 
@@ -521,6 +521,7 @@ $(val_dict[:relax])
 
 # Keyword arguments
 
+  - $(arg_dict[:term_rm])
   - `prefix::Symbol`: Model State namespace of the build (default: empty, i.e. the bare key).
 
 # Returns
@@ -534,7 +535,7 @@ $(val_dict[:relax])
 """
 function set_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
                             pr::Option{<:AbstractPriorResult}, ::LinearBound, ::LinearRatio;
-                            prefix::Symbol = Symbol(""))
+                            prefix::Symbol = Symbol(""), kwargs...)
     sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
     W = set_sdp_constraints!(model; prefix = prefix)
     sigma_W = state_set!(model, prefix, :sigma_W_, i, JuMP.@expression(model, sigma * W))
@@ -544,11 +545,12 @@ end
 function set_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
                             pr::Option{<:AbstractPriorResult}, ::LinearBound,
                             ratio_alg::RatioFormulation = r.ratio_alg;
+                            term::RiskMeasureSettings = r.settings,
                             prefix::Symbol = Symbol(""))
     # `RatioFormulation` is an extension point whose members implement only the flag, so
     # this method takes the root. Outside a positive term of `MaximumRatio` the term reads
     # the lift with the corner `k`, which is the term of `LinearRatio`.
-    if !sdp_objective_lift_flag(model, ratio_alg, r.settings)
+    if !sdp_objective_lift_flag(model, ratio_alg, term)
         return set_variance_risk!(model, i, r, pr, LinearBound(), LinearRatio();
                                   prefix = prefix)
     end
@@ -760,11 +762,13 @@ function rc_variance_constraints!(::JuMP.Model, ::Any, ::Nothing, ::Any;
 end
 function set_risk!(model::JuMP.Model, i::Any, r::Variance, opt::RiskBoundOwner,
                    pr::Option{<:AbstractPriorResult}, pl::Option{<:PlC_VecPlC}, args...;
-                   prefix::Symbol = Symbol(""), kwargs...)
+                   term::RiskMeasureSettings = r.settings, prefix::Symbol = Symbol(""),
+                   kwargs...)
     rc = risk_contribution_constraints(r, opt, pr)
     rc_flag = sdp_rc_variance_flag!(model, opt, rc)
     sdp_flag = sdp_variance_flag!(model, rc_flag, pl; prefix = prefix)
-    variance_risk = set_variance_risk!(model, i, r, pr, sdp_flag; prefix = prefix)
+    variance_risk = set_variance_risk!(model, i, r, pr, sdp_flag; term = term,
+                                       prefix = prefix)
     rc_variance_constraints!(model, i, rc, variance_risk; prefix = prefix)
     return variance_risk, sdp_flag
 end
@@ -786,6 +790,11 @@ When the variance is a positive term of the objective's risk, the builder marks 
   - `pr`: The prior result, or `nothing` when `r` holds its covariance matrix and has no risk-contribution rows.
   - $(arg_dict[:pl_opt])
 
+# Keyword arguments
+
+  - $(arg_dict[:term_rm])
+  - `prefix::Symbol`: Model State namespace of the build (default: empty, i.e. the bare key).
+
 # Returns
 
   - `variance_risk`: The variance expression.
@@ -799,10 +808,11 @@ When the variance is a positive term of the objective's risk, the builder marks 
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance, opt::RiskBoundOwner,
                                pr::Option{<:AbstractPriorResult}, pl::Option{<:PlC_VecPlC},
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
-    mark_objective_variance!(model, prefix, r.settings)
-    variance_risk, sdp_flag = set_risk!(model, i, r, opt, pr, pl, args...; prefix = prefix,
-                                        kwargs...)
+                               args...; term::RiskMeasureSettings = r.settings,
+                               prefix::Symbol = Symbol(""), kwargs...)
+    mark_objective_variance!(model, prefix, term)
+    variance_risk, sdp_flag = set_risk!(model, i, r, opt, pr, pl, args...; term = term,
+                                        prefix = prefix, kwargs...)
     # Under a unit budget the trace has degree two in the weights and degree zero in `k`, so
     # the bound acts on the deviation, which has degree one.
     if isa(sdp_flag, LinearBound) && !isnothing(r.settings.ub) && is_unit_budget(model)
@@ -876,6 +886,11 @@ $(val_dict[:relax])
   - $(arg_dict[:pr])
   - `b::MatNum`: ``\\mathbf{P}``, the basis that maps the decision vector to the asset weights.
 
+# Keyword arguments
+
+  - $(arg_dict[:term_rm])
+  - `prefix::Symbol`: Model State namespace of the build (default: empty, i.e. the bare key).
+
 # Validation
 
   - `r.rc` is `nothing` when the namespace owns its weights, because its rows state the contributions of the factors to the variance of the portfolio. Raises an `ArgumentError`.
@@ -893,8 +908,9 @@ $(val_dict[:relax])
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                                opt::FactorRiskContribution, pr::AbstractPriorResult, ::Any,
-                               ::Any, b::MatNum, args...; prefix::Symbol = Symbol(""),
-                               kwargs...)
+                               ::Any, b::MatNum, args...;
+                               term::RiskMeasureSettings = r.settings,
+                               prefix::Symbol = Symbol(""), kwargs...)
     # A build that owns its weights, the weight difference of a tracking measure, is not a
     # function of the decision vector alone, so no lift of that vector states its variance.
     if weights_prefix(model, prefix) !== Symbol("")
@@ -908,7 +924,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                                                  variance_risk, r.settings; prefix = prefix)
         return variance_risk
     end
-    mark_objective_variance!(model, prefix, r.settings)
+    mark_objective_variance!(model, prefix, term)
     rc = linear_constraints(r.rc, opt.sets; datatype = eltype(pr.X),
                             strict = opt.opt.strict)
     Nf = length(shared_get(model, :w1))
@@ -917,7 +933,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
     # the rest, present under `flag = true`, price the off-factor weights (#1350).
     sigma_z = transpose(b) * sigma * b
     ub = variance_risk_bounds_val(LinearBound(), r.settings.ub)
-    lift = sdp_objective_lift_flag(model, r.ratio_alg, r.settings)
+    lift = sdp_objective_lift_flag(model, r.ratio_alg, term)
     # The bound reads the lift with the corner `k`, and so does the objective term unless
     # it reads the lift with a constant corner, which gives it degree two (#1676).
     if !lift || !isnothing(ub)
@@ -1324,6 +1340,7 @@ Under a unit budget the lift of the objective has the corner `1`, so its worst c
 
 # Keyword arguments
 
+  - $(arg_dict[:term_rm])
   - `prefix::Symbol`: Model State namespace of the build (default: empty, i.e. the bare key).
   - `rd::ReturnsResult`: The optimisation's returns, read by an estimator of the set (default: an empty `ReturnsResult`).
   - `kwargs...`: The keywords of the caller that this method does not read, such as the side `loss` of a tail of a range.
@@ -1342,9 +1359,10 @@ Under a unit budget the lift of the objective has the corner `1`, so its worst c
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVariance,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               term::RiskMeasureSettings = r.settings,
                                prefix::Symbol = Symbol(""),
                                rd::ReturnsResult = ReturnsResult(), kwargs...)
-    mark_objective_variance!(model, prefix, r.settings)
+    mark_objective_variance!(model, prefix, term)
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     # The prior travels beside the returns, because an `AbstractPriorUncertaintySetEstimator`
     # is fitted from the optimisation's own prior result rather than from returns data.
@@ -1357,9 +1375,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVaria
                                                                ucs_variance_risk, name,
                                                                r.settings.ub;
                                                                prefix = prefix)
-    elseif !sdp_objective_lift_flag(model, r.ratio_alg, r.settings)
+    elseif !sdp_objective_lift_flag(model, r.ratio_alg, term)
         ub = r.settings.ub
-        objective, bounds = set_risk_epigraphs!(model, reads_risk_term(r.settings),
+        objective, bounds = set_risk_epigraphs!(model, reads_risk_term(term),
                                                 !isnothing(ub); prefix = prefix) do k, p
             return set_ucs_variance_risk!(model, i, ucs, sigma, r.mtx_sqrt; prefix = p,
                                           W = set_sdp_constraints!(model, k;

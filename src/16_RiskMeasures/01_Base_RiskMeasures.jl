@@ -645,7 +645,7 @@ To implement a new risk measure, subtype `RiskMeasure` with a `settings::RiskMea
 
   - `set_risk_constraints!(model::JuMP.Model, i, r::MyRiskMeasure, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)`: Builds the measure into the model of a `JuMP` optimiser, or of a programme Allocation Set, and returns its risk expression. There is no fallback.
 
-The method builds the risk expression from the model's weights, then registers it with [`set_risk_bounds_and_expression!`](@ref), which reads the bound and the contribution to the aggregate risk expression off `r.settings`. A tracking measure reads the bounded expression from that call, so the call is mandatory. Scale every constraint by [`get_constraint_scale`](@ref), and multiply any constant bound by [`get_k`](@ref), so the bound is compared against unrescaled weights under a ratio objective.
+The method builds the risk expression from the model's weights, then registers it with [`set_risk_bounds_and_expression!`](@ref), which reads the bound and the contribution to the aggregate risk expression off `r.settings`. A tracking measure, and a range that has a bound, read the bounded expression from that call, so the call is mandatory. Each rebuilds the measure with its request in the `ub` of the `settings`, so the type needs a keyword constructor. A range gives each of its tails the keyword `term`, the [`RiskMeasureSettings`](@ref) of the term that an objective reads. A builder whose objective and whose bound read two expressions takes `term::RiskMeasureSettings = r.settings`, and reads `rke` and `scale` from it. Scale every constraint by [`get_constraint_scale`](@ref), and multiply any constant bound by [`get_k`](@ref), so the bound is compared against unrescaled weights under a ratio objective.
 
 ## Optional methods
 
@@ -711,7 +711,7 @@ A range measure is its base measure applied twice: once to the losses at level `
   - The method of [`set_risk_constraints!`](@ref) for a [`RangeRiskMeasure`](@ref) builds `loss` with `loss = true` and `gain` with `loss = false`, then sums the two expressions. When the range is itself a gain tail, it exchanges the two sides.
   - The measure's own `r(x::VecNum)` functor is the value-level twin of the same sum, `loss(x) + gain(-x)`.
 
-The tails carry `RiskMeasureSettings(; rke = false)`: an upper bound and a risk-expression contribution belong to the range as a whole, which registers them once from the composite expression. A range that *fuses* its two tails into a shared formulation rather than duplicating one ([`Range`](@ref), [`ValueatRiskRange`](@ref) under [`DistributionValueatRisk`](@ref), and [`OrderedWeightsArrayRange`](@ref) under [`ExactOrderedWeightsArray`](@ref) or [`SortingNetworkOrderedWeightsArray`](@ref)) declares no tails, because there are no two sub-models to build.
+The tails carry `RiskMeasureSettings(; rke = false)`: an upper bound and a risk-expression contribution belong to the range as a whole, which registers them once from the composite expression. The objective still reads the expression of each tail, so the builder gives the tails its own settings in the keyword `term`. A range that *fuses* its two tails into a shared formulation rather than duplicating one ([`Range`](@ref), [`ValueatRiskRange`](@ref) under [`DistributionValueatRisk`](@ref), and [`OrderedWeightsArrayRange`](@ref) under [`ExactOrderedWeightsArray`](@ref) or [`SortingNetworkOrderedWeightsArray`](@ref)) declares no tails, because there are no two sub-models to build.
 
 There is no default. A range that fuses throws rather than returning a decomposition that does not describe it. A measure that is not a range has no method.
 
@@ -1112,9 +1112,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Asks the builder of a tracked measure for the expression that its bound acts on.
+Asks the builder of a tracked measure, or of a tail of a range, for the expression that its bound acts on.
 
 [`RiskTrackingRiskMeasure`](@ref) and [`RiskTrackingError`](@ref) build the measure that they track, and they state the bound themselves. The bound row multiplies the bound by ``k``, so it needs an expression of degree one in the weights and ``k``, and only the builder of the measure knows that expression. The tracking builder puts this request into the bound slot of the tracked measure. The builder of the measure converts the request with the conversion that it uses for a bound, and [`set_risk_upper_bound!`](@ref) registers the expression and the converted request in place of a row.
+
+A range measure with a bound has the same need for each of its tails, and [`set_range_tail_constraints!`](@ref) puts the request into the bound slot of the tail. A tail can have a bound of its own, so that request carries it in the `ub` field.
 
 # Mathematical definition
 
@@ -1141,9 +1143,11 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    TrackedRiskBound(prefix::Symbol, rke::Bool, level::Number, exact::Bool) -> TrackedRiskBound
+    TrackedRiskBound(prefix::Symbol, rke::Bool, level::Number, exact::Bool, factor::Number = 1,
+                     bound::FrontierBoundEstimator = LinearBound(),
+                     ub::Option{<:Union{Num_VecNum, Frontier}} = nothing) -> TrackedRiskBound
 
-Creates the request of a tracking builder, with a `factor` of `1` and a [`LinearBound`](@ref).
+Creates the request of a tracking builder or of a range builder.
 
     TrackedRiskBound(ub::TrackedRiskBound, factor::Number,
                      bound::FrontierBoundEstimator) -> TrackedRiskBound
@@ -1155,11 +1159,12 @@ Creates the request that a builder converted.
   - [`Frontier`](@ref)
   - [`RkRtBounds`](@ref)
   - [`set_tracked_risk_constraints!`](@ref)
+  - [`set_range_tail_constraints!`](@ref)
   - [`variance_risk_bounds_val`](@ref)
 """
 @concrete struct TrackedRiskBound <: AbstractAlgorithm
     """
-    `prefix`: The Model State namespace of the tracked build, which the expression is registered under.
+    `prefix`: The Model State namespace of the request, which the expression is registered under. A tracking builder gives the namespace of the tracked build.
     """
     prefix
     """
@@ -1167,7 +1172,7 @@ Creates the request that a builder converted.
     """
     rke
     """
-    `level`: The size of the risk that the tracking builder states its rows at, or zero when it states none. It is the bound of the independent mode, and the risk of the benchmark in the dependent mode. The model of the bound of an even moment takes its units from it.
+    `level`: The size of the risk that the builder of the request states its rows at, or zero when it states none. It is the bound of the independent mode, the risk of the benchmark in the dependent mode, and the bound of the tail or of the range for a tail. The model of the bound of an even moment takes its units from it.
     """
     level
     """
@@ -1182,25 +1187,29 @@ Creates the request that a builder converted.
     `bound`: The conversion from the units of the risk to the units of the expression, a [`FrontierBoundEstimator`](@ref).
     """
     bound
+    """
+    `ub`: The own bound of the measure, in the units of the risk, or `nothing`. A tail of a range can hold one, and the request takes its slot. [`set_risk_upper_bound!`](@ref) states it beside the request.
+    """
+    ub
     function TrackedRiskBound(prefix::Symbol, rke::Bool, level::Number, exact::Bool,
-                              factor::Number, bound::FrontierBoundEstimator)
+                              factor::Number = 1,
+                              bound::FrontierBoundEstimator = LinearBound(),
+                              ub::Option{<:Union{Num_VecNum, Frontier}} = nothing)
         return new{typeof(prefix), typeof(rke), typeof(level), typeof(exact),
-                   typeof(factor), typeof(bound)}(prefix, rke, level, exact, factor, bound)
+                   typeof(factor), typeof(bound), typeof(ub)}(prefix, rke, level, exact,
+                                                              factor, bound, ub)
     end
-end
-function TrackedRiskBound(prefix::Symbol, rke::Bool, level::Number, exact::Bool)
-    return TrackedRiskBound(prefix, rke, level, exact, 1, LinearBound())
 end
 function TrackedRiskBound(ub::TrackedRiskBound, factor::Number,
                           bound::FrontierBoundEstimator)
-    return TrackedRiskBound(ub.prefix, ub.rke, ub.level, ub.exact, factor, bound)
+    return TrackedRiskBound(ub.prefix, ub.rke, ub.level, ub.exact, factor, bound, ub.ub)
 end
 """
     const RkRtBounds = Union{Num_VecNum, Frontier, TrackedRiskBound}
 
 Union type for risk-measure upper bound specifications.
 
-A caller gives a number, a vector of numbers, or a [`Frontier`](@ref) sweep. A tracking builder gives a [`TrackedRiskBound`](@ref) to the measure that it tracks. [`RiskMeasureSettings`](@ref) holds the bound in its `ub` field.
+A caller gives a number, a vector of numbers, or a [`Frontier`](@ref) sweep. A tracking builder gives a [`TrackedRiskBound`](@ref) to the measure that it tracks, and a range builder gives one to each tail. [`RiskMeasureSettings`](@ref) holds the bound in its `ub` field.
 
 # Related
 

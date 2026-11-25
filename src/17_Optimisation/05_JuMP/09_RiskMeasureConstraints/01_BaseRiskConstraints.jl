@@ -507,7 +507,7 @@ The type of `ub` and the owner `opt` select the method.
   - A `nothing` bound adds nothing.
   - A number adds one row. The row bounds `r_expr` from above when `flag` is `true`, and from below when it is `false`.
   - A [`Front_NumVec`](@ref) adds an entry to the `:risk_frontier` registry, and the frontier solve reads the entry later. The owner of the entry is written as `nothing`, because the measure is not known here. [`set_risk_frontier_owner!`](@ref) writes the owner afterwards.
-  - A [`TrackedRiskBound`](@ref) adds no row. It registers `r_expr` and the request under the namespace of the request, and the tracking builder reads both, as [`set_tracked_risk_constraints!`](@ref) states. Every owner honours it.
+  - A [`TrackedRiskBound`](@ref) registers `r_expr` and the request under the namespace of the request, with [`set_tracked_risk_bound!`](@ref), and the builder of the request reads both, as [`set_tracked_risk_constraints!`](@ref) and [`set_range_tail_constraints!`](@ref) state. Every owner honours it. The request adds no row. The own bound that it carries then takes the method of its type.
 
 Under a ratio objective the head divides the weights by ``k`` after the solve, so the row bounds the risk of the weights that the head returns. That is exact for a risk expression of degree one in the weights. A builder whose risk expression has a higher degree passes a separate expression of degree one, as [`set_variance_risk_bounds_and_expression!`](@ref) does. [`RiskBudgeting`](@ref) also divides the weights by ``k``, and [`set_risk_epigraphs!`](@ref) states the rule for a risk that reads [`effective_k`](@ref).
 
@@ -560,15 +560,53 @@ function set_risk_upper_bound!(::JuMP.Model, ::RiskConstraintOwner, r_expr, ::No
                                flag::Bool = true)
     return nothing
 end
-function set_risk_upper_bound!(model::JuMP.Model, ::JuMPOptimisationEstimator, r_expr,
+function set_risk_upper_bound!(model::JuMP.Model, opt::JuMPOptimisationEstimator, r_expr,
                                ub::TrackedRiskBound, key, flag::Bool = true)
-    state_set!(model, ub.prefix, :tracked_risk_bound, (r_expr, ub))
-    return nothing
+    own = set_tracked_risk_bound!(model, r_expr, ub)
+    return set_risk_upper_bound!(model, opt, r_expr, own, key, flag)
 end
-function set_risk_upper_bound!(model::JuMP.Model, ::AbstractProgrammeAllocationSet, r_expr,
-                               ub::TrackedRiskBound, key, flag::Bool = true)
+function set_risk_upper_bound!(model::JuMP.Model, opt::AbstractProgrammeAllocationSet,
+                               r_expr, ub::TrackedRiskBound, key, flag::Bool = true)
+    own = set_tracked_risk_bound!(model, r_expr, ub)
+    return set_risk_upper_bound!(model, opt, r_expr, own, key, flag)
+end
+"""
+    set_tracked_risk_bound!(model::JuMP.Model, r_expr, ub::TrackedRiskBound)
+    set_tracked_risk_bound!(model::JuMP.Model, r_expr, ub)
+
+Registers the answer to the request `ub`, and returns the own bound of the measure.
+
+The builder of a measure converted the request as it converts a bound, so the own bound of the measure takes the same conversion. A bound that is not a request is the own bound, and the method returns it unchanged.
+
+# JuMP formulation
+
+## Expressions
+
+  - `tracked_risk_bound`: registered under `ub.prefix`, the pair `(r_expr, ub)`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `r_expr`: The expression of degree one that the bound row acts on.
+  - `ub`: The bound that the builder converted, a [`TrackedRiskBound`](@ref) or a bound of the caller.
+
+# Returns
+
+  - `own`: The own bound of the measure, in the units of `r_expr`, or `nothing`.
+
+# Related
+
+  - [`TrackedRiskBound`](@ref)
+  - [`set_risk_upper_bound!`](@ref)
+  - [`set_unindexed_risk_bounds_and_expression!`](@ref)
+  - [`variance_risk_bounds_val`](@ref)
+"""
+function set_tracked_risk_bound!(model::JuMP.Model, r_expr, ub::TrackedRiskBound)
     state_set!(model, ub.prefix, :tracked_risk_bound, (r_expr, ub))
-    return nothing
+    return variance_risk_bounds_val(ub, ub.ub)
+end
+function set_tracked_risk_bound!(::JuMP.Model, ::Any, ub)
+    return ub
 end
 function set_risk_upper_bound!(::JuMP.Model, opt::JuMPOptimisationEstimator, r_expr, ub,
                                key, flag::Bool = true)
@@ -730,11 +768,11 @@ Bounds the risk expression of a measure that has no index, and adds it to the ri
 
 The builders of [`MaximumDrawdown`](@ref), [`WorstRealisation`](@ref), [`NoRisk`](@ref), [`Range`](@ref) and [`BrownianDistanceVariance`](@ref) do not read the index of the measure. A measure of these types has no parameter that sets two instances apart, so its builder registers the risk expression once, under `name`. The bound row takes the name `<name>_ub`, and a second bound cannot have the same name. So the settings of the first measure take effect. The settings of a later measure have no effect, and the function logs a warning that says so.
 
-A measure whose settings hold no bound and set `rke` to `false` changes nothing, and the function returns at once. A tail of a range measure is such a measure when it has no bound, so it does not take the place of a later measure.
+A measure whose settings hold no bound and set `rke` to `false` changes nothing, and the function returns at once. A tail of a range measure is such a measure when it has no bound, so it does not take the place of a later measure. A request in the bound slot is not a bound, and the function registers it first.
 
 # Algorithm
 
- 1. When `settings.ub` is `nothing` and `settings.rke` is `false`, return.
+ 1. Register a request in `ub` with [`set_tracked_risk_bound!`](@ref), which gives the own bound `ub` of the measure. When `ub` is `nothing` and `settings.rke` is `false`, return.
  2. When the presence flag `<name>_settings` is registered under `prefix`, log a warning that names the type of `r` and its settings, and return.
  3. Register the presence flag with [`mark_state!`](@ref).
  4. Bound `r_expr_ub` by `ub` with [`set_risk_upper_bound!`](@ref), under the key of `name`.
@@ -780,7 +818,8 @@ function set_unindexed_risk_bounds_and_expression!(model::JuMP.Model,
                                                    r_expr_ub::JuMP.AbstractJuMPScalar = r_expr,
                                                    ub::Option{<:RkRtBounds} = r.settings.ub)
     settings = r.settings
-    if isnothing(settings.ub) && !settings.rke
+    ub = set_tracked_risk_bound!(model, r_expr_ub, ub)
+    if isnothing(ub) && !settings.rke
         return nothing
     end
     flag_name = Symbol(name, :_settings)
@@ -801,11 +840,15 @@ end
 
 Returns `true` when an objective reads the risk expression of a measure.
 
-The objective reads the expression of a measure with `rke = true`, and the expression of a tracked measure whose tracking measure has `rke = true`. The tracking constructors clear the `rke` of the tracked measure, so the second case is the `rke` of its [`TrackedRiskBound`](@ref).
+The objective reads three kinds of expression:
+
+  - The expression of a measure with `rke = true`.
+  - The expression of a tracked measure whose tracking measure has `rke = true`. The tracking constructors clear the `rke` of the tracked measure, so this is the `rke` of its [`TrackedRiskBound`](@ref).
+  - The expression of a tail of a range that the objective reads. The `rke` of a tail is `false`, so the range gives the tail its own settings in the keyword `term`, and the builder of the tail reads this function from `term`. A range that is a tail gives its tails the settings of the outer range.
 
 # Arguments
 
-  - `settings::RiskMeasureSettings`: The settings of the measure.
+  - `settings::RiskMeasureSettings`: The settings of the term that holds the measure, which are the settings of the measure when it is not a tail of a range.
 
 # Returns
 
@@ -857,9 +900,9 @@ Builds the model of a risk of degree above one, and returns the risk that the ob
 
 The row of [`set_risk_upper_bound!`](@ref) multiplies the bound by ``k``, so it needs a risk of degree one in the unscaled weights ``\\boldsymbol{y} = k \\boldsymbol{w}`` and ``k``. A builder gets that degree when its model divides by ``k``. The objective of [`RiskBudgeting`](@ref) needs a risk of ``\\boldsymbol{y}`` alone, so the same model divides by `1`, [`effective_k`](@ref). Only that head records a unit budget, and only there do the two readers need two models.
 
-The second model is a cost of the bounded measure alone. A measure without a bound, and every measure under another head, builds one model. A measure that is only a bound, with `rke = false`, builds one model too, which divides by ``k``.
+The second model is a cost of the bounded measure alone. A measure without a bound, and every measure under another head, builds one model. A measure that is only a bound, which no objective reads, builds one model too, which divides by ``k``.
 
-A tracking measure states its own bound on the measure that it tracks, so the tracked measure takes a [`TrackedRiskBound`](@ref) and counts as bounded.
+A tail of a range whose range has a bound takes a [`TrackedRiskBound`](@ref) and counts as bounded, because the bound of the range acts on a sum of expressions of degree one. A tracking measure states its own bound on the measure that it tracks, so the tracked measure takes a [`TrackedRiskBound`](@ref) and counts as bounded.
 
 Two builders do not call this function. The bound of a [`Variance`](@ref) acts on its deviation, of degree one, and the bound of an even moment acts on the model of [`set_even_moment_bound!`](@ref).
 
@@ -1027,9 +1070,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Adds the constraints of a range risk measure to `model`, as the sum of its loss tail and its gain tail.
 
-This is the build of every [`RangeRiskMeasure`](@ref) formulation that decomposes. The two tails from [`range_tails`](@ref) carry `rke = false`, so the sum alone reaches the objective. A bound of a tail bounds that tail alone. Each tail builds under its own index, which [`nested_index`](@ref) composes from the side and `i`. The keys of the two tails therefore differ, also when a range holds a range. A range that is the gain tail of a range reads the negated portfolio, so its two tails exchange their sides. A formulation that fuses its tails has a method of its own, which is more specific.
+This is the build of every [`RangeRiskMeasure`](@ref) formulation that decomposes. The two tails from [`range_tails`](@ref) carry `rke = false`, so the sum alone reaches the objective. A bound of a tail bounds that tail alone. Each tail builds under its own index, which [`nested_index`](@ref) composes from the side and `i`. The keys of the two tails therefore differ, also when a range holds a range. A range that is the gain tail of a range reads the negated portfolio, so its two tails exchange their sides. The objective reads the expression of each tail, so the builder passes its settings to the tails in the keyword `term`. The bound of the range acts on the sum of the expressions of degree one that [`set_range_tail_constraints!`](@ref) gives. A formulation that fuses its tails has a method of its own, which is more specific.
 
-Two decomposed formulations do work of their own before the tails: [`OrderedWeightsArrayRange`](@ref) under [`ApproxOrderedWeightsArray`](@ref) checks `w1` and `w2` under their names, and [`GenericValueatRiskRange`](@ref) of two [`DistributionValueatRisk`](@ref) tails builds the cone that the tails share. Their methods hold a copy of the steps below, and the copies agree with this method. The tails of an [`OrderedWeightsArrayRange`](@ref) hold no bound, so its copy records no owner.
+Two decomposed formulations do work of their own before the tails: [`OrderedWeightsArrayRange`](@ref) under [`ApproxOrderedWeightsArray`](@ref) checks `w1` and `w2` under their names, and [`GenericValueatRiskRange`](@ref) of two [`DistributionValueatRisk`](@ref) tails builds the cone that the tails share. Their methods hold a copy of the steps below. Every tail of the two has degree one, so the copies build it with [`set_risk_constraints!`](@ref) and bound the sum itself. The tails of an [`OrderedWeightsArrayRange`](@ref) hold no bound, so its copy records no owner.
 
 # Mathematical definition
 
@@ -1049,16 +1092,18 @@ Where:
 # Algorithm
 
  1. Read the tails `loss` and `gain` of `r` with [`range_tails`](@ref), and the key `name` of the sum with [`range_risk_key`](@ref).
- 2. Build `loss` at index `nested_index(:loss_, i)` on the side of the keyword `loss`, giving `loss_risk`. Record the owner of the frontier entries that it added with [`set_risk_frontier_owner!`](@ref), so that a sweep on the tail takes its span from the tail. The owner is the tail when it reads the portfolio, and its [`GainTail`](@ref) when it reads the negated portfolio.
- 3. Build `gain` at index `nested_index(:gain_, i)` on the other side, giving `gain_risk`. Record the owner of the entries that it added by the same rule.
+ 2. Build `loss` at index `nested_index(:loss_, i)` on the side of the keyword `loss` with [`set_range_tail_constraints!`](@ref), giving `loss_risk` and `loss_bound`. Record the owner of the frontier entries that it added with [`set_risk_frontier_owner!`](@ref), so that a sweep on the tail takes its span from the tail. The owner is the tail when it reads the portfolio, and its [`GainTail`](@ref) when it reads the negated portfolio.
+ 3. Build `gain` at index `nested_index(:gain_, i)` on the other side, giving `gain_risk` and `gain_bound`. Record the owner of the entries that it added by the same rule.
  4. Register `range_risk = loss_risk + gain_risk` under the Model State key of `name` and `i`.
- 5. Bound `range_risk` and add it to `risk_vec` with [`set_risk_bounds_and_expression!`](@ref), from `r.settings`.
+ 5. When a tail gives an expression of its own for the bound, register `loss_bound + gain_bound` under the same name in the namespace `bound_` nested in `prefix`, giving `range_bound`. Otherwise `range_bound` is `range_risk`.
+ 6. Bound `range_bound` and add `range_risk` to `risk_vec` with [`set_variance_risk_bounds_and_expression!`](@ref), from `r.settings`.
 
 # JuMP formulation
 
 ## Expressions
 
   - `<prefix><name><i>`: ``\\mathcal{R}_{\\mathrm{loss}} + \\mathcal{R}_{\\mathrm{gain}}``, registered as a Model State entry. `name` is `range_risk_key(r)`.
+  - `<prefix>bound_<name><i>`: The sum of the two expressions of degree one, registered when the bound of the range does not act on the entry above.
 
 Where:
 
@@ -1075,6 +1120,7 @@ Where:
 # Keyword arguments
 
   - `loss::Bool`: `true` builds the range on the net portfolio returns, and `false` on their negation, as a range that is itself the gain tail of a range does (default: `true`).
+  - $(arg_dict[:term_rm])
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
 
 # Returns
@@ -1088,30 +1134,120 @@ Where:
   - [`range_risk_key`](@ref)
   - [`nested_index`](@ref)
   - [`set_risk_frontier_owner!`](@ref)
+  - [`set_range_tail_constraints!`](@ref)
   - [`GainTail`](@ref)
-  - [`set_risk_bounds_and_expression!`](@ref)
+  - [`set_variance_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RangeRiskMeasure,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
-                               loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
+                               loss::Bool = true, term::RiskMeasureSettings = r.settings,
+                               prefix::Symbol = Symbol(""), kwargs...)
     tails = range_tails(r)
     name = range_risk_key(r)
+    ub = r.settings.ub
     # A sweep on a tail takes its span from that tail, so each tail records the measure of its
     # own side as the owner of its entry before the whole range claims the rest. A range that
     # is itself a gain tail reads the negated portfolio, so its tails exchange their sides.
     first = risk_frontier_length(model)
-    loss_risk = set_risk_constraints!(model, nested_index(:loss_, i), tails.loss, opt, pr,
-                                      args...; loss = loss, prefix = prefix, kwargs...)
+    loss_risk, loss_bound = set_range_tail_constraints!(model, nested_index(:loss_, i),
+                                                        tails.loss, ub, opt, pr, args...;
+                                                        loss = loss, term = term,
+                                                        prefix = prefix, kwargs...)
     set_risk_frontier_owner!(model, first, loss ? tails.loss : GainTail(tails.loss))
     first = risk_frontier_length(model)
-    gain_risk = set_risk_constraints!(model, nested_index(:gain_, i), tails.gain, opt, pr,
-                                      args...; loss = !loss, prefix = prefix, kwargs...)
+    gain_risk, gain_bound = set_range_tail_constraints!(model, nested_index(:gain_, i),
+                                                        tails.gain, ub, opt, pr, args...;
+                                                        loss = !loss, term = term,
+                                                        prefix = prefix, kwargs...)
     set_risk_frontier_owner!(model, first, loss ? GainTail(tails.gain) : tails.gain)
     range_risk = state_set!(model, prefix, name, i,
                             JuMP.@expression(model, loss_risk + gain_risk))
-    set_risk_bounds_and_expression!(model, opt, range_risk, r.settings, name, i;
-                                    prefix = prefix)
+    range_bound = if loss_bound === loss_risk && gain_bound === gain_risk
+        range_risk
+    else
+        state_set!(model, nested_prefix(prefix, :bound_), name, i,
+                   JuMP.@expression(model, loss_bound + gain_bound))
+    end
+    set_variance_risk_bounds_and_expression!(model, opt, range_bound, ub, name, i,
+                                             range_risk, r.settings; prefix = prefix)
     return range_risk
+end
+"""
+    set_range_tail_constraints!(model::JuMP.Model, i, tail::RiskMeasure, ::Nothing, opt, pr,
+                                args...; kwargs...)
+    set_range_tail_constraints!(model::JuMP.Model, i, tail::RiskMeasure, ub::RkRtBounds, opt,
+                                pr, args...; prefix::Symbol, term::RiskMeasureSettings,
+                                kwargs...)
+
+Builds one tail of a range, and returns its risk expression and the expression that the bound `ub` of the range acts on.
+
+The row of [`set_risk_upper_bound!`](@ref) multiplies the bound by ``k``, so it needs a sum of two expressions of degree one in the weights and ``k``. The risk expression of a tail can have degree two, and only the builder of the tail knows the expression of degree one. So the range asks the tail for it with a [`TrackedRiskBound`](@ref), which carries the own bound of the tail. A range without a bound asks for nothing, and a tail of degree one answers with its risk expression and adds nothing to the model.
+
+# Algorithm
+
+ 1. Without a bound of the range, build `tail` with [`set_risk_constraints!`](@ref), and return its risk expression two times.
+ 2. Otherwise compose the namespace of the request, `tail_` nested in `prefix` at the index `i`, and read the own bound of the tail. The level of the request is the level of `ub` from [`risk_bound_level`](@ref), or the own bound when that is a smaller number.
+ 3. Put the request into the bound slot of `tail`, and build it at the index `i` under `prefix`, giving `risk`.
+ 4. When the builder did not register `tracked_risk_bound`, or registered `risk`, return `risk` two times. The builder of a measure of a user that states no bound registers nothing.
+ 5. Otherwise convert the registered expression with [`set_degree_one_tracked_risk!`](@ref), giving `bound`, and return `risk` and `bound`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `tail::RiskMeasure`: The tail of the range.
+  - `ub`: The bound of the range, or `nothing`.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace of the build.
+  - $(arg_dict[:term_rm])
+  - `kwargs...`: The keywords of the builder of the tail, such as the side `loss`.
+
+# Returns
+
+  - `(risk, bound)`: The risk expression of the tail, and the expression that the bound of the range acts on.
+
+# Related
+
+  - [`RangeRiskMeasure`](@ref)
+  - [`TrackedRiskBound`](@ref)
+  - [`set_risk_constraints!`](@ref)
+  - [`set_degree_one_tracked_risk!`](@ref)
+  - [`set_risk_epigraphs!`](@ref)
+"""
+function set_range_tail_constraints!(model::JuMP.Model, i::Any, tail::RiskMeasure,
+                                     ::Nothing, opt::RiskConstraintOwner,
+                                     pr::AbstractPriorResult, args...; kwargs...)
+    risk = set_risk_constraints!(model, i, tail, opt, pr, args...; kwargs...)
+    return risk, risk
+end
+function set_range_tail_constraints!(model::JuMP.Model, i::Any, tail::RiskMeasure,
+                                     ub::RkRtBounds, opt::RiskConstraintOwner,
+                                     pr::AbstractPriorResult, args...; prefix::Symbol,
+                                     term::RiskMeasureSettings, kwargs...)
+    tprefix = nested_prefix(prefix, :tail_, i)
+    own = tail.settings.ub
+    level = first(risk_bound_level(ub))
+    # Each bound is a ceiling of the tail, so the smaller one is nearer to its size.
+    level = isa(own, Number) ? min(own, level) : level
+    ask = TrackedRiskBound(tprefix, reads_risk_term(term), level, true, 1, LinearBound(),
+                           own)
+    asked = rebuild_struct(tail, (; settings = rebuild_struct(tail.settings, (; ub = ask))))
+    risk = set_risk_constraints!(model, i, asked, opt, pr, args...; prefix = prefix,
+                                 term = term, kwargs...)
+    if !state_has(model, tprefix, :tracked_risk_bound)
+        return risk, risk
+    end
+    expr, map = state_get(model, tprefix, :tracked_risk_bound)
+    if expr === risk
+        return risk, risk
+    end
+    bound, _ = set_degree_one_tracked_risk!(model, map.bound, expr, map, level;
+                                            prefix = tprefix)
+    return risk, bound
 end
 """
     range_risk_key(r::RangeRiskMeasure) -> Symbol
