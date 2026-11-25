@@ -261,6 +261,7 @@ commit = "391be5e"
 "src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { lines = 43, misses = 0 }
 "src/09_ConstraintGeneration/10_LotUnitConstraintGeneration.jl" = { lines = 20, misses = 0 }
 "src/09_ConstraintGeneration/11_ConcentrationLimitGeneration.jl" = { lines = 53, misses = 0 }
+"src/09_ConstraintGeneration/12_PositionConstraintGeneration.jl" = { lines = 37, misses = 0 }
 "src/10_Prior/01_Base_Prior.jl" = { lines = 238, misses = 0 }
 "src/10_Prior/02_EmpiricalPrior.jl" = { lines = 50, misses = 0 }
 "src/10_Prior/03_FactorPrior.jl" = { lines = 68, misses = 1 }

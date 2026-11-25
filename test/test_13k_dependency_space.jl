@@ -266,6 +266,10 @@ end
                                                                 opt = jo))
     @test PO.holds_node_reader(("a" => ece, 1)) && !PO.holds_node_reader([1.0, 2.0])
     @test !PO.holds_node_reader([1.0 2.0]) && !PO.holds_node_reader(plain)
+    # A callable of a user can hold a log whose entries are not defined yet.
+    log = Vector{Symbol}(undef, 2)
+    @test !PO.holds_node_reader(log) && PO.holds_node_reader(Any[ece, log])
+    @test isnothing(PO.assert_graph_walk((log, jo), ["g"], [DS_G1], ""))
 end
 
 @testset "a pipeline step needs no prior" begin

@@ -320,7 +320,8 @@ end
     assert_graph_walk(est::Union{AbstractEstimator, AbstractAlgorithm, StatsBase.CovarianceEstimator}, ng, G, path::AbstractString) -> nothing
     assert_graph_walk(v::AbstractArray{<:Number}, ng, G, path::AbstractString) -> nothing
     assert_graph_walk(v::AbstractVector{<:Number}, ng, G, path::AbstractString) -> nothing
-    assert_graph_walk(v::Union{AbstractVector, Tuple}, ng, G, path::AbstractString) -> nothing
+    assert_graph_walk(v::AbstractVector, ng, G, path::AbstractString) -> nothing
+    assert_graph_walk(v::Tuple, ng, G, path::AbstractString) -> nothing
     assert_graph_walk(p::Pair, ng, G, path::AbstractString) -> nothing
     assert_graph_walk(x, ng, G, path::AbstractString) -> nothing
 
@@ -334,7 +335,7 @@ The method that Julia selects is the algorithm.
 
  1. An estimator, an algorithm or a covariance estimator: check its graphs with [`assert_consumer_graphs`](@ref), then walk each field.
  2. An array of numbers: return `nothing`.
- 3. A vector or a tuple: walk each element.
+ 3. A vector or a tuple: walk each element. An undefined element of a vector, such as a row of a log that a callable fills as it runs, holds no consumer.
  4. A Pair: walk its value.
  5. Any other value: return `nothing`.
 
@@ -375,8 +376,15 @@ function assert_graph_walk(::AbstractVector{<:Number}, ::Any, ::Any,
                            ::AbstractString)::Nothing
     return nothing
 end
-function assert_graph_walk(v::Union{AbstractVector, Tuple}, ng, G,
-                           path::AbstractString)::Nothing
+function assert_graph_walk(v::AbstractVector, ng, G, path::AbstractString)::Nothing
+    for i in eachindex(v)
+        if isassigned(v, i)
+            assert_graph_walk(v[i], ng, G, string(path, "[", i, "]"))
+        end
+    end
+    return nothing
+end
+function assert_graph_walk(v::Tuple, ng, G, path::AbstractString)::Nothing
     for (i, x) in pairs(v)
         assert_graph_walk(x, ng, G, string(path, "[", i, "]"))
     end

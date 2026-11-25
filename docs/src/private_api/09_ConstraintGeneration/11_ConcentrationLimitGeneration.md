@@ -11,5 +11,6 @@ CnlE_Cnl
 VecCnlE_Cnl
 CnlE_Cnl_VecCnlE_Cnl
 Cnl_VecCnl
+PortfolioOptimisers.long_only_reading
 PortfolioOptimisers.concentration_positions
 ```

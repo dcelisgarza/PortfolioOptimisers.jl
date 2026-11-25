@@ -812,7 +812,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the [routing target](@ref PIPELINE_ROUTING_TARGETS) that a constraint result names by its type alone, or `nothing`.
 
-Five result types name one optimiser field each. A [`WeightBounds`](@ref) goes to `:wb`, a [`LinearConstraint`](@ref) to `:lcse`, a phylogeny constraint result to `:ple`, a [`ConcentrationLimit`](@ref) to `:conc`, and a [`RiskBudget`](@ref) to `:rkb`. Every other type returns `nothing`, and needs a target beside it, see [`TargetedConstraint`](@ref).
+Six result types name one optimiser field each. A [`WeightBounds`](@ref) goes to `:wb`, a [`LinearConstraint`](@ref) and a [`PositionConstraint`](@ref) to `:lcse`, a phylogeny constraint result to `:ple`, a [`ConcentrationLimit`](@ref) to `:conc`, and a [`RiskBudget`](@ref) to `:rkb`. Every other type returns `nothing`, and needs a target beside it, see [`TargetedConstraint`](@ref).
 
 This function is the only part of the fan-out that the type decides. It also decides whether the value of a step needs a wrapper. [`add_constraint_result`](@ref) wraps a value only when the value cannot name its own target, so the `constraints` slot holds a bare result where it can.
 
@@ -830,7 +830,7 @@ This function is the only part of the fan-out that the type decides. It also dec
   - [`TargetedConstraint`](@ref)
 """
 implicit_constraint_target(::WeightBounds)::Symbol = :wb
-implicit_constraint_target(::LinearConstraint)::Symbol = :lcse
+implicit_constraint_target(::Union{LinearConstraint, PositionConstraint})::Symbol = :lcse
 implicit_constraint_target(::AbstractPhylogenyConstraintResult)::Symbol = :ple
 implicit_constraint_target(::RiskBudget)::Symbol = :rkb
 implicit_constraint_target(::ConcentrationLimit)::Symbol = :conc
@@ -867,7 +867,7 @@ function constraint_target_of(c)::Symbol
     if !isnothing(target)
         return target
     end
-    return throw(ArgumentError("cannot route a $(Base.typename(typeof(c)).wrapper) constraint result into any optimiser; supported: WeightBounds, LinearConstraint, RiskBudget, phylogeny constraint results, and any value a constraint step paired with a routing target"))
+    return throw(ArgumentError("cannot route a $(Base.typename(typeof(c)).wrapper) constraint result into any optimiser; supported: WeightBounds, LinearConstraint, PositionConstraint, RiskBudget, phylogeny constraint results, and any value a constraint step paired with a routing target"))
 end
 function constraint_target_of(c::TargetedConstraint)::Symbol
     return c.target

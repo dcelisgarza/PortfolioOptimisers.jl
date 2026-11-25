@@ -62,10 +62,12 @@ The parts of a reach share the keys of their series, so the key of the first par
 
   - [`exposure_snapshots`](@ref)
 """
-function exposure_row_snapshot(parts::Tuple{Vararg{ExogenousGraph}}, ::Integer, ::Any)
+function exposure_row_snapshot(parts::Tuple{ExogenousGraph, Vararg{ExogenousGraph}},
+                               ::Integer, ::Any)
     return 1, parts
 end
-function exposure_row_snapshot(parts::Tuple{Vararg{ExogenousGraphSeries}}, kint::Integer,
+function exposure_row_snapshot(parts::Tuple{ExogenousGraphSeries,
+                                            Vararg{ExogenousGraphSeries}}, kint::Integer,
                                kts)
     s = first(parts)
     p = searchsortedlast(s.ts, exposure_row_key(s, kint, kts))

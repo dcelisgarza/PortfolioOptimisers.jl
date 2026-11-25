@@ -367,6 +367,8 @@ end
                                                :coskewness => "its Coverage Universe method of a panel shares the callee `coverage_panel_moment` with 7 other functions (rule 3, #2092)",
                                                :coverage_inner_corrected => "3 functions share its callee `partial_fit_corrected` (rule 3, #2092)",
                                                :supports_partial_fit => "its callee `folds` is a shared public verb, and a driver of the hook must call it (rule 3, #2089, #2092)",
+                                               # src/09_ConstraintGeneration (#2297).
+                                               :position_constraints => "one method for each form of a resolved constraint: the `LinearConstraint` form calls the constructor of `PositionConstraint`, and the `nothing` and vector forms give another answer (rule 3, #2297)",
                                                # src/11_UncertaintySets (#2098).
                                                :calibration_series_vec => "one method for each series marker: the drawdown forms call `absolute_drawdown_vec` and `relative_drawdown_vec`, which 3 functions share each (rule 3, #2098)",
                                                :calibration_series_matrix => "one method for each series marker: the drawdown forms call `absolute_drawdown_arr`, which 3 functions share, and `relative_drawdown_arr`, which 2 functions share (rule 3, #2098)",

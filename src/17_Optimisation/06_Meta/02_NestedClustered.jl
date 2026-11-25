@@ -154,10 +154,14 @@ function set_retcode(res::NestedClusteredResult, retcode::OptRetCode_VecOptRetCo
 end
 """
     holds_precomputed(x, ::Type{T}) -> Bool
+    holds_precomputed(v::AbstractVector, ::Type{T}) -> Bool
+    holds_precomputed(td::TimeDependent, ::Type{T}) -> Bool
+    holds_precomputed(pce::PositionConstraintEstimator, ::Type{T}) -> Bool
+    holds_precomputed(pc::PositionConstraint, ::Type{T}) -> Bool
 
 Report whether a slot of an estimator holds a value of type `T`.
 
-The predicate reads the value in the slot and each entry of a vector in the slot. For a [`TimeDependent`](@ref) schedule in the slot, it reads each vector entry and the `default`, through [`time_dependent_entries`](@ref). A callable schedule has no value until it runs, so the predicate reads its `default` alone. The refusals of a nested optimiser pass a result type as `T`, so one predicate finds a precomputed result in each shape that a slot accepts. [`FactorRiskContribution`](@ref) passes the two semidefinite kinds of a phylogeny, so it finds one in each shape that `opt.ple` accepts.
+The predicate reads the value in the slot and each entry of a vector in the slot. For a [`TimeDependent`](@ref) schedule in the slot, it reads each vector entry and the `default`, through [`time_dependent_entries`](@ref). A callable schedule has no value until it runs, so the predicate reads its `default` alone. A [`PositionConstraintEstimator`](@ref) and a [`PositionConstraint`](@ref) apply the rows that they hold to the assets, so the predicate reads the constraint inside them. The refusals of a nested optimiser pass a result type as `T`, so one predicate finds a precomputed result in each shape that a slot accepts. [`FactorRiskContribution`](@ref) passes the two semidefinite kinds of a phylogeny, so it finds one in each shape that `opt.ple` accepts.
 
 # Arguments
 
@@ -166,7 +170,7 @@ The predicate reads the value in the slot and each entry of a vector in the slot
 
 # Returns
 
-  - `true` when `x`, an entry of a vector in `x`, or an entry of a schedule in `x` is a `T`. `false` otherwise.
+  - `true` when `x`, an entry of a vector in `x`, an entry of a schedule in `x`, or the constraint inside a position constraint in `x` is a `T`. `false` otherwise.
 
 # Related
 
@@ -176,8 +180,19 @@ The predicate reads the value in the slot and each entry of a vector in the slot
   - [`FactorRiskContribution`](@ref)
 """
 function holds_precomputed(x, ::Type{T})::Bool where {T}
-    entries = isa(x, TimeDependent) ? time_dependent_entries(x) : (x,)
-    return any(e -> isa(e, T) || isa(e, AbstractVector) && any(y -> isa(y, T), e), entries)
+    return isa(x, T)
+end
+function holds_precomputed(v::AbstractVector, ::Type{T})::Bool where {T}
+    return any(x -> holds_precomputed(x, T), v)
+end
+function holds_precomputed(td::TimeDependent, ::Type{T})::Bool where {T}
+    return any(x -> holds_precomputed(x, T), time_dependent_entries(td))
+end
+function holds_precomputed(pce::PositionConstraintEstimator, ::Type{T})::Bool where {T}
+    return holds_precomputed(pce.lce, T)
+end
+function holds_precomputed(pc::PositionConstraint, ::Type{T})::Bool where {T}
+    return holds_precomputed(pc.lc, T)
 end
 """
     assert_internal_optimiser(opt::HierarchicalEqualRiskContribution)
@@ -198,7 +213,7 @@ Each cluster solves its problem over its own assets, so each input of the inner 
 
   - A [`HierarchicalEqualRiskContribution`](@ref): `opt.cle` holds no `AbstractClusteringResult`.
   - A [`HierarchicalRiskParity`](@ref) or a [`SchurComplementHierarchicalRiskParity`](@ref): `opt.ser` holds no [`HierarchicalSeriationResult`](@ref), and no [`HierarchicalSeriation`](@ref) whose `cle` is an `AbstractClusteringResult`. A [`FixedSeriationResult`](@ref) and a [`SpectralSeriationResult`](@ref) pass, because their view keeps the assets of the cluster in their order.
-  - A JuMP optimiser: `opt` passes [`assert_rc_variance`](@ref) and [`assert_rc_pl`](@ref). `opt.opt.lcse`, `opt.opt.cte`, `opt.opt.gcarde` and `opt.opt.sgcarde` hold no `LinearConstraint`, and `opt.opt.ple` holds no `AbstractPhylogenyConstraintResult`.
+  - A JuMP optimiser: `opt` passes [`assert_rc_variance`](@ref) and [`assert_rc_pl`](@ref). `opt.opt.lcse`, `opt.opt.cte`, `opt.opt.gcarde` and `opt.opt.sgcarde` hold no `LinearConstraint`, inside a position constraint neither, and `opt.opt.ple` holds no `AbstractPhylogenyConstraintResult`.
   - A vector of optimisers: each entry passes.
   - A [`NestedClustered`](@ref): `opt.cle` holds no `AbstractClusteringResult`, and `opt.opto` passes [`assert_external_optimiser`](@ref). When `opt.opti` is not `opt.opto`, it passes this function.
 
@@ -302,7 +317,7 @@ function assert_internal_optimiser(opt::JuMPOptimisationEstimator)::Nothing
     assert_rc_variance(opt)
     assert_rc_pl(opt)
     @argcheck(!holds_precomputed(opt.opt.lcse, LinearConstraint),
-              ArgumentError("opt.opt.lcse cannot be a LinearConstraint, or a TimeDependent schedule whose entries or default hold one, in NCO inner optimiser"))
+              ArgumentError("opt.opt.lcse cannot be a LinearConstraint or a PositionConstraint, or a PositionConstraintEstimator or a TimeDependent schedule whose entries or default hold one, in NCO inner optimiser"))
     @argcheck(!holds_precomputed(opt.opt.cte, LinearConstraint),
               ArgumentError("opt.opt.cte cannot be a LinearConstraint, or a TimeDependent schedule whose entries or default hold one, in NCO inner optimiser"))
     @argcheck(!holds_precomputed(opt.opt.gcarde, LinearConstraint),
@@ -362,6 +377,7 @@ end
 """
     stated_constraint_space_basis(space::FactorSpace) -> Bool
     stated_constraint_space_basis(ece::ExposureConstraintEstimator) -> Bool
+    stated_constraint_space_basis(pce::PositionConstraintEstimator) -> Bool
     stated_constraint_space_basis(lcse::AbstractVector) -> Bool
     stated_constraint_space_basis(td::TimeDependent) -> Bool
     stated_constraint_space_basis(::Any) -> Bool
@@ -386,6 +402,9 @@ function stated_constraint_space_basis(::Any)::Bool
 end
 function stated_constraint_space_basis(ece::ExposureConstraintEstimator)::Bool
     return stated_constraint_space_basis(ece.space)
+end
+function stated_constraint_space_basis(pce::PositionConstraintEstimator)::Bool
+    return stated_constraint_space_basis(pce.lce)
 end
 function stated_constraint_space_basis(lcse::AbstractVector)::Bool
     return any(stated_constraint_space_basis, lcse)
@@ -421,7 +440,8 @@ end
     holds_node_reader(space::DependencySpace) -> Bool
     holds_node_reader(v::AbstractArray{<:Number}) -> Bool
     holds_node_reader(v::AbstractVector{<:Number}) -> Bool
-    holds_node_reader(v::Union{AbstractVector, Tuple}) -> Bool
+    holds_node_reader(v::AbstractVector) -> Bool
+    holds_node_reader(v::Tuple) -> Bool
     holds_node_reader(p::Pair) -> Bool
     holds_node_reader(x) -> Bool
 
@@ -436,7 +456,7 @@ The method that Julia selects is the algorithm.
  1. An [`ExogenousNetwork`](@ref), a [`WalkProfilePanel`](@ref) or a [`DependencySpace`](@ref): `true`.
  2. An estimator, an algorithm or a covariance estimator: walk each field.
  3. An array of numbers: `false`.
- 4. A vector or a tuple: walk each element.
+ 4. A vector or a tuple: walk each element, and no undefined element of a vector.
  5. A Pair: walk its value.
  6. Any other value: `false`.
 
@@ -460,7 +480,10 @@ end
 function holds_node_reader(::AbstractVector{<:Number})::Bool
     return false
 end
-function holds_node_reader(v::Union{AbstractVector, Tuple})::Bool
+function holds_node_reader(v::AbstractVector)::Bool
+    return any(i -> isassigned(v, i) && holds_node_reader(v[i]), eachindex(v))
+end
+function holds_node_reader(v::Tuple)::Bool
     return any(holds_node_reader, v)
 end
 function holds_node_reader(p::Pair)::Bool

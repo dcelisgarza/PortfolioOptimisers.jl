@@ -958,7 +958,7 @@ One [`LinearConstraintEstimator`](@ref), or a vector of them. The group excludes
 const LcE_VecLcE = Union{LinearConstraintEstimator, VecLcE}
 """
     linear_constraints(lcs::Option{<:LinearConstraint}, args...; kwargs...)
-    linear_constraints(lcs::AbstractVector{<:LinearConstraint}, ::Nothing, args...; kwargs...)
+    linear_constraints(lcs::AbstractVector{<:LinearConstraint}, ::Nothing; kwargs...)
 
 Return an assembled `LinearConstraint`, `nothing`, or a vector of assembled constraints unchanged.
 
@@ -1026,7 +1026,10 @@ end
     assert_investable_constraint_width(lcs::Nothing, N::Integer, slot::AbstractString)
     assert_investable_constraint_width(lc::LinearConstraint, N::Integer,
                                        slot::AbstractString)
-    assert_investable_constraint_width(lcs::VecLc, N::Integer, slot::AbstractString)
+    assert_investable_constraint_width(pc::PositionConstraint, N::Integer,
+                                       slot::AbstractString)
+    assert_investable_constraint_width(lcs::AbstractVector, N::Integer,
+                                       slot::AbstractString)
 
 Refuse a precomputed [`LinearConstraint`](@ref) whose rows are wider than the investable universe, with a message that states why.
 
@@ -1038,7 +1041,7 @@ The repair is always the same. State the constraint as a [`LinearConstraintEstim
 
 # Algorithm
 
- 1. Return when there is nothing to check, which is a `nothing` slot or a `nothing` half of a [`LinearConstraint`](@ref).
+ 1. Return when there is nothing to check, which is a `nothing` slot or a `nothing` half of a [`LinearConstraint`](@ref). Check the wrapped constraint of a [`PositionConstraint`](@ref), and each element of a vector.
  2. Otherwise compare `size(A, 2)` of each half against `N` and throw a `DimensionMismatch` naming the slot, the two widths and the repair when they disagree.
 
 # Arguments
@@ -1076,14 +1079,14 @@ function assert_investable_constraint_width(lc::LinearConstraint, N::Integer,
     end
     return nothing
 end
-function assert_investable_constraint_width(lcs::VecLc, N::Integer,
+function assert_investable_constraint_width(lcs::AbstractVector, N::Integer,
                                             slot::AbstractString)::Nothing
     for lc in lcs
         assert_investable_constraint_width(lc, N, slot)
     end
     return nothing
 end
-function linear_constraints(lcs::AbstractVector{<:LinearConstraint}, ::Nothing, args...;
+function linear_constraints(lcs::AbstractVector{<:LinearConstraint}, ::Nothing;
                             kwargs...)::AbstractVector{<:LinearConstraint}
     return lcs
 end

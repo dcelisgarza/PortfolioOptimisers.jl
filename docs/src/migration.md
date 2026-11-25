@@ -1172,8 +1172,18 @@ A `ConstraintBlock` holds concentration rules, such as the UCITS 5/10/40 rule, i
 - **A returns result of your own** that subtypes `AbstractReturnsResult` holds no graph unless it adds the two fields. The user verbs read the graphs of a `ReturnsResult` and a `PricesResult` only.
 - **`PredictionReturnsResult`**, the `rd` of a fold, has the fields `ng` and `G` after `E` too. A fold keeps the graphs of its test rows, so `dependency_exposure(pred)` reads the graph in force at each row of the fold. The positional constructor takes thirteen arguments, `PredictionReturnsResult(nx, X, nf, F, nb, B, ne, E, ng, G, ts, iv, ivpa)`, where v0.34 took eleven, and the type gains two parameters after the one of `E`. The keyword constructor takes both with the default `nothing`. The series of a path, `MultiPeriodPredictionResult.mrd`, holds no graph.
 
+### [The slot of the linear constraints](@id migration-0-35-position)
+
+The slot `lcse` also takes a `PositionConstraintEstimator` and its Result `PositionConstraint`, so a row can cap the gross, long or short position of a group, a factor or a node of a graph. A configuration without one does not change.
+
+- **The resolved slot `lcsr`** of a `ResolvedConstraintBlock` can hold a `PositionConstraint` beside a `LinearConstraint`. Code that reads `lcsr.ineq` under a `PositionConstraintEstimator` reads `lcsr.lc.ineq`.
+- **A vector `lcse` with an entry that wraps a vector, or with an entry whose every row dropped,** raised a `TypeError` at the resolution of the block. The resolved slot now holds the constraints of every entry in one vector, and leaves out a dropped entry.
+- **`linear_constraints` on a vector of constraints** passes every keyword to its entries.
+
 ### [If you extend the library](@id migration-0-35-extending)
 
+- **A position reading of your own, a subtype of `AbstractPositionReading`,** also reads a long-only book. A `ConcentrationLimit` read the weights there for every reading. It now calls `position_reading(pos, w, w, zeros)`, so a reading of the short part is zero.
+- **An extension of `set_linear_weight_constraints!`** passes the weight bounds of its block in the keyword `wb` when it holds a `PositionConstraint`.
 - **A branch order of your own is a subtype of `AbstractBranchOrder`**, which is public, with a method `PortfolioOptimisers.order_branches!(hmer::Clustering.HclustMerges, D, ::MyOrder)`. A method of `order_branches!(hmer, D, ::Val{:my_order})` is not called any more.
 - **A linkage of your own is a subtype of `AbstractLinkage`**, which is public, with a method of `PortfolioOptimisers.linkage_symbol` for its label. A Lance-Williams linkage adds a method of `PortfolioOptimisers.lance_williams_update` and runs in the generic algorithm of the library. Any other linkage adds a method of `PortfolioOptimisers.linkage_merges` that returns its merges.
 - **A seriation of your own is a subtype of `AbstractSeriationEstimator`**, which is public, with a method `PortfolioOptimisers.seriate(ser::MySeriation, X::PortfolioOptimisers.MatNum; dims::Int = 1, kwargs...)` that returns a subtype of `AbstractSeriationResult` with the property `order`. HRP and Schur read nothing else.

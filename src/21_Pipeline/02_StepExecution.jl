@@ -458,7 +458,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute an [`ExposureConstraintEstimator`](@ref) step's value: re-base its rows through the basis of its space into an asset-space [`LinearConstraint`](@ref).
+Compute an [`ExposureConstraintEstimator`](@ref) step's value: re-base its rows through the basis of its space into an asset-space [`LinearConstraint`](@ref). A [`PositionConstraintEstimator`](@ref) step resolves the constraint that it wraps in the same way, and its value is a [`PositionConstraint`](@ref).
 
 This is the one constraint step that can read a computed slot other than `:returns`. [`pipe_reads`](@ref) of the space gives them. For a [`FactorSpace`](@ref) the basis is `ctx.prior.rr`, so a prior step must come earlier; a prior that carries no regression makes [`constraint_space_basis`](@ref) throw, which is the intended failure — see [`ExposureConstraintEstimator`](@ref).
 
@@ -475,7 +475,8 @@ This is the one constraint step that can read a computed slot other than `:retur
   - [`linear_constraints`](@ref)
   - [`pipeline_asset_sets`](@ref)
 """
-function constraint_step_value(ce::ExposureConstraintEstimator, ctx::PipelineContext)
+function constraint_step_value(ce::Union{ExposureConstraintEstimator,
+                                         PositionConstraintEstimator}, ctx::PipelineContext)
     foreach(s -> require_slot(ctx, s, ce), pipe_reads(ce))
     rr = isnothing(ctx.prior) ? nothing : ctx.prior.rr
     return linear_constraints(ce, pipeline_asset_sets(ctx, ce); rr = rr, rd = ctx.returns)

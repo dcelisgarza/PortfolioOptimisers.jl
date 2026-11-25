@@ -1083,8 +1083,16 @@ The number of assets of equal absolute weight that have the concentration of a b
 *Avoid*: a count of the weights that are not zero, and the Kish effective sample size of a vector of observation weights.
 
 **Concentration Limit**
-A rule that caps each position at `c` and limits the sum of the positions over a threshold `t` to `s`: `ConcentrationLimitEstimator` and its resolved `ConcentrationLimit`, in the slot `conc` of a Constraint Block. The UCITS 5/10/40 rule is the default. A position is an asset, or a row of an asset sets matrix such as one issuer, so two share classes of one issuer are one position. The field `on` of `AssetSetsMatrixEstimator` gives a rule its issuers, so the exceptions of the directive are more rules in a vector. A position reading (`GrossPosition`, `NetPosition`, `LongPosition`) says how a short counts. `ExactConcentration` states the rule with one binary for each position, and `SumLargestConcentration` states a stricter linear form. `concentration_margins` checks the weights of any optimiser against a rule. ADR 0246, #2018.
+A rule that caps each position at `c` and limits the sum of the positions over a threshold `t` to `s`: `ConcentrationLimitEstimator` and its resolved `ConcentrationLimit`, in the slot `conc` of a Constraint Block. The UCITS 5/10/40 rule is the default. A position is an asset, or a row of an asset sets matrix such as one issuer, so two share classes of one issuer are one position. The field `on` of `AssetSetsMatrixEstimator` gives a rule its issuers, so the exceptions of the directive are more rules in a vector. A Position Reading says how a short counts. `ExactConcentration` states the rule with one binary for each position, and `SumLargestConcentration` states a stricter linear form. `concentration_margins` checks the weights of any optimiser against a rule. ADR 0246, #2018.
 *Avoid*: `ConcentrationRadius`, which is the concentration of measure of a calibration rule, and the concentration of a book, which the Effective Number of Assets reads.
+
+**Position Reading**
+How a rule reads a weight that can be short: `GrossPosition` (`lw + sw`), `NetPosition` (`w`), `LongPosition` (`lw`) or `ShortPosition` (`sw`, the size of the short part). A Concentration Limit and a Position Constraint hold one in `pos`. A long-only model reads the weights as their own long part and has no short part. ADR 0246, #2018, #2297.
+*Avoid*: exposure, which is a linear form over the factors or the nodes of a graph.
+
+**Position Constraint**
+A linear constraint whose rows apply to a Position Reading of the weights, and not to the weights: `PositionConstraintEstimator` and its resolved `PositionConstraint`, in the slot `lcse` of a Constraint Block. The wrapped constraint states the frame (assets, groups, factors or nodes), and the reading states gross, long, short or net, so a gross cap on a group, on a factor or on a node of an Exogenous Graph is one type. The parts of the weights are upper bounds, so a floor or a negative coefficient needs `xbgt`. ADR 0047, #2290, #2297.
+*Avoid*: the gross budget `gbgt`, which caps the gross position of the whole book, and a net cap, which is a bare linear constraint.
 
 **Exact vs Bounded Budgets**
 The distinction between a budget that *bounds* the realised exposure and one that *pins* it. A pin needs a sign bit for each asset, which makes the problem mixed-integer. So a pin is opt-in.

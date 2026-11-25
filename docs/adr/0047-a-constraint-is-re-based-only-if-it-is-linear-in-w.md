@@ -426,7 +426,8 @@ ADR 0045.
 `DependencySpace(; ng, reach, dir)` is a second member (#2202, row 13 of #2168). Its rows name the
 nodes of an Exogenous Graph, and a row `a` re-bases to `(Rᵀ a)ᵀ w`, with `R` the reach of the
 Dependency Exposure. The rule of this ADR decides its limit: the net exposure is a linear form in
-`w`, so a row can cap it. A gross cap needs the long and the short variables, so it stays outside.
+`w`, so a row can cap it. A gross cap needs the long and the short variables, so it stays outside
+the re-basis. The amendment *a position constraint* below states it with a wrapper.
 
 **The names are nodes, not a key of the sets.** The nodes change over time and most of them are not
 assets, so a declared axis repeats what the graph holds. `constraint_space_basis` returns a
@@ -453,3 +454,34 @@ kernel of the Asset Panel producers.
 
 **A pipeline step reads the slots that the space states.** `pipe_reads` of the estimator is
 `pipe_reads` of its space: `(:returns, :prior)` by default, and `(:returns,)` for `DependencySpace`.
+
+## Amendment (2026-11-25): a position constraint
+
+`PositionConstraintEstimator(; lce, pos = GrossPosition())` caps the gross, long or short position of
+any row of `lcse` (#2297, decided on #2290). It resolves to `PositionConstraint(lc, pos)`, whose rows
+apply to a reading of the weights: `A * position_reading(pos, w, lw, sw) <= k B`.
+
+**A wrapper, not a field.** The frame of a row and the reading of the weights are two choices, so one
+type takes every frame: assets, groups, factors and nodes. A field of `LinearConstraintEstimator`
+reaches `gcarde`, `sgcarde` and `rc`, where a reading has no meaning, for the reason that this ADR
+gives for the re-basis. A field of `DependencySpace` or `ExposureConstraintEstimator` cannot reach a
+row in asset names, because the family has no `AssetSpace`.
+
+**The form is the exposure of the absolute weights.** `M` applied to `abs(w)` is the gross exposure of
+the Dependency Exposure report. `abs(M w) <= b` is two net rows, which a bare estimator states.
+
+**The row reads the weights.** Over a `FactorSpace`, the gross position is `sum(F_i * abs(w_i))`, with
+the projection of this ADR. It is not `sum(abs(F_i * w_i))`.
+
+**A row that the parts do not hold is accepted.** `lw` and `sw` are upper bounds on the parts of the
+weights, so a floor, an equality or a negative coefficient does not hold without `xbgt`. The docstring
+warns, as it does for the floor of `gbgt`, and no check refuses the row.
+
+**The bounds of the block make the parts.** A block whose bounds admit a short position reads
+`weight_parts!`. Other bounds make no variable: gross, long and net give the plain row, and the short
+reading is zero. `ConcentrationLimit` gives zeros for `ShortPosition` there too.
+
+**Two aliases, two places.** `EcE_LcE_Lc` stays the bound of what the wrapper takes.
+`PcE_Pc_EcE_LcE_Lc` is the bound of `lcse` alone, and `Pc_Lc_VecPc_Lc` the bound of `lcsr`. The
+resolver of a block puts a vector inside an entry into the one vector of `lcsr`, and leaves out an
+entry whose every row dropped.

@@ -5,7 +5,7 @@ The basis of the nodes of an Exogenous Graph. It re-bases a constraint written i
 
 A row such as `\"Protocol <= 0.3\"` caps the Dependency Exposure of the portfolio to the node `Protocol`: the weight of `Protocol` itself, when it is an asset, plus the weight of each asset that the reach takes to it. [`DependencyExposure`](@ref) measures the same exposure on a Result, with the same `ng`, `reach` and `dir`.
 
-The cap is on the net exposure, because a re-basis takes a linear form in the weights only. A short weight lowers it. Under non-negative weights the net exposure and the gross exposure are equal.
+The cap is on the net exposure, because a re-basis takes a linear form in the weights only. A short weight lowers it. Under non-negative weights the net exposure and the gross exposure are equal. A [`PositionConstraintEstimator`](@ref) around the [`ExposureConstraintEstimator`](@ref) caps the gross, the long or the short exposure that the [`DependencyExposure`](@ref) reports. No entry of the reach is negative, so such a cap holds on the realised weights.
 
 The space reads the graph in force at the last row of the returns, so each fold of a cross-validation and each nested optimisation reads its own graph. The space holds no data, so a view of the assets returns it unchanged.
 
@@ -105,6 +105,7 @@ julia> linear_constraints(ece, sets; rd = rd).ineq.A
   - [`WalkShares`](@ref)
   - [`GraphUnion`](@ref)
   - [`ConstraintBasis`](@ref)
+  - [`PositionConstraintEstimator`](@ref)
 """
 @concrete struct DependencySpace <: AbstractConstraintSpace
     """

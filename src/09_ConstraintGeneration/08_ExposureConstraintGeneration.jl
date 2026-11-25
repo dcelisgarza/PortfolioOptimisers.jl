@@ -9,6 +9,7 @@ The limit comes from the mechanism. A re-basis rewrites a row and does not chang
 
   - Cardinality, sub-group cardinality and buy-in thresholds index the binary held-indicators, not the weights.
   - The weight bounds of each asset need no counterpart in another basis. ``lb \\leq \\mathbf{P}^\\intercal\\boldsymbol{w} \\leq ub`` is a linear constraint, and this mechanism already takes it.
+  - A gross, long or short cap reads the long and the short parts of the weights. A [`PositionConstraintEstimator`](@ref) around the re-based row states it.
   - Turnover and tracking error are norm forms. ``\\lVert \\mathbf{P}^\\intercal(\\boldsymbol{w} - \\boldsymbol{w}_0) \\rVert`` has a meaning, but it needs its own variables and cones. Its re-basis is possible in mathematics, but not with this mechanism.
   - A fee is a price per traded position, which the model subtracts from the return. It is not a constraint on the weights.
 
@@ -312,12 +313,13 @@ const VecEcE_LcE_Lc = AbstractVector{<:EcE_LcE_Lc}
 
 Alias for an [`EcE_LcE_Lc`](@ref) or a vector of them.
 
-It is the bound of `lcse`, the only slot that admits a re-basis. `gcarde` and `sgcarde` keep the narrower aliases built on [`LcE_Lc`](@ref). That difference is the enforcement that [`ExposureConstraintEstimator`](@ref) describes.
+It is the bound of the constraint that a [`PositionConstraintEstimator`](@ref) wraps. The slot `lcse`, the only slot that admits a re-basis, takes the wider [`PcE_Pc_EcE_LcE_Lc`](@ref) or a vector of them. `gcarde` and `sgcarde` keep the narrower aliases built on [`LcE_Lc`](@ref). That difference is the enforcement that [`ExposureConstraintEstimator`](@ref) describes.
 
 # Related
 
   - [`EcE_LcE_Lc`](@ref)
   - [`VecEcE_LcE_Lc`](@ref)
+  - [`PositionConstraintEstimator`](@ref)
 """
 const EcE_LcE_Lc_VecEcE_LcE_Lc = Union{EcE_LcE_Lc, VecEcE_LcE_Lc}
 """
@@ -355,7 +357,7 @@ Return a copy of an [`ExposureConstraintEstimator`](@ref) over the selected asse
 
 The method passes the wrapped constraint through and views the space, and it does nothing more. The wrapped shape is written in the names of the space, so an asset index has no meaning for it. The basis of the space is the only part of the estimator that has an asset index.
 
-The generic vector method of [`port_opt_view`](@ref) covers a [`VecEcE_LcE_Lc`](@ref) slot, mixed or not. It views each element in turn, and does not slice the list of constraints by asset index.
+The generic vector method of [`port_opt_view`](@ref) covers a vector in the slot `lcse`, mixed or not. It views each element in turn, and does not slice the list of constraints by asset index.
 
 # Arguments
 
@@ -726,43 +728,6 @@ function linear_constraints(lcs::ExposureConstraintEstimator, sets::UniverseSets
     basis, key = constraint_space_basis(lcs.space, sets, rr, rd)
     return rebase_linear_constraints(lcs.lce, sets, basis, key; datatype = datatype,
                                      strict = strict, bl_flag = bl_flag)
-end
-"""
-    linear_constraints(lcs::VecEcE_LcE_Lc, sets::UniverseSets; datatype::DataType = Float64,
-                       strict::Bool = false, bl_flag::Bool = false,
-                       rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
-                       rd::Option{<:ReturnsResult} = nothing)
-
-Apply [`linear_constraints`](@ref) to each element of a vector that can mix re-based constraints and constraints over the assets. The method passes the loadings and the returns to each element. The narrower `VecLcE` method still applies to a vector that holds only [`LinearConstraintEstimator`](@ref)s.
-
-Each element resolves its own basis, so one vector can hold a space that reads the prior and a space that states or refits its own basis.
-
-# Arguments
-
-  - `lcs`: The vector of shapes, a mix of re-based constraints and constraints over the assets.
-  - `sets`: The declared universe the names resolve against.
-  - `datatype`: Data type of the assembled rows.
-  - `strict`: If `true`, a name that the universe does not resolve throws, and a row whose coefficients are all zero raises an [`IsZeroError`](@ref). If `false`, each case warns. The function drops the row in both cases.
-  - `bl_flag`: If `true`, a group expands to the mean over its members, as the Black-Litterman views need. If `false`, it expands to the sum.
-  - `rr`: The loadings, which the method passes to every element.
-  - `rd`: Returns from which the space of an element can refit, which the method passes to every element.
-
-# Returns
-
-  - `lcs`: One result per entry of the input, in the order of the input. An entry is a [`LinearConstraint`](@ref) or `nothing`.
-
-# Related
-
-  - [`ExposureConstraintEstimator`](@ref)
-  - [`linear_constraints`](@ref)
-"""
-function linear_constraints(lcs::VecEcE_LcE_Lc, sets::UniverseSets;
-                            datatype::DataType = Float64, strict::Bool = false,
-                            bl_flag::Bool = false,
-                            rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
-                            rd::Option{<:ReturnsResult} = nothing)
-    return [linear_constraints(lc, sets; datatype = datatype, strict = strict,
-                               bl_flag = bl_flag, rr = rr, rd = rd) for lc in lcs]
 end
 """
     reader_frames(space::FactorSpace, path::AbstractString, refit::Bool)

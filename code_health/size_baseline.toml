@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.4"
 julia_syntax = "1.0.2"
-commit = "d3a7fe37e9"
+commit = "2d8943aeb5"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { code = 35, doc = 0, comment = 5, blank = 4, total = 44 }
@@ -263,6 +263,7 @@ commit = "d3a7fe37e9"
 "src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { code = 64, doc = 111, comment = 2, blank = 57, total = 234 }
 "src/09_ConstraintGeneration/10_LotUnitConstraintGeneration.jl" = { code = 44, doc = 190, comment = 0, blank = 86, total = 320 }
 "src/09_ConstraintGeneration/11_ConcentrationLimitGeneration.jl" = { code = 146, doc = 454, comment = 0, blank = 191, total = 791 }
+"src/09_ConstraintGeneration/12_PositionConstraintGeneration.jl" = { code = 88, doc = 257, comment = 0, blank = 117, total = 462 }
 "src/10_Prior/01_Base_Prior.jl" = { code = 484, doc = 1162, comment = 69, blank = 503, total = 2218 }
 "src/10_Prior/02_EmpiricalPrior.jl" = { code = 108, doc = 318, comment = 14, blank = 131, total = 571 }
 "src/10_Prior/03_FactorPrior.jl" = { code = 145, doc = 406, comment = 32, blank = 143, total = 726 }

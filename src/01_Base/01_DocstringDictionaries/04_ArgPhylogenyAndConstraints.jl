@@ -173,7 +173,10 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :cnl_s => "`s`: Limit of the sum of the positions over `t`. The UCITS value is `0.40`.",#
                  :cnl_set => "`set`: The positions that the rule reads. `nothing` makes each asset its own position. An `AssetSetsMatrixEstimator` or a membership matrix makes each row of the matrix one position, such as one issuer, so two share classes of one issuer are one position.",#
                  :cnl_res_set => "`set`: Membership matrix whose rows are the positions that the rule reads, or `nothing` to make each asset its own position.",#
-                 :cnl_pos => "`pos`: Reading of a position with a short side: `GrossPosition()`, `NetPosition()` or `LongPosition()`. On a long-only book the three readings are the weights.",#
+                 :cnl_pos => "`pos`: Reading of a position with a short side: `GrossPosition()`, `NetPosition()`, `LongPosition()` or `ShortPosition()`. On a long-only book the first three readings are the weights, and the short reading is zero.",#
+                 :pce_lce => "`lce`: Wrapped linear constraint. It takes every shape that `lcse` takes except this wrapper: a [`LinearConstraintEstimator`](@ref), a precomputed [`LinearConstraint`](@ref), an [`ExposureConstraintEstimator`](@ref), or a vector that can mix them.",#
+                 :pce_pos => "`pos`: Reading of the weights that the rows apply to: `GrossPosition()`, `LongPosition()`, `ShortPosition()` or `NetPosition()`.",#
+                 :pcr_lc => "`lc`: Linear constraint over the assets. Its rows apply to the reading of the weights, and not to the weights.",#
                  :cnl_alg => "`alg`: Form of the rule: `ExactConcentration()`, the mixed-integer rule itself, or `SumLargestConcentration()`, a linear form that is stricter than the rule.",#
                  :cnm_x => "`x`: The position of each row of the rule, as `pos` and `set` read the weights.",#
                  :cnm_cap => "`cap`: The cap margin of each position, `x - c`. A margin `<= 0` passes.",#

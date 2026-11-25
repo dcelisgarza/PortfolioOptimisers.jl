@@ -11,6 +11,7 @@ AbstractPositionReading
 GrossPosition
 NetPosition
 LongPosition
+ShortPosition
 AbstractConcentrationAlgorithm
 ExactConcentration
 SumLargestConcentration
