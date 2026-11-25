@@ -209,3 +209,50 @@ The projection programme reads the same rule, because the leader and the project
 one shared entry, `resolve_block_entry` (#2046). `assert_set_prior_priced` now runs only in a direct
 call of `set_allocation_set_constraints!`, which resolves the step itself and cannot drop an
 asset.
+
+## Amendment (2026-11-25): a reader that cannot price a leg removes it from the step
+
+Issue #2339. The Decision gave a `RiskLoss` a zero gradient at a leg that its window does not
+cover, and it gave a forecast-reading rule a forecast of one. Both were wrong for the same reason:
+the projection moves the book on the difference between the legs. A zero gradient is the best
+gradient when every priced leg has a positive one, and a forecast of one is the best forecast when
+every other one is below one. So a step could move the whole book to a leg with no data. Under a
+time-varying panel the Recursion Result then had no mass on an active asset, and it was an
+`OptimisationFailure` with `NaN` weights. With no panel it was a success with the whole book on
+that leg. On 300 rows of eight assets, one of them inactive at every row, the default
+`MovingAverageReversion()` failed at four rows.
+
+Two readers of a statistic already removed such a leg and wrote a zero: a `FollowTheLeader` and a
+`ProgrammeAllocationSet`, as every batch head does. Every reader does so now.
+
+- **A `NaN` is the mark.** `loss_gradient` and `forecast_relative` answer `NaN` at an asset that
+  the reader cannot price, as a prior does in `mu`, and `investable_mask` of the vector reads it.
+  A custom objective or predictor uses the same mark. A vector with no finite entry states no
+  universe: a forecast is then flat, and a gradient is refused with the raw step.
+- **The step runs on the mask.** It starts from the allocation on the priced legs, renormalised
+  (`investable_book`). The gradient reads that book too, where the Decision read the slice with no
+  renormalisation. The projection takes the mask in a last slot, reduces the geometry and the set,
+  and writes a zero outside it. A `ProgrammeAllocationSet` intersects the mask with the one of its
+  prior. So on a panel with an asset that never lists, the book is the book of the same rule over
+  the other assets, to rounding.
+- **The iterate of a `MirrorDescent` keeps its weight at such a leg** (`parked_iterate`), and the
+  step moves the rest of its mass alone. The book holds a zero, and the leg comes back at the
+  weight of the iterate. A multiplicative step from a zero would hold the zero for ever, which is
+  the fact that ADR 0157 and ADR 0162 rest on. An `AdaptiveSubgradient` keeps no iterate. Its step
+  is additive, so it can buy the leg from the zero.
+- **Bounds that do not reach the budget on the mask hold the step.**
+
+*The programme set is the one place the recursion takes a zero it did not step to* is superseded:
+every reader of a statistic is such a place. *The step reads a gap as cash* holds. A kernel over
+price relatives, log wealth among them, prices a gap at a flat return, so it forces no zero, and a
+relisted asset comes back at the weight of the recursion. Such a kernel can still move the whole
+book to an inactive leg when its step is large. #2346 holds that question.
+
+Rejected alternatives:
+
+1. **Hold the mass of the unpriced legs, and project the priced legs onto the simplex of the
+   rest.** The book then holds a leg outside the loss. Option 4 above rejected the same form for a
+   programme set.
+2. **Reduce the head to the active mask once per row.** Every Rule State then needs an inverse of
+   its view, and the state of a folding forecaster has none. It also removes the cash reading of
+   every kernel, which ADR 0162 rules.

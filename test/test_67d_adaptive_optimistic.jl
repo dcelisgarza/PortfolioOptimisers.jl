@@ -349,9 +349,9 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         @test wh == cases[2]
 
         # The issue's panel: the window of the Risk Loss does not price D, so its gradient is
-        # zero there. On two rows the first step reads one row and holds the uniform start.
-        # The second has g = 2 Σ u on A, B, C, with g_C < 0 and the others positive, so
-        # q = u - η sign(g) on them and q_D = 1/4. C keeps 1/4 + η, and D takes the rest.
+        # `NaN` there. On two rows the first step reads one row and holds the uniform start.
+        # The second has g = 2 Σ v on A, B, C at v = 1/3, with g_C < 0 and the others
+        # positive, so q = v - η sign(g) on them, and C takes the whole book (#2339).
         R7 = 0.02 .* randn(StableRNG(7), 40, 4)
         Rn = copy(R7[1:3, :])
         am = trues(3, 4)
@@ -361,8 +361,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
                             pnl = AssetPanel(; amsk = am, emsk = copy(am)))
         risk = RiskLoss(; window = 10)
         o2 = po.partial_fit!(OPS(; alg = AdaptiveSubgradient(; obj = risk)), rows(rdn, 1:2))
-        eta = 1 / sqrt(2)
-        @test isapprox(o2.cache.w, [0.0, 0.0, 0.25 + eta, 0.75 - eta]; atol = 1e-15)
+        @test o2.cache.w == [0.0, 0.0, 1.0, 0.0]
         @test o2.cache.st.s[4] == 0
         lim(d) = optimise(OPS(; alg = AdaptiveSubgradient(; delta = d, obj = risk)), rdn).w
         @test maxerr(lim(0), lim(1e-12)) < 1e-9

@@ -10,8 +10,10 @@ PortfolioOptimisers.forecaster_seed
 PortfolioOptimisers.forecast_min_rows
 PortfolioOptimisers.holds_second_moment
 PortfolioOptimisers.flat_where_undefined
+PortfolioOptimisers.forecast_where_defined
 PortfolioOptimisers.refit_rows
 PortfolioOptimisers.last_active_mask
 PortfolioOptimisers.scale_relative
+PortfolioOptimisers.forecast_step
 PortfolioOptimisers.ForecastReadingRule
 ```

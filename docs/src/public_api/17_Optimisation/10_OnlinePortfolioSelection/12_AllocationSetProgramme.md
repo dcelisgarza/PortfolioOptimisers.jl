@@ -8,5 +8,6 @@ Description = "Allocation Set programme, public API of PortfolioOptimisers.jl: s
 
 ```@docs
 PortfolioOptimisers.set_allocation_set_constraints!
+PortfolioOptimisers.project(::PortfolioOptimisers.AbstractProjectionGeometry, ::PortfolioOptimisers.AbstractAllocationSet, ::AbstractVector, ::AbstractVector, ::Nothing)
 PortfolioOptimisers.project(::PortfolioOptimisers.AbstractProjectionGeometry, ::Tuple, ::AbstractVector, ::AbstractVector, ::PortfolioOptimisers.Option{<:PortfolioOptimisers.ReturnsResult})
 ```

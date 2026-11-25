@@ -1,11 +1,12 @@
 ```@meta
-Description = "Base Online Portfolio Selection, private API of PortfolioOptimisers.jl: simplex_bounds, assert_feasible_bounds, assert_finite_raw_step, budget_or_held_step, …"
+Description = "Base Online Portfolio Selection, private API of PortfolioOptimisers.jl: simplex_bounds, feasible_bounds, assert_feasible_bounds, assert_finite_raw_step, …"
 ```
 
 # Base Online Portfolio Selection: private API
 
 ```@docs
 PortfolioOptimisers.simplex_bounds
+PortfolioOptimisers.feasible_bounds
 PortfolioOptimisers.assert_feasible_bounds
 PortfolioOptimisers.assert_finite_raw_step
 PortfolioOptimisers.budget_or_held_step

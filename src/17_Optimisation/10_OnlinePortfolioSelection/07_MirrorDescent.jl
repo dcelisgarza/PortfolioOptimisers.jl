@@ -977,7 +977,7 @@ The objective is the loss of each period. The mirror step reads the gradient of 
 
 In order to implement a new objective, subtype `AbstractOnlineObjective` and implement:
 
-  - `loss_gradient(obj::AbstractOnlineObjective, u::AbstractVector, x::AbstractVector, rows) -> AbstractVector`: The gradient of the period's loss at the iterate `u`. It reads the period's price relative `x` and the rows the head holds, which are `nothing` when the objective reads no rows.
+  - `loss_gradient(obj::AbstractOnlineObjective, u::AbstractVector, x::AbstractVector, rows) -> AbstractVector`: The gradient of the period's loss at the iterate `u`. It reads the period's price relative `x` and the rows the head holds, which are `nothing` when the objective reads no rows. It holds `NaN` at an asset that the objective cannot price. The rule then takes the step on the other assets, and gives that asset a zero weight.
   - `rows_needed(obj::AbstractOnlineObjective) -> Union{Nothing, Integer}`: The number of rows the objective reads at a step, `0` when it reads none. The rule that holds the objective answers this number as its own.
 
 # Related
@@ -1040,7 +1040,7 @@ A prior fitted on one row has no covariance. So the loss starts when the head ho
 
 **A risk gradient is small, so a rule on a Risk Loss needs a much larger rate than a log-wealth rule.** A variance gradient ``2 \\boldsymbol{\\Sigma} \\boldsymbol{w}`` has the size of one period's variance. Take 1000 periods of returns `randn(StableRNG(7), 1000, 4) .* [0.01 0.02 0.03 0.04]`, a window of 20 and the uniform allocation. Over every window, the log-wealth gradient is then between 1100 and 6400 times larger than the variance gradient. The entropic rule on [`Variance`](@ref) at the log-wealth default `eta = 0.05` ends 0.005 from its uniform start, and the minimum-variance allocation is 0.45 away. At `eta = 100` the rule ends within 0.06 of that allocation.
 
-The prior is fitted on the window, a view of the rows that the head holds as a [`ReturnsResult`](@ref), as a batch prior is fitted on any returns data. The rows hold `NaN` where there was no return, and the active mask beside them. So under a time-varying panel the prior reduces to the Coverage Universe of the window, and answers `NaN` at an asset that the window does not cover. The loss reads its gradient on the Investable Mask of that result, and writes zero at every other leg. The window holds no data about such a leg, so the loss does not move it, and the projection alone places it. A plain `pe` therefore never meets a constant column. A leg unlisted for a part of the window is outside the Coverage Universe of a plain prior until the window clears that part. A mask-aware prior takes the leg in after its own warm-up.
+The prior is fitted on the window, a view of the rows that the head holds as a [`ReturnsResult`](@ref), as a batch prior is fitted on any returns data. The rows hold `NaN` where there was no return, and the active mask beside them. So under a time-varying panel the prior reduces to the Coverage Universe of the window, and answers `NaN` at an asset that the window does not cover. The loss reads its gradient on the Investable Mask of that result, and marks every other leg with `NaN`. The rule takes its step on the mask, and the book holds a zero at every other leg, as a batch head leaves out an asset that its prior cannot price. So on a panel with an asset that never lists, the book is the book of the same rule over the other assets. A plain `pe` therefore never meets a constant column. A leg unlisted for a part of the window is outside the Coverage Universe of a plain prior until the window clears that part. A mask-aware prior takes the leg in after its own warm-up. A leg that the window prices again comes back at the weight that the iterate of a [`MirrorDescent`](@ref) kept for it, and at zero under an [`AdaptiveSubgradient`](@ref), whose step can then buy it.
 
 The regret theorems of the first-order rules need a convex loss. So they hold here for the measures that are convex in the weights: [`Variance`](@ref), [`StandardDeviation`](@ref), [`ConditionalValueatRisk`](@ref), [`EntropicValueatRisk`](@ref), [`WorstRealisation`](@ref), [`Range`](@ref), [`MaximumDrawdown`](@ref), [`AverageDrawdown`](@ref), [`ConditionalDrawdownatRisk`](@ref), [`EntropicDrawdownatRisk`](@ref), the low-order moment measures, and [`MeanReturn`](@ref), which is linear. A quantile measure such as [`ValueatRisk`](@ref) or [`DrawdownatRisk`](@ref), a kurtosis, a skewness and a ratio are not convex, and on them the step is a heuristic with no bound. At a kink of a convex measure, a finite-difference gradient is the chord across the kink, near a subgradient, as [`risk_gradient`](@ref) states.
 
@@ -1247,7 +1247,7 @@ The [`LogWealth`](@ref) method returns `-x ./ dot(u, x)`. The [`RiskLoss`](@ref)
  2. View the last `min(window, n)` of the `n` rows of `rows`. The head can hold more rows than the loss reads, because another part of the head can need more.
  3. Fit the prior `pr` of the loss on that view, as a batch prior is fitted, on its returns and its Asset Panel. The prior reads its own source, so under `x_src = ExcessSource()` it reads `X - B`. The prior answers `NaN` at an asset outside its Coverage Universe.
  4. Read the Investable Mask of `pr`.
- 5. Compute the gradient of the measure on that mask with [`investable_risk_gradient`](@ref), against the rows of the view. It is zero at every other leg.
+ 5. Compute the gradient of the measure on that mask with [`investable_risk_gradient`](@ref), against the rows of the view. It is `NaN` at every other leg.
 
 # Related
 
@@ -1274,7 +1274,7 @@ end
 
 Computes the gradient of a Risk Loss on the Investable Mask of its prior result.
 
-A leg that the window does not cover gets a zero gradient, so the loss does not move it.
+A leg that the window does not cover gets `NaN`, the mark of an asset that the loss cannot price. The rule then leaves it out of the step, see [`investable_gradient`](@ref).
 
 # Algorithm
 
@@ -1283,10 +1283,10 @@ The measure reads the rows `rd` that the prior is fitted on: each [`DataBenchmar
 When the mask is `nothing`, every asset is priced, and the method returns [`risk_gradient`](@ref) of the bound measure at `u`. Otherwise it runs these steps.
 
  1. Find the indices `idx` of the assets on the mask.
- 2. Make the zero vector `g` of the length of `u`.
+ 2. Make the vector `g` of the length of `u`, `NaN` at each entry.
  3. View the measure at `idx` with [`port_opt_view`](@ref). The view cuts a benchmark, a turnover reference or a moment that the measure holds to the legs on the mask.
  4. Bind the viewed measure to the rows viewed at `idx`.
- 5. Write [`risk_gradient`](@ref) of the bound measure at `u[idx]`, against the prior viewed at `idx`, into `g[idx]`. The slice of `u` is not renormalised.
+ 5. Write [`risk_gradient`](@ref) of the bound measure at the slice of `u` at `idx`, renormalised to sum to one with [`renormalised_view`](@ref), against the prior viewed at `idx`, into `g[idx]`. So the gradient reads the book that the fund holds on the mask.
 
 # Related
 
@@ -1301,9 +1301,10 @@ end
 function investable_risk_gradient(obj::RiskLoss, u::AbstractVector, pr::AbstractPriorResult,
                                   imsk::BitVector, rd::ReturnsResult)
     idx = findall(imsk)
-    g = zeros(eltype(u), length(u))
     r = bind_data_benchmark(port_opt_view(obj.r, idx, pr.X), port_opt_view(rd, idx))
-    g[idx] .= risk_gradient(r, u[idx], port_opt_view(pr, idx); sca = obj.sca)
+    gr = risk_gradient(r, renormalised_view(u, idx), port_opt_view(pr, idx); sca = obj.sca)
+    g = fill(convert(eltype(gr), NaN), length(u))
+    g[idx] .= gr
     return g
 end
 """
@@ -1311,7 +1312,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the state of a [`MirrorDescent`](@ref) rule between its updates.
 
-The state holds the unmixed iterate, the Start Allocation that a restart returns to, the statistic of the schedule and the averages of the Gradient Transform. The mirror step reads and writes the iterate. The head plays the uniform mix of the iterate when `alpha` is positive, and the iterate itself otherwise.
+The state holds the unmixed iterate, the Start Allocation that a restart returns to, the statistic of the schedule and the averages of the Gradient Transform. The mirror step reads and writes the iterate. The head plays the uniform mix of the iterate when `alpha` is positive, and the iterate itself otherwise. After a step that the loss cannot price everywhere, the head plays the iterate on the priced assets, renormalised, and the iterate keeps its weight at every other asset, see [`parked_iterate`](@ref).
 
 # Fields
 
@@ -1409,7 +1410,7 @@ A schedule can name a restart. The update of that period then returns the Start 
 
 The rule can also serve inside a mixture. As the weighting of an [`ExpertMixture`](@ref), it moves the weight over the experts on their period returns. As an expert of a mixture under [`BlendPoint`](@ref), the rule reads its gradient at the blend that the mixture played, and steps from its own iterate. The last slot of [`online_update!`](@ref) hands it that Gradient Point. This is the shared gradient of Algorithm 4 of [zhang2018ader](@cite). The meta-algorithm of [zhao2020sword](@cite) also reads the gradient at the blend, as the linearised loss of its Equation 13. Each of its experts reads the gradient at its own iterate. On the head, and under [`OwnPoint`](@ref), the point is the iterate.
 
-`obj` is the loss. [`LogWealth`](@ref) is the loss of every rule above. A [`RiskLoss`](@ref) is a risk measure over the last `window` rows the head holds. The rule reads as many rows as its objective. Only the log-wealth gradient reads the mixed price relatives, because a risk measure reads returns and not price relatives. The mix of the played allocation applies under both.
+`obj` is the loss. [`LogWealth`](@ref) is the loss of every rule above. A [`RiskLoss`](@ref) is a risk measure over the last `window` rows the head holds. The rule reads as many rows as its objective. Only the log-wealth gradient reads the mixed price relatives, because a risk measure reads returns and not price relatives. The mix of the played allocation applies under both. An objective can price a part of the universe alone, as a [`RiskLoss`](@ref) does under a time-varying panel. The step, the projection and the mix then run on the priced assets, and the book holds a zero at every other one.
 
 `predictor` makes the step optimistic. With a Gradient Predictor, the rule is the optimistic mirror descent (OMD) of [rakhlin2013colt](@cite) and [rakhlin2013nips](@cite). With a fixed rate and the last gradient as the hint, it is the algorithm of [chiang2012](@citet). Each period then takes two half-steps in the rule's geometry, and the second one follows the predictor's hint for the gradient of the next period. The state of the rule is then an [`OptimisticMirrorDescentState`](@ref), which holds two iterates. The secondary iterate is where the step of the next period starts, and the played allocation is one hint step ahead of it. At `predictor = nothing` the rule takes the plain step, and its state is a [`MirrorDescentState`](@ref).
 
@@ -1471,32 +1472,32 @@ For a fixed rate ``\\eta`` and a comparator ``\\boldsymbol{w}^*`` with ``D_\\Psi
 [`online_update!`](@ref) runs these steps at the period's row `x`. The Gradient Point `point` is the iterate when it is `nothing`, the default. `st` is the state of the rule, the [`MirrorDescentState`](@ref) that the rule keeps from one update to the next.
 
  1. Set the period `t = st.n + 1`, and the Price-Adjusted Allocation `wh` of the book `w` after the row.
- 2. When the schedule names a restart at `t`, re-enter the Start Allocation `st.w0` onto the set from `wh` with [`reprojection`](@ref). Put the statistic of the schedule and the state of the Gradient Transform back at their seeds, keep `t`, and return that allocation. Stop.
+ 2. When the schedule names a restart at `t`, re-enter the Start Allocation `st.w0` onto the set from `wh` with [`reprojection`](@ref), on the assets that the loss prices. Put the statistic of the schedule and the state of the Gradient Transform back at their seeds, keep `t`, and return that allocation. Stop.
  3. When the schedule reads the period's row, write its statistic from `w` and `x`.
  4. Read the rate `eta` and the share `alpha` of period `t`. A schedule's share takes precedence over the field `alpha`.
  5. Mix the price relatives into `xm` with [`mixed_relatives`](@ref).
- 6. Resolve the loss against `wh` with [`factory`](@ref), so that a benchmark or a turnover reference of a [`RiskLoss`](@ref) that is not fixed takes `wh`. Take the gradient `g` of that loss at `point`, from `xm` and the head's `rows`.
+ 6. Resolve the loss against `wh` with [`factory`](@ref), so that a benchmark or a turnover reference of a [`RiskLoss`](@ref) that is not fixed takes `wh`. Take the gradient `g` of that loss at `point`, from `xm` and the head's `rows`, and its Investable Mask `imsk`, with [`investable_gradient`](@ref).
  7. Transform `g` with the Gradient Transform, which updates its state.
- 8. Take the mirror step `q` from the iterate `st.u`, on `eta` times the transformed gradient.
- 9. Project `q` onto the set from `wh`, which gives the new iterate `u`.
+ 8. Take the mirror step `q` from the iterate `st.u`, reduced to the mask with [`investable_book`](@ref), on `eta` times the transformed gradient.
+ 9. Project `q` onto the set from `wh` at the mask, which gives `u`. The new iterate is `u`, with the weight that `st.u` keeps at an asset outside the mask, through [`parked_iterate`](@ref).
 10. When the schedule reads the past alone, write its statistic from `w` and `x`.
-11. Form the played allocation from `u` with [`played_allocation`](@ref). When `alpha` is positive, project it with [`reprojection`](@ref).
+11. Form the played allocation from `u` with [`played_allocation`](@ref), on the mask. When `alpha` is positive, project it with [`reprojection`](@ref).
 12. Return the new state and the played allocation.
 
 With a `predictor`, the update runs these steps instead. The Gradient Point `point` is the unmixed played iterate `st.u` when it is `nothing`, the default. `st` is then an [`OptimisticMirrorDescentState`](@ref).
 
  1. Set the period `t = st.n + 1`, and form the Price-Adjusted Allocation `wh` of the book `w` after the row.
- 2. When the schedule of `eta` names a restart at `t`, re-enter the Start Allocation `st.w0` onto the set from `wh` with [`reprojection`](@ref). Put both iterates at that allocation, and the states of the schedule and the predictor at their seeds, keep `t`, and return that allocation. Stop.
+ 2. When the schedule of `eta` names a restart at `t`, re-enter the Start Allocation `st.w0` onto the set from `wh` with [`reprojection`](@ref), on the assets that the loss prices. Put both iterates at that allocation, and the states of the schedule and the predictor at their seeds, keep `t`, and return that allocation. Stop.
  3. When the schedule reads the period's row before the rate, write its statistic from `w` and `x`.
  4. Read the rate `eta` and the share `alpha` of period `t`.
  5. Mix the price relatives into `xm` with [`mixed_relatives`](@ref).
- 6. Resolve `obj` against `wh` with [`factory`](@ref). Take the gradient `g` of that objective at `point`, from `xm` and the head's `rows`, with [`loss_gradient`](@ref).
- 7. Take the first half-step from the secondary iterate `st.v` on `eta .* g` with [`half_step`](@ref), which gives the new secondary iterate `v`.
- 8. Form the hint `m` and the state `ps` of the predictor with [`predict_gradient!`](@ref), from the resolved objective, `g`, `v`, `x` and `xm`.
+ 6. Resolve `obj` against `wh` with [`factory`](@ref). Take the gradient `g` of that objective at `point`, from `xm` and the head's `rows`, with [`loss_gradient`](@ref), and its Investable Mask `imsk`, with [`investable_gradient`](@ref).
+ 7. Take the first half-step from the secondary iterate `st.v` on `eta .* g` with [`half_step`](@ref), at the mask, which gives `v`. The new secondary iterate is `v`, with the weight that `st.v` keeps at an asset outside the mask, through [`parked_iterate`](@ref).
+ 8. Form the hint `m` and the state `ps` of the predictor with [`predict_gradient!`](@ref), from the resolved objective, `g`, `v`, `x` and `xm`. Intersect `imsk` with the mask of the hint, which gives `kmsk`. When the two share no asset, `kmsk` is `imsk`, and the hint is zero on it.
  9. Measure the residual `r` of `g` against the last hint `st.m` with [`hint_residual`](@ref), and shift the residual sums into `res`.
 10. When the schedule reads the past alone, write its statistic `s` from `w` and `x`.
-11. Read the rate of period `t + 1` from a state of the rule that holds the period's row. Take the second half-step from `v` on that rate times `m`, which gives the unmixed played iterate `u`.
-12. Form the played allocation from `u` with [`played_allocation`](@ref). When `alpha` is positive, project it with [`reprojection`](@ref).
+11. Read the rate of period `t + 1` from a state of the rule that holds the period's row. Take the second half-step from `v` on that rate times `m`, at `kmsk`, which gives the unmixed played iterate `u`.
+12. Form the played allocation from `u` with [`played_allocation`](@ref), on `kmsk`. When `alpha` is positive, project it with [`reprojection`](@ref).
 13. Return the new state and the played allocation.
 
 # Fields
@@ -1631,11 +1632,12 @@ function rule_state_seed(alg::MirrorDescent, w::AbstractVector,
                               gradient_state_seed(alg.grad, w))
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    played_allocation(u::AbstractVector, alpha::Real, imsk::Nothing = nothing)
+    played_allocation(u::AbstractVector, alpha::Real, imsk::BitVector)
 
 Forms the allocation that a [`MirrorDescent`](@ref) rule plays from its iterate.
 
-At `alpha = 0` the function returns a copy of the iterate `u`.
+At `alpha = 0` the function returns a copy of the iterate `u`. With an Investable Mask `imsk`, the uniform allocation is the one over the assets of the mask, and ``N`` is their number.
 
 # Mathematical definition
 
@@ -1657,11 +1659,14 @@ Where:
 
   - [`MirrorDescent`](@ref)
 """
-function played_allocation(u::AbstractVector, alpha::Real)
+function played_allocation(u::AbstractVector, alpha::Real, ::Nothing = nothing)
     if iszero(alpha)
         return copy(u)
     end
     return (1 - alpha) .* u .+ alpha / length(u)
+end
+function played_allocation(u::AbstractVector, alpha::Real, imsk::BitVector)
+    return (1 - alpha) .* u .+ (alpha / count(imsk)) .* imsk
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1719,11 +1724,15 @@ function online_update!(alg::MirrorDescent, st::MirrorDescentState, w::AbstractV
                         point::Option{<:AbstractVector} = nothing)
     t = st.n + 1
     wh = price_adjusted_allocation(w, x)
+    obj = factory(alg.obj, wh)
     if restart(alg.eta, t)
         # The period count survives the restart: the schedule's stages are cumulative. The
-        # start re-enters the set from the book the fund holds, as it entered at the seed.
-        u0 = reprojection(alg.proj, set, st.w0, wh)
-        return MirrorDescentState(t, u0, st.w0, schedule_state_seed(alg.eta, st.w0),
+        # start re-enters the set from the book the fund holds, as it entered at the seed,
+        # on the assets that the loss prices.
+        imsk = investable_mask(loss_gradient(obj, st.u, x, rows))
+        u0 = reprojection(alg.proj, set, investable_book(st.w0, imsk), wh, imsk)
+        return MirrorDescentState(t, parked_iterate(st.w0, u0, imsk), st.w0,
+                                  schedule_state_seed(alg.eta, st.w0),
                                   gradient_state_seed(alg.grad, st.w0)), copy(u0)
     end
     # A schedule that chooses the rate from the period's row writes its statistic here, and
@@ -1733,24 +1742,24 @@ function online_update!(alg::MirrorDescent, st::MirrorDescentState, w::AbstractV
     eta = learning_rate(alg.eta, t, st)
     alpha = mixing_share(alg.eta, t, alg.alpha)
     xm = mixed_relatives(x, alpha)
-    g = loss_gradient(factory(alg.obj, wh), something(point, st.u), xm, rows)
+    g, imsk = investable_gradient(loss_gradient(obj, something(point, st.u), xm, rows))
     gs, gt = transform_gradient!(alg.grad, st.gs, g)::Tuple
-    q = mirror_step(alg.proj, st.u, eta .* gt)
-    u = project(alg.proj, set, q, wh)
+    q = mirror_step(alg.proj, investable_book(st.u, imsk), eta .* gt)
+    u = project(alg.proj, set, q, wh, imsk)
     s = statistic_after_step(alg.eta, st.s, w, x)
-    played = played_allocation(u, alpha)
-    return MirrorDescentState(t, u, st.w0, s, gs),
-           iszero(alpha) ? played : reprojection(alg.proj, set, played, wh)
+    played = played_allocation(u, alpha, imsk)
+    return MirrorDescentState(t, parked_iterate(st.u, u, imsk), st.w0, s, gs),
+           iszero(alpha) ? played : reprojection(alg.proj, set, played, wh, imsk)
 end
 """
-    reprojection(proj::AbstractProjectionGeometry, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
-    reprojection(proj::AbstractProjectionGeometry, set::AbstractAllocationSet, q::AbstractVector, w::AbstractVector)
+    reprojection(proj::AbstractProjectionGeometry, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector, imsk::Option{BitVector} = nothing)
+    reprojection(proj::AbstractProjectionGeometry, set::AbstractAllocationSet, q::AbstractVector, w::AbstractVector, imsk::Option{BitVector} = nothing)
 
 Projects onto the head's Allocation Set an allocation that a [`MirrorDescent`](@ref) rule plays without a step to it.
 
 There are two such allocations. One is the uniform mix of the iterate under `alpha`. The other is the Start Allocation that a restart of a Learning-Rate Schedule returns to. Either can lie outside the set. The mix does when the set excludes the uniform allocation. The start does when a turnover ceiling or a MIP kind excludes it from the book the fund now holds. So the head projects them again, in the rule's own geometry, as an [`ExpertMixture`](@ref) projects its blend with [`blend_projection`](@ref).
 
-On a [`BoundedAllocationSet`](@ref), the function returns an allocation inside the bounds unchanged, so the default set costs nothing. On every other set the projection is a programme, and a rule with a positive `alpha` solves two programmes per period.
+On a [`BoundedAllocationSet`](@ref), the function returns an allocation inside the bounds unchanged, so the default set costs nothing. On every other set the projection is a programme, and a rule with a positive `alpha` solves two programmes per period. With an Investable Mask, the function projects `q` at the mask on every set.
 
 # Arguments
 
@@ -1758,10 +1767,11 @@ On a [`BoundedAllocationSet`](@ref), the function returns an allocation inside t
   - `set`: The set, resolved.
   - `q`: The allocation to play.
   - `w`: The Price-Adjusted Allocation the step trades from.
+  - `imsk`: The Investable Mask of the step, or `nothing`.
 
 # Returns
 
-  - `w'::AbstractVector`: `q` itself on a bounded set it lies in, its projection otherwise.
+  - `w'::AbstractVector`: `q` itself on a bounded set it lies in, its projection at the mask otherwise.
 
 # Related
 
@@ -1770,13 +1780,16 @@ On a [`BoundedAllocationSet`](@ref), the function returns an allocation inside t
   - [`played_allocation`](@ref)
 """
 function reprojection(proj::AbstractProjectionGeometry, set::BoundedAllocationSet,
-                      q::AbstractVector, w::AbstractVector)
+                      q::AbstractVector, w::AbstractVector,
+                      imsk::Option{BitVector} = nothing)
     wb = set.wb
-    return all(wb.lb .<= q .<= wb.ub) ? q : project(proj, set, q, w)
+    inside = isnothing(imsk) && all(wb.lb .<= q .<= wb.ub)
+    return inside ? q : project(proj, set, q, w, imsk)
 end
 function reprojection(proj::AbstractProjectionGeometry, set::AbstractAllocationSet,
-                      q::AbstractVector, w::AbstractVector)
-    return project(proj, set, q, w)
+                      q::AbstractVector, w::AbstractVector,
+                      imsk::Option{BitVector} = nothing)
+    return project(proj, set, q, w, imsk)
 end
 """
     ExponentiatedGradient(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(), grad::Option{<:AbstractGradientTransform} = nothing, predictor::Option{<:AbstractGradientPredictor} = nothing)

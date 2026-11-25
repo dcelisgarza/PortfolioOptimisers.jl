@@ -549,3 +549,12 @@ returns `(nothing, g)`, where the amendment of #1867 above states `g`. The rule 
 at the call, so a transform with the old return raises a `TypeError` at its first step.
 `gradient_state_seed` returns `nothing` for a transform with no method of its own, as
 `predictor_state_seed` does for a predictor.
+
+## Amendment (2026-11-25): a Risk Loss that cannot price an asset removes it from the step
+
+Issue #2339. The amendment of 2026-10-20 placed an asset that the window of a `RiskLoss` does not
+price at the limit of the seminorm projection, so the projection could give it the whole rest of
+the budget. `loss_gradient` now gives `NaN` there, and a `MirrorDescent` or an
+`AdaptiveSubgradient` takes the step on the priced assets, with a zero in the book at the other
+ones. The limit still settles an asset with no gradient mass that the loss prices, such as one
+whose every price relative is zero. ADR 0170, amendment of 2026-11-25, states the rule.

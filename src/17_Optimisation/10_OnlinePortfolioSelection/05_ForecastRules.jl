@@ -98,7 +98,7 @@ Advances the forecaster of a rule by the row `x`, and returns its Price Relative
 
 The fold arm folds a forecaster on a [`ForecasterState`](@ref) on the row, and reads the forecast from its state. The refit arm fits a forecaster with no state again on the rows that the head holds, which include the row. Outside the head, with no rows, the fold arm folds the finite `x .- 1`, and the refit arm fits the row alone.
 
-Both arms read the rows that the head holds, a [`ReturnsResult`](@ref), as the batch verb reads them, with the gaps and the active mask. The refit arm reduces to the Coverage Universe of the window. So a plain forecaster gives `NaN`, and the step holds the asset, when the asset has a gap anywhere in the window. A mask-aware forecaster gives the forecast from the rows that it has.
+Both arms read the rows that the head holds, a [`ReturnsResult`](@ref), as the batch verb reads them, with the gaps and the active mask. The refit arm reduces to the Coverage Universe of the window. So a plain forecaster gives `NaN`, and the step leaves the asset out at a zero weight, when the asset has a gap anywhere in the window. A mask-aware forecaster gives the forecast from the rows that it has.
 
 The fold arm folds the last of those rows, which is the current row as the head received it, under its active mask. The running statistic of a plain moment forecaster is then `NaN` from the first gap on, which is the Coverage Universe of the prefix. A mask-aware forecaster freezes, resets or admits the asset again by its own policy. A folding price-level statistic resets the asset that the mask turns off, and gives `NaN` until it has folded a level, so a relisted asset starts cold.
 
@@ -106,7 +106,7 @@ The fold arm folds the last of those rows, which is the current row as the head 
 
 ```math
 \\begin{align}
-\\hat{x}_{t+1, i} &= \\begin{cases} 1 + \\hat{\\mu}_i & \\text{if } \\hat{\\mu}_i \\text{ is finite}\\,, \\\\ 1 & \\text{otherwise}\\,. \\end{cases}
+\\hat{x}_{t+1, i} &= \\begin{cases} 1 + \\hat{\\mu}_i & \\text{if } \\hat{\\mu}_i \\text{ is finite}\\,, \\\\ 1 & \\text{if no } \\hat{\\mu}_j \\text{ is finite}\\,, \\\\ \\text{NaN} & \\text{otherwise}\\,. \\end{cases}
 \\end{align}
 ```
 
@@ -116,7 +116,7 @@ Where:
   - ``\\hat{\\mu}_i``: Expected return of asset ``i`` that the forecaster estimates after the row of period ``t``.
   - $(math_dict[:t_period])
 
-A forecast of one in every asset is flat, and the step of every rule holds on a flat forecast. The refit arm also gives a flat forecast while it has fewer rows than [`forecast_min_rows`](@ref).
+An entry of `NaN` marks an asset that the forecaster cannot price, and [`investable_mask`](@ref) reads it. A forecast of one in every asset is flat, and the step of every rule holds on a flat forecast. The refit arm also gives a flat forecast while it has fewer rows than [`forecast_min_rows`](@ref).
 
 # Algorithm
 
@@ -125,13 +125,13 @@ With no state, the refit arm:
  1. Take the returns `X`, the Asset Panel `pnl` and the implied-volatility keywords `vols` with [`refit_rows`](@ref).
  2. When `X` has fewer rows than [`forecast_min_rows`](@ref), return `nothing` and a flat forecast. Stop.
  3. Estimate the expected returns with `mean(me, X, pnl; dims = 1, vols...)`.
- 4. Return `nothing` and one plus the expected returns, through [`flat_where_undefined`](@ref).
+ 4. Return `nothing` and one plus the expected returns, through [`forecast_where_defined`](@ref).
 
 With a [`ForecasterState`](@ref), the fold arm:
 
  1. Fold the forecaster `st.me` with [`partial_fit!`](@ref). When `rows` holds the rows, fold the last row of their returns in the head's frame, which [`head_frame_returns`](@ref) gives, under the mask of [`last_active_mask`](@ref). When `rows` is `nothing`, fold `x .- 1`, which is in the head's frame too.
  2. Read the expected returns from the state of the folded forecaster.
- 3. Return the new [`ForecasterState`](@ref) and one plus the expected returns, through [`flat_where_undefined`](@ref).
+ 3. Return the new [`ForecasterState`](@ref) and one plus the expected returns, through [`forecast_where_defined`](@ref).
 
 # Arguments
 
@@ -158,14 +158,14 @@ function forecast_relative(me::AbstractExpectedReturnsEstimator, ::Nothing,
         return nothing, fill(one(eltype(x)), length(x))
     end
     return nothing,
-           flat_where_undefined(one(eltype(x)) .+
-                                vec(Statistics.mean(me, X, pnl; dims = 1, vols...)))
+           forecast_where_defined(one(eltype(x)) .+
+                                  vec(Statistics.mean(me, X, pnl; dims = 1, vols...)))
 end
 function forecast_relative(::AbstractExpectedReturnsEstimator, st::ForecasterState,
                            x::AbstractVector, ::Nothing)
     me = partial_fit!(st.me, x .- one(eltype(x)))
     return ForecasterState(me),
-           flat_where_undefined(one(eltype(x)) .+ vec(Statistics.mean(me)))
+           forecast_where_defined(one(eltype(x)) .+ vec(Statistics.mean(me)))
 end
 function forecast_relative(::AbstractExpectedReturnsEstimator, st::ForecasterState,
                            x::AbstractVector, rows::ReturnsResult)
@@ -173,7 +173,7 @@ function forecast_relative(::AbstractExpectedReturnsEstimator, st::ForecasterSta
     me = partial_fit!(st.me, view(X, size(X, 1), :);
                       active_mask = last_active_mask(rows.pnl))
     return ForecasterState(me),
-           flat_where_undefined(one(eltype(x)) .+ vec(Statistics.mean(me)))
+           forecast_where_defined(one(eltype(x)) .+ vec(Statistics.mean(me)))
 end
 """
     last_active_mask(pnl::Nothing)
@@ -255,16 +255,35 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Reads each non-finite entry of a Price Relative Forecast as one, so the step holds that asset.
+Reads each non-finite entry of a Price Relative Forecast as one.
 
-A forecaster whose estimate is undefined over the first rows, such as a variance over one observation, therefore holds until the estimate is defined.
+It gives the diagonal of [`scale_relative`](@ref), so the step on an asset that the `scale` statistic cannot give is not scaled.
+
+# Related
+
+  - [`scale_relative`](@ref)
+  - [`forecast_where_defined`](@ref)
+"""
+function flat_where_undefined(xhat::AbstractVector)
+    return [isfinite(v) ? v : one(v) for v in xhat]
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Reads each non-finite entry of a Price Relative Forecast as `NaN`, the mark of an asset that the forecaster cannot price.
+
+The step of the rule leaves such an asset out with [`investable_mask`](@ref), and gives it a zero weight, as a batch optimiser does with an asset that its prior cannot price. A forecaster that prices no asset states no universe. The forecast is then flat, so the step holds. This happens over the first rows of a forecaster whose estimate is undefined on them, such as a variance over one observation.
 
 # Related
 
   - [`forecast_relative`](@ref)
+  - [`investable_mask`](@ref)
 """
-function flat_where_undefined(xhat::AbstractVector)
-    return [isfinite(v) ? v : one(v) for v in xhat]
+function forecast_where_defined(xhat::AbstractVector)
+    if !any(isfinite, xhat)
+        return fill(one(eltype(xhat)), length(xhat))
+    end
+    return [isfinite(v) ? v : oftype(v, NaN) for v in xhat]
 end
 """
     refit_rows(rows::ReturnsResult, x::AbstractVector)
@@ -355,6 +374,8 @@ The sign of the step is opposite to the sign of [`PassiveAggressiveMeanReversion
  4. Form the diagonal `D` of the preconditioner with [`scale_relative`](@ref), or `nothing`.
  5. Form the raw step `q = w .+ lam .* dev`, or `q = w .+ lam .* D .* dev` with a preconditioner.
  6. Project `q` onto the set with [`project`](@ref), with the [`price_adjusted_allocation`](@ref) of `w` after the row. Return `st` and the new allocation.
+
+Steps 2 to 6 run on the assets that the forecaster prices, and the new allocation holds a zero at every other one, see [`ForecastReadingRule`](@ref).
 
 # Fields
 
@@ -453,10 +474,40 @@ end
 function rows_needed(alg::ForecastReversion)
     return rows_needed_max(rows_needed(alg.me), window_rows(alg.scale))
 end
-function online_update!(alg::ForecastReversion, st, w::AbstractVector, x::AbstractVector,
-                        rows, set::AbstractAllocationSet,
-                        ::Option{<:AbstractVector} = nothing)
-    st, xhat = forecast_relative(alg.me, st, x, rows)
+"""
+    forecast_step(alg::ForecastReversion, w::AbstractVector, what::AbstractVector, xhat::AbstractVector, imsk::Option{BitVector}, x::AbstractVector, rows)
+    forecast_step(alg::ForecastTracking, w::AbstractVector, what::AbstractVector, xhat::AbstractVector, imsk, x::AbstractVector, rows)
+    forecast_step(alg::KernelTrendTracking, w::AbstractVector, what::AbstractVector, xhat::AbstractVector, imsk, x::AbstractVector, rows)
+    forecast_step(alg::TransactionCostOptimisation, w::AbstractVector, what::AbstractVector, xhat::AbstractVector, imsk, x::AbstractVector, rows)
+    forecast_step(alg::ShortTermSparsePortfolio, w::AbstractVector, what::AbstractVector, xhat::AbstractVector, imsk, x::AbstractVector, rows)
+
+Returns the raw step of a rule that reads a Price Relative Forecast, over the assets that the forecaster prices.
+
+The docstring of each rule states its step. [`online_update!`](@ref) reduces the three vectors to the Investable Mask of the forecast, and projects the step at that mask. A forecast that prices every asset has no mask, so the vectors are the full ones.
+
+# Arguments
+
+  - `alg`: The rule.
+  - `w`: The allocation of the step, reduced to the mask.
+  - `what`: The Price-Adjusted Allocation of the step, reduced to the mask.
+  - `xhat`: The Price Relative Forecast, reduced to the mask.
+  - `imsk`: The Investable Mask of the forecast, or `nothing` when the forecaster prices every asset. [`ForecastReversion`](@ref) reduces its preconditioner to it.
+  - `x`: The price relative of the row over the full universe.
+  - `rows`: The rows that the head holds through the row, a [`ReturnsResult`](@ref), or `nothing`.
+
+# Returns
+
+  - `q::AbstractVector`: The raw step, reduced to the mask.
+
+# Related
+
+  - [`ForecastReadingRule`](@ref)
+  - [`forecast_relative`](@ref)
+  - [`project`](@ref)
+"""
+function forecast_step(alg::ForecastReversion, w::AbstractVector, ::AbstractVector,
+                       xhat::AbstractVector, imsk::Option{BitVector}, x::AbstractVector,
+                       rows)
     dev = xhat .- Statistics.mean(xhat)
     denom = sum(abs2, dev)
     lam = if iszero(denom)
@@ -465,8 +516,11 @@ function online_update!(alg::ForecastReversion, st, w::AbstractVector, x::Abstra
         max(zero(denom), (alg.eps - LinearAlgebra.dot(w, xhat)) / denom)
     end
     D = scale_relative(alg.scale, x, rows)
-    q = isnothing(D) ? w .+ lam .* dev : w .+ lam .* D .* dev
-    return st, project(alg.proj, set, q, price_adjusted_allocation(w, x))
+    return if isnothing(D)
+        w .+ lam .* dev
+    else
+        w .+ lam .* investable_weights_view(imsk, D) .* dev
+    end
 end
 """
     MovingAverageReversion(; window::Integer = 5, eps::Real = 10, proj::EuclideanProjection = EuclideanProjection())
@@ -774,6 +828,8 @@ On the simplex, the projection is one-hot on asset ``i`` whenever ``\\epsilon (u
  3. Form the raw step `q`, which is `w` when `nrm` is zero and `w .+ eps .* dev ./ nrm` otherwise.
  4. Project `q` onto the set with [`project`](@ref), with the [`price_adjusted_allocation`](@ref) of `w` after the row. Return `st` and the new allocation.
 
+Steps 2 to 4 run on the assets that the forecaster prices, and the new allocation holds a zero at every other one, see [`ForecastReadingRule`](@ref).
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -852,14 +908,11 @@ function ForecastTracking(;
                           proj::EuclideanProjection = EuclideanProjection())::ForecastTracking
     return ForecastTracking(me, eps, proj)
 end
-function online_update!(alg::ForecastTracking, st, w::AbstractVector, x::AbstractVector,
-                        rows, set::AbstractAllocationSet,
-                        ::Option{<:AbstractVector} = nothing)
-    st, xhat = forecast_relative(alg.me, st, x, rows)
+function forecast_step(alg::ForecastTracking, w::AbstractVector, ::AbstractVector,
+                       xhat::AbstractVector, ::Any, ::AbstractVector, ::Any)
     dev = xhat .- Statistics.mean(xhat)
     nrm = LinearAlgebra.norm(dev)
-    q = iszero(nrm) ? w : w .+ alg.eps .* dev ./ nrm
-    return st, project(alg.proj, set, q, price_adjusted_allocation(w, x))
+    return iszero(nrm) ? w : w .+ alg.eps .* dev ./ nrm
 end
 """
     PeakPriceTracking(; window::Integer = 5, eps::Real = 100, proj::EuclideanProjection = EuclideanProjection())
@@ -1040,6 +1093,8 @@ On the simplex, the projection is one-hot on asset ``i`` whenever ``\\eta (K_i \
  4. Form the kernel `K` from the centred `w` and `dev`, and the raw step `q = w .+ eta .* K .* dev`.
  5. Project `q` onto the set with [`project`](@ref), with the [`price_adjusted_allocation`](@ref) of `w` after the row. Return `st` and the new allocation.
 
+Steps 2 to 5 run on the assets that the forecaster prices, and the new allocation holds a zero at every other one, see [`ForecastReadingRule`](@ref).
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -1131,18 +1186,14 @@ function KernelTrendTracking(;
                              proj::EuclideanProjection = EuclideanProjection())::KernelTrendTracking
     return KernelTrendTracking(me, eta, q, proj)
 end
-function online_update!(alg::KernelTrendTracking, st, w::AbstractVector, x::AbstractVector,
-                        rows, set::AbstractAllocationSet,
-                        ::Option{<:AbstractVector} = nothing)
-    st, xhat = forecast_relative(alg.me, st, x, rows)
+function forecast_step(alg::KernelTrendTracking, w::AbstractVector, ::AbstractVector,
+                       xhat::AbstractVector, ::Any, ::AbstractVector, ::Any)
     dev = xhat .- Statistics.mean(xhat)
-    q = if all(iszero, dev)
-        w
-    else
-        K = exp.(.-(abs.((w .- Statistics.mean(w)) .- dev) .^ inv(alg.q)))
-        w .+ alg.eta .* K .* dev
+    if all(iszero, dev)
+        return w
     end
-    return st, project(alg.proj, set, q, price_adjusted_allocation(w, x))
+    K = exp.(.-(abs.((w .- Statistics.mean(w)) .- dev) .^ inv(alg.q)))
+    return w .+ alg.eta .* K .* dev
 end
 """
     KernelTrendPatternTracking(; window::Integer = 5, nu::Real = 0.5, theta::Real = 0.99, ratio::Real = 1e-3, iters::Integer = 10_000, tol::Real = 1e-10, q::Real = 6, eta::Real = 1000, proj::EuclideanProjection = EuclideanProjection())
@@ -1248,6 +1299,8 @@ The text before Algorithm 2 of [li2018tco](@cite) renames the threshold ``\\eta 
  6. Form the raw step `q` by the soft threshold of `v` at `lam`, added to `what`.
  7. Project `q` onto the set with [`project`](@ref), with `what`. Return `st` and the new allocation.
 
+Steps 3 to 7 run on the assets that the forecaster prices, and the new allocation holds a zero at every other one, see [`ForecastReadingRule`](@ref).
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -1331,16 +1384,13 @@ function TransactionCostOptimisation(;
                                      proj::EuclideanProjection = EuclideanProjection())::TransactionCostOptimisation
     return TransactionCostOptimisation(me, eta, gamma, proj)
 end
-function online_update!(alg::TransactionCostOptimisation, st, w::AbstractVector,
-                        x::AbstractVector, rows, set::AbstractAllocationSet,
-                        ::Option{<:AbstractVector} = nothing)
-    st, xhat = forecast_relative(alg.me, st, x, rows)
-    what = price_adjusted_allocation(w, x)
+function forecast_step(alg::TransactionCostOptimisation, ::AbstractVector,
+                       what::AbstractVector, xhat::AbstractVector, ::Any, ::AbstractVector,
+                       ::Any)
     g = xhat ./ LinearAlgebra.dot(what, xhat)
     v = alg.eta .* (g .- Statistics.mean(g))
     lam = 10 * alg.eta * alg.gamma
-    q = what .+ sign.(v) .* max.(abs.(v) .- lam, zero(lam))
-    return st, project(alg.proj, set, q, what)
+    return what .+ sign.(v) .* max.(abs.(v) .- lam, zero(lam))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1418,6 +1468,8 @@ Both programmes have a minimum only when ``\\max \\boldsymbol{\\phi} - \\min \\b
  4. Find the iterate `b` with [`sparse_portfolio_iterate`](@ref), from `phi` and the seed `w`.
  5. Project `zeta .* b` onto the set with [`project`](@ref), with the [`price_adjusted_allocation`](@ref) of `w` after the row. Return `st` and the new allocation.
 
+Steps 2 to 5 run on the assets that the forecaster prices, and the new allocation holds a zero at every other one, see [`ForecastReadingRule`](@ref).
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -1437,7 +1489,7 @@ Keywords correspond to the struct's fields. The defaults of `zeta` and of the pa
 
   - `zeta > 0`. A `DomainError` is thrown otherwise.
   - `me` is not an [`Online`](@ref) wrapper, and holds none. An `ArgumentError` is thrown otherwise, and it names the wrapper.
-  - At the update, `x̂ > 0` in every asset, so the log is defined. A `DomainError` is thrown otherwise.
+  - At the update, `x̂ > 0` in every asset that the forecaster prices, so the log is defined. A `DomainError` is thrown otherwise.
 
 # Examples
 
@@ -1506,16 +1558,13 @@ function ShortTermSparsePortfolio(;
                                   proj::EuclideanProjection = EuclideanProjection())::ShortTermSparsePortfolio
     return ShortTermSparsePortfolio(me, alg, zeta, proj)
 end
-function online_update!(alg::ShortTermSparsePortfolio, st, w::AbstractVector,
-                        x::AbstractVector, rows, set::AbstractAllocationSet,
-                        ::Option{<:AbstractVector} = nothing)
-    st, xhat = forecast_relative(alg.me, st, x, rows)
+function forecast_step(alg::ShortTermSparsePortfolio, w::AbstractVector, ::AbstractVector,
+                       xhat::AbstractVector, ::Any, ::AbstractVector, ::Any)
     @argcheck(all(v -> v > zero(v), xhat),
               DomainError(xhat,
-                          "the short-term sparse portfolio takes the log of the Price Relative Forecast, which must be positive in every asset"))
+                          "the short-term sparse portfolio takes the log of the Price Relative Forecast, which must be positive in every asset that it prices"))
     phi = .-(1.1 .* log.(xhat) .+ one(eltype(xhat)))
-    b = sparse_portfolio_iterate(alg.alg, phi, w)
-    return st, project(alg.proj, set, alg.zeta .* b, price_adjusted_allocation(w, x))
+    return alg.zeta .* sparse_portfolio_iterate(alg.alg, phi, w)
 end
 """
     const ForecastReadingRule = Union{ForecastReversion, ForecastTracking, KernelTrendTracking,
@@ -1523,12 +1572,14 @@ end
 
 Union type for the Online Selection Rules that read a Price Relative Forecast on their `me` slot.
 
-Each rule holds its forecaster on `me`. So the rule views the forecaster at an asset subset, holds the rows that the forecaster reads, and seeds its state from the forecaster, through one method of [`port_opt_view`](@ref), of [`rows_needed`](@ref) and of [`rule_state_seed`](@ref) on this union. [`ForecastReversion`](@ref) also reads the rows of its `scale`, so it has a method of `rows_needed` of its own.
+Each rule holds its forecaster on `me`. So the rule views the forecaster at an asset subset, holds the rows that the forecaster reads, seeds its state from the forecaster, and takes its update, through one method of [`port_opt_view`](@ref), of [`rows_needed`](@ref), of [`rule_state_seed`](@ref) and of [`online_update!`](@ref) on this union. [`forecast_step`](@ref) gives the raw step of each rule. A forecaster can price a part of the universe alone, with `NaN` at every other asset, as [`forecast_relative`](@ref) states. The update then reduces the allocation to the priced assets with [`renormalised_view`](@ref), takes the step and projects it at them, and gives a zero weight to every other asset, as a batch optimiser does with an asset that its prior cannot price. So on a panel with an asset that never lists, the book is the book of the same rule over the other assets. [`ForecastReversion`](@ref) also reads the rows of its `scale`, so it has a method of `rows_needed` of its own.
 
 # Related
 
   - [`ForecasterState`](@ref)
   - [`forecast_relative`](@ref)
+  - [`forecast_step`](@ref)
+  - [`investable_mask`](@ref)
   - [`AbstractOnlinePortfolioSelectionAlgorithm`](@ref)
 """
 const ForecastReadingRule = Union{ForecastReversion, ForecastTracking, KernelTrendTracking,
@@ -1542,6 +1593,21 @@ end
 function rule_state_seed(alg::ForecastReadingRule, ::AbstractVector,
                          ::Option{<:AbstractAllocationSet} = nothing)
     return forecaster_seed(alg.me)
+end
+function online_update!(alg::ForecastReadingRule, st, w::AbstractVector, x::AbstractVector,
+                        rows, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
+    st, xhat = forecast_relative(alg.me, st, x, rows)
+    imsk = investable_mask(xhat)
+    wh = price_adjusted_allocation(w, x)
+    if isnothing(imsk)
+        q = forecast_step(alg, w, wh, xhat, nothing, x, rows)
+        return st, project(alg.proj, set, q, wh)
+    end
+    # The step of the rule runs on the assets that the forecaster prices alone.
+    q = forecast_step(alg, renormalised_view(w, imsk), renormalised_view(wh, imsk),
+                      xhat[imsk], imsk, x, rows)
+    return st, project(alg.proj, set, expand_investable_weights(imsk, q), wh, imsk)
 end
 export ForecastReversion, MovingAverageReversion, ExponentialMovingAverageReversion,
        RobustMedianReversion, ReweightedPriceRelativeTracking, GaussianWeightingReversion,
