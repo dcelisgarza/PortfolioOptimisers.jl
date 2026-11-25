@@ -1080,16 +1080,11 @@ A static `TensorPanelField` and a static feature matrix keep `assets × labels` 
 | `partial_fit!` of a prior whose covariance is a `GeneralCovariance` or a `Covariance` over an estimator other than `StatsBase.SimpleCovariance`, such as `EmpiricalPrior(; ce = Covariance(; ce = MyCovariance()))` | `ArgumentError` at the fold | Runs. `supports_partial_fit` answers `false` for such an estimator, so the prior runs the batch verb over its own rows, as it does for the bare estimator. `partial_fit!` of the estimator itself still raises the `ArgumentError`. |
 | `covariance_forecast_evaluation` of a covariance estimator of another package | `MethodError` | Runs, as for `GeneralCovariance(; ce = ce)`. |
 | `partial_fit!(ce::GeneralCovariance, X; active_mask)`, and the carry of an `EmpiricalPrior` with `ce = GeneralCovariance()` over an asset panel that varies in time | `MethodError` | Runs. An inactive cell folds as a `NaN`, as in a `Covariance`. |
-| `prior` of an `OpinionPoolingPrior` with `alg = LogarithmicOpinionPooling()`, when an opinion of zero probability gives an observation a zero weight | `ArgumentError` | Runs. The opinion does not change the pool. |
-| `prior` of an `OpinionPoolingPrior` with a large `p`, when the penalty takes the probability of every opinion below the smallest number | `ArgumentError` | Runs. The opinions nearest the consensus keep the probability. |
 
 ### [Results that move](@id migration-0-34-5-numbers)
 
 - **`DimensionReductionRegression` with `ve = SimpleVariance(; me = nothing)` and weights in `retgt`** takes the mean of the factors under those weights. v0.34.4 took the mean with no weights, so the intercept that it rebuilt was not the intercept of the fit.
 - **`var`, `std` and a variance series of a `GeodesicShrinkageCovariance` over an asset panel**, when its `ce` is mask-aware, such as `ExpWeightedCovariance()`, read the gaps of the sample, as its `cov` does. v0.34.4 removed each asset with a gap from the window and gave it `NaN`, where `cov` estimates it. An `EWResidualVolatility` now takes such an estimator as its `ce`.
-- **An entropy pooling prior with `OptimEntropyPooling`, the default optimiser, and a prior probability of zero** meets its views. With `alg = LogEntropyPooling()`, v0.34.4 stopped at the start of the solve and reported success, and the posterior missed the views. With `alg = ExpEntropyPooling()`, v0.34.4 could miss a view when an observation of zero prior probability held an extreme value. `JuMPEntropyPooling` had neither defect.
-- **An `EntropyPoolingPrior` or a `MeucciEntropyPoolingPrior` with a prior probability of zero at an extreme return**, such as a crash that `w` removes, meets its views under every optimiser. v0.34.4 scaled each view with the return that the prior removes. A kurtosis view could miss its target by a third of it. An entropic value at risk view gave the prior back, with no error, or raised an error about the grid or about a `NaN` coefficient. The views now read the mean row of the other observations there, so the posterior moves by rounding when the removed returns are ordinary.
-- **`OpinionPoolingPrior(; p = Inf)`** raises a `DomainError` at the construction. v0.34.4 raised an `ArgumentError` in `prior`.
 
 ### [If you extend the library](@id migration-0-34-5-extending)
 
@@ -1108,3 +1103,23 @@ A `ConstraintBlock` holds concentration rules, such as the UCITS 5/10/40 rule, i
 - **`AssetSetsMatrixEstimator`** has the field `on` after `val`, with the default `nothing`, so its type gains a second parameter. `AssetSetsMatrixEstimator(val)` still gives the v0.34.5 estimator. Its show prints the row `on ┴ nothing` last.
 - **`asset_sets_matrix`** of an estimator takes the keyword `strict`, with the default `false`, and gives it to the names of `on`. A method of your own for a precomputed matrix that `asset_sets_matrix` reads must take keywords.
 - **The exact cost budget**, a `BudgetCosts` with `xbgt = true`, names two rows of its model `cost_bgt_gd_ub` and `cost_bgt_gd_lb`, where v0.34.5 named them `cost_bgt_gz_ub` and `cost_bgt_gz_lb`. Under an objective that is not a ratio, the model holds no entry `cost_bgt_g`. Read the binaries from `cost_bgt_z` there.
+
+## From v0.34.7 to v0.34.8
+
+### [Calls that now answer](@id migration-0-34-8-answers)
+
+| Call | v0.34.7 | v0.34.8 |
+| --- | --- | --- |
+| `prior` of an `OpinionPoolingPrior` with `alg = LogarithmicOpinionPooling()`, when an opinion of zero probability gives an observation a zero weight | `ArgumentError` | Runs. The opinion does not change the pool. |
+| `prior` of an `OpinionPoolingPrior` with a large `p`, when the penalty takes the probability of every opinion below the smallest number | `ArgumentError` | Runs. The opinions nearest the consensus keep the probability. |
+
+### [Calls that now raise](@id migration-0-34-8-raises)
+
+| Call | v0.34.7 | v0.34.8 |
+| --- | --- | --- |
+| `OpinionPoolingPrior(; p = Inf)` | `ArgumentError` in `prior` | Raises a `DomainError` at the construction. |
+
+### [Results that move](@id migration-0-34-8-numbers)
+
+- **An entropy pooling prior with `OptimEntropyPooling`, the default optimiser, and a prior probability of zero** meets its views. With `alg = LogEntropyPooling()`, v0.34.7 stopped at the start of the solve and reported success, and the posterior missed the views. With `alg = ExpEntropyPooling()`, v0.34.7 could miss a view when an observation of zero prior probability held an extreme value. `JuMPEntropyPooling` had neither defect.
+- **An `EntropyPoolingPrior` or a `MeucciEntropyPoolingPrior` with a prior probability of zero at an extreme return**, such as a crash that `w` removes, meets its views under every optimiser. v0.34.7 scaled each view with the return that the prior removes. A kurtosis view could miss its target by a third of it. An entropic value at risk view gave the prior back, with no error, or raised an error about the grid or about a `NaN` coefficient. The views now read the mean row of the other observations there, so the posterior moves by rounding when the removed returns are ordinary.
