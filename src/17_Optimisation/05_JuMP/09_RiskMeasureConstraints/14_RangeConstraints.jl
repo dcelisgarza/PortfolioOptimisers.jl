@@ -27,6 +27,8 @@ Where:
 
 where ``\\mathrm{WR} = -\\min_t \\hat{r}_t`` and ``\\mathrm{BR} = -\\max_t \\hat{r}_t``.
 
+The method reads no side from its keywords. The range of the negated returns is the range of the returns, so the same expression is the gain tail of a range.
+
 # Arguments
 
   - $(arg_dict[:model])

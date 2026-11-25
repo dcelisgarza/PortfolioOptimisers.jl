@@ -1027,7 +1027,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Adds the constraints of a range risk measure to `model`, as the sum of its loss tail and its gain tail.
 
-This is the build of every [`RangeRiskMeasure`](@ref) formulation that decomposes. The two tails from [`range_tails`](@ref) carry `rke = false`, so the sum alone reaches the objective. A bound of a tail bounds that tail alone. Each tail builds under its own index, which [`nested_index`](@ref) composes from the side and `i`. The keys of the two tails therefore differ, also when a range holds a range. A formulation that fuses its tails has a method of its own, which is more specific.
+This is the build of every [`RangeRiskMeasure`](@ref) formulation that decomposes. The two tails from [`range_tails`](@ref) carry `rke = false`, so the sum alone reaches the objective. A bound of a tail bounds that tail alone. Each tail builds under its own index, which [`nested_index`](@ref) composes from the side and `i`. The keys of the two tails therefore differ, also when a range holds a range. A range that is the gain tail of a range reads the negated portfolio, so its two tails exchange their sides. A formulation that fuses its tails has a method of its own, which is more specific.
 
 Two decomposed formulations do work of their own before the tails: [`OrderedWeightsArrayRange`](@ref) under [`ApproxOrderedWeightsArray`](@ref) checks `w1` and `w2` under their names, and [`GenericValueatRiskRange`](@ref) of two [`DistributionValueatRisk`](@ref) tails builds the cone that the tails share. Their methods hold a copy of the steps below, and the copies agree with this method. The tails of an [`OrderedWeightsArrayRange`](@ref) hold no bound, so its copy records no owner.
 
@@ -1049,8 +1049,8 @@ Where:
 # Algorithm
 
  1. Read the tails `loss` and `gain` of `r` with [`range_tails`](@ref), and the key `name` of the sum with [`range_risk_key`](@ref).
- 2. Build `loss` at index `nested_index(:loss_, i)` with `loss = true`, giving `loss_risk`. Record `loss` as the owner of the frontier entries that it added with [`set_risk_frontier_owner!`](@ref), so that a sweep on the tail takes its span from the tail.
- 3. Build `gain` at index `nested_index(:gain_, i)` with `loss = false`, giving `gain_risk`. The builder then reads the negated net portfolio returns. Record the [`GainTail`](@ref) of `gain` as the owner of the entries that it added.
+ 2. Build `loss` at index `nested_index(:loss_, i)` on the side of the keyword `loss`, giving `loss_risk`. Record the owner of the frontier entries that it added with [`set_risk_frontier_owner!`](@ref), so that a sweep on the tail takes its span from the tail. The owner is the tail when it reads the portfolio, and its [`GainTail`](@ref) when it reads the negated portfolio.
+ 3. Build `gain` at index `nested_index(:gain_, i)` on the other side, giving `gain_risk`. Record the owner of the entries that it added by the same rule.
  4. Register `range_risk = loss_risk + gain_risk` under the Model State key of `name` and `i`.
  5. Bound `range_risk` and add it to `risk_vec` with [`set_risk_bounds_and_expression!`](@ref), from `r.settings`.
 
@@ -1074,6 +1074,7 @@ Where:
 
 # Keyword arguments
 
+  - `loss::Bool`: `true` builds the range on the net portfolio returns, and `false` on their negation, as a range that is itself the gain tail of a range does (default: `true`).
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
 
 # Returns
@@ -1092,19 +1093,20 @@ Where:
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RangeRiskMeasure,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
-                               prefix::Symbol = Symbol(""), kwargs...)
-    (; loss, gain) = range_tails(r)
+                               loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
+    tails = range_tails(r)
     name = range_risk_key(r)
     # A sweep on a tail takes its span from that tail, so each tail records the measure of its
-    # own side as the owner of its entry before the whole range claims the rest.
+    # own side as the owner of its entry before the whole range claims the rest. A range that
+    # is itself a gain tail reads the negated portfolio, so its tails exchange their sides.
     first = risk_frontier_length(model)
-    loss_risk = set_risk_constraints!(model, nested_index(:loss_, i), loss, opt, pr,
-                                      args...; loss = true, prefix = prefix, kwargs...)
-    set_risk_frontier_owner!(model, first, loss)
+    loss_risk = set_risk_constraints!(model, nested_index(:loss_, i), tails.loss, opt, pr,
+                                      args...; loss = loss, prefix = prefix, kwargs...)
+    set_risk_frontier_owner!(model, first, loss ? tails.loss : GainTail(tails.loss))
     first = risk_frontier_length(model)
-    gain_risk = set_risk_constraints!(model, nested_index(:gain_, i), gain, opt, pr,
-                                      args...; loss = false, prefix = prefix, kwargs...)
-    set_risk_frontier_owner!(model, first, GainTail(gain))
+    gain_risk = set_risk_constraints!(model, nested_index(:gain_, i), tails.gain, opt, pr,
+                                      args...; loss = !loss, prefix = prefix, kwargs...)
+    set_risk_frontier_owner!(model, first, loss ? GainTail(tails.gain) : tails.gain)
     range_risk = state_set!(model, prefix, name, i,
                             JuMP.@expression(model, loss_risk + gain_risk))
     set_risk_bounds_and_expression!(model, opt, range_risk, r.settings, name, i;

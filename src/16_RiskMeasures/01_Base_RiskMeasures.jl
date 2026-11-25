@@ -653,6 +653,7 @@ Each has a fallback on [`AbstractBaseRiskMeasure`](@ref):
 
   - `needs_previous_weights(r::MyRiskMeasure) -> Bool`: `true` for a measure that reads the previous weights; the fallback answers `false`.
   - `bigger_is_better(r::MyRiskMeasure) -> Bool`: `true` for a measure a caller maximises; the fallback answers `false`.
+  - `supports_gain_tail(r::MyRiskMeasure) -> Bool`: `true` for a measure that can be the gain tail of a range. Its method of `set_risk_constraints!` then takes a keyword `loss::Bool = true`, and reads the negated portfolio when it is `false`. The fallback on `RiskMeasure` answers `false`.
   - [`factory`](@ref): rebuild the measure against a prior result before it is evaluated, for a measure whose slots are filled from the prior.
 
 A Range variant subtypes [`RangeRiskMeasure`](@ref), whose `# Interfaces` section states two more methods.
@@ -681,20 +682,21 @@ A range is a [`RiskMeasure`](@ref), so it implements the methods of that `# Inte
 
 ## A formulation that decomposes
 
-Implement the two methods below. The method of [`set_risk_constraints!`](@ref) for a `RangeRiskMeasure` then builds the range: it builds `loss` with `loss = true` and `gain` with `loss = false`, and it registers their sum once.
+Implement the two methods below. The method of [`set_risk_constraints!`](@ref) for a `RangeRiskMeasure` then builds the range: it builds `loss` with `loss = true` and `gain` with `loss = false`, and it registers their sum once. When the range is itself the gain tail of a range, the two sides exchange: it builds `loss` with `loss = false` and `gain` with `loss = true`.
 
-  - `range_tails(r::MyRange) -> RangeTails`: The two point measures of the range, the **Range Tails**. Each tail carries `rke = false`.
+  - `range_tails(r::MyRange) -> RangeTails`: The two measures of the range, the **Range Tails**. Each tail carries `rke = false`, and [`supports_gain_tail`](@ref) is `true` for the gain tail.
   - `range_risk_key(r::MyRange) -> Symbol`: The Model State key of the sum, by the convention `<base>_range_risk_`.
 
 ## A formulation that fuses
 
-Implement a method of [`set_risk_constraints!`](@ref) for the formulation, and declare no `range_tails`. Its method is more specific than the method for a `RangeRiskMeasure`. `range_tails` then throws an `ArgumentError` that names the type.
+Implement a method of [`set_risk_constraints!`](@ref) for the formulation, and declare no `range_tails`. Its method is more specific than the method for a `RangeRiskMeasure`. `range_tails` then throws an `ArgumentError` that names the type. A formulation that can be the gain tail of a range declares [`supports_gain_tail`](@ref) too.
 
 # Related
 
   - [`RiskMeasure`](@ref)
   - [`range_tails`](@ref)
   - [`RangeTails`](@ref)
+  - [`supports_gain_tail`](@ref)
   - [`range_risk_key`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
@@ -706,7 +708,7 @@ Decompose a range risk measure into the two point measures it is the sum of.
 
 A range measure is its base measure applied twice: once to the losses at level `alpha`, and once to the gains at the second level the range carries (`beta`, `w2`, …). The two point measures are the whole content of that statement, so a range declares them here once and both of its consumers read them from this one place:
 
-  - The method of [`set_risk_constraints!`](@ref) for a [`RangeRiskMeasure`](@ref) builds `loss` with `loss = true` and `gain` with `loss = false`, then sums the two expressions.
+  - The method of [`set_risk_constraints!`](@ref) for a [`RangeRiskMeasure`](@ref) builds `loss` with `loss = true` and `gain` with `loss = false`, then sums the two expressions. When the range is itself a gain tail, it exchanges the two sides.
   - The measure's own `r(x::VecNum)` functor is the value-level twin of the same sum, `loss(x) + gain(-x)`.
 
 The tails carry `RiskMeasureSettings(; rke = false)`: an upper bound and a risk-expression contribution belong to the range as a whole, which registers them once from the composite expression. A range that *fuses* its two tails into a shared formulation rather than duplicating one ([`Range`](@ref), [`ValueatRiskRange`](@ref) under [`DistributionValueatRisk`](@ref), and [`OrderedWeightsArrayRange`](@ref) under [`ExactOrderedWeightsArray`](@ref) or [`SortingNetworkOrderedWeightsArray`](@ref)) declares no tails, because there are no two sub-models to build.
@@ -741,7 +743,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the **Range Tails** of a range risk measure: the two point measures whose sum is the range.
 
-[`range_tails`](@ref) returns it, and a range of your own builds it in its method of that verb. The `loss` tail reads the net portfolio returns, and the `gain` tail reads their negation at the second level of the range. An upper bound and a risk-expression contribution belong to the range as a whole, which registers them once from the composite expression. So each tail carries `rke = false`, and the constructor refuses a tail that does not.
+[`range_tails`](@ref) returns it, and a range of your own builds it in its method of that verb. The `loss` tail reads the net portfolio returns, and the `gain` tail reads their negation at the second level of the range. An upper bound and a risk-expression contribution belong to the range as a whole, which registers them once from the composite expression. So each tail carries `rke = false`, and the constructor refuses a tail that does not. [`supports_gain_tail`](@ref) must be `true` for the gain tail, and the constructor refuses any other measure there.
 
 # Fields
 
@@ -755,6 +757,7 @@ $(DocStringExtensions.FIELDS)
 # Validation
 
   - `loss.settings.rke` and `gain.settings.rke` are `false`. Otherwise an `ArgumentError` is raised.
+  - `supports_gain_tail(gain)`. Otherwise an `ArgumentError` is raised.
   - The keyword constructor refuses a tail that is not a [`RiskMeasure`](@ref) with a `TypeError`. The positional constructor checks only a pair of `RiskMeasure`s: the generic positional method that `@concrete` adds takes any other pair with no check.
 
 # Examples
@@ -783,6 +786,7 @@ Stacktrace:
 # Related
 
   - [`range_tails`](@ref)
+  - [`supports_gain_tail`](@ref)
   - [`RiskMeasure`](@ref)
   - [`RiskMeasureSettings`](@ref)
   - [`GenericValueatRiskRange`](@ref)
@@ -799,6 +803,8 @@ Stacktrace:
     function RangeTails(loss::RiskMeasure, gain::RiskMeasure)
         @argcheck(!loss.settings.rke && !gain.settings.rke,
                   ArgumentError("Each tail of a range carries `rke = false`, because the range registers its risk expression once. Got\nloss.settings.rke => $(loss.settings.rke)\ngain.settings.rke => $(gain.settings.rke)"))
+        @argcheck(supports_gain_tail(gain),
+                  ArgumentError("The gain tail of a range measures the negated portfolio, and `$(nameof(typeof(gain)))` cannot be built on that side. Use a measure that `supports_gain_tail` answers `true` for. For a measure of your own, build it under `loss = false` on the negated portfolio and declare `PortfolioOptimisers.supports_gain_tail(::$(nameof(typeof(gain)))) = true`."))
         return new{typeof(loss), typeof(gain)}(loss, gain)
     end
 end

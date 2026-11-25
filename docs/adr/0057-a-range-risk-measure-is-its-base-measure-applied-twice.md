@@ -165,3 +165,33 @@ the single-tail seam builds them. Only the name of the builder and the place of 
 A new range that decomposes now costs a `range_tails` method and a one-line `range_risk_key`
 method, and a range of a user takes the same path. Before this amendment, a range of a user had
 no builder of its own to call.
+
+## Amendment (2026-11-25) — a range can be a tail, and a gain tail is a measure that has that side
+
+The decision above builds `loss` with `loss = true` and `gain` with `loss = false`. Each builder
+then splatted its keywords after that value, so a range that was itself a tail gave the side of
+the outer range to both of its tails. The model optimised a value that was not the value of the
+functor (#2328). The three builders now take `loss::Bool = true`. They build the loss tail on that
+side and the gain tail on the other, and they record the owner of each frontier entry by the same
+side.
+
+A builder that takes no `loss` keyword gave the loss tail in place of the gain tail, and nothing
+objected. Each such measure now has one of three answers:
+
+- `OrderedWeightsArray` and `OrderedWeightsArrayRange` under `ExactOrderedWeightsArray` and
+    `SortingNetworkOrderedWeightsArray`, and `ValueatRiskRange` under `DistributionValueatRisk`,
+    build the side. They take no second block: an OWA builder negates and reverses its weight
+    vector, and the parametric range negates the mean and reflects the law over the same cone.
+- `Range`, the variances, `Kurtosis` and `BrownianDistanceVariance` have one value on the two
+    sides, so their builders need no keyword.
+- Every other measure has no gain tail. `supports_gain_tail` is a public trait with the fallback
+    `false` on `RiskMeasure`, and `RangeTails` refuses a gain tail whose answer is `false`. The
+    configuration alone decides the refusal, so it is in the constructor.
+
+`NegativeSkewness` has one value on `w` and `-w`, but its matrix reads the negative side of the
+coskewness alone, so it has no gain tail. A range that decomposes answers for its loss tail, which
+moves to the negated portfolio with the range.
+
+The trait fails closed. A measure of a user whose builder reads `loss` declares it, where no
+declaration was necessary before. A default of `true` would keep the silent defect for each measure
+that a user or a later ticket adds.

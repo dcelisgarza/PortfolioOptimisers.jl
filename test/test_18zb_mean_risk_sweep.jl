@@ -1,5 +1,5 @@
 using Clarabel, JuMP
-using Distributions: Normal
+using Distributions: Normal, quantile
 const PO = PortfolioOptimisers
 
 # The sweep of `src/17_Optimisation/05_JuMP/04_MeanRisk.jl`. Each objective of `MeanRisk` is
@@ -575,6 +575,7 @@ end
 PO.risk_input_kind(::MrsRange) = PO.NetReturnsInput()
 PO.range_tails(r::MrsRange) = PO.RangeTails(r.loss, r.gain)
 PO.range_risk_key(::MrsRange) = :mrs_range_risk_
+(r::MrsRange)(x::PO.VecNum) = r.loss(x) + r.gain(-x)
 
 @testset "MeanRisk sweep: a Frontier on a tail of a range spans that tail" begin
     # The sweep took the span of the whole range, so the levels were too high and most points
@@ -641,6 +642,90 @@ PO.range_risk_key(::MrsRange) = :mrs_range_risk_
     @test isa(owners[1], ConditionalValueatRisk)
     @test isa(owners[2], PO.GainTail)
     @test isa(owners[3], GenericValueatRiskRange)
+end
+
+@testset "MeanRisk sweep: a range builds each tail on its own side" begin
+    # A range that was the gain tail of a range built both of its tails on the negated returns,
+    # and a fused range, or an OWA measure with an exact formulation, built the loss side. The
+    # model then optimised a value that was not the value of the functor (#2328).
+    pr = prior(HighOrderPriorEstimator(), MRS_X[1:40, :])
+    opt = JuMPOptimiser(; pe = pr, slv = MRS_SLV)
+    off = RiskMeasureSettings(; rke = false)
+    cvar(a) = ConditionalValueatRisk(; settings = off, alpha = a)
+    cvarr(a, b) = ConditionalValueatRiskRange(; settings = off, alpha = a, beta = b)
+    vdist(m) = DistributionValueatRisk(; dist = Normal(m, 2.0))
+    var(m, a) = ValueatRisk(; settings = off, alpha = a, alg = vdist(m))
+    gvar(l, g) = GenericValueatRiskRange(; settings = off, loss = l, gain = g)
+    user(l, g) = MrsRange(off, l, g)
+    # Two different vectors, so that the two sides have different values. `w2` is reversed.
+    w1, w2 = owa_cvar(40, 0.1), reverse(owa_cvar(40, 0.4))
+    owa(alg) = OrderedWeightsArray(; settings = off, w = w1, alg = alg)
+    owar(alg) = OrderedWeightsArrayRange(; settings = off, w1 = w1, w2 = w2, alg = alg)
+    algs = (ExactOrderedWeightsArray(), SortingNetworkOrderedWeightsArray(),
+            ApproxOrderedWeightsArray())
+    # Measures with a side.
+    sided = Any[cvarr(0.05, 0.2), user(cvar(0.05), cvar(0.2)),
+                user(cvarr(0.05, 0.2), cvarr(0.1, 0.3)),
+                gvar(var(0.1, 0.05), var(0.3, 0.2)), gvar(cvar(0.05), var(0.3, 0.2)),
+                gvar(cvar(0.05), cvar(0.2)), owa.(algs)..., owar.(algs)...]
+    # Measures with one value for the two sides. Each law of a `DistributionValueatRisk` is
+    # symmetric about its centre, so the spread of its quantiles is one of them.
+    even = Any[ValueatRiskRange(; settings = off, alpha = 0.05, beta = 0.3,
+                                alg = vdist(0.5)), Range(; settings = off),
+               Variance(; settings = off), StandardDeviation(; settings = off),
+               Kurtosis(; settings = off), BrownianDistanceVariance(; settings = off)]
+    value(r, w) = expected_risk(factory(r, pr, MRS_SLV), w, pr)
+    for g in vcat(sided, even)
+        @testset "$(nameof(typeof(g)))" begin
+            @test PO.supports_gain_tail(g)
+            rng = MrsRange(RiskMeasureSettings(), cvar(0.1), g)
+            res = optimise(MeanRisk(; r = [rng], opt = opt))
+            @test isa(res.retcode, OptimisationSuccess)
+            built = JuMP.value(res.model[:mrs_range_risk_1])
+            loss, gain = value(cvar(0.1), res.w), value(PO.GainTail(g), res.w)
+            @test isapprox(built, loss + gain; rtol = 1e-5)
+            # The two sides differ, so a build of the wrong side fails the test above.
+            @test isapprox(gain, value(g, res.w); rtol = 1e-3) == (g in even)
+        end
+    end
+    # The registered legs of the parametric range are the legs of the negated portfolio.
+    g = first(even)
+    res = optimise(MeanRisk(; r = [MrsRange(RiskMeasureSettings(), cvar(0.1), g)],
+                            opt = opt))
+    sd = JuMP.value(res.model[:g_var_range_gain_1])
+    legs = [JuMP.value(res.model[k]) for k in (:var_risk_l_gain_1, :var_risk_h_gain_1)]
+    z = quantile.(Normal(-0.5, 2.0), (0.95, 0.3))
+    @test isapprox(legs, dot(pr.mu, res.w) .+ sd .* collect(z); rtol = 1e-8)
+    # A range that is the loss tail keeps the two sides of its own tails.
+    r = MrsRange(RiskMeasureSettings(), cvarr(0.05, 0.2), cvarr(0.1, 0.3))
+    res = optimise(MeanRisk(; r = [r], opt = opt))
+    @test isapprox(JuMP.value(res.model[:mrs_range_risk_1]), r(pr.X * res.w); rtol = 1e-6)
+    # Each entry of a frontier in a nested range takes the measure of its own side as its owner.
+    bnd = RiskMeasureSettings(; rke = false, ub = Frontier(; N = 2))
+    b(a) = ConditionalValueatRisk(; settings = bnd, alpha = a)
+    r = MrsRange(RiskMeasureSettings(), user(b(0.05), b(0.2)),
+                 MrsRange(bnd, b(0.1), b(0.3)))
+    model = optimise(MeanRisk(; r = [r], opt = opt, obj = MaximumReturn())).model
+    owners = [e.second[4] for e in model[:risk_frontier]]
+    @test [isa(o, PO.GainTail) for o in owners] == [false, true, true, false, true]
+    @test [isa(o, PO.GainTail) ? o.r.settings : o.settings for o in owners] == fill(bnd, 5)
+    @test owners[2].r.alpha == 0.2 && owners[3].r.alpha == 0.1 && owners[4].alpha == 0.3
+    @test isa(owners[5].r, MrsRange)
+    # The two fused tails of a `GenericValueatRiskRange` record the owner by the same rule, and a
+    # sweep on the inner gain tail of a gain tail spans that tail on the portfolio.
+    inner(l, g) = GenericValueatRiskRange(; settings = off, loss = l, gain = g)
+    vb(s, m, a) = ValueatRisk(; settings = s, alpha = a, alg = vdist(m))
+    r = MrsRange(RiskMeasureSettings(), cvar(0.1),
+                 inner(vb(off, 0.1, 0.05), vb(bnd, 0.3, 0.2)))
+    free = MrsRange(RiskMeasureSettings(), cvar(0.1),
+                    inner(vb(off, 0.1, 0.05), vb(off, 0.3, 0.2)))
+    res = optimise(MeanRisk(; r = [r], opt = opt, obj = MaximumReturn()))
+    owner = only(res.model[:risk_frontier]).second[4]
+    @test isa(owner, ValueatRisk)
+    ends = [value(vb(off, 0.3, 0.2),
+                  optimise(MeanRisk(; r = [free], opt = opt, obj = obj)).w)
+            for obj in (MinimumRisk(), MaximumReturn())]
+    @test isapprox([value(vb(off, 0.3, 0.2), w) for w in res.w], sort(ends); rtol = 1e-4)
 end
 
 @testset "MeanRisk sweep: a Frontier needs two points" begin
