@@ -13,6 +13,8 @@ set_maximum_ratio_factor_variables!
 maximum_ratio_normalisation
 set_maximum_ratio_normalisation!
 set_maximum_ratio_scale_floor!
+book_size_estimate
+return_characteristic
 set_maximum_ratio_scale_ceiling!
 add_penalty_to_objective!
 set_portfolio_objective_function!

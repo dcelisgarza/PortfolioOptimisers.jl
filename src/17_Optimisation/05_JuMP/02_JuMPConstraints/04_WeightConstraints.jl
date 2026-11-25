@@ -294,7 +294,7 @@ end
 
 Return the upper bound that a budget puts on a sum of weights, or `Inf` when it puts none.
 
-A number pins the sum, so it is its own bound. A [`BudgetRange`](@ref) bounds the sum by its `ub`. `nothing`, a range without `ub`, and a budget that also pays costs give `Inf`.
+A number pins the sum, so it is its own bound. A [`BudgetRange`](@ref) bounds the sum by its `ub`. A budget that also pays costs bounds the sum of the weights and the costs, and no cost is negative, so it bounds the sum by the bound of its `bgt`. `nothing` and a range without `ub` give `Inf`.
 
 # Arguments
 
@@ -313,6 +313,9 @@ function budget_upper_bound(bgt::Number)
 end
 function budget_upper_bound(bgt::BudgetRange)
     return isnothing(bgt.ub) ? Inf : bgt.ub
+end
+function budget_upper_bound(bgt::BudgetCostEstimator)
+    return budget_upper_bound(bgt.bgt)
 end
 function budget_upper_bound(args...)
     return Inf

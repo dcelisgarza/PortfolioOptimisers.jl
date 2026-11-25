@@ -190,10 +190,10 @@ end
                                                                                    "max_step_fraction" =>
                                                                                        0.9)),
                   check_sol = (; allow_local = true, allow_almost = true))
-    function solve_k(; bgt = 1.0, kw...)
+    function solve_k(; bgt = 1.0, g = 1.0, kw...)
         opt = JuMPOptimiser(; slv = slvk, so = 1e4, bgt = bgt,
-                            wb = WeightBounds(; lb = 0.0, ub = cap * bgt),
-                            lt = Threshold(; val = lt * bgt), kw...)
+                            wb = WeightBounds(; lb = 0.0, ub = cap * g),
+                            lt = Threshold(; val = lt * g), kw...)
         rba = AssetRiskBudgeting(; alg = MixedIntegerRiskBudgeting())
         return optimise(RiskBudgeting(; r = StandardDeviation(), opt = opt, rba = rba), rdk)
     end
@@ -214,7 +214,7 @@ end
     @test PO.mip_indicators(res1.model) isa PO.LongShortIndicators
     @test isapprox(res.w, res1.w; rtol = 1e-3)
     # A small budget scales `k` up.
-    res1 = solve_k(; bgt = 0.1)
+    res1 = solve_k(; bgt = 0.1, g = 0.1)
     @test isa(res1.retcode, OptimisationSuccess)
     @test isapprox(res1.model[:ss], 4000)
     @test value(res1.model[:k]) > 400 - 1
@@ -222,9 +222,23 @@ end
     # The formula: no ceiling on the sum of the weights reads a budget of one.
     for (bgt, v) in ((1.0, 400), (2.0, 200), (-0.5, 800), (nothing, 400), (0.0, 400),
                      (BudgetRange(; lb = 0.5, ub = 0.8), 500),
-                     (BudgetRange(; lb = 0.5, ub = nothing), 400))
-        rb = RiskBudgeting(; opt = JuMPOptimiser(; slv = slvk, bgt = bgt))
-        @test PO.risk_budgeting_scale_ceiling(rb, N) ≈ v
+                     (BudgetRange(; lb = 0.5, ub = nothing), 400),
+                     (BudgetCosts(; bgt = 0.5, w = zeros(N)), 800))
+        opt = JuMPOptimiser(; slv = slvk, bgt = bgt,
+                            wb = WeightBounds(; lb = -1.0, ub = 1.0))
+        attrs = PO.resolve_jump_optimiser(opt, rdk)
+        @test PO.risk_budgeting_scale_ceiling(RiskBudgeting(; opt = opt), attrs) ≈ v
+    end
+    # With no budget that sets the size of the book, a small cap sets it (#2309).
+    for bgt in (nothing, BudgetRange(; lb = 0.01, ub = 1.0),
+                BudgetCosts(; bgt = 1.0, w = fill(1e-4, N), vp = 1e-3, vn = 1e-3))
+        kw = (; bgt = bgt, wb = WeightBounds(; lb = 0.0, ub = 0.001),
+              lt = Threshold(; val = 1e-4))
+        res1 = solve_k(; kw...)
+        @test isa(res1.retcode, OptimisationSuccess)
+        @test res1.model[:ss] ≈ 10 * N / 0.04
+        @test 10 * N < value(res1.model[:k]) < res1.model[:ss]
+        @test all(x -> 1e-4 - 1e-7 <= x <= 1e-3 + 1e-7, res1.w)
     end
 end
 

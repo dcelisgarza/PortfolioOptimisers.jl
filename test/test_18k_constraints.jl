@@ -1276,11 +1276,11 @@ end
         cap == 0.5 && @test isapprox(res.w, base.w; atol = 1e-4)
     end
     # A rate that one asset of five exceeds makes the excess return small, and `k` large.
-    ceil_k(obj, pr = prm) = begin
+    function ceil_k(obj, pr = prm; ret = ArithmeticReturn(; mu = pr.mu), g = 1)
         m = JuMP.Model()
         pe.set_sdp_lift_corner!(m, obj, pr)
-        pe.set_maximum_ratio_scale_ceiling!(m, obj, pr)
-        m[:k_ceil]
+        pe.set_maximum_ratio_scale_ceiling!(m, obj, ret, pr, g)
+        return m[:k_ceil]
     end
     ohf = clamp(mean(abs, prm.mu), 1e-3, 1e3)
     @test ceil_k(MaximumRatio(; rf = 0.9 * maximum(prm.mu))) ≈
@@ -1293,10 +1293,70 @@ end
     prq = pe.LowOrderPrior(; X = [1//100 -3//100; 2//100 1//100], mu = [1//100, -3//100],
                            sigma = [1//1 0//1; 0//1 1//1])
     @test ceil_k(MaximumRatio(; rf = 0//1), prq) === 40//1
+    # A small book earns less, so its `k` is larger. A book above one keeps the ceiling.
+    e = mean(max.(prm.mu, 0))
+    @test ceil_k(MaximumRatio(); g = 0.1) ≈ 10 * ohf / (0.1 * e)
+    @test ceil_k(MaximumRatio(); g = 3.0) ≈ 10 * ohf / e
+    # The ceiling reads the vector of the return terms, and the prior when no term has one.
+    # The weight of a single term weighs nothing, and the weights of two terms do.
+    st(x) = JuMPReturnsSettings(; scale = x)
+    @test ceil_k(MaximumRatio(); ret = ArithmeticReturn(; mu = prm.mu / 1e3)) ≈
+          1e4 * 1e-3 / e
+    @test ceil_k(MaximumRatio(); ret = LogarithmicReturn()) ≈ 10 * ohf / e
+    @test ceil_k(MaximumRatio();
+                 ret = ArithmeticReturn(; mu = prm.mu, settings = st(1e-3))) ≈ 10 * ohf / e
+    @test ceil_k(MaximumRatio();
+                 ret = [ArithmeticReturn(; mu = prm.mu, settings = st(1e-3)),
+                        LogarithmicReturn()]) ≈ 1e4 * 1e-3 / e
+    @test ceil_k(MaximumRatio(); ret = ArithmeticReturn(; mu = 0.5)) ≈ 10
+    # The size of the book: the net budget, and a smaller bound on the gross exposure.
+    size_of(ub; bgt = 1.0, sbgt = nothing, gbgt = nothing, lb = 0.0) = pe.book_size_estimate(WeightBounds(;
+                                                                                                          lb = lb,
+                                                                                                          ub = ub),
+                                                                                             bgt,
+                                                                                             sbgt,
+                                                                                             gbgt,
+                                                                                             4)
+    @test size_of(1.0) == 1
+    @test size_of(1.0; bgt = 2.0) == 2
+    @test size_of(1.0; bgt = -0.5, lb = -1.0) == 0.5
+    @test size_of(1.0; bgt = 0.0, lb = -1.0) == 1
+    @test size_of(1.0; bgt = nothing) == 1
+    @test size_of(0.1; bgt = nothing) == 0.4
+    @test size_of(1.0; bgt = BudgetRange(; lb = 0.5, ub = 0.8)) == 0.8
+    @test size_of(1.0; bgt = BudgetRange(; lb = 0.5, ub = nothing)) == 1
+    @test size_of(1.0; bgt = nothing, gbgt = 0.2, lb = -1.0) == 0.2
+    @test size_of(0.0) == 1
+    # No cost is negative, so a budget that pays costs bounds the sum by its own bound.
+    @test size_of(1.0; bgt = BudgetCosts(; bgt = 0.02, w = zeros(4))) == 0.02
+    @test size_of(1.0;
+                  bgt = BudgetMarketImpact(; bgt = BudgetRange(; lb = 0.01, ub = 0.03),
+                                           w = zeros(4))) == 0.03
+    # A book with a small budget, a small cap, a budget that pays costs, and a
+    # return term with a small vector have a `k` that the constant of a fully invested book of
+    # the prior refused (#2309). A stated constant far above `k` gives the same book.
+    function solve_small(; kw...)
+        res = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(),
+                                opt = JuMPOptimiser(; pe = prm, slv = slvm, card = 3,
+                                                    kw...)))
+        @test isa(res.retcode, OptimisationSuccess)
+        return res
+    end
+    cap(x) = WeightBounds(; lb = 0.0, ub = x)
+    for kw in ((; bgt = 0.02, wb = cap(0.01)),
+               (; bgt = BudgetRange(; lb = 0.005, ub = 1.0), wb = cap(0.002)),
+               (; bgt = BudgetCosts(; bgt = 0.02, w = zeros(5), vp = 1e-3, vn = 1e-3),
+                wb = cap(0.01)), (; ret = ArithmeticReturn(; mu = prm.mu / 1e4), wb = cap(0.5)))
+        res = solve_small(; kw...)
+        ref = solve_small(; kw..., ss = 1e5)
+        @test 1000 * maximum(res.wb.ub) < value(ref.model[:k]) < res.model[:ss]
+        @test isapprox(res.w, ref.w; rtol = 1e-3)
+    end
     # Any other objective has a constant `k`, so it records no ceiling, and a small bound
     # keeps its constant.
     mn = JuMP.Model()
-    @test isnothing(pe.set_maximum_ratio_scale_ceiling!(mn, MinimumRisk(), prm))
+    @test isnothing(pe.set_maximum_ratio_scale_ceiling!(mn, MinimumRisk(),
+                                                        ArithmeticReturn(), prm, 1))
     @test !haskey(mn, :k_ceil)
     mn[:k] = 1
     @test pe.get_mip_ss(nothing, WeightBounds(; lb = [0.0], ub = [0.01]), mn) == 10.0

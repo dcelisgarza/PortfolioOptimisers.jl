@@ -563,9 +563,10 @@ function set_maximum_ratio_factor_variables!(model::JuMP.Model, obj)
     return nothing
 end
 """
-    maximum_ratio_normalisation(obj::MaximumRatio, mu::Num_VecNum)
+    maximum_ratio_normalisation(ohf::Number, args...)
+    maximum_ratio_normalisation(ohf::Nothing, mu::Num_VecNum)
 
-Return the normalisation factor of the ratio problem: `obj.ohf` when the caller states it, and a size derived from `mu` otherwise.
+Return the normalisation factor of the ratio problem: `ohf` when the caller states it, and a size derived from `mu` when it is `nothing`.
 
 The size is a matter of numerics alone, because every ``\\mathrm{ohf} > 0`` gives the same
 weights.
@@ -580,13 +581,13 @@ weights.
 
 Where:
 
-  - $(math_dict[:ohf_ratio]) A stated `obj.ohf` replaces the formula.
+  - $(math_dict[:ohf_ratio]) A stated `ohf` replaces the formula.
   - ``\\mu_j``: Entry ``j`` of `mu`.
   - $(math_dict[:N])
 
 # Arguments
 
-  - `obj::MaximumRatio`: The ratio objective.
+  - `ohf`: The field `ohf` of the [`MaximumRatio`](@ref).
   - `mu`: The characteristic of the assets, such as their expected returns.
 
 # Returns
@@ -598,10 +599,10 @@ Where:
   - [`set_maximum_ratio_normalisation!`](@ref)
   - [`set_maximum_ratio_scale_ceiling!`](@ref)
 """
-function maximum_ratio_normalisation(obj::MaximumRatio, mu::Num_VecNum)
-    if !isnothing(obj.ohf)
-        return obj.ohf
-    end
+function maximum_ratio_normalisation(ohf::Number, args...)
+    return ohf
+end
+function maximum_ratio_normalisation(::Nothing, mu::Num_VecNum)
     m = Statistics.mean(abs, mu)
     return clamp(m, inv(oftype(m, 1000)), oftype(m, 1000))
 end
@@ -662,7 +663,7 @@ Where:
 """
 function set_maximum_ratio_normalisation!(model::JuMP.Model, obj::MaximumRatio,
                                           mu::Option{<:Num_VecNum}, pr::AbstractPriorResult)
-    ohf = maximum_ratio_normalisation(obj, isnothing(mu) ? pr.mu : mu)
+    ohf = maximum_ratio_normalisation(obj.ohf, isnothing(mu) ? pr.mu : mu)
     JuMP.@expression(model, ohf, ohf)
     return nothing
 end
@@ -769,13 +770,94 @@ function set_maximum_ratio_scale_floor!(model::JuMP.Model, obj::MaximumRatio,
     return nothing
 end
 """
-    set_maximum_ratio_scale_ceiling!(model::JuMP.Model, obj::ObjectiveFunction, pr::AbstractPriorResult)
+    book_size_estimate(wb::WeightBounds, bgt, sbgt, gbgt, N::Integer) -> Number
+
+Return an estimate of the gross exposure of the smallest book that the weight bounds and the budgets fix.
+
+The ceiling on a variable ``k`` reads it, because the ``k`` of a solution grows when the book is small. The net budget sets the size, because the gross exposure is at or above the net exposure. A small weight bound or a small gross budget keeps the book below it. A large one does not say that the book is large, so it changes nothing.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{g} &= \\min\\left(b,\\, \\overline{g}\\right)\\,, \\\\
+b &= \\begin{cases}
+\\lvert b_{g}^{+} \\rvert & \\text{if } 0 < \\lvert b_{g}^{+} \\rvert < \\infty\\,, \\\\
+1 & \\text{otherwise}\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{g}``: The estimate. It is ``b`` when ``\\overline{g}`` is not positive, because no book then meets the bounds.
+  - ``b_{g}^{+}``: The upper bound of the budget `bgt`, from [`budget_upper_bound`](@ref).
+  - ``\\overline{g}``: The bound on the gross exposure, from [`gross_exposure_bound`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:wb_arg])
+  - `bgt`: The budget.
+  - `sbgt`: The short budget.
+  - `gbgt`: The gross budget.
+  - `N::Integer`: The number of assets.
+
+# Returns
+
+  - `g::Number`: The estimate, positive and finite.
+
+# Related
+
+  - [`set_maximum_ratio_scale_ceiling!`](@ref)
+  - [`risk_budgeting_scale_ceiling`](@ref)
+  - [`budget_upper_bound`](@ref)
+  - [`gross_exposure_bound`](@ref)
+"""
+function book_size_estimate(wb::WeightBounds, bgt, sbgt, gbgt, N::Integer)
+    b = abs(budget_upper_bound(bgt))
+    b = ifelse(iszero(b) || isinf(b), one(b), b)
+    g = min(b, gross_exposure_bound(wb, bgt, sbgt, gbgt, N))
+    return g > zero(g) ? g : b
+end
+"""
+    return_characteristic(ret::JuMPReturnsEstimator)
+    return_characteristic(ret::ArithmeticReturn)
+    return_characteristic(ret::VecJRE)
+
+Return the aggregate characteristic of the return terms `ret` before the model holds them, or `nothing` when no term carries one.
+
+The model resolves the characteristic with the rows of the return, which come after the mixed-integer rows. So [`set_maximum_ratio_scale_ceiling!`](@ref) reads this value. An [`ArithmeticReturn`](@ref) gives its `mu`, which the resolution of the head filled from the prior. A vector of terms gives the sum of [`aggregate_return_characteristic`](@ref). A single term has no weight in a sum, so its scale is not read. The centre of an uncertainty set is not read either.
+
+# Arguments
+
+  - `ret`: The return term or the vector of terms, resolved against the prior.
+
+# Returns
+
+  - `mu::Option{<:Num_VecNum}`: The characteristic, or `nothing`.
+
+# Related
+
+  - [`aggregate_return_characteristic`](@ref)
+  - [`set_maximum_ratio_scale_ceiling!`](@ref)
+"""
+function return_characteristic(::JuMPReturnsEstimator)
+    return nothing
+end
+function return_characteristic(ret::ArithmeticReturn)
+    return ret.mu
+end
+function return_characteristic(ret::VecJRE)
+    return aggregate_return_characteristic(ret, map(return_characteristic, ret))
+end
+"""
+    set_maximum_ratio_scale_ceiling!(model::JuMP.Model, obj::ObjectiveFunction, ret, pr::AbstractPriorResult, g::Number)
 
 Register `k_ceil`, the ceiling on ``k`` that sizes the big-M constant of the mixed-integer rows under [`MaximumRatio`](@ref).
 
 The head calls it after [`set_sdp_lift_corner!`](@ref) and before the mixed-integer rows, which [`get_mip_ss`](@ref) sizes from the entry. Every other objective registers nothing, because ``k`` is then the constant ``1``.
 
-The ceiling is an estimate with a margin, not a bound that the model holds. The solution sets ``k``: the return form fixes ``k = \\mathrm{ohf} / (\\mathrm{ret} - r_f)``. The function takes the mean of the positive excess returns of the assets as the excess return of the portfolio, the size that a broad book earns. The factor ``10`` leaves room for a portfolio that earns less. When no asset earns more than ``r_f``, the risk form sets ``k``, so the function reads the corner ``c`` of [`set_sdp_lift_corner!`](@ref), the size of ``k`` that the library takes for a lifted variance.
+The ceiling is an estimate with a margin, not a bound that the model holds. The solution sets ``k``: the return form fixes ``k = \\mathrm{ohf} / (\\mathrm{ret} - r_f)``. The function takes the mean of the positive excess returns of the assets as the excess return of the portfolio, the size that a broad book earns. A book of a gross exposure below one earns less in proportion, so the function scales the returns by it. The factor ``10`` leaves room for a portfolio that earns less. When no asset of that book earns more than ``r_f``, the risk form sets ``k``, so the function reads the corner ``c`` of [`set_sdp_lift_corner!`](@ref), the size of ``k`` that the library takes for a lifted variance.
 
 # Mathematical definition
 
@@ -792,16 +874,19 @@ Where:
 
   - $(math_dict[:k_ceil])
   - $(math_dict[:ohf_ratio]) Here it is the [`maximum_ratio_normalisation`](@ref) of ``\\boldsymbol{\\mu}``.
-  - ``e``: The mean of the positive excess returns, ``\\frac{1}{N} \\sum_{i=1}^{N} \\max\\left(\\mu_i - r_f,\\, 0\\right)``.
+  - ``e``: The mean of the positive excess returns, ``\\frac{1}{N} \\sum_{i=1}^{N} \\max\\left(\\min\\left(\\hat{g},\\, 1\\right) \\mu_i - r_f,\\, 0\\right)``.
+  - ``\\hat{g}``: The size of the book, `g`.
   - ``c``: The corner, the `sdp_corner` of the model.
-  - ``\\mu_i``: Entry ``i`` of the expected returns of the prior, `pr.mu`. The normalisation of the model reads the characteristic of the return terms, which the model resolves after the mixed-integer rows. The prior's vector is its value when a single term states no vector of its own.
+  - ``\\mu_i``: Entry ``i`` of the [`return_characteristic`](@ref) of `ret`, or of the expected returns of the prior when no term carries one.
   - $(math_dict[:r_f_ratio])
 
 # Arguments
 
   - $(arg_dict[:model])
   - `obj`: The objective. Only a [`MaximumRatio`](@ref) registers the ceiling.
+  - `ret`: The return terms, resolved against the prior.
   - $(arg_dict[:pr])
+  - `g::Number`: The size of the book, from [`book_size_estimate`](@ref).
 
 # Returns
 
@@ -811,18 +896,23 @@ Where:
 
   - [`MaximumRatio`](@ref)
   - [`get_mip_ss`](@ref)
+  - [`book_size_estimate`](@ref)
+  - [`return_characteristic`](@ref)
   - [`set_maximum_ratio_scale_floor!`](@ref)
   - [`risk_budgeting_scale_ceiling`](@ref)
   - [`set_sdp_lift_corner!`](@ref)
 """
-function set_maximum_ratio_scale_ceiling!(::JuMP.Model, ::ObjectiveFunction,
-                                          ::AbstractPriorResult)
+function set_maximum_ratio_scale_ceiling!(::JuMP.Model, ::ObjectiveFunction, ret,
+                                          ::AbstractPriorResult, ::Number)
     return nothing
 end
-function set_maximum_ratio_scale_ceiling!(model::JuMP.Model, obj::MaximumRatio,
-                                          pr::AbstractPriorResult)
-    ohf = maximum_ratio_normalisation(obj, pr.mu)
-    ex = Statistics.mean(m -> max(m - obj.rf, zero(m - obj.rf)), pr.mu)
+function set_maximum_ratio_scale_ceiling!(model::JuMP.Model, obj::MaximumRatio, ret,
+                                          pr::AbstractPriorResult, g::Number)
+    mu = return_characteristic(ret)
+    mu = isnothing(mu) ? pr.mu : mu
+    ohf = maximum_ratio_normalisation(obj.ohf, mu)
+    s = min(g, one(g))
+    ex = Statistics.mean(m -> max(s * m - obj.rf, zero(s * m - obj.rf)), mu)
     k = ex > zero(ex) ? ohf / ex : shared_get(model, :sdp_corner)
     shared_set!(model, :k_ceil, 10 * k)
     return nothing

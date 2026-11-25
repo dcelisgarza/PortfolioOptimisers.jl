@@ -85,8 +85,11 @@ the binary is the gate only when `k` is a number. The interface is `mip_wx!`, `m
 the rows of a gate keep `k` at or below the constant, and a small weight bound says nothing about
 `k`. So each producer of a variable `k` records a ceiling under `:k_ceil`, beside `k` itself:
 `set_maximum_ratio_scale_ceiling!` for a ratio and `risk_budgeting_scale_ceiling` for the risk
-budgeting head. The ceiling is an estimate with a margin, because the solution sets `k`, and a
-stated `ss` replaces the constant.
+budgeting head. Both read the size of the book from `book_size_estimate`, because the `k` of a
+solution grows when the net budget, the gross budget or the weight bounds make the book small. The
+ratio also reads the characteristic of its return terms, the vector that its normalisation reads.
+The ceiling is an estimate with a margin, because the solution sets `k`, and a stated `ss` replaces
+the constant.
 
 A larger constant at every bound was refused, because a constant that is far above `k` loosens the
 relaxation, and the integrality tolerance of the solver leaves more of a gate open. A model with a

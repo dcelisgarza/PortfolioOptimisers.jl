@@ -826,7 +826,9 @@ function build_mean_risk_model(mr::MeanRisk, attrs::ResolvedJuMPOptimiser,
     set_model_observations!(model, size(attrs.pr.X, 1))
     set_maximum_ratio_factor_variables!(model, mr.obj)
     set_sdp_lift_corner!(model, mr.obj, attrs.pr)
-    set_maximum_ratio_scale_ceiling!(model, mr.obj, attrs.pr)
+    g = book_size_estimate(attrs.wb, mr.opt.bgt, mr.opt.sbgt, mr.opt.gbgt,
+                           size(attrs.pr.X, 2))
+    set_maximum_ratio_scale_ceiling!(model, mr.obj, attrs.ret, attrs.pr, g)
     set_w!(model, attrs.pr.X, mr.wi)
     assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj; blocks = blocks)
     return model

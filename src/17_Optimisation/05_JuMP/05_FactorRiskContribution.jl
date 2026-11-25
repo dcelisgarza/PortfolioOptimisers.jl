@@ -552,7 +552,9 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_model_observations!(model, size(attrs.pr.X, 1))
     set_maximum_ratio_factor_variables!(model, frc.obj)
     set_sdp_lift_corner!(model, frc.obj, attrs.pr)
-    set_maximum_ratio_scale_ceiling!(model, frc.obj, attrs.pr)
+    g = book_size_estimate(attrs.wb, frc.opt.bgt, frc.opt.sbgt, frc.opt.gbgt,
+                           size(attrs.pr.X, 2))
+    set_maximum_ratio_scale_ceiling!(model, frc.obj, attrs.ret, attrs.pr, g)
     b1, b2, rr = set_factor_risk_contribution_constraints!(model, frc.re, rd, attrs.pr,
                                                            frc.flag, frc.wi)
     # The risk builders read the basis of the whole decision vector, so a variance under
