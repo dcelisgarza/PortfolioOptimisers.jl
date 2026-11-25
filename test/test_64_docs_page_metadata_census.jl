@@ -325,6 +325,8 @@ end
         for (from, to) in (("0.1.9", "0.2.0"), ("0.1.0", "0.3.0"), ("0.3.0", "0.2.5"))
             @test_throws ErrorException FoldSeam.fold(guide, ["# [D](@id d)\n"], from, to)
         end
+        @test FoldSeam.fold_fragment("# [A](@id a)\n\n  ## B\n\n#5 is text.") ==
+              "### [A](@id a)\n\n#### B\n\n#5 is text."
         # A line that starts with inline code opens no block, and a longer fence ends one.
         for block in ("```` ```x``` ````", "```julia\na\n`````", "~~~\n# a\n~~~")
             @test endswith(FoldSeam.fold_fragment("# [A](@id a)\n\n$block\n\n## Calls\n"),
@@ -366,6 +368,12 @@ end
                                                 head *
                                                 "\n```bash\n# Install.\n##### x\n```\n",
                                                 guide))
+        # A label, a URL, and a call in inline code are not a relative link or a footnote.
+        @test isempty(FoldSeam.fragment_defects("cap",
+                                                head *
+                                                "\n[`A`](@ref) [b](@ref migration) " *
+                                                "[c](https://x.org) `a[i](x)` ``y[^2]``\n\n---\n",
+                                                guide))
         # Each text has one defect. Two pages with one label, or a link that needs the
         # `CurrentModule` that the fold drops, stop the docs build.
         for (text, word) in
@@ -374,7 +382,15 @@ end
              (replace(head, "[A cap](@id migration-next-cap)" => "A cap"), "one H1"),
              (head * "\n##### Deep\n", "level four"), (head * "\n```julia\na\n", "no end"),
              (head * "\n## [B](@id calls)\n", "`calls`"),
-             (head * "\n| Call | v0.34.5 | Now |\n", "`v0.34.5`"))
+             (head * "\n| Call | v0.34.5 | Now |\n", "`v0.34.5`"),
+             # An indented heading is a heading, and an indented `@meta` block is a `@meta` block.
+             (head * "\n  # Second\n", "one H1"), (head * "\n ##### Deep\n", "level four"),
+             (head * "\nSecond\n======\n", "underline"),
+             (replace(head, "```@meta" => " ```@meta"), "`@meta`"),
+             # A target that the move of the page breaks, and a name that two pages can hold.
+             (head * "\n![Plot](../assets/plot.png)\n", "`../assets/plot.png`"),
+             (head * "\n[Calls](#Calls)\n", "`#Calls`"),
+             (head * "\nText[^1].\n", "a footnote"))
             found = FoldSeam.fragment_defects("cap", text, guide)
             @test length(found) == 1 && occursin(word, only(found))
         end

@@ -18,10 +18,10 @@
 #
 # `test/test_72_prose_census.jl` is the gate. It includes this file, so the suite and a rewrite
 # session read the prose with one reader and cannot drift. `scan` is what a rewrite session runs on
-# its own texts before and after the rewrite. `refresh` writes the whole baseline. A release
-# runs it after `docs/fold_next_release.jl`, which moves text between rows. A rewrite session does NOT refresh: rewrite tickets run in parallel, and two sessions
-# that each write the whole file lose one of the two writes. It pastes the row the census prints
-# for its own texts instead.
+# its own texts before and after the rewrite. `refresh` writes the whole baseline. A release runs it
+# after `docs/fold_next_release.jl`, which moves text between rows. A rewrite session does NOT
+# refresh: rewrite tickets run in parallel, and two sessions that each write the whole file lose one
+# of the two writes. It pastes the row the census prints for its own texts instead.
 #
 # This script reads TEXT and loads only `TOML`, as every census in this repository does. It parses
 # no Julia and loads no package under measurement, so it costs well under a second over the corpus.

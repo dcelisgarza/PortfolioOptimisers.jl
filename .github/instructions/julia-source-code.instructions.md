@@ -28,10 +28,13 @@ reaches.
   replaces. A released number that moves is the same cost.
 - **Name the break.** State it in the commit and in `docs/src/next_release/<feature>.md`, where a
   user reads it. The page is one change: a `@meta` block with its `Description` alone, one H1 with
-  the label `(@id migration-next-<feature>)`, and the text. It says "before" and "now", and names
-  no version. A pull request that changes `version` folds the pages into `docs/src/migration.md`,
-  and no other change adds to that guide. A correction of its text is permitted, such as a link
-  that a rename moves. A docstring states the current behaviour alone.
+  the label `(@id migration-next-<feature>)`, and the text, with no relative link and no footnote.
+  It says "before" and "now", and names no version. A pull request that changes `version` folds the
+  pages into `docs/src/migration.md`, and no other change adds to that guide. A correction of its
+  text is permitted, such as a link that a rename moves. A docstring states the current behaviour
+  alone.
+- **A change with no effect on the functionality takes no page and no version.** A change of the
+  CI, of the docs or of the tools is one. Its commit states it.
 - **A bug fix is not a break.** A fix that makes the code do what its documentation states, such
   as an option that a path ignored or a number that was wrong, ships in a patch release. The
   commit states it, and no page of the next release lists it.
@@ -636,8 +639,8 @@ keep it:
 - **The name is public, or a hub that callers reach through one name.** Give the hub the
   methods: each form of the input is a method of the public function. When the wrapper itself
   is the public name, remove it all the same. The break is the cost of the better form, and
-  `docs/src/next_release/<feature>.md` names it, as § *A design is chosen by the standing test* states. A
-  released spelling is never a reason by itself.
+  `docs/src/next_release/<feature>.md` names it, as § *A design is chosen by the standing test*
+  states. A released spelling is never a reason by itself.
 - **The target takes the slot as a keyword, by the precedent of its family.** Give the target a
   method for the form, and keep the keyword in that method.
 - **Another arm of the function holds logic, or owns a fallback.** The arm that only forwards
@@ -964,8 +967,8 @@ is the workflow that applies them.
   reaches, mixed element types among them, compares every output with the base bit for bit. One
   cause of a difference is accepted: a change of the order of a sum, or a BLAS call that now
   takes a contiguous slice, which moves the last few bits. The commit, the ADR of the change and
-  `docs/src/next_release/<feature>.md` then state the largest relative change and its cause. Any other
-  difference is a defect of the change.
+  `docs/src/next_release/<feature>.md` then state the largest relative change and its cause. Any
+  other difference is a defect of the change.
 - **A claim of speed is a measurement of one run.** The base and the change run in the same
   process order, single-threaded, as the median of five fits after a warm-up. A comparison with
   another library times that library in that same run.

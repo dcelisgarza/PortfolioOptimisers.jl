@@ -38,7 +38,7 @@ function fragment_lines(text::AbstractString)
             m = match(r"^\s*(?:(`{3,})[^`]*|(~{3,}).*)$", line)
             if !isnothing(m)
                 fence = String(something(m.captures...))
-                kind = startswith(line, "```@meta") ? :meta : :code
+                kind = startswith(lstrip(line), "```@meta") ? :meta : :code
             end
             push!(out, kind => line)
         else
@@ -74,12 +74,33 @@ function fragment_defects(feature::AbstractString, text::AbstractString,
     if fragment_lines(text * "\n")[end].first !== :text
         push!(out, "a fenced block has no end")
     end
-    h1 = [l for (k, l) in lines if k === :text && startswith(l, "# ")]
+    h1 = [l for (k, l) in lines if k === :text && occursin(r"^ {0,3}# ", l)]
     if length(h1) != 1 || !startswith(h1[1], "# [") || !endswith(h1[1], "](@id $label)")
         push!(out, "the page does not hold one H1, `# [Title](@id $label)`")
     end
-    if any(k === :text && occursin(r"^#{5,} ", l) for (k, l) in lines)
+    if any(k === :text && occursin(r"^ {0,3}#{5,} ", l) for (k, l) in lines)
         push!(out, "a heading is below level four, and the fold lowers it by two")
+    end
+    for i in 2:length(lines)
+        if all(==(:text), first.(lines[(i - 1):i])) &&
+           !isempty(strip(lines[i - 1].second)) &&
+           occursin(r"^ {0,3}(=+|-+)\s*$", lines[i].second)
+            push!(out, "a heading has an underline, and the fold does not lower it")
+        end
+    end
+    for (k, l) in lines
+        if k !== :text
+            continue
+        end
+        prose = replace(l, r"(`+)[^`]*\1" => "")
+        # The fold moves the page one directory up, and joins it to pages with the same headings.
+        for m in eachmatch(r"\]\((?!@|[a-z][a-z0-9+.-]*:)([^)]+)\)", prose)
+            push!(out, "the link `$(m.captures[1])` is relative, and the fold breaks it")
+        end
+        # Two pages can hold one footnote name, and the guide takes it once.
+        if occursin("[^", prose)
+            push!(out, "the text holds a footnote")
+        end
     end
     # The name of the file makes a label unique in the directory, and the guide holds the old ones.
     for m in eachmatch(r"\(@id ([^)]+)\)", text)
@@ -104,7 +125,7 @@ The section of one fragment: the text with no `@meta` block, and with each headi
 A `#` inside a fenced block is not a heading.
 """
 function fold_fragment(text::AbstractString)
-    out = [k === :text && occursin(r"^#+ ", l) ? "##" * l : l
+    out = [k === :text ? replace(l, r"^ {0,3}(?=#+ )" => "##") : l
            for (k, l) in fragment_lines(text) if k !== :meta]
     return strip(join(out, '\n'))
 end
