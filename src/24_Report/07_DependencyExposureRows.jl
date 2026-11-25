@@ -206,20 +206,21 @@ function exposure_unplaced_rows!(de::DependencyExposure, ridx::VecInt,
     return ridx
 end
 """
-    exposure_nodes(de::DependencyExposure, snaps::AbstractVector, nrows::Integer) -> Vector{String}
+    exposure_nodes(::Nothing, known::VecStr, nrows::Integer) -> Vector{String}
+    exposure_nodes(nodes::VecStr, known::VecStr, nrows::Integer) -> Vector{String}
 
-Return the nodes that a Dependency Exposure reports: `de.nodes`, or every node of the snapshots in force, in the order of their first use.
+Return the nodes that a Dependency Exposure reports: its `nodes`, or with `nothing` every node of the snapshots in force, in the order of their first use.
 
 # Arguments
 
-  - `de`: The configuration.
-  - `snaps`: The distinct snapshots.
+  - `nodes`: The field `nodes` of the configuration.
+  - `known`: The nodes of the snapshots in force, in the order of their first use. It is empty when no snapshot is in force.
   - `nrows`: The number of rows of weights.
 
 # Validation
 
-  - With `de.nodes = nothing`, a snapshot is in force at a row, so a node is known. Raises an `ArgumentError`.
-  - With `de.nodes`, each name is a node of a snapshot in force, when one is in force. Raises an `ArgumentError` that names the unknown names.
+  - With `nodes = nothing`, a snapshot is in force at a row, so a node is known. Raises an `ArgumentError`.
+  - With `nodes`, each name is a node of a snapshot in force, when one is in force. Raises an `ArgumentError` that names the unknown names.
 
 # Returns
 
@@ -229,17 +230,16 @@ Return the nodes that a Dependency Exposure reports: `de.nodes`, or every node o
 
   - [`exposure_result`](@ref)
 """
-function exposure_nodes(de::DependencyExposure, snaps::AbstractVector, nrows::Integer)
-    known = unique(String[n for s in snaps for n in first(s).nodes])
-    if isnothing(de.nodes)
-        @argcheck(nrows == 0 || !isempty(snaps),
-                  ArgumentError("no graph is in force at any row of the Dependency Exposure, so no node is known. Name the nodes to report with `nodes`"))
-        return known
-    end
-    lost = isempty(snaps) ? String[] : setdiff(de.nodes, known)
+function exposure_nodes(::Nothing, known::VecStr, nrows::Integer)
+    @argcheck(nrows == 0 || !isempty(known),
+              ArgumentError("no graph is in force at any row of the Dependency Exposure, so no node is known. Name the nodes to report with `nodes`"))
+    return convert(Vector{String}, known)
+end
+function exposure_nodes(nodes::VecStr, known::VecStr, ::Integer)
+    lost = isempty(known) ? String[] : setdiff(nodes, known)
     @argcheck(isempty(lost),
               ArgumentError("the nodes $(pinned_repr(first(lost, 5)))$(length(lost) > 5 ? " and $(length(lost) - 5) more" : "") of `nodes` are not nodes of any graph in force"))
-    return convert(Vector{String}, de.nodes)
+    return convert(Vector{String}, nodes)
 end
 """
     exposure_held(W::MatNum, ridx::VecInt, p::Integer) -> BitVector
@@ -380,7 +380,8 @@ function exposure_result(de::DependencyExposure, blocks::AbstractVector,
     labels = [l for b in blocks for l in b[5]]
     snaps, ridx, first_keys = exposure_snapshots(blocks)
     exposure_unplaced_rows!(de, ridx, labels, first_keys, gname)
-    nodes = exposure_nodes(de, snaps, length(ridx))
+    known = unique(String[n for s in snaps for n in first(s).nodes])
+    nodes = exposure_nodes(de.nodes, known, length(ridx))
     lost = [exposure_unplaced_assets(de, W, nx, ridx, labels, snaps[p], p, gname)
             for p in eachindex(snaps)]
     none = any(lost) ? length(nodes) + 1 : 0

@@ -596,7 +596,9 @@ This is the step of the memory. [`seriate`](@ref) reads the memory and keeps non
   - [`SpectralSeriationState`](@ref)
   - [`seriate`](@ref)
 """
-function partial_fit!(ser::SpectralSeriation, X::MatNum; dims::Int = 1, kwargs...)
+function partial_fit!(ser::SpectralSeriation{<:Any, <:Any, <:Any, <:Any,
+                                             <:Option{<:SpectralSeriationState}}, X::MatNum;
+                      dims::Int = 1, kwargs...)
     res = seriate(ser, X; dims = dims, kwargs...)
     return rebuild_struct(ser, (; cache = seriation_state(res, nothing)))
 end

@@ -3320,7 +3320,9 @@ end
                   WardLinkage(; presquared = true))
             clr = clusterise(ClustersEstimator(; alg = HClustAlgorithm(; linkage = l)), X)
             @test clr isa Clusters
-            @test clr.res.linkage === PortfolioOptimisers.linkage_symbol(l)
+            # A dynamic call, because a direct call folds the constant and runs no line of it.
+            @test clr.res.linkage ===
+                  Base.invokelatest(PortfolioOptimisers.linkage_symbol, l)
             @test maximum(assignments(clr)) == clr.k
         end
     end

@@ -143,6 +143,13 @@ Pipeline), which the decision tickets of the map can change.
     function excess_hierarchical(; x_src = :data, kw...)
         return excess_head(HierarchicalOptimiser(; kw...), x_src)
     end
+    # The seriation of HRP and Schur, and HERC itself, hold the clustering since #2174, so the
+    # source of the graph goes there and not into the `HierarchicalOptimiser`.
+    function excess_cle(x_src = :data)
+        g = x_src === :prior ? PriorSource() : ExcessSource()
+        return excess_reader(ClustersEstimator(), g, nothing)
+    end
+    excess_ser(x_src = :data) = HierarchicalSeriation(; cle = excess_cle(x_src))
     excess_inverse_volatility() = excess_head(InverseVolatility())
     excess_nested(; x_src = :data, kw...) = excess_head(NestedClustered(; kw...), x_src)
     excess_stacking(; kw...) = excess_head(Stacking(; kw...))
@@ -250,26 +257,31 @@ Pipeline), which the decision tickets of the map can change.
              ("EmpiricalPrior", EmpiricalPrior, :data))
             ho() = excess_hierarchical(; pe = mkpe(), x_src = xs)
             case!("HierarchicalRiskParity, $pn, x_src = :$xs, $b", :exact,
-                  () -> w(HierarchicalRiskParity(; opt = ho()), r))
+                  () -> w(HierarchicalRiskParity(; ser = excess_ser(xs), opt = ho()), r))
             case!("SchurComplementHierarchicalRiskParity, $pn, x_src = :$xs, $b", :exact,
-                  () -> w(SchurComplementHierarchicalRiskParity(; opt = ho(),
+                  () -> w(SchurComplementHierarchicalRiskParity(; ser = excess_ser(xs),
+                                                                opt = ho(),
                                                                 params = SchurComplementParams(;
                                                                                                gamma = 0.5)),
                           r))
             case!("HierarchicalEqualRiskContribution, $pn, x_src = :$xs, $b", :exact,
-                  () -> w(HierarchicalEqualRiskContribution(; opt = ho()), r))
+                  () -> w(HierarchicalEqualRiskContribution(; cle = excess_cle(xs),
+                                                            opt = ho()), r))
         end
         hd() = excess_hierarchical(; pe = FactorPrior())
         case!("the default x_src: HierarchicalRiskParity, FactorPrior, x_src = :data, $b",
-              :exact, () -> w(HierarchicalRiskParity(; opt = hd()), r))
+              :exact, () -> w(HierarchicalRiskParity(; ser = excess_ser(), opt = hd()), r))
         case!("the default x_src: SchurComplementHierarchicalRiskParity, FactorPrior, x_src = :data, $b",
               :exact,
-              () -> w(SchurComplementHierarchicalRiskParity(; opt = hd(),
+              () -> w(SchurComplementHierarchicalRiskParity(; ser = excess_ser(),
+                                                            opt = hd(),
                                                             params = SchurComplementParams(;
                                                                                            gamma = 0.5)),
                       r))
         case!("the default x_src: HierarchicalEqualRiskContribution, FactorPrior, x_src = :data, $b",
-              :exact, () -> w(HierarchicalEqualRiskContribution(; opt = hd()), r))
+              :exact,
+              () -> w(HierarchicalEqualRiskContribution(; cle = excess_cle(), opt = hd()),
+                      r))
         case!("InverseVolatility, $b", :exact, () -> w(excess_inverse_volatility(), r))
 
         # The meta heads. Their own `brt` changes their own prior and clustering, and no
@@ -359,14 +371,16 @@ Pipeline), which the decision tickets of the map can change.
                            ("RelaxedRiskBudgeting", RelaxedRiskBudgeting(; opt = excess_jump())),
                            ("NearOptimalCentering", NearOptimalCentering(; opt = excess_jump())),
                            ("HierarchicalRiskParity, EmpiricalPrior, x_src = :data",
-                            HierarchicalRiskParity(; opt = excess_hierarchical(; x_src = :data))),
+                            HierarchicalRiskParity(; ser = excess_ser(),
+                                                   opt = excess_hierarchical(; x_src = :data))),
                            ("SchurComplementHierarchicalRiskParity, EmpiricalPrior, x_src = :data",
-                            SchurComplementHierarchicalRiskParity(;
+                            SchurComplementHierarchicalRiskParity(; ser = excess_ser(),
                                                                   opt = excess_hierarchical(; x_src = :data),
                                                                   params = SchurComplementParams(;
                                                                                                  gamma = 0.5))),
                            ("HierarchicalEqualRiskContribution, EmpiricalPrior, x_src = :data",
-                            HierarchicalEqualRiskContribution(; opt = excess_hierarchical(; x_src = :data))),
+                            HierarchicalEqualRiskContribution(; cle = excess_cle(),
+                                                              opt = excess_hierarchical(; x_src = :data))),
                            ("InverseVolatility", excess_inverse_volatility()),
                            ("NestedClustered, the weights", nco()), ("Stacking, the weights", sto()),
                            ("SubsetResampling, the weights", sro()))
@@ -486,18 +500,19 @@ Pipeline), which the decision tickets of the map can change.
     case!("a vector benchmark gap, InverseVolatility", :exact,
           () -> w(excess_inverse_volatility(), rdvg))
     case!("a vector benchmark gap, HierarchicalRiskParity, FactorPrior", :exact,
-          () -> w(HierarchicalRiskParity(;
+          () -> w(HierarchicalRiskParity(; ser = excess_ser(:prior),
                                          opt = excess_hierarchical(; pe = FactorPrior(),
                                                                    x_src = :prior)), rdvg))
     # Before #1688 a head with no fallback refused the gap rows under `x_src = :data`.
     case!("a vector benchmark gap, HierarchicalRiskParity, FactorPrior, x_src = :data",
           :exact,
-          () -> w(HierarchicalRiskParity(;
+          () -> w(HierarchicalRiskParity(; ser = excess_ser(),
                                          opt = excess_hierarchical(; pe = FactorPrior(),
                                                                    x_src = :data)), rdvg))
     case!("the default x_src: a vector benchmark gap, HierarchicalRiskParity, FactorPrior, x_src = :data",
           :exact,
-          () -> w(HierarchicalRiskParity(; opt = excess_hierarchical(; pe = FactorPrior())),
+          () -> w(HierarchicalRiskParity(; ser = excess_ser(),
+                                         opt = excess_hierarchical(; pe = FactorPrior())),
                   rdvg))
     case!("a vector benchmark gap, MeanRisk, a centrality constraint, x_src = :data",
           :solved,
