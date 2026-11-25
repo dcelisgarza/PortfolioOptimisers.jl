@@ -1137,14 +1137,16 @@ A `ConstraintBlock` holds concentration rules, such as the UCITS 5/10/40 rule, i
 
 ## From v0.34.8 to v0.34.9
 
-### [The view of a finite allocator cuts its sets](@id migration-0-34-9-allocators)
+### [Views of a finite allocation](@id migration-0-34-9-allocators)
 
-`DiscreteAllocation` and `GreedyAllocation` no longer have the field `idx`. `PortfolioOptimisers.port_opt_view(allocator, i)` now cuts `unit`, `sets` and `fb` at the assets `i`, as the view of every other estimator that holds a `UniverseSets` does.
+`DiscreteAllocation` and `GreedyAllocation` no longer have the field `idx`. `PortfolioOptimisers.port_opt_view(allocator, i)` resolves a `LotUnitEstimator` against the whole `sets`, and returns an allocator that holds the `LotUnit` and the `sets` of the assets `i`. A name that the view left out still gives no diagnostic.
 
 - **`DiscreteAllocation`** takes eight positional arguments, where v0.34.8 took nine. Remove the argument after `sets`, or use the keyword constructor. The type parameters lose the entry after the one of `sets`.
 - **`GreedyAllocation`** takes four positional arguments, where v0.34.8 took five. Remove the argument after `sets`, or use the keyword constructor. The type parameters lose the entry after the one of `sets`. The fallback has no positional default, so the three-argument form of v0.34.6 does not return.
 - **The keyword `idx`** is gone from both constructors. Replace `GreedyAllocation(; unit = unit, sets = sets, idx = i)` with `PortfolioOptimisers.port_opt_view(GreedyAllocation(; unit = unit, sets = sets), i)`.
 - **The show** of both types loses the row `idx ┼ nothing`.
-- **A name that the view left out.** A `LotUnitEstimator` of the view resolves against the cut `sets`. A name that the cut removed raises an `ArgumentError` under `strict`, and logs a warning without it, where v0.34.8 gave no diagnostic. Every other estimator that names assets does the same. Name the assets of the selection alone in `val`, or give the allocator of the selected assets a `sets` that lists the removed names under `nikey`, such as `UniverseSets(; dict = Dict("nx" => kept, "ni" => removed))`. The resolution skips those names.
-- **A `LotUnitEstimator` with a `key`** resolves on the cut universe only when the name of that universe starts with `xkey`, such as `"nx_isin"`. The view of a `UniverseSets` does not cut a universe of another name, such as `"isin"`, so the allocation then raises a `DimensionMismatch`.
-- **A `LotUnitEstimator` with a rule in `val`**, such as `UniformValues()`, reads the number of selected assets, where v0.34.8 read the number of assets of the whole universe.
+- **The fields of a view.** `unit` is a `LotUnit` of the selected assets and `sets` holds the selected assets alone, where v0.34.8 kept both whole.
+- **A name outside the whole universe** raises or warns at the view, where v0.34.8 did so at `optimise`.
+- **The number type of the lots of a view** comes from the values of the `LotUnitEstimator`, where v0.34.8 took the number type of the input. A `Float32` input with `Float64` lots can give a share count that differs in its last digit. The share counts keep the number type of the input.
+
+`PortfolioOptimisers.port_opt_view(input, i)` of a `FiniteAllocationInput` now cuts the weights, the prices, the fee and the rule of the unpriced assets. It returned the whole input before. A view of an `AssetRedistribution` or a `SideRedistribution` moves the positions to the selected assets, and it returned the whole rule before.

@@ -15,9 +15,11 @@ PortfolioOptimisers.AbstractUnpricedWeightAlgorithm
 ProportionalRedistribution
 EvenRedistribution
 AssetRedistribution
+port_opt_view(upw::AssetRedistribution, i::VecInt, args...)
 SideRedistribution
 PortfolioOptimisers.unpriced_weights
 FiniteAllocationInput
+port_opt_view(fai::FiniteAllocationInput, i, args...)
 factory(res::FiniteAllocationOptimisationResult, fb::Option{<:FOptE_FOpt_FbChain})
 ```
 

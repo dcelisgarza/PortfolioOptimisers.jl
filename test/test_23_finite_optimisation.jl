@@ -1349,22 +1349,25 @@ end
         @test rl.shares[2] < 0
     end
 
-    # A selection cuts the asset axis, and the allocator follows it (#1991). The view cuts
-    # `unit`, `sets` and `fb`, as the view of every other holder of a `sets` does.
+    # A selection cuts the asset axis, and the allocator and the input follow it (#1991,
+    # #2333). The estimator resolves on the whole universe, and the view keeps the lots of
+    # the selected assets.
     @testset "a view of an allocator follows a cut of the assets" begin
         usets = UniverseSets(;
-                             dict = Dict("nx" => ["A", "B", "C", "D"], "g" => ["B", "D"],
-                                         "nx_isin" => ["a", "b", "c", "d"]))
+                             dict = Dict("nx" => ["A", "B", "C", "D"], "g" => ["A", "C"],
+                                         "nx_isin" => ["a", "b", "c", "d"],
+                                         "isin" => ["a", "b", "c", "d"]))
         l = [100.0, 0.5, 1.0, 0.25]
-        u = LotUnitEstimator(; val = Dict("B" => 0.5, "D" => 0.25))
+        u = LotUnitEstimator(; val = Dict("A" => 100, "B" => 0.5, "D" => 0.25))
         wc = FiniteAllocationInput(; w = [0.6, 0.4], prices = [71.0, 129.0], cash = 1000.0)
         ga = GreedyAllocation(; unit = u, sets = usets, strict = true)
         da = DiscreteAllocation(; slv = mip_slv, unit = u, sets = usets, strict = true)
 
+        # A cut name gives no refusal under `strict`, and no warning without it.
         for i in ([2, 4], BitVector([0, 1, 0, 1]), 2:2:4)
             for a in (ga, da)
-                v = @inferred PO.port_opt_view(a, i)
-                @test v.unit.val === u.val
+                v = PO.port_opt_view(a, i)
+                @test v.unit.val == [0.5, 0.25]
                 @test v.sets.dict["nx"] == ["B", "D"]
                 r = optimise(v, wc)
                 @test r.shares ==
@@ -1373,45 +1376,50 @@ end
             end
         end
         # The fallback views the same assets.
-        @test PO.port_opt_view(da, [2, 4]).fb.sets.dict["nx"] == ["B", "D"]
-
-        # A name that the view left out takes the diagnostic of every other estimator that
-        # names assets, and the Non-Investable Axis excuses it.
-        uc = LotUnitEstimator(; val = Dict("A" => 100, "B" => 0.5, "D" => 0.25))
-        gc = PO.port_opt_view(GreedyAllocation(; unit = uc, sets = usets, strict = true),
-                              [2, 4])
-        @test_throws ArgumentError optimise(gc, wc)
-        gl = PO.port_opt_view(GreedyAllocation(; unit = uc, sets = usets), [2, 4])
-        ref = optimise(PO.port_opt_view(ga, [2, 4]), wc).shares
-        @test (@test_logs (:warn,) optimise(gl, wc)).shares == ref
-        ni = UniverseSets(; dict = Dict("nx" => ["B", "D"], "ni" => ["A", "C"]))
-        @test (@test_logs optimise(PO.rebuild_struct(gc, (; sets = ni)), wc)).shares == ref
-        wb = WeightBoundsEstimator(; ub = Dict("A" => 0.5, "B" => 0.5))
-        hopt = PO.port_opt_view(HierarchicalOptimiser(; wb = wb, sets = usets,
-                                                      strict = true), [2, 4])
-        @test_throws ArgumentError weight_bounds_constraints(hopt.wb, hopt.sets;
-                                                             strict = hopt.strict)
+        @test PO.port_opt_view(da, [2, 4]).fb.unit.val == [0.5, 0.25]
+        vl = @test_logs PO.port_opt_view(GreedyAllocation(; unit = u, sets = usets), [2, 4])
+        @test (@test_logs optimise(vl, wc)).shares ==
+              optimise(PO.port_opt_view(ga, [2, 4]), wc).shares
+        # A name outside the whole universe is still refused, at the view.
+        uz = LotUnitEstimator(; val = "Z" => 0.5)
+        @test_throws ArgumentError PO.port_opt_view(GreedyAllocation(; unit = uz,
+                                                                     sets = usets,
+                                                                     strict = true), [2, 4])
+        @test_logs (:warn,) match_mode = :any PO.port_opt_view(GreedyAllocation(; unit = uz,
+                                                                                sets = usets),
+                                                               [2, 4])
 
         # A view of a view indexes the assets that the first view kept, in the stated order.
-        lots(a, w = wc) = PO.allocation_lot_unit(a.unit, a.sets, a.strict, w)
-        v2 = PO.port_opt_view(PO.port_opt_view(ga, BitVector([0, 1, 1, 1])), [3, 1])
-        @test v2.sets.dict["nx"] == ["D", "B"]
-        @test lots(v2) == [0.25, 0.5]
+        v2 = PO.port_opt_view(PO.port_opt_view(ga, BitVector([1, 1, 0, 1])), [3, 1])
+        @test v2.sets.dict["nx"] == ["D", "A"]
+        @test v2.unit.val == [0.25, 100.0]
         # The whole axis keeps every asset.
-        @test PO.port_opt_view(ga, :).sets.dict["nx"] == usets.dict["nx"]
+        @test PO.port_opt_view(ga, :).unit.val == l
 
-        # The group, the vector, the scalar and the keyed forms follow the cut.
-        glots(unit, i) = lots(PO.port_opt_view(GreedyAllocation(; unit = unit, sets = usets,
-                                                                strict = true), i))
-        @test glots(LotUnitEstimator(; val = "g" => 10.0), [4, 2]) == [10.0, 10.0]
-        @test glots(LotUnitEstimator(; val = l), [4, 1]) == [0.25, 100.0]
-        @test glots(LotUnitEstimator(; val = 0.5), [4, 1]) == 0.5
-        @test glots(LotUnitEstimator(; val = Dict("d" => 2.0), key = "nx_isin"), [3, 4]) ==
-              [1.0, 2.0]
-        # The number type comes from the input, as with no view.
+        # Every form of the estimator gives the lots of the whole universe at the cut, and the
+        # share counts have the number type of the input.
         w32 = FiniteAllocationInput(; w = Float32[0.6, 0.4], prices = Float32[71, 129],
                                     cash = 1000.0f0)
-        @test eltype(lots(PO.port_opt_view(ga, [2, 4]), w32)) == Float32
+        for (unit, i) in ((u, [2, 4]), (LotUnitEstimator(; val = "g" => 10.0), [3, 4]),
+                          (LotUnitEstimator(; val = l), [4, 1]), (LotUnitEstimator(; val = 0.5), [4, 1]),
+                          (LotUnitEstimator(; val = Dict("B" => 2)), [2, 3]),
+                          (LotUnitEstimator(; val = Dict("B" => 2), dval = 0.5), [2, 3]),
+                          (LotUnitEstimator(; val = UniformValues()), [2, 3]),
+                          (LotUnitEstimator(; val = Dict("a" => 5.0, "d" => 2.0), key = "isin"), [3, 4]),
+                          (LotUnitEstimator(; val = Dict("a" => 5.0, "d" => 2.0), key = "nx_isin"), [3, 4])),
+            f in (wc, w32)
+
+            T = eltype(f.w)
+            lot = PO.nothing_scalar_array_view(lot_unit_constraints(unit, usets;
+                                                                    datatype = T,
+                                                                    strict = true).val, i)
+            v = PO.port_opt_view(GreedyAllocation(; unit = unit, sets = usets,
+                                                  strict = true), i)
+            @test v.unit.val == lot
+            shares = optimise(v, f).shares
+            @test shares == optimise(GreedyAllocation(; unit = LotUnit(lot)), f).shares
+            @test eltype(shares) == T
+        end
 
         # A resolved lot unit is sliced, and a scalar one is kept.
         vu = PO.port_opt_view(DiscreteAllocation(; slv = mip_slv, unit = LotUnit(l)),
@@ -1427,5 +1435,77 @@ end
                       FiniteAllocationInput(; w = fill(0.25, 4), prices = fill(1.0, 4),
                                             cash = 1000.0))
         @test PO.port_opt_view(GreedyAllocation(; fb = rg), [2, 4]).fb === rg
+    end
+
+    @testset "a view of the input follows a cut of the assets" begin
+        w = [0.5, 0.3, -0.2, 0.0, 0.2]
+        p = [10.0, 20.0, 5.0, 8.0, NaN]
+        ca = CashCollateral(; amount = 300.0)
+        fees = Fees(; l = [0.001, 0.002, 0.003, 0.004, 0.005], s = 0.001,
+                    tn = Turnover(; w = [0.1, 0.2, -0.1, 0.0, 0.2], val = fill(0.01, 5)),
+                    lq = Turnover(; w = [0.25], val = [0.01]))
+        fai = FiniteAllocationInput(; w = w, prices = p, cash = 1e4, prev_cash = 9e3,
+                                    horizon = 3, fees = fees, ca = ca,
+                                    upw = AssetRedistribution(; idx = [4, 1]))
+        for i in ([1, 3], BitVector([1, 0, 1, 0, 0]), 1:2:3)
+            v = PO.port_opt_view(fai, i)
+            @test v.w == w[[1, 3]]
+            @test v.prices == p[[1, 3]]
+            @test (v.cash, v.prev_cash, v.horizon, v.ca) == (1e4, 9e3, 3, ca)
+            @test v.fees.l == fees.l[[1, 3]]
+            @test v.fees.s == fees.s
+            @test v.fees.tn.w == fees.tn.w[[1, 3]]
+            @test v.fees.lq === fees.lq
+            @test isnothing(v.imsk)
+            @test v.upw.idx == [1]
+        end
+        # The whole axis keeps the problem, and the empty fields stay empty.
+        @test PO.port_opt_view(fai, :).upw.idx == [1, 4]
+        @test optimise(GreedyAllocation(), PO.port_opt_view(fai, :)).shares ==
+              optimise(GreedyAllocation(), fai).shares
+        bare = PO.port_opt_view(FiniteAllocationInput(; w = w, prices = p), [2, 5])
+        @test isnothing(bare.fees) && isnothing(bare.upw)
+        # A view of a view indexes the assets that the first view kept.
+        v2 = PO.port_opt_view(PO.port_opt_view(fai, [5, 4, 1]), [3, 1])
+        @test v2.w == w[[1, 5]] && v2.upw.idx == [1]
+
+        # The rules of the Unpriced Assets follow the cut.
+        ar = AssetRedistribution(; idx = 4)
+        @test PO.port_opt_view(ar, [1, 4]).idx == [2]
+        @test PO.port_opt_view(ar, BitVector([0, 0, 1, 1, 0])).idx == [2]
+        @test isnothing(PO.port_opt_view(ar, [1, 2]))
+        @test PO.port_opt_view(ar, :) === ar
+        sr = PO.port_opt_view(SideRedistribution(; l = ar, s = EvenRedistribution()),
+                              [1, 4])
+        @test sr.l.idx == [2] && sr.s === EvenRedistribution()
+        fr = (w, umsk) -> PO.unpriced_weights(nothing, w, umsk)
+        @test PO.port_opt_view(fr, [1]) === fr
+        @test PO.port_opt_view(SideRedistribution(; l = fr), [1]).l === fr
+
+        # A fee of a reduced optimisation goes back on the axis of `w`, so a view at the
+        # assets of the mask keeps the fee and the share counts of the whole input.
+        imsk = BitVector([true, false, true, true])
+        mf = Fees(; l = [0.001, 0.002, 0.003], lq = Turnover(; w = [0.25], val = [0.01]),
+                  flq = Turnover(; w = [0.25], val = [5.0]))
+        mi = FiniteAllocationInput(; w = [0.4, 0.0, 0.35, 0.25],
+                                   prices = [10.0, 20.0, 5.0, 8.0], cash = 1e4, horizon = 3,
+                                   fees = mf, imsk = imsk)
+        mv = PO.port_opt_view(mi, findall(imsk))
+        @test mv.fees.l == mf.l && isnothing(mv.fees.imsk)
+        for a in (GreedyAllocation(), DiscreteAllocation(; slv = mip_slv))
+            r, rv = optimise(a, mi), optimise(a, mv)
+            @test rv.shares ≈ r.shares[imsk]
+            @test rv.fees ≈ r.fees
+            @test rv.cash ≈ r.cash
+        end
+
+        # The allocator and the input follow one index.
+        usets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C", "D", "E"]))
+        ga = GreedyAllocation(; unit = LotUnitEstimator(; val = Dict("A" => 10, "E" => 3)),
+                              sets = usets, strict = true)
+        i = [2, 1]
+        r = optimise(PO.port_opt_view(ga, i), PO.port_opt_view(fai, i))
+        @test is_lot_multiple(collect(r.shares), [1.0, 10.0])
+        @test length(r.shares) == 2
     end
 end

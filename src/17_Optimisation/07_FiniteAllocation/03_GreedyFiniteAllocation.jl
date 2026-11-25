@@ -149,13 +149,11 @@ Keywords correspond to the struct's fields.
 
 ## View parameters
 
-[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
+`GreedyAllocation` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
 
-  - `unit`: Recursively viewed through [`port_opt_view`](@ref).
-  - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
-  - `fb`: Recursively viewed through [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
-
-A [`LotUnitEstimator`](@ref) of the view resolves against the sliced `sets`, so the universe no longer holds a name that the view left out. `strict` raises on such a name, and the loose form warns, as in every estimator that names assets. The resolution skips a name on the Non-Investable Axis of `sets`.
+  - A [`LotUnitEstimator`](@ref) in `unit` resolves against the whole `sets`, under `strict`, and the view holds the [`LotUnit`](@ref) of the selected assets. A name that the view left out is a correct name, so it gives no diagnostic. A name outside the whole universe gives one.
+  - A [`LotUnit`](@ref) in `unit` and the `sets` are sliced to the selected assets.
+  - `fb` goes through [`view_child`](@ref), which views a fallback estimator and keeps a fallback result.
 
 # Examples
 
@@ -184,15 +182,15 @@ GreedyAllocation
 
   - $(ref_dict[:martin2021]) Methods, page 3. $(ref_dict[:no_original_source])
 """
-@propagatable @concrete struct GreedyAllocation <: FiniteAllocationOptimisationEstimator
+@concrete struct GreedyAllocation <: FiniteAllocationOptimisationEstimator
     """
     $(field_dict[:unit])
     """
-    @vprop unit
+    unit
     """
     $(field_dict[:sets_alloc])
     """
-    @vprop sets
+    sets
     """
     $(field_dict[:strict_opt])
     """
@@ -200,7 +198,7 @@ GreedyAllocation
     """
     $(field_dict[:fb])
     """
-    @vprop fb
+    fb
     function GreedyAllocation(unit::LuE_Lu, sets::Option{<:UniverseSets}, strict::Bool,
                               fb::Option{<:FOptE_FOpt})
         if isa(unit, LotUnitEstimator)
@@ -215,6 +213,58 @@ function GreedyAllocation(; unit::LuE_Lu = LotUnit(),
                           sets::Option{<:UniverseSets} = nothing, strict::Bool = false,
                           fb::Option{<:FOptE_FOpt} = nothing)::GreedyAllocation
     return GreedyAllocation(unit, sets, strict, fb)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a copy of [`GreedyAllocation`](@ref) for the assets `i`.
+
+Call it after a selection, with the index that cut the returns data, so that the allocator buys the lots of the assets that the selection kept. [`port_opt_view`](@ref) of a [`FiniteAllocationInput`](@ref) cuts the weights, the prices and the fee at the same index.
+
+# Algorithm
+
+ 1. Resolve `unit` with [`lot_unit_constraints`](@ref) against the whole `sets`, under `strict`. The fill value of an unnamed asset is an integer one, so the number type of the lots comes from the values of `unit`.
+ 2. View the resolved lot unit and the `sets` at `i`.
+ 3. View `fb` at `i` through [`view_child`](@ref), so the fallback reads the same assets.
+ 4. Rebuild the allocator with the new `unit`, `sets` and `fb`. The other fields hold no value for each asset.
+
+# Arguments
+
+  - `ga`: The allocator.
+  - `i`: Indices of the assets that the view keeps.
+  - `args...`: Forwarded to the view of `fb`.
+
+# Returns
+
+  - `ga::GreedyAllocation`: The allocator restricted to the assets at `i`.
+
+# Examples
+
+```jldoctest
+julia> sets = UniverseSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
+
+julia> unit = LotUnitEstimator(; val = Dict(\"A\" => 100, \"B\" => 0.5));
+
+julia> alloc = GreedyAllocation(; unit = unit, sets = sets);
+
+julia> PortfolioOptimisers.port_opt_view(alloc, [2, 3]).unit.val == [0.5, 1.0]
+true
+```
+
+# Related
+
+  - [`GreedyAllocation`](@ref)
+  - [`FiniteAllocationInput`](@ref)
+  - [`lot_unit_constraints`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`view_child`](@ref)
+"""
+function port_opt_view(ga::GreedyAllocation, i, args...)::GreedyAllocation
+    unit = lot_unit_constraints(ga.unit, ga.sets; datatype = Int, strict = ga.strict)
+    return rebuild_struct(ga,
+                          (; unit = port_opt_view(unit, i),
+                           sets = port_opt_view(ga.sets, i),
+                           fb = view_child(ga.fb, i, args...)))
 end
 """
     greedy_fee_delta(::Nothing, ::VecNum, shares::VecNum, ::Integer, ::Number)

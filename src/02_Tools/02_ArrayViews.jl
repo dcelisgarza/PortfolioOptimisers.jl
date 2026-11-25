@@ -3,7 +3,7 @@
         x::Union{Nothing, Number, Pair, VecPair, Dict,
                  AbstractEstimatorValueAlgorithm,
                  DynamicAbstractWeights, AbstractEstimator, AbstractAlgorithm,
-                 StatsBase.CovarianceEstimator},
+                 StatsBase.CovarianceEstimator, Function},
         ::Any
     ) -> x
     nothing_scalar_array_view(x::AbstractVector, i) -> view(x, i)
@@ -20,7 +20,7 @@ View of a value at the asset index `i`, where the value can be `nothing`, a scal
 
 The method that Julia selects is the algorithm. Each step is one method, and no method allocates a copy of the data.
 
- 1. `x` carries no asset axis, because it is `nothing`, a scalar, a pair, a dictionary, a value algorithm, a set of dynamic weights, an estimator, an algorithm or a `StatsBase.CovarianceEstimator`: return `x` itself.
+ 1. `x` carries no asset axis, because it is `nothing`, a scalar, a pair, a dictionary, a value algorithm, a set of dynamic weights, an estimator, an algorithm, a `StatsBase.CovarianceEstimator` or a function: return `x` itself.
  2. `x` is a vector: return `view(x, i)`, one entry per selected asset.
  3. `x` is a [`VecScalar`](@ref): return a new [`VecScalar`](@ref) whose vector part is `view(x.v, i)` and whose scalar part is `x.s`. The scalar part has no asset axis.
  4. `x` is a matrix: return `view(x, i, i)`, which selects the **same** index on **both** axes. This is the rule for a square matrix over the assets, such as a covariance matrix or a similarity matrix. A matrix whose two axes are different needs [`nothing_scalar_array_view_odd_order`](@ref).
@@ -35,7 +35,7 @@ The method that Julia selects is the algorithm. Each step is one method, and no 
 
   - `x`: Input value.
 
-      + `::Union{Nothing, Number, Pair, VecPair, Dict, AbstractEstimatorValueAlgorithm, DynamicAbstractWeights, AbstractEstimator, AbstractAlgorithm, StatsBase.CovarianceEstimator}`: Returns `x` unchanged.
+      + `::Union{Nothing, Number, Pair, VecPair, Dict, AbstractEstimatorValueAlgorithm, DynamicAbstractWeights, AbstractEstimator, AbstractAlgorithm, StatsBase.CovarianceEstimator, Function}`: Returns `x` unchanged.
       + `::AbstractVector`: Returns `view(x, i)`.
       + `::VecScalar`: Returns `VecScalar(; v = view(x.v, i), s = x.s)`.
       + `::AbstractMatrix`: Returns `view(x, i, i)`.
@@ -69,7 +69,7 @@ function nothing_scalar_array_view(x::Union{Nothing, Number, Pair, VecPair, Dict
                                             AbstractEstimatorValueAlgorithm,
                                             DynamicAbstractWeights, AbstractEstimator,
                                             AbstractAlgorithm,
-                                            StatsBase.CovarianceEstimator}, ::Any)
+                                            StatsBase.CovarianceEstimator, Function}, ::Any)
     return x
 end
 function nothing_scalar_array_view(x::AbstractVector, i)

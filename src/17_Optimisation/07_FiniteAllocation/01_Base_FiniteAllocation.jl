@@ -25,7 +25,7 @@ To implement a new finite allocation estimator, subtype `FiniteAllocationOptimis
 
 ## `port_opt_view`
 
-  - `port_opt_view(fa::MyAllocation, i, args...) -> FiniteAllocationOptimisationEstimator`: Restricts the allocator to the assets `i`, and a fallback estimator in `fb` with it. A precomputed result in `fb` stays as it is. The method is optional, and the generic method returns the allocator unchanged. [`@propagatable`](@ref) makes the method from the `@vprop` tags of the fields that hold a value for each asset, the sets or a fallback.
+  - `port_opt_view(fa::MyAllocation, i, args...) -> FiniteAllocationOptimisationEstimator`: Restricts the allocator to the assets `i`, and a fallback estimator in `fb` with it. A precomputed result in `fb` stays as it is. The method is optional. Define it when a field holds a value for each asset. The generic method returns the allocator unchanged.
 
 ### Arguments
 
@@ -401,7 +401,7 @@ Where:
   - `w`: Target portfolio weights over the full universe. A negative weight is on the short side.
   - `umsk`: Mask of the Unpriced Assets, in the order of `w`.
 
-The returned vector must have the length of `w`, and a zero at every Unpriced Asset. The allocators check both conditions, and throw an `ArgumentError` when one fails. A plain function with the same signature is also a valid `upw`. [`unpriced_weights`](@ref) states the zero-weight reading of `nothing`, which a rule can call to start from.
+The returned vector must have the length of `w`, and a zero at every Unpriced Asset. The allocators check both conditions, and throw an `ArgumentError` when one fails. A plain function with the same signature is also a valid `upw`. A rule that holds a value or a position for each asset also defines [`port_opt_view`](@ref), as [`AssetRedistribution`](@ref) does. [`unpriced_weights`](@ref) states the zero-weight reading of `nothing`, which a rule can call to start from.
 
 # Examples
 
@@ -648,6 +648,12 @@ Keywords correspond to the struct's fields.
   - Every entry of `idx` is positive, else a `DomainError`.
   - The functor throws a `BoundsError` when an entry of `idx` is larger than the length of `w`.
 
+## View parameters
+
+`AssetRedistribution` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - `idx` takes the positions of its assets on the axis of the view. A view that keeps none of them gives `nothing`.
+
 # Functor
 
     (upw::AssetRedistribution)(w::VecNum, umsk::AbstractVector{Bool})
@@ -671,6 +677,7 @@ julia> AssetRedistribution(; idx = 4)([0.5, 0.3, 0.2, 0.0], [false, false, true,
   - [`ProportionalRedistribution`](@ref)
   - [`EvenRedistribution`](@ref)
   - [`FiniteAllocationInput`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @concrete struct AssetRedistribution <: AbstractUnpricedWeightAlgorithm
     """
@@ -685,6 +692,43 @@ julia> AssetRedistribution(; idx = 4)([0.5, 0.3, 0.2, 0.0], [false, false, true,
 end
 function AssetRedistribution(; idx::Union{Integer, VecInt})::AssetRedistribution
     return AssetRedistribution(idx)
+end
+"""
+    port_opt_view(upw::AssetRedistribution, i::VecInt, args...)
+    port_opt_view(upw::AssetRedistribution, ::Colon, args...)
+
+Return the rule for the assets `i`, with the positions of the assets that the view kept.
+
+A rule whose assets are all outside the view gives `nothing`, the zero-weight reading. That is the rule itself on a book in which no asset of `idx` can take the weight. The whole axis keeps the rule.
+
+# Algorithm
+
+ 1. Read the positions of the assets that the view keeps. A mask gives the positions of its `true` entries.
+ 2. Find the entries of these positions that `upw.idx` names.
+ 3. Return the rule on them, or `nothing` when there is none.
+
+# Arguments
+
+  - `upw`: The rule.
+  - `i`: Positions of the assets that the view keeps, or a mask.
+  - `args...`: More positional arguments, which the method ignores.
+
+# Returns
+
+  - `upw::Option{<:AssetRedistribution}`: The rule on the axis of the view.
+
+# Related
+
+  - [`AssetRedistribution`](@ref)
+  - [`FiniteAllocationInput`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function port_opt_view(upw::AssetRedistribution, i::VecInt, args...)
+    idx = findall(in(upw.idx), isa(i, AbstractVector{Bool}) ? findall(i) : i)
+    return isempty(idx) ? nothing : AssetRedistribution(idx)
+end
+function port_opt_view(upw::AssetRedistribution, ::Colon, args...)
+    return upw
 end
 function (upw::AssetRedistribution)(w::VecNum, umsk::AbstractVector{Bool})
     wt = unpriced_weights(nothing, w, umsk)
@@ -737,6 +781,13 @@ Keywords correspond to the struct's fields. With both rules `nothing`, the rule 
 
   - Neither `l` nor `s` is a `SideRedistribution`, else an `ArgumentError`. The rule of a side gives only the entries of that side, so a nested rule adds nothing.
 
+## View parameters
+
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
+
+  - `l`: Recursively viewed through [`port_opt_view`](@ref).
+  - `s`: Recursively viewed through [`port_opt_view`](@ref).
+
 # Functor
 
     (upw::SideRedistribution)(w::VecNum, umsk::AbstractVector{Bool})
@@ -763,16 +814,17 @@ julia> SideRedistribution(; l = ProportionalRedistribution())([0.6, 0.3, 0.3, -0
   - [`EvenRedistribution`](@ref)
   - [`AssetRedistribution`](@ref)
   - [`FiniteAllocationInput`](@ref)
+  - [`port_opt_view`](@ref)
 """
-@concrete struct SideRedistribution <: AbstractUnpricedWeightAlgorithm
+@propagatable @concrete struct SideRedistribution <: AbstractUnpricedWeightAlgorithm
     """
     Rule for the weight of the Unpriced Assets of the long side, or `nothing` for a zero weight.
     """
-    l
+    @vprop l
     """
     Rule for the weight of the Unpriced Assets of the short side, or `nothing` for a zero weight.
     """
-    s
+    @vprop s
     function SideRedistribution(l::Option{<:UnpricedAlg_Func},
                                 s::Option{<:UnpricedAlg_Func})
         @argcheck(!isa(l, SideRedistribution) && !isa(s, SideRedistribution),
@@ -896,6 +948,15 @@ Reads from a fitted optimisation every value that an allocation can take from it
   - The mask of `fees` is `nothing` or equal to `imsk`. [`mark_fees`](@ref) throws an `ArgumentError` otherwise.
   - `imsk`, stated or read from the fee, has `length(imsk) == length(w)`, else a `DimensionMismatch`, and `any(imsk)`, else an [`IsEmptyError`](@ref).
 
+## View parameters
+
+`FiniteAllocationInput` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - `w` and `prices` are sliced to the selected assets. `cash` and `prev_cash` stay, so the weight of an asset that the view left out stays in the cash, as the weight of an Unpriced Asset under `upw = nothing` does.
+  - `fees` goes back on the axis of `w` with [`lift_fees`](@ref), and then through [`port_opt_view`](@ref). `lq` and `flq` stay whole, because they charge the exits of the book and not a position of the view.
+  - `imsk` becomes `nothing`, because the fee of the view is on the axis of the weights of the view.
+  - `upw` goes through [`port_opt_view`](@ref), which moves the positions of an [`AssetRedistribution`](@ref) to the axis of the view.
+
 # Examples
 
 ```jldoctest
@@ -929,6 +990,7 @@ FiniteAllocationInput
   - [`AbstractUnpricedWeightAlgorithm`](@ref)
   - [`prepare_finite_allocation`](@ref)
   - [`optimise`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @concrete struct FiniteAllocationInput <: AbstractEstimator
     """
@@ -1027,6 +1089,62 @@ function FiniteAllocationInput(res::NonFiniteAllocationOptimisationResult; price
                                  allocation_horizon(res, horizon), extract_fees(res, fees),
                                  isnothing(imsk) ? result_investable_mask(res) : imsk, ca,
                                  upw)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a copy of [`FiniteAllocationInput`](@ref) for the assets `i`.
+
+Use it with the [`port_opt_view`](@ref) of the allocator at the same index. The view is the book of the assets `i` under the cash of the whole book. An allocation of the view buys the target weights of these assets, and leaves the rest of the cash. A view that leaves out only assets with a zero target weight and no previous weight keeps the budget of each side and the fee.
+
+A fee of a reduced optimisation records its mask and is on two reduced axes, so the view first puts it on the axis of `w`. A view at the assets that the mask kept then still charges the exits of the assets that left.
+
+!!! warning
+
+    The view charges no sale of an asset that it left out. State that sale in `fees.lq` before the view, or keep the asset in the view with a zero weight, so that its turnover fee charges it.
+
+# Algorithm
+
+ 1. Read the positions `pos` of the assets `i` on the axis of `w`.
+ 2. View `w` and `prices` at `pos`.
+ 3. Put the fee on the axis of `w` with [`lift_fees`](@ref), and view it at `pos`. `lq` and `flq` stay whole.
+ 4. View the rule `upw` at `pos`.
+ 5. Rebuild the input with these fields, with `imsk` set to `nothing`. The other fields hold no value for each asset.
+
+# Arguments
+
+  - `fai`: The input.
+  - `i`: Indices of the assets that the view keeps.
+  - `args...`: More positional arguments, which the method ignores.
+
+# Returns
+
+  - `fai::FiniteAllocationInput`: The input restricted to the assets at `i`.
+
+# Examples
+
+```jldoctest
+julia> fai = FiniteAllocationInput(; w = [0.5, 0.3, 0.2], prices = [10.0, 20.0, 5.0],
+                                   cash = 1000.0);
+
+julia> PortfolioOptimisers.port_opt_view(fai, [1, 3]).prices == [10.0, 5.0]
+true
+```
+
+# Related
+
+  - [`FiniteAllocationInput`](@ref)
+  - [`DiscreteAllocation`](@ref)
+  - [`GreedyAllocation`](@ref)
+  - [`lift_fees`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function port_opt_view(fai::FiniteAllocationInput, i, args...)::FiniteAllocationInput
+    pos = eachindex(fai.w)[i]
+    return rebuild_struct(fai,
+                          (; w = view(fai.w, pos), prices = view(fai.prices, pos),
+                           fees = port_opt_view(lift_fees(fai.fees), pos), imsk = nothing,
+                           upw = port_opt_view(fai.upw, pos)))
 end
 export FiniteAllocationInput
 public FiniteAllocationOptimisationEstimator, AbstractCollateralAlgorithm,
