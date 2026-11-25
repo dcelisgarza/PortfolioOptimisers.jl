@@ -261,9 +261,11 @@ function sub_portfolio_cv(cv)
 end
 """
     outer_optimisation_finaliser(wb::WeightBounds, wf::WeightFinaliser, resi::VecOpt,
-                                 rco::OptimisationReturnCode, w::VecNum, wi::MatNum)
+                                 rco::OptimisationReturnCode, w::VecNum, wi::MatNum,
+                                 ctx::Tuple = ())
     outer_optimisation_finaliser(wb::WeightBounds, wf::WeightFinaliser, resi::VecOpt,
-                                 rcos::VecOptRetCode, ws::VecVecNum, wi::MatNum)
+                                 rcos::VecOptRetCode, ws::VecVecNum, wi::MatNum,
+                                 ctx::Tuple = ())
 
 Combine the inner and outer weights of a meta-optimiser, and finalise them under its weight bounds.
 
@@ -303,6 +305,7 @@ The method for an efficient frontier runs these steps once for each pair of `rco
   - `w`: Outer weights, one entry for each sub-portfolio.
   - `rcos`, `ws`: The return codes and outer weights of the points of an efficient frontier.
   - `wi`: Inner weights, `assets × sub-portfolios`.
+  - `ctx`: The context of the head, `(pr, rd, sets, fees, strict)`, which [`finalise_weight_bounds`](@ref) takes.
 
 # Returns
 
@@ -316,9 +319,10 @@ The method for an efficient frontier runs these steps once for each pair of `rco
   - [`WeightBounds`](@ref)
 """
 function outer_optimisation_finaliser(wb::WeightBounds, wf::WeightFinaliser, resi::VecOpt,
-                                      rco::OptimisationReturnCode, w::VecNum, wi::MatNum)
+                                      rco::OptimisationReturnCode, w::VecNum, wi::MatNum,
+                                      ctx::Tuple = ())
     w = wi * w
-    retcode, w = finalise_weight_bounds(wf, wb, w)
+    retcode, w = finalise_weight_bounds(wf, wb, w, ctx...)
     wb_flag = isa(retcode, OptimisationFailure)
     opto_flag = isa(rco, OptimisationFailure)
     resi_retcodes = getproperty.(resi, :retcode)
@@ -341,8 +345,9 @@ function outer_optimisation_finaliser(wb::WeightBounds, wf::WeightFinaliser, res
     return retcode, w
 end
 function outer_optimisation_finaliser(wb::WeightBounds, wf::WeightFinaliser, resi::VecOpt,
-                                      rcos::VecOptRetCode, ws::VecVecNum, wi::MatNum)
-    retcode_w = [outer_optimisation_finaliser(wb, wf, resi, rco, w, wi)
+                                      rcos::VecOptRetCode, ws::VecVecNum, wi::MatNum,
+                                      ctx::Tuple = ())
+    retcode_w = [outer_optimisation_finaliser(wb, wf, resi, rco, w, wi, ctx)
                  for (rco, w) in zip(rcos, ws)]
     return map(x -> x[1], retcode_w), map(x -> x[2], retcode_w)
 end

@@ -566,6 +566,7 @@ An entry of a schedule in `opti` or `opto` must be an estimator, as the static v
   - `fees`: Recursively updated through [`factory`](@ref).
   - `opti`: Recursively updated through [`factory`](@ref).
   - `opto`: Recursively updated through [`factory`](@ref).
+  - `wf`: Recursively updated through [`factory`](@ref).
   - `fb`: Recursively updated through [`factory`](@ref).
   - `cache`: Recursively updated through [`factory`](@ref).
 
@@ -575,7 +576,7 @@ An entry of a schedule in `opti` or `opto` must be an estimator, as the static v
 
   - The method reads the returns matrix `X`. When `pe` holds a prior result, the method uses `pe.X` in place of `X`, so the fields that read a matrix read the observations of the prior.
   - `pe`, `wb`, `sets` and `cache` recurse through [`port_opt_view`](@ref) with the index alone.
-  - `fees`, `opti` and `opto` recurse through [`port_opt_view`](@ref) with the index and the matrix, and `fb` through [`view_child`](@ref).
+  - `fees`, `wf`, `opti` and `opto` recurse through [`port_opt_view`](@ref) with the index and the matrix, and `fb` through [`view_child`](@ref).
   - `cle` passes through unchanged, because the clustering runs again over the viewed assets.
 
 ## Observation weight parameters
@@ -587,6 +588,7 @@ An entry of a schedule in `opti` or `opto` must be an estimator, as the static v
   - `fees`: Recursively indexed through [`obs_weights_view`](@ref).
   - `opti`: Recursively indexed through [`obs_weights_view`](@ref).
   - `opto`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `wf`: Recursively indexed through [`obs_weights_view`](@ref).
   - `fb`: Recursively indexed through [`obs_weights_view`](@ref).
   - `cache`: Removed by [`obs_weights_view`](@ref), because a state has no slice on the observation axis.
 
@@ -648,7 +650,7 @@ An entry of a schedule in `opti` or `opto` must be an estimator, as the static v
     """
     $(field_dict[:wf])
     """
-    wf
+    @fprop @oprop wf
     """
     $(field_dict[:ex])
     """
@@ -691,9 +693,10 @@ An entry of a schedule in `opti` or `opto` must be an estimator, as the static v
         if !isnothing(cv)
             assert_external_optimiser(opti)
         end
-        if name_keyed(wb)
+        if name_keyed(wb) || name_keyed(wf)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
+        assert_data_benchmark_prior(wf, pe, :wf, :NestedClustered)
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
@@ -794,6 +797,7 @@ function needs_previous_weights(opt::NestedClustered)
     return (any(f -> needs_previous_weights(getfield(opt, f)),
                 time_dependent_fields(opt)) ||
             needs_previous_weights(opt.fees) ||
+            needs_previous_weights(opt.wf) ||
             needs_previous_weights(opt.opti) ||
             needs_previous_weights(opt.opto) ||
             needs_previous_weights(opt.fb))
@@ -868,9 +872,9 @@ function port_opt_view(nco::NestedClustered, i, X::MatNum, args...)
     opto = port_opt_view(nco.opto, i, X)
     return NestedClustered(; pe = pe, cle = nco.cle, wb = wb, fees = fees, sets = sets,
                            opti = opti, opto = opto, cv = nco.cv, scorer = nco.scorer,
-                           wf = nco.wf, ex = nco.ex, fb = view_child(nco.fb, i, X),
-                           strict = nco.strict, pcol = nco.pcol,
-                           cache = port_opt_view(nco.cache, i))
+                           wf = port_opt_view(nco.wf, i, X), ex = nco.ex,
+                           fb = view_child(nco.fb, i, X), strict = nco.strict,
+                           pcol = nco.pcol, cache = port_opt_view(nco.cache, i))
 end
 function non_investable_universe(nco::NestedClustered, ni::VecStr)::NestedClustered
     return rebuild_struct(nco, (; sets = non_investable_sets(nco.sets, ni)))
@@ -992,9 +996,13 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol 
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     # A fit again after a refusal of the distance reader passes its mask as `rmsk`.
-    imsk = distance_reader_entry_mask(nco.cle, pr, rd, nco.strict; rmsk = rmsk)
+    imsk = distance_reader_entry_mask((nco.cle, finaliser_readers(nco.wf)...), pr, rd,
+                                      nco.strict; rmsk = rmsk)
     fees = investable_fees_view(fees_constraints(nco.fees, nco.sets; datatype = Tf,
                                                  strict = nco.strict), imsk, pr.X)
+    # The block of the weight finaliser resolves its names on the same universe, and follows
+    # the mask as the fee does.
+    wf = investable_finaliser(nco.wf, nco.sets, nco.strict, imsk, pr.X)
     # A forced exit is charged once, against the full-universe weight vector the fit
     # rebuilds, so only the result charges it. No sub-problem below holds that vector —
     # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
@@ -1013,10 +1021,12 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol 
     # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
     clr = distance_reader_call(clusterise, nco.cle, pr; rd = rdr, iv = rdr.iv,
                                ivpa = rdr.ivpa, branchorder = branchorder)
-    if clr isa DistanceReaderRefusalError
+    rwf = distance_reader_call(fit_finaliser_readers, wf, pr, rdr, nco.strict)
+    if clr isa DistanceReaderRefusalError || rwf isa DistanceReaderRefusalError
+        err = clr isa DistanceReaderRefusalError ? clr : rwf
         return _optimise(rebuild_struct(nco0, (; pe = pr0)), rd; branchorder = branchorder,
                          str_names = str_names, save = save,
-                         rmsk = distance_reader_refusal_mask(clr, imsk, rd, nco0.strict),
+                         rmsk = distance_reader_refusal_mask(err, imsk, rd, nco0.strict),
                          kwargs...)
     end
     assert_clustering_universe(clr, size(X, 2))
@@ -1042,7 +1052,8 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol 
                     save = save, kwargs...)
     wb = weight_bounds_constraints(nco.wb, nco.sets; rd = rdr, N = size(X, 2),
                                    strict = nco.strict, datatype = Tf)
-    retcode, w = outer_optimisation_finaliser(wb, nco.wf, resi, reso.retcode, reso.w, wi)
+    retcode, w = outer_optimisation_finaliser(wb, rwf, resi, reso.retcode, reso.w, wi,
+                                              (pr, rdr, nco.sets, fees, nco.strict))
     return NestedClusteredResult(; pr = pr, clr = clr, wb = wb, fees = fees, resi = resi,
                                  reso = reso, cv = nco.cv, scorer = nco.scorer,
                                  retcode = retcode, w = w, imsk = imsk, fb = nothing)

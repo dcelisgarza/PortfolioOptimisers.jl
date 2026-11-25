@@ -474,6 +474,7 @@ include("17_Optimisation/10_OnlinePortfolioSelection/11_AllocationRiskCeiling.jl
 include("17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl")
 include("17_Optimisation/10_OnlinePortfolioSelection/13_SparsePortfolioAlgorithms.jl")
 include("17_Optimisation/11_ProjectionWeightFinalisers.jl")
+include("17_Optimisation/12_JuMPWeightFinaliser.jl")
 include("18_ExpectedReturns/01_ExpectedReturns.jl")
 include("18_ExpectedReturns/02_BrinsonAttribution.jl")
 include("18_ExpectedReturns/03_PerformanceSummary.jl")

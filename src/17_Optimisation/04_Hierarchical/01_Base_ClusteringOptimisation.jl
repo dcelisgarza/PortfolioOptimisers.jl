@@ -471,7 +471,8 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref) or [`TD_O
 
 ## Validation
 
-  - If `wb` is keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`. A [`ScoreWeightBounds`](@ref) with a number or a vector of numbers in `val` names no asset and needs no sets.
+  - If `wb`, or a slot of `wf`, is keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`. A [`ScoreWeightBounds`](@ref) with a number or a vector of numbers in `val` names no asset and needs no sets.
+  - The rule of [`assert_data_benchmark_prior`](@ref) for a tracking error in a slot of `wf`.
   - If a field holds a [`TimeDependent`](@ref) schedule: the constructor runs again with each value of the schedule in that field, so a value that the constructor refuses raises here and not in a later fold.
 
 ## Propagated parameters
@@ -479,6 +480,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref) or [`TD_O
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `fees`: Recursively updated through [`factory`](@ref).
+  - `wf`: Recursively updated through [`factory`](@ref).
   - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
@@ -489,6 +491,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref) or [`TD_O
   - `wb`: Recursively viewed through [`port_opt_view`](@ref).
   - `fees`: Recursively viewed through [`port_opt_view`](@ref).
   - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `wf`: Recursively viewed through [`port_opt_view`](@ref).
   - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 ## Observation weight parameters
@@ -498,6 +501,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref) or [`TD_O
   - `pe`: Recursively indexed through [`obs_weights_view`](@ref).
   - `cle`: Recursively indexed through [`obs_weights_view`](@ref).
   - `fees`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `wf`: Recursively indexed through [`obs_weights_view`](@ref).
   - `cache`: Removed by [`obs_weights_view`](@ref), because a state has no slice on the observation axis.
 
 # Examples
@@ -610,7 +614,7 @@ HierarchicalOptimiser
     """
     $(field_dict[:wf])
     """
-    wf
+    @fprop @vprop @oprop wf
     """
     $(field_dict[:strict_opt]) Under `true` the fit also refuses an asset with a gap in the rows that a plain graph reader reads, which it otherwise drops with a warning, see [`graph_reader_mask`](@ref). It also refuses an asset that a distance reader of the fit cannot estimate, which it otherwise drops with a warning, see [`distance_reader_refusal_mask`](@ref).
     """
@@ -625,9 +629,10 @@ HierarchicalOptimiser
                                    sets::TD_Option{<:UniverseSets},
                                    wf::TD{<:WeightFinaliser}, strict::Bool,
                                    cache::Option{<:ReturnsBufferState})
-        if name_keyed(wb)
+        if name_keyed(wb) || name_keyed(wf)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
+        assert_data_benchmark_prior(wf, pe, :wf, :HierarchicalOptimiser)
         assert_time_dependent_substitution(HierarchicalOptimiser,
                                            (; pe, cle, slv, wb, fees, sets, wf, strict),
                                            hierarchical_optimiser_td_defaults())
@@ -713,7 +718,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `true` when a [`HierarchicalOptimiser`](@ref) reads the weights of the previous fold.
 
-The optimiser reads them when its fees do, as a turnover fee does, or when one of its [`TimeDependent`](@ref) schedules does.
+The optimiser reads them when its fees do, as a turnover fee does, when a slot of its weight finaliser does, or when one of its [`TimeDependent`](@ref) schedules does.
 
 # Arguments
 
@@ -730,6 +735,7 @@ The optimiser reads them when its fees do, as a turnover fee does, or when one o
 """
 function needs_previous_weights(opt::HierarchicalOptimiser)
     return needs_previous_weights(opt.fees) ||
+           needs_previous_weights(opt.wf) ||
            any(f -> needs_previous_weights(getfield(opt, f)), time_dependent_fields(opt))
 end
 """

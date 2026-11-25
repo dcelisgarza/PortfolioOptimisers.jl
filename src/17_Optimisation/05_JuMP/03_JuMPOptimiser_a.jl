@@ -441,7 +441,7 @@ A value outside its bound raises an `IsEmptyError`, an `IsNonFiniteError`, a `Do
         # constructor of the block checks each slot on its own.
         assert_gross_budget_admissible(bgt, cbe.sbgt, cbe.gbgt, cbe.wb)
         assert_data_benchmark_prior(cbe.tr, pe, :tr, :JuMPOptimiser)
-        if isa(fees, FeesEstimator)
+        if name_keyed(cbe) || isa(fees, FeesEstimator)
             @argcheck(!isnothing(cbe.sets),
                       IsNothingError("sets cannot be nothing when estimator-type fields are provided"))
         end

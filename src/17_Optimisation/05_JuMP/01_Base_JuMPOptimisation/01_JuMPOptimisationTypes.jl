@@ -26,6 +26,20 @@ A subtype holds a [`JuMPOptimiser`](@ref) in its `opt` field and a fallback in i
 """
 abstract type JuMPOptimisationEstimator <: NonFiniteAllocationOptimisationEstimator end
 """
+    const ProgrammeBlockOwner = Union{AbstractProgrammeAllocationSet, WeightFinaliser}
+
+Groups the owners of a [`ConstraintBlock`](@ref) that project a vector onto its feasible set, and minimise no risk.
+
+A programme Allocation Set projects the step of an online head, and a [`JuMPWeightFinaliser`](@ref) projects the weights of an optimiser with no solver. The builders of a risk constraint and of a tracking error take both as owners.
+
+# Related
+
+  - [`AbstractProgrammeAllocationSet`](@ref)
+  - [`WeightFinaliser`](@ref)
+  - [`RiskConstraintOwner`](@ref)
+"""
+const ProgrammeBlockOwner = Union{AbstractProgrammeAllocationSet, WeightFinaliser}
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `true` when the optimiser, its inner [`JuMPOptimiser`](@ref) or its fallback carries a time-dependent field.

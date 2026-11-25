@@ -82,13 +82,20 @@ The positional constructor takes the fields in the order of the struct: `pe`, `s
 
 ## Validation
 
-The constructor of [`ConstraintBlock`](@ref) checks each slot on its own: the values of `sbgt`, `gbgt`, `card`, `l2c`, `linfc`, `l1` and `linf`, an empty vector in a slot, the roles of `lp` and `lpc`, the shapes of the sub-group MIP slots, and `sets` beside a slot keyed by name ([`name_keyed`](@ref)). This constructor checks the fields of the set, and the rules that read the set and its block together.
+The constructor of [`ConstraintBlock`](@ref) checks each slot on its own: the values of `sbgt`, `gbgt`, `card`, `l2c`, `linfc`, `l1` and `linf`, an empty vector in a slot, the roles of `lp` and `lpc`, and the shapes of the sub-group MIP slots. This constructor checks the fields of the set, and the rules that read the set and its block together.
+
+  - If a slot of `cbe` is keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`. An `IsNothingError` is thrown otherwise.
 
   - If `slv` is a vector: `!isempty(slv)`. An `IsEmptyError` is thrown otherwise.
+
   - No slot of `cbe` holds a [`TimeDependent`](@ref). No fold loop resolves a schedule inside an Allocation Set, so the constructor refuses it with an `ArgumentError`. Schedule the whole set instead, `OnlinePortfolioSelection(; set = TimeDependent([…]))`.
+
   - If `gbgt` is given: `sbgt` is not a number, because the budget of one and a number in `sbgt` already fix the gross exposure. If `wb` is a [`WeightBounds`](@ref), one of its bounds admits a short weight. If `gbgt` has an upper end, it is at least one, because the gross exposure is at least the budget of one ([`assert_gross_budget_admissible`](@ref)). An `ArgumentError` is thrown otherwise.
+
   - If `r` is given: the `settings.ub` of every measure is a finite non-negative number, the ceiling, and no measure holds a [`ReturnsTracking`](@ref), because the ceiling reads rows that change at every step ([`assert_risk_ceiling`](@ref)). An `ArgumentError` is thrown otherwise, and an `IsEmptyError` for an empty vector.
+
   - If `ret` is given: the `settings.lb` of every return term is `nothing` or a number, the floor, because the projection solves once and returns one allocation ([`assert_return_floor`](@ref)). An `ArgumentError` is thrown for a [`Frontier`](@ref) or a vector. An empty vector raises an `IsEmptyError`.
+
   - If `tr` or `r` holds a [`DataBenchmarkTracking`](@ref): `pe` must not state `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
 
 ## View parameters
@@ -234,6 +241,10 @@ ProgrammeAllocationSet
         tdfs = typed_time_dependent_fields(cbe)
         @argcheck(isempty(tdfs),
                   ArgumentError("the slot `$(first(tdfs))` of a `ProgrammeAllocationSet` holds a `TimeDependent` schedule, and no fold loop resolves a schedule inside an Allocation Set: the online head resolves a schedule of the whole set. Schedule the set, `OnlinePortfolioSelection(; set = TimeDependent([...]))`, and give each entry a static slot."))
+        if name_keyed(cbe)
+            @argcheck(!isnothing(cbe.sets),
+                      IsNothingError("sets cannot be nothing when estimator-type fields are provided"))
+        end
         assert_gross_budget_admissible(1, cbe.sbgt, cbe.gbgt, cbe.wb)
         assert_risk_ceiling(r)
         assert_return_floor(ret)
@@ -327,10 +338,12 @@ end
     name_keyed(x)
     name_keyed(cl::ConcentrationLimitEstimator)
     name_keyed(x::AbstractVector)
+    name_keyed(cbe::ConstraintBlock)
+    name_keyed(wf::JuMPWeightFinaliser)
 
 Tells whether a constraint slot holds an estimator that resolves its names over `sets`.
 
-The owner of such a slot must carry `sets`. The estimators are every [`AbstractWeightBoundsEstimator`](@ref), [`LinearConstraintEstimator`](@ref), [`ExposureConstraintEstimator`](@ref), [`ThresholdEstimator`](@ref), [`AssetSetsMatrixEstimator`](@ref) and [`TurnoverEstimator`](@ref). A [`ScoreWeightBounds`](@ref) is the exception: it is keyed by name only when its `val` or its static bounds name assets. A [`ConcentrationLimitEstimator`](@ref) is keyed by name only when its `set` is. A vector is keyed by name when one of its entries is.
+The owner of such a slot must carry `sets`. The estimators are every [`AbstractWeightBoundsEstimator`](@ref), [`LinearConstraintEstimator`](@ref), [`ExposureConstraintEstimator`](@ref), [`ThresholdEstimator`](@ref), [`AssetSetsMatrixEstimator`](@ref) and [`TurnoverEstimator`](@ref). A [`ScoreWeightBounds`](@ref) is the exception: it is keyed by name only when its `val` or its static bounds name assets. A [`ConcentrationLimitEstimator`](@ref) is keyed by name only when its `set` is. A vector is keyed by name when one of its entries is, a [`ConstraintBlock`](@ref) when one of its slots is, and a [`JuMPWeightFinaliser`](@ref) when its block is.
 
 # Returns
 
@@ -354,6 +367,11 @@ function name_keyed(cl::ConcentrationLimitEstimator)
 end
 function name_keyed(x::AbstractVector)
     return any(name_keyed, x)
+end
+function name_keyed(cbe::ConstraintBlock)
+    return any(name_keyed,
+               (cbe.wb, cbe.lt, cbe.st, cbe.lcse, cbe.gcarde, cbe.sgcarde, cbe.smtx,
+                cbe.sgmtx, cbe.slt, cbe.sst, cbe.sglt, cbe.sgst, cbe.conc, cbe.tn))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -487,7 +505,7 @@ end
 
 Returns the number of rows that a programme set reads at a step.
 
-The set reads every row that the head has folded when one of its slots reads the rows. These slots are weight bounds that read them ([`bounds_read_rows`](@ref)), a risk ceiling that reads them ([`risk_reads_rows`](@ref)), a tracking error, a centrality or phylogeny estimator ([`fitted_on_rows`](@ref)), an exposure row ([`exposure_keyed`](@ref)), a return floor, and a Calibration Rule in a norm ceiling or in a penalty ([`calibrated`](@ref)).
+The set reads every row that the head has folded when one of its slots reads the rows. These slots are weight bounds that read them ([`bounds_read_rows`](@ref)), a risk ceiling that reads them ([`risk_reads_rows`](@ref)), a slot of its block that reads the prior ([`block_reads_prior`](@ref)), and a return floor.
 
 # Returns
 
@@ -502,12 +520,35 @@ The set reads every row that the head has folded when one of its slots reads the
 function rows_needed(set::ProgrammeAllocationSet)
     reads = bounds_read_rows(set.wb) ||
             risk_reads_rows(set.r) ||
-            !isnothing(set.tr) ||
-            any(fitted_on_rows, (set.cte, set.ple)) ||
-            exposure_keyed(set.lcse) ||
-            !isnothing(set.ret) ||
-            any(calibrated, (set.l2c, set.lpc, set.linfc, set.l1, set.l2, set.lp, set.linf))
+            block_reads_prior(set.cbe) ||
+            !isnothing(set.ret)
     return reads ? nothing : 0
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Tells whether a slot of a [`ConstraintBlock`](@ref) reads the prior of its owner.
+
+These slots are a tracking error, a centrality or phylogeny estimator ([`fitted_on_rows`](@ref)), an exposure row ([`exposure_keyed`](@ref)), and a Calibration Rule in a norm ceiling or in a penalty ([`calibrated`](@ref)). The weight bounds read the returns data and no prior, see [`bounds_read_rows`](@ref).
+
+# Arguments
+
+  - `cbe`: The block.
+
+# Returns
+
+  - `flag::Bool`: `true` when a slot reads the prior.
+
+# Related
+
+  - [`rows_needed`](@ref)
+  - [`assert_prior_free_finaliser`](@ref)
+"""
+function block_reads_prior(cbe::ConstraintBlock)::Bool
+    return !isnothing(cbe.tr) ||
+           any(fitted_on_rows, (cbe.cte, cbe.ple)) ||
+           exposure_keyed(cbe.lcse) ||
+           any(calibrated, (cbe.l2c, cbe.lpc, cbe.linfc, cbe.l1, cbe.l2, cbe.lp, cbe.linf))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -969,8 +1010,7 @@ Refuses a resolved bound with a negative floor under a geometry whose potential 
   - [`TsallisProjection`](@ref)
   - [`LogBarrierProjection`](@ref)
 """
-function assert_geometry_admits_bounds(::AbstractProjectionGeometry,
-                                       ::WeightBounds)::Nothing
+function assert_geometry_admits_bounds(::WfF_ProjG, ::WeightBounds)::Nothing
     return nothing
 end
 function assert_geometry_admits_bounds(proj::Union{EntropicProjection, TsallisProjection,

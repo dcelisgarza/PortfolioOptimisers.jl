@@ -1,5 +1,5 @@
 ```@meta
-Description = "Programme Allocation Set, private API of PortfolioOptimisers.jl: name_keyed, exposure_keyed, fitted_on_rows, bounds_read_rows, assert_mirror_base, …"
+Description = "Programme Allocation Set, private API of PortfolioOptimisers.jl: name_keyed, exposure_keyed, fitted_on_rows, bounds_read_rows, block_reads_prior, …"
 ```
 
 # Programme Allocation Set: private API
@@ -9,6 +9,7 @@ PortfolioOptimisers.name_keyed
 PortfolioOptimisers.exposure_keyed
 PortfolioOptimisers.fitted_on_rows
 PortfolioOptimisers.bounds_read_rows
+PortfolioOptimisers.block_reads_prior
 PortfolioOptimisers.assert_mirror_base
 PortfolioOptimisers.barrier_projection
 PortfolioOptimisers.barrier_upper_bracket

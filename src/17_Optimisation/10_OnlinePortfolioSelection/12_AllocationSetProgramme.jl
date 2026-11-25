@@ -1038,12 +1038,12 @@ function investable_geometry_view(imsk::BitVector,
     return GramProjection(; slv = proj.slv, A = App), qp
 end
 """
-    solve_projection_programme!(model::JuMP.Model, proj::AbstractProjectionGeometry, q::AbstractVector, slv::Slv_VecSlv)
+    solve_projection_programme!(model::JuMP.Model, proj::WfF_ProjG, q::AbstractVector, slv::Slv_VecSlv)
     solve_projection_programme!(model::JuMP.Model, proj::DiagonalProjection, q::AbstractVector, slv::Slv_VecSlv)
 
 Solves a projection programme, and picks one minimiser when the divergence of the geometry has many.
 
-The projection programme of [`project`](@ref) calls it after it writes the objective. Every geometry except [`DiagonalProjection`](@ref) has one minimiser, and the function solves the model once with [`optimise_JuMP_model!`](@ref). A diagonal with a zero entry is a seminorm, so its minimisers share their weights at the positive entries of the diagonal and differ at the zero entries. After a first solve that succeeds, the diagonal arm then solves a second stage on the same model. Its answer is the limit of the projection in ``\\mathrm{diag}(\\boldsymbol{h} + \\delta \\boldsymbol{1})`` as ``\\delta \\to 0^{+}``: the minimiser nearest ``\\boldsymbol{q}`` in the Euclidean norm.
+The projection programme of [`project`](@ref) and the programme of a [`JuMPWeightFinaliser`](@ref) call it after they write the objective. Every geometry except [`DiagonalProjection`](@ref) has one minimiser, and the function solves the model once with [`optimise_JuMP_model!`](@ref). A diagonal with a zero entry is a seminorm, so its minimisers share their weights at the positive entries of the diagonal and differ at the zero entries. After a first solve that succeeds, the diagonal arm then solves a second stage on the same model. Its answer is the limit of the projection in ``\\mathrm{diag}(\\boldsymbol{h} + \\delta \\boldsymbol{1})`` as ``\\delta \\to 0^{+}``: the minimiser nearest ``\\boldsymbol{q}`` in the Euclidean norm.
 
 When the second stage fails, the arm returns the weights of the first stage, and the result is a success that holds the trials of the second stage. Those weights are a minimiser of the projection, so the regret bound of [`AdaptiveSubgradient`](@ref) holds on them. The second stage can fail when its face is one point: under a strictly convex Objective Penalty, or when the budget pins the free weights at their bounds. That point is then the limit. On a face of more than one point, the weights of the first stage are a minimiser that need not be the limit.
 
@@ -1095,8 +1095,8 @@ Where:
   - [`set_projection_objective!`](@ref)
   - [`optimise_JuMP_model!`](@ref)
 """
-function solve_projection_programme!(model::JuMP.Model, ::AbstractProjectionGeometry,
-                                     ::AbstractVector, slv::Slv_VecSlv)
+function solve_projection_programme!(model::JuMP.Model, ::WfF_ProjG, ::AbstractVector,
+                                     slv::Slv_VecSlv)
     res = optimise_JuMP_model!(model, slv)
     return res, res.success ? JuMP.value.(get_w(model)) : nothing
 end
@@ -1120,7 +1120,7 @@ function projection_scale(::BoundedAllocationSet, ::Symbol)
     return 1
 end
 """
-    programme_answer(proj::AbstractProjectionGeometry, w::AbstractVector, wb::WeightBounds)
+    programme_answer(proj::WfF_ProjG, w::AbstractVector, wb::WeightBounds)
 
 Returns the answer of a solved projection programme, on the assets of the step.
 
@@ -1141,7 +1141,7 @@ Under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) and [`LogBarrier
   - [`project`](@ref)
   - [`clip_at_zero`](@ref)
 """
-function programme_answer(::AbstractProjectionGeometry, w::AbstractVector, ::WeightBounds)
+function programme_answer(::WfF_ProjG, w::AbstractVector, ::WeightBounds)
     return w
 end
 function programme_answer(::Union{EntropicProjection, TsallisProjection,

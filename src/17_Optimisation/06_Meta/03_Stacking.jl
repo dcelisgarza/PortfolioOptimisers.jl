@@ -318,6 +318,7 @@ Keywords correspond to the struct's fields.
   - `fees`: Recursively updated through [`factory`](@ref).
   - `opti`: Recursively updated through [`factory`](@ref).
   - `opto`: Recursively updated through [`factory`](@ref).
+  - `wf`: Recursively updated through [`factory`](@ref).
   - `fb`: Recursively updated through [`factory`](@ref).
   - `cache`: Carried unchanged through [`factory`](@ref).
 
@@ -327,7 +328,7 @@ Keywords correspond to the struct's fields.
 
   - The method reads the returns matrix `X` as its third argument. When `pe` holds a prior result, the method replaces `X` with `pe.X`, so it views the children against the observations of that prior.
   - `pe`, `wb`, `sets` and `cache` recurse through [`port_opt_view`](@ref) with the index alone.
-  - `fees`, `opti` and `opto` recurse through [`port_opt_view`](@ref) with that matrix.
+  - `fees`, `wf`, `opti` and `opto` recurse through [`port_opt_view`](@ref) with that matrix.
   - `fb` recurses through [`view_child`](@ref) with that matrix.
   - `scale` stays unchanged. It holds one entry for each inner optimiser, not one for each asset.
 
@@ -339,6 +340,7 @@ Keywords correspond to the struct's fields.
   - `fees`: Recursively indexed through [`obs_weights_view`](@ref).
   - `opti`: Recursively indexed through [`obs_weights_view`](@ref).
   - `opto`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `wf`: Recursively indexed through [`obs_weights_view`](@ref).
   - `fb`: Recursively indexed through [`obs_weights_view`](@ref).
   - `cache`: Removed by [`obs_weights_view`](@ref), because a state has no slice on the observation axis.
 
@@ -398,7 +400,7 @@ Keywords correspond to the struct's fields.
     """
     $(field_dict[:wf])
     """
-    wf
+    @fprop @oprop wf
     """
     $(field_dict[:ex])
     """
@@ -452,9 +454,10 @@ Keywords correspond to the struct's fields.
         if !isnothing(cv)
             assert_external_optimiser(opti)
         end
-        if name_keyed(wb)
+        if name_keyed(wb) || name_keyed(wf)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
+        assert_data_benchmark_prior(wf, pe, :wf, :Stacking)
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
@@ -573,6 +576,7 @@ function needs_previous_weights(opt::Stacking)
     return (any(f -> needs_previous_weights(getfield(opt, f)),
                 time_dependent_fields(opt)) ||
             needs_previous_weights(opt.fees) ||
+            needs_previous_weights(opt.wf) ||
             needs_previous_weights(opt.opti) ||
             needs_previous_weights(opt.opto) ||
             needs_previous_weights(opt.fb))
@@ -697,9 +701,10 @@ function port_opt_view(st::Stacking, i, X::MatNum, args...)::Stacking
     opti = port_opt_view(st.opti, i, X)
     opto = port_opt_view(st.opto, i, X)
     return Stacking(; pe = pe, wb = wb, fees = fees, sets = sets, scale = st.scale,
-                    opti = opti, opto = opto, cv = st.cv, scorer = st.scorer, wf = st.wf,
-                    ex = st.ex, fb = view_child(st.fb, i, X), strict = st.strict,
-                    pcol = st.pcol, cache = port_opt_view(st.cache, i))
+                    opti = opti, opto = opto, cv = st.cv, scorer = st.scorer,
+                    wf = port_opt_view(st.wf, i, X), ex = st.ex,
+                    fb = view_child(st.fb, i, X), strict = st.strict, pcol = st.pcol,
+                    cache = port_opt_view(st.cache, i))
 end
 function non_investable_universe(st::Stacking, ni::VecStr)::Stacking
     return rebuild_struct(st, (; sets = non_investable_sets(st.sets, ni)))
@@ -750,7 +755,8 @@ Run the stacking optimisation.
   - [`_optimise`](@ref)
 """
 function _optimise(st::Stacking, rd::ReturnsResult; branchorder::Symbol = :optimal,
-                   str_names::Bool = false, save::Bool = true, kwargs...)
+                   str_names::Bool = false, save::Bool = true,
+                   rmsk::Option{BitVector} = nothing, kwargs...)
     st = reset_time_dependent_estimator(st)
     pr = prior(st.pe, rd)
     # A weight and a fee take the element type of the returns.
@@ -760,9 +766,15 @@ function _optimise(st::Stacking, rd::ReturnsResult; branchorder::Symbol = :optim
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
     # the complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
-    imsk = investable_mask(pr)
+    # A distance reader of the weight finaliser drops an asset as the reader of a clustering
+    # does, see `distance_reader_entry_mask`.
+    imsk = distance_reader_entry_mask(finaliser_readers(st.wf), pr, rd, st.strict;
+                                      rmsk = rmsk)
     fees = investable_fees_view(fees_constraints(st.fees, st.sets; datatype = Tf,
                                                  strict = st.strict), imsk, pr.X)
+    # The block of the weight finaliser resolves its names on the same universe, and follows
+    # the mask as the fee does.
+    wf = investable_finaliser(st.wf, st.sets, st.strict, imsk, pr.X)
     # A forced exit is charged once, against the full-universe weight vector the fit
     # rebuilds, so only the result charges it. No sub-problem below holds that vector —
     # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
@@ -775,7 +787,15 @@ function _optimise(st::Stacking, rd::ReturnsResult; branchorder::Symbol = :optim
     # The reduced `rd` takes a name of its own: a variable that is reassigned and then
     # captured by the fold's closure is boxed, which FLoops reports as a correctness and
     # performance problem on every call.
+    st0, pr0 = st, pr
     _, pr, st, rdr = investable_reduction(pr, st, rd, imsk)
+    rwf = distance_reader_call(fit_finaliser_readers, wf, pr, rdr, st.strict)
+    if rwf isa DistanceReaderRefusalError
+        return _optimise(rebuild_struct(st0, (; pe = pr0)), rd; branchorder = branchorder,
+                         str_names = str_names, save = save,
+                         rmsk = distance_reader_refusal_mask(rwf, imsk, rd, st0.strict),
+                         kwargs...)
+    end
     X = pr.X
     opti = st.opti
     Ni = length(opti)
@@ -795,8 +815,9 @@ function _optimise(st::Stacking, rd::ReturnsResult; branchorder::Symbol = :optim
                     save = save, kwargs...)
     wb = weight_bounds_constraints(st.wb, st.sets; rd = rdr, N = size(X, 2),
                                    strict = st.strict, datatype = Tf)
-    retcode, w = outer_optimisation_finaliser(wb, st.wf, resi, reso.retcode,
-                                              combination_weights(st.scale, reso.w), wi)
+    retcode, w = outer_optimisation_finaliser(wb, rwf, resi, reso.retcode,
+                                              combination_weights(st.scale, reso.w), wi,
+                                              (pr, rdr, st.sets, fees, st.strict))
     return StackingResult(; pr = pr, wb = wb, fees = fees, resi = resi, reso = reso,
                           cv = st.cv, scorer = st.scorer, retcode = retcode, w = w,
                           imsk = imsk, fb = nothing)

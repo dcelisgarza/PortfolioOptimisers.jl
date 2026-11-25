@@ -147,6 +147,18 @@ julia> PortfolioOptimisers.project(FixedDiagonal([1.0, 3.0]), set, [0.8, 0.8], [
 """
 abstract type AbstractProjectionGeometry <: AbstractAlgorithm end
 """
+    const WfF_ProjG = Union{JuMPWeightFinaliserFormulation, AbstractProjectionGeometry}
+
+The families of the objective of a [`JuMPWeightFinaliser`](@ref): a deviation from the input weights, or a Projection Geometry.
+
+# Related
+
+  - [`JuMPWeightFinaliserFormulation`](@ref)
+  - [`AbstractProjectionGeometry`](@ref)
+  - [`JuMPWeightFinaliser`](@ref)
+"""
+const WfF_ProjG = Union{JuMPWeightFinaliserFormulation, AbstractProjectionGeometry}
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Projects the raw step onto the Allocation Set in squared Euclidean distance.
@@ -328,6 +340,10 @@ end
 function GramProjection(; slv::Slv_VecSlv,
                         A::Option{<:AbstractMatrix} = nothing)::GramProjection
     return GramProjection(slv, A)
+end
+# A view at the assets `i` is the geometry of weights that are zero at every other asset.
+function port_opt_view(proj::GramProjection, i, args...)::GramProjection
+    return GramProjection(proj.slv, nothing_scalar_array_view(proj.A, i))
 end
 """
     gram_geometry(proj::AbstractProjectionGeometry, A::AbstractMatrix)

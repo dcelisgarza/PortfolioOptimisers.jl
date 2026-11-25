@@ -430,10 +430,14 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     # A fit again after a refusal of the distance reader passes its mask as `rmsk`.
-    imsk = distance_reader_entry_mask(hrp.opt.cle, pr, rd, hrp.opt.strict; rmsk = rmsk)
+    imsk = distance_reader_entry_mask((hrp.opt.cle, finaliser_readers(hrp.opt.wf)...), pr,
+                                      rd, hrp.opt.strict; rmsk = rmsk)
     fees = investable_fees_view(fees_constraints(hrp.opt.fees, hrp.opt.sets;
                                                  strict = hrp.opt.strict, datatype = T),
                                 imsk, pr.X)
+    # The block of the weight finaliser resolves its names on the same universe, and follows
+    # the mask as the fee does.
+    wf = investable_finaliser(hrp.opt.wf, hrp.opt.sets, hrp.opt.strict, imsk, pr.X)
     # A forced exit is charged once, against the full-universe weight vector the fit
     # rebuilds, so only the result charges it. No sub-problem below holds that vector —
     # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
@@ -453,11 +457,13 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
     clr = distance_reader_call(clusterise, hrp.opt.cle, pr; rd = rd, iv = rd.iv,
                                ivpa = rd.ivpa)
-    if clr isa DistanceReaderRefusalError
+    rwf = distance_reader_call(fit_finaliser_readers, wf, pr, rd, hrp.opt.strict)
+    if clr isa DistanceReaderRefusalError || rwf isa DistanceReaderRefusalError
+        err = clr isa DistanceReaderRefusalError ? clr : rwf
         return _optimise(rebuild_struct(hrp0,
                                         (; opt = rebuild_struct(hrp0.opt, (; pe = pr0)))),
                          rd0;
-                         rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
+                         rmsk = distance_reader_refusal_mask(err, imsk, rd0,
                                                              hrp0.opt.strict), kwargs...)
     end
     assert_clustering_universe(clr, size(X, 2))
@@ -493,7 +499,8 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
             w[rc] .*= one(alpha) - alpha
         end
     end
-    retcode, w = finalise_weight_bounds(hrp.opt.wf, wb, w / sum(w))
+    retcode, w = finalise_weight_bounds(rwf, wb, w / sum(w), pr, rd, hrp.opt.sets, fees,
+                                        hrp.opt.strict)
     return HierarchicalRiskParityResult(;
                                         hr = HierarchicalResult(; pr = pr, clr = clr,
                                                                 wb = wb, fees = fees,
@@ -619,10 +626,14 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     # A fit again after a refusal of the distance reader passes its mask as `rmsk`.
-    imsk = distance_reader_entry_mask(hrp.opt.cle, pr, rd, hrp.opt.strict; rmsk = rmsk)
+    imsk = distance_reader_entry_mask((hrp.opt.cle, finaliser_readers(hrp.opt.wf)...), pr,
+                                      rd, hrp.opt.strict; rmsk = rmsk)
     fees = investable_fees_view(fees_constraints(hrp.opt.fees, hrp.opt.sets;
                                                  strict = hrp.opt.strict, datatype = T),
                                 imsk, pr.X)
+    # The block of the weight finaliser resolves its names on the same universe, and follows
+    # the mask as the fee does.
+    wf = investable_finaliser(hrp.opt.wf, hrp.opt.sets, hrp.opt.strict, imsk, pr.X)
     # A forced exit is charged once, against the full-universe weight vector the fit
     # rebuilds, so only the result charges it. No sub-problem below holds that vector —
     # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
@@ -642,11 +653,13 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
     clr = distance_reader_call(clusterise, hrp.opt.cle, pr; rd = rd, iv = rd.iv,
                                ivpa = rd.ivpa)
-    if clr isa DistanceReaderRefusalError
+    rwf = distance_reader_call(fit_finaliser_readers, wf, pr, rd, hrp.opt.strict)
+    if clr isa DistanceReaderRefusalError || rwf isa DistanceReaderRefusalError
+        err = clr isa DistanceReaderRefusalError ? clr : rwf
         return _optimise(rebuild_struct(hrp0,
                                         (; opt = rebuild_struct(hrp0.opt, (; pe = pr0)))),
                          rd0;
-                         rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
+                         rmsk = distance_reader_refusal_mask(err, imsk, rd0,
                                                              hrp0.opt.strict), kwargs...)
     end
     assert_clustering_universe(clr, size(X, 2))
@@ -675,7 +688,8 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
             w[rc] .*= one(alpha) - alpha
         end
     end
-    retcode, w = finalise_weight_bounds(hrp.opt.wf, wb, w / sum(w))
+    retcode, w = finalise_weight_bounds(rwf, wb, w / sum(w), pr, rd, hrp.opt.sets, fees,
+                                        hrp.opt.strict)
     return HierarchicalRiskParityResult(;
                                         hr = HierarchicalResult(; pr = pr, clr = clr,
                                                                 wb = wb, fees = fees,
