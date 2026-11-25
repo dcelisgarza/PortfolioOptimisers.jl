@@ -2804,7 +2804,7 @@ end
         carrying a risk-budgeting algorithm accept it.
         =#
         jump = [:pe, :wb, :lcse, :cte, :ple, :lt, :st, :slt, :sst, :sglt, :sgst, :smtx,
-                :sgmtx]
+                :sgmtx, :conc]
         expected = Dict("JuMPOptimiser" => [jump; :mu_ucs],
                         "HierarchicalOptimiser" => [:pe, :cle, :wb],
                         "MeanRisk" => [jump; :mu_ucs; :sigma_ucs],
@@ -2882,10 +2882,13 @@ end
         @test PO.pipe_route(j, Val(:cle), nothing) === j
         # Everything else would silently change the solved portfolio, so it throws.
         for t in
-            (:lcse, :cte, :ple, :lt, :st, :slt, :sst, :sglt, :sgst, :smtx, :sgmtx, :rkb,
-             :mu_ucs, :sigma_ucs)
+            (:lcse, :cte, :ple, :lt, :st, :slt, :sst, :sglt, :sgst, :smtx, :sgmtx, :conc,
+             :rkb, :mu_ucs, :sigma_ucs)
             @test_throws ArgumentError PO.pipe_route(ew, Val(t), nothing)
         end
+        # A concentration rule lands in the slot of the same name.
+        cl = ConcentrationLimit()
+        @test PO.pipe_route(j, Val(:conc), cl).conc === cl
         @test_throws ArgumentError PO.pipe_route(HierarchicalOptimiser(), Val(:lcse),
                                                  nothing)
     end
@@ -3053,7 +3056,8 @@ end
                   :sst => (; sst = [thr, thr], smtx = [mtx, mtx]),
                   :sglt => (; sglt = [thr, thr], sgmtx = [mtx, mtx]),
                   :sgst => (; sgst = [thr, thr], sgmtx = [mtx, mtx]),
-                  :smtx => (; smtx = [mtx, mtx]), :sgmtx => (; sgmtx = [mtx, mtx]))
+                  :smtx => (; smtx = [mtx, mtx]), :sgmtx => (; sgmtx = [mtx, mtx]),
+                  :conc => (; conc = [ConcentrationLimit(), ConcentrationLimit()]))
         for (target, kwargs) in packed
             @test JuMPOptimiser(; slv = slv, kwargs...) isa JuMPOptimiser
             @test target in PO.PIPELINE_ACCUMULATING_TARGETS
@@ -3221,6 +3225,8 @@ end
                  # The scalar resolves to `RiskBudget(1.0)`, which `test_01_structs.jl`
                  # asserts. This row asserts the routing target only.
                  "RiskBudgetEstimator" => (RiskBudgetEstimator(; val = 0.2), nothing, :rkb),
+                 "ConcentrationLimitEstimator" =>
+                     (ConcentrationLimitEstimator(), nothing, :conc),
                  "CentralityConstraint" => (CentralityConstraint(), nothing, :cte),
                  "IntegerPhylogenyEstimator" =>
                      (IntegerPhylogenyEstimator(; B = 1), nothing, :ple)]

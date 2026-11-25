@@ -1095,3 +1095,16 @@ A static `TensorPanelField` and a static feature matrix keep `assets × labels` 
 
 - **A variance estimator of your own in `DimensionReductionRegression`** that holds a mean estimator in a field `me` adds a method `PortfolioOptimisers.standardisation_mean(ve::MyVariance, w) = ve.me`. Without it the mean of the factors takes the weights of `retgt`.
 - **A variance estimator of your own that folds, in the `ve` of `CrossSectionalFactorPrior`**, gets the `active_mask` keyword alone in `partial_fit!`. Add a method of `PortfolioOptimisers.fold_mask_keywords` that gives the estimation mask too, if the fold reads it. A fold that reads the active mask adds a method of `PortfolioOptimisers.reads_active_mask` that returns `true`. Without it, a step with a gap raises an `IsNonFiniteError`.
+
+## From v0.34.5 to v0.34.6
+
+### [Concentration limits](@id migration-0-34-6-concentration)
+
+A `ConstraintBlock` holds concentration rules, such as the UCITS 5/10/40 rule, in the new slot `conc`. Code that builds the block, its Result or an asset sets matrix estimator by keyword does not change.
+
+- **`ConstraintBlock`** has the field `conc` after `sgst`, so its positional constructor takes 33 arguments, where v0.34.5 took 32. Pass `nothing` after `sgst`, or use the keyword constructor. The type parameters gain one entry after the one of `sgst`.
+- **`ResolvedConstraintBlock`** has the field `conc` after `sgst`, so its positional constructor takes 33 arguments, where v0.34.5 took 32. The type parameters gain one entry after the one of `sgst`.
+- **The show** of a `ConstraintBlock`, and of every optimiser that holds one, prints the row `conc ┼ nothing` after `sgst`. A doctest of your own that prints a `JuMPOptimiser` gains the row.
+- **`AssetSetsMatrixEstimator`** has the field `on` after `val`, with the default `nothing`, so its type gains a second parameter. `AssetSetsMatrixEstimator(val)` still gives the v0.34.5 estimator. Its show prints the row `on ┴ nothing` last.
+- **`asset_sets_matrix`** of an estimator takes the keyword `strict`, with the default `false`, and gives it to the names of `on`. A method of your own for a precomputed matrix that `asset_sets_matrix` reads must take keywords.
+- **The exact cost budget**, a `BudgetCosts` with `xbgt = true`, names two rows of its model `cost_bgt_gd_ub` and `cost_bgt_gd_lb`, where v0.34.5 named them `cost_bgt_gz_ub` and `cost_bgt_gz_lb`. Under an objective that is not a ratio, the model holds no entry `cost_bgt_g`. Read the binaries from `cost_bgt_z` there.

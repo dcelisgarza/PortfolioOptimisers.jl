@@ -252,6 +252,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/09_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { raw = 2, reviewed = 2 }
 "src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/10_LotUnitConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
+"src/09_ConstraintGeneration/11_ConcentrationLimitGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/01_Base_Prior.jl" = { raw = 1, reviewed = 1 }
 "src/10_Prior/02_EmpiricalPrior.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/03_FactorPrior.jl" = { raw = 0, reviewed = 0 }
@@ -385,6 +386,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl" = { raw = 2, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl" = { raw = 4, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/14_ConstraintBlock.jl" = { raw = 0, reviewed = 0 }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/15_ConcentrationConstraints.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { raw = 0, reviewed = 0 }
@@ -705,6 +707,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/09_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/10_LotUnitConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
+"src/09_ConstraintGeneration/11_ConcentrationLimitGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/01_Base_Prior.jl" = { raw = 2, reviewed = 2 }
 "src/10_Prior/02_EmpiricalPrior.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/03_FactorPrior.jl" = { raw = 0, reviewed = 0 }
@@ -838,6 +841,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/14_ConstraintBlock.jl" = { raw = 0, reviewed = 0 }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/15_ConcentrationConstraints.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { raw = 0, reviewed = 0 }
@@ -1158,6 +1162,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/09_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/10_LotUnitConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
+"src/09_ConstraintGeneration/11_ConcentrationLimitGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/01_Base_Prior.jl" = { raw = 2, reviewed = 2 }
 "src/10_Prior/02_EmpiricalPrior.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/03_FactorPrior.jl" = { raw = 0, reviewed = 0 }
@@ -1291,6 +1296,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/14_ConstraintBlock.jl" = { raw = 0, reviewed = 0 }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/15_ConcentrationConstraints.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { raw = 0, reviewed = 0 }
