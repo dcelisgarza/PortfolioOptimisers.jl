@@ -79,6 +79,20 @@ as the gates under the unit budget of `RiskBudgeting`. That head solves for the 
 the binary is the gate only when `k` is a number. The interface is `mip_wx!`, `mip_bounds` and
 `mip_key`.
 
+The concentration limit (#2018, ADR 0246) gates a binary of its own, and it would have been the
+fifth copy of the rows that link a binary to a free budget `k`. The held bit, the long bit, the
+short bit and the exact cost budget held the other four.
+
+- **`declare_mip_gate!(model, sp, bin, gate, N, wb, ss)` declares the binaries and their gates.**
+  Under a numeric `k` the gate is the binary. Under a variable `k` the gate is a continuous
+  variable with its three big-M rows. The five sites call it, and it registers each key through
+  `state_set!`, so a second declaration under one key raises.
+- **`ConcentrationMIPSpace` is a member of the family.** It implements `mip_wx!` and `mip_key`. A
+  space that gates no weight bound has no `mip_bounds`.
+- The rows of the exact cost budget take the keys `cost_bgt_gd_ub` and `cost_bgt_gd_lb`, after
+  the form of the other gates, where they had `cost_bgt_gz_ub` and `cost_bgt_gz_lb`. Under a
+  numeric `k` the model holds no `cost_bgt_g`.
+
 ## Amendment (2026-11-24)
 
 `get_mip_ss` reads the scale of `k` as well as the weight bounds (#2302). When `k` is a variable,

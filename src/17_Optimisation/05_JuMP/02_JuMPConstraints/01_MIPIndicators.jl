@@ -102,6 +102,7 @@ A MIP space tells the shared builders which expression the binary indicators gat
   - [`AssetMIPSpace`](@ref)
   - [`SubsetMIPSpace`](@ref)
   - [`FactorMIPSpace`](@ref)
+  - [`ConcentrationMIPSpace`](@ref)
 """
 abstract type AbstractMIPSpace end
 """
@@ -162,7 +163,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Map a logical MIP builder name to the model key for the given space.
 
-Asset space returns the name under the `prefix` of the space; sub-group space returns `Symbol(pfx, name, :_, i, :_)` under its `prefix`; factor space ([`FactorMIPSpace`](@ref)) returns `Symbol(:frc_, name)`. [`state_key`](@ref) joins the prefix, so the empty prefix gives the names of a head.
+Asset space returns the name under the `prefix` of the space; sub-group space returns `Symbol(pfx, name, :_, i, :_)` under its `prefix`; factor space ([`FactorMIPSpace`](@ref)) returns `Symbol(:frc_, name)`; concentration space ([`ConcentrationMIPSpace`](@ref)) returns `Symbol(:conc_, name, :_, i)` under its `prefix`. [`state_key`](@ref) joins the prefix, so the empty prefix gives the names of a head.
 
 # Related
 
@@ -199,7 +200,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the weight expression the MIP indicators gate.
 
-Asset space returns the portfolio weights `w` under its `prefix`; sub-group space registers and returns the sub-group weight expression `smtx * w` under the space's `:mtx_expr` key; factor space returns the factor weights `w1`.
+Asset space returns the portfolio weights `w` under its `prefix`; sub-group space registers and returns the sub-group weight expression `smtx * w` under the space's `:mtx_expr` key; factor space returns the factor weights `w1`; concentration space registers and returns the positions of its rule.
 
 # Related
 
@@ -219,7 +220,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Map a weight bound vector into the MIP space.
 
-Asset space returns the bounds unchanged; sub-group space maps them through the selection matrix, `smtx * b`; factor space returns them unchanged, because [`factor_weight_bounds`](@ref) states them on the factor axis already.
+Asset space returns the bounds unchanged; sub-group space maps them through the selection matrix, `smtx * b`; factor space returns them unchanged, because [`factor_weight_bounds`](@ref) states them on the factor axis already. Concentration space has no method, because its rule states its cap on the positions and no row gates a weight bound.
 
 # Related
 
@@ -674,12 +675,89 @@ function mip_wb(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBounds, wx::V
     return nothing
 end
 """
+    declare_mip_gate!(model::JuMP.Model, sp::AbstractMIPSpace, bin::Symbol, gate::Symbol, N::Integer, wb::WeightBounds, ss::Option{<:Number}) -> Tuple
+
+Declare `N` binaries and the gate of each one, and return both.
+
+The gate is the product of the binary and the budget scale ``k``. When ``k`` is a number, it is 1, so the gate is the binary itself, and the function adds no gate variable and no row. When ``k`` is a variable, the product is a continuous variable, and big-M rows link it to the binary. Every builder that gates a row with a binary calls this function, so the link has one form in the library. The rows that the caller writes on the gate give the binary its meaning.
+
+# JuMP formulation
+
+## Variables
+
+  - `bin`: ``N \\times 1``, binary.
+  - `gate`: ``N \\times 1``, ``\\geq 0``, when ``k`` is a variable.
+
+## Constraints
+
+The rows exist when ``k`` is a variable. The name `gate` is the stem of their keys:
+
+  - `gate_ub`: ``s_c \\left(\\boldsymbol{g} - k\\right) \\leq 0``.
+  - `gated_ub`: ``s_c \\left(\\boldsymbol{g} - M_s\\, \\boldsymbol{z}\\right) \\leq 0``.
+  - `gated_lb`: ``s_c \\left(\\boldsymbol{g} + M_s \\left(1 - \\boldsymbol{z}\\right) - k\\right) \\geq 0``.
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:k_budget])
+  - ``\\boldsymbol{z}``, ``\\boldsymbol{g}``: The binaries `bin` and their gates `gate`.
+  - ``M_s``: The big-M expression of [`set_mip_ss_expr!`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `sp::AbstractMIPSpace`: Weight space that names the model keys, see [`mip_key`](@ref).
+  - `bin`: Name of the binaries.
+  - `gate`: Name of the gate variables, and the stem of the names of their rows.
+  - `N`: Number of binaries.
+  - $(arg_dict[:wb_arg])
+  - $(arg_dict[:ss_arg])
+
+# Validation
+
+  - Each key is free. Otherwise [`assert_state_key_free`](@ref) raises an `ArgumentError`.
+
+# Returns
+
+  - `(z, g)::Tuple`: The binaries and their gates. `g === z` when ``k`` is a number.
+
+# Related
+
+  - [`declare_mip_indicators!`](@ref)
+  - [`set_cost_budget_mip_constraints!`](@ref)
+  - [`set_concentration_rows!`](@ref)
+  - [`set_mip_ss_expr!`](@ref)
+"""
+function declare_mip_gate!(model::JuMP.Model, sp::AbstractMIPSpace, bin::Symbol,
+                           gate::Symbol, N::Integer, wb::WeightBounds,
+                           ss::Option{<:Number})::Tuple
+    k = get_k(model)
+    # `mip_key` composes the whole key, so the interface registers it under the empty prefix.
+    pfx = Symbol("")
+    z = state_set!(model, pfx, mip_key(sp, bin),
+                   JuMP.@variable(model, [1:N], binary = true))
+    if isa(k, Number)
+        return z, z
+    end
+    sc = get_constraint_scale(model)
+    ssx = set_mip_ss_expr!(model, ss, wb)
+    g = state_set!(model, pfx, mip_key(sp, gate),
+                   JuMP.@variable(model, [1:N], lower_bound = 0))
+    state_set!(model, pfx, mip_key(sp, Symbol(gate, :_ub)),
+               JuMP.@constraint(model, sc * (g .- k) <= 0))
+    state_set!(model, pfx, mip_key(sp, Symbol(gate, :d_ub)),
+               JuMP.@constraint(model, sc * (g - ssx * z) <= 0))
+    state_set!(model, pfx, mip_key(sp, Symbol(gate, :d_lb)),
+               JuMP.@constraint(model, sc * ((g + ssx * (1 .- z)) .- k) >= 0))
+    return z, g
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Declare the long-only *held* indicators and the constraints that give them meaning.
 
-Creates one binary per asset and, when the budget `k` is a free variable, the continuous
-relaxation `ibf = ib * k` with its big-M linking constraints. The caller then applies [`mip_wb`](@ref), which
+Creates one binary per asset and its gate with [`declare_mip_gate!`](@ref). When the budget `k` is
+a free variable, the gate is the continuous relaxation `ibf = ib * k`. The caller then applies [`mip_wb`](@ref), which
 is what forces `w = 0` for an unheld asset and so makes the bit *mean* held. Each call that reads the bundle applies its own [`mip_wb`](@ref), with its own bounds, so the declaration writes none.
 
 Emits no feature constraints — thresholds, fees, cardinality, phylogeny, and budgets are the
@@ -700,27 +778,14 @@ business of their own emitters, which take the returned bundle.
 # Related
 
   - [`HeldIndicators`](@ref)
+  - [`declare_mip_gate!`](@ref)
   - [`mip_indicators!`](@ref)
 """
 function declare_mip_indicators!(model::JuMP.Model, sp::AbstractMIPSpace,
                                  ::Type{HeldIndicators}, wb::WeightBounds, wx::VecNum,
                                  ss::Option{<:Number})
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    N = length(wx)
-    ib = model[mip_key(sp, :ib)] = JuMP.@variable(model, [1:N], binary = true)
-    i_mip = if isa(k, Number)
-        model[mip_key(sp, :i_mip)] = JuMP.@expression(model, ib)
-    else
-        ssx = set_mip_ss_expr!(model, ss, wb)
-        ibf = model[mip_key(sp, :ibf)] = JuMP.@variable(model, [1:N], lower_bound = 0)
-        model[mip_key(sp, :ibf_ub)] = JuMP.@constraint(model, sc * (ibf .- k) <= 0)
-        model[mip_key(sp, :ibfd_ub)] = JuMP.@constraint(model, sc * (ibf - ssx * ib) <= 0)
-        model[mip_key(sp, :ibfd_lb)] = JuMP.@constraint(model,
-                                                        sc *
-                                                        ((ibf + ssx * (1 .- ib)) .- k) >= 0)
-        model[mip_key(sp, :i_mip)] = JuMP.@expression(model, ibf)
-    end
+    ib, g = declare_mip_gate!(model, sp, :ib, :ibf, length(wx), wb, ss)
+    i_mip = model[mip_key(sp, :i_mip)] = JuMP.@expression(model, g)
     return HeldIndicators(ib, i_mip)
 end
 """
@@ -729,8 +794,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Declare the long-short indicators and the constraints that give them meaning.
 
 Creates a long and a short binary per asset, forces them mutually exclusive (`ilb + isb <= 1`,
-so an asset is long, short, or inactive), and builds the continuous relaxations `ilf`/`isf` with
-their big-M linking constraints when the budget is free. Each call that reads the bundle applies its own [`mip_wb`](@ref).
+so an asset is long, short, or inactive), and their gates with [`declare_mip_gate!`](@ref). When the
+budget is free, the gates are the continuous relaxations `ilf` and `isf`. Each call that reads the bundle applies its own [`mip_wb`](@ref).
 
 Emits no feature constraints; see the [`HeldIndicators`](@ref) method.
 
@@ -749,37 +814,22 @@ Emits no feature constraints; see the [`HeldIndicators`](@ref) method.
 # Related
 
   - [`LongShortIndicators`](@ref)
+  - [`declare_mip_gate!`](@ref)
   - [`mip_indicators!`](@ref)
 """
 function declare_mip_indicators!(model::JuMP.Model, sp::AbstractMIPSpace,
                                  ::Type{LongShortIndicators}, wb::WeightBounds, wx::VecNum,
                                  ss::Option{<:Number})
-    k = get_k(model)
     sc = get_constraint_scale(model)
-    ss = set_mip_ss_expr!(model, ss, wb)
+    # The threshold rows read the big-M expression under every budget, and the gates only under
+    # a free one.
+    set_mip_ss_expr!(model, ss, wb)
     N = length(wx)
-    ilb = model[mip_key(sp, :ilb)] = JuMP.@variable(model, [1:N], binary = true)
-    isb = model[mip_key(sp, :isb)] = JuMP.@variable(model, [1:N], binary = true)
+    ilb, ilg = declare_mip_gate!(model, sp, :ilb, :ilf, N, wb, ss)
+    isb, isg = declare_mip_gate!(model, sp, :isb, :isf, N, wb, ss)
     i_mip = model[mip_key(sp, :i_mip)] = JuMP.@expression(model, ilb + isb)
-    if isa(k, Number)
-        il = model[mip_key(sp, :il)] = JuMP.@expression(model, ilb)
-        is = model[mip_key(sp, :is)] = JuMP.@expression(model, isb)
-    else
-        ilf = model[mip_key(sp, :ilf)] = JuMP.@variable(model, [1:N], lower_bound = 0)
-        isf = model[mip_key(sp, :isf)] = JuMP.@variable(model, [1:N], lower_bound = 0)
-        model[mip_key(sp, :ilf_ub)] = JuMP.@constraint(model, sc * (ilf .- k) <= 0)
-        model[mip_key(sp, :isf_ub)] = JuMP.@constraint(model, sc * (isf .- k) <= 0)
-        model[mip_key(sp, :ilfd_ub)] = JuMP.@constraint(model, sc * (ilf - ss * ilb) <= 0)
-        model[mip_key(sp, :isfd_ub)] = JuMP.@constraint(model, sc * (isf - ss * isb) <= 0)
-        model[mip_key(sp, :ilfd_lb)] = JuMP.@constraint(model,
-                                                        sc *
-                                                        ((ilf + ss * (1 .- ilb)) .- k) >= 0)
-        model[mip_key(sp, :isfd_lb)] = JuMP.@constraint(model,
-                                                        sc *
-                                                        ((isf + ss * (1 .- isb)) .- k) >= 0)
-        il = model[mip_key(sp, :il)] = JuMP.@expression(model, ilf)
-        is = model[mip_key(sp, :is)] = JuMP.@expression(model, isf)
-    end
+    il = model[mip_key(sp, :il)] = JuMP.@expression(model, ilg)
+    is = model[mip_key(sp, :is)] = JuMP.@expression(model, isg)
     model[mip_key(sp, :i_mip_ub)] = JuMP.@constraint(model, sc * (i_mip .- 1) <= 0)
     return LongShortIndicators(ilb, isb, il, is, i_mip)
 end
@@ -1244,3 +1294,5 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
     set_gcard_constraints!(model, sp, ind, gcard)
     return nothing
 end
+
+public mip_key, declare_mip_gate!

@@ -86,6 +86,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :sst => "`sst`: Sub-group short threshold.",#
                  :sglt => "`sglt`: Sub-grouped long threshold.",#
                  :sgst => "`sgst`: Sub-grouped short threshold.",#
+                 :conc => "`conc`: Concentration limit(s), one rule or a vector of rules. Each rule caps each position and limits the sum of the positions over its threshold, as the UCITS 5/10/40 rule does.",#
                  :tn_jmp => "`tn`: Turnover constraint estimator(s).",#
                  :fees_jmp => "`fees`: Fee estimator or fee structure.",#
                  :tr_jmp => "`tr`: Tracking error constraint(s).",#
