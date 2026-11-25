@@ -309,3 +309,17 @@ the same branch.
 Two forms were rejected. With a label on the pull request alone, the session that files an issue
 makes no choice. With one value for work that depends, a sweep ticket that can wait makes a layer,
 and each layer costs a full run of the CI.
+
+## Amendment (2026-11-25)
+
+Sessions turned on auto-merge for #2323 and #2325, as § *Own branch* told them to. Both merged with no
+review. The maintainer ruled that `main` takes no commit from a session.
+
+1. **The merge.** The maintainer merges each pull request into `main`, whatever its route. A session
+   opens the pull request and stops. It runs no `gh pr merge`, with or without `--auto`. This replaces
+   the auto-merge of § *Own branch*, of § *Map*, and of the amendment on issues from a review.
+2. **The review of a known head.** `review_stamp.sh post` takes the sha that the reviewer read, and it
+   refuses another head. A change of the base of a pull request changes its diff and not its head, so
+   the status `Review` then becomes `pending`.
+3. **A target that is a branch.** A merge does not delete the branch now, so the state of a
+   `dev-<feature>` target is that of its newest pull request.

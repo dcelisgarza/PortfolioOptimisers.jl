@@ -309,8 +309,9 @@ function landing_of(path::AbstractString, after::AbstractString;
         return "dev"
     end
     if isempty(after)
-        error("Neither `dev` nor `main` has `$path`, so its sweep ticket must wait for the ",
-              "work that adds it. Run this again with `--after '#<pr>'`, or with ",
+        error("Neither `origin/dev` nor `origin/main` has `$path`, so its sweep ticket must ",
+              "wait for the work that adds it. Run `git fetch origin`, and run this again. If it ",
+              "refuses again, run it with `--after '#<pr>'`, or with ",
               "`--after dev-<feature>` while the branch has no pull request.")
     end
     return "dev after $after"

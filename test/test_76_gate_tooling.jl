@@ -1438,6 +1438,117 @@ end
         @test !agrees("9", "dev-x", "main", "dev", "")
         @test agrees("9", "dev-x", "main", "map", "#3")
     end
+    @testset "lands_on.sh reads the pull request of a branch before the branch" begin
+        #=
+        A merge does not delete the branch, so the state of `dev-robust-covariance` was `open` after
+        its pull request merged, and work that waited for it waited forever. A failure of `gh` was
+        also read as a body with no line, which the workflow lets pass.
+        =#
+        script = joinpath(@__DIR__, "..", "code_health", "lands_on.sh")
+        function state(pull, ref)
+            bash = """
+                   source "\$1"
+                   gh() { case "\$2" in
+                       *pulls\\?state=all*head=*dev-x) printf '%s' "$pull" ;;
+                       *matching-refs/heads/dev-x) printf '%s' "$ref" ;;
+                       *) return 1 ;;
+                   esac; }
+                   target_state dev-x
+                   """
+            return readchomp(`bash -c $bash _ $script`)
+        end
+        @test state("merged dev-x", "refs/heads/dev-x") == "merged dev-x"
+        @test state("open dev-x", "refs/heads/dev-x") == "open dev-x"
+        @test state("", "refs/heads/dev-x") == "open dev-x"
+        @test state("", "") == "gone dev-x"
+        bash = """
+               source "\$1"
+               gh() { [[ \$* == *title* ]] && echo a title; }
+               check_issue 1 2>/dev/null
+               """
+        @test run(ignorestatus(`bash -c $bash _ $script`)).exitcode == 1
+    end
+    @testset "review_stamp.sh stamps the head that was read, and carries its patch" begin
+        #=
+        The patch id came from `git diff`, whose text follows the `diff.*` settings, so a session and
+        a runner gave two ids to one diff. `post` stamped the head of the moment, and not the head
+        that the review read. A change of the base kept the status of the old diff.
+        =#
+        script = abspath(joinpath(@__DIR__, "..", "code_health", "review_stamp.sh"))
+        origin, dir = mktempdir(), mktempdir()
+        git(origin, "init", "-q", "-b", "main")
+        put(origin, "a.txt", join(1:20, '\n'))
+        put(origin, "old.md", "one\ntwo\nthree\n")
+        write(joinpath(origin, "b.bin"), UInt8[0, 1, 2, 0])
+        commit(origin, "c0")
+        git(origin, "checkout", "-q", "-b", "lower")
+        put(origin, "lower.txt", "lower\n")
+        commit(origin, "c1")
+        git(origin, "checkout", "-q", "-b", "upper")
+        put(origin, "a.txt", join([1:9; 99; 11:20], '\n'))
+        git(origin, "mv", "old.md", "new.md")
+        write(joinpath(origin, "b.bin"), UInt8[0, 3, 4, 0])
+        head = commit(origin, "c2")
+        git(origin, "update-ref", "refs/pull/9/head", head)
+        git(dir, "init", "-q", "-b", "main")
+        git(dir, "remote", "add", "origin", origin)
+        # The stub answers from `$BASE`, `$HEAD`, `$REVIEWS` and `$SEEN`, and logs each status.
+        stub = """
+               source "\$1"; shift
+               gh() { case "\$*" in
+                   *--jq\\ .base.ref*) echo "\$BASE" ;;
+                   *--jq\\ .head.sha*) echo "\$HEAD" ;;
+                   *statuses/*) echo "STATUS \$4 \$8" ;;
+                   *--paginate*reviews*) printf '%s\\n' "\$REVIEWS" ;;
+                   *event=COMMENT*) echo "REVIEW \$6" ;;
+                   *commits/*/status*) printf '%s\\n' "\$SEEN" ;;
+                   *) return 1 ;;
+               esac; }
+               main "\$@"
+               """
+        function stamp(args...; base = "lower", reviews = "", seen = "", config = ())
+            env = ["BASE" => base, "HEAD" => head, "REVIEWS" => reviews, "SEEN" => seen,
+                   "GIT_CONFIG_COUNT" => string(length(config))]
+            for (i, (k, v)) in enumerate(config)
+                push!(env, "GIT_CONFIG_KEY_$(i - 1)" => k, "GIT_CONFIG_VALUE_$(i - 1)" => v)
+            end
+            out = IOBuffer()
+            cmd = addenv(Cmd(ignorestatus(`bash -c $stub _ $script $(collect(args))`); dir),
+                         env...)
+            p = run(pipeline(cmd; stdout = out, stderr = devnull))
+            return p.exitcode, chomp(String(take!(out)))
+        end
+        rc, patch = stamp("patch", "9")
+        @test rc == 0 && occursin(r"^[0-9a-f]{40}$", patch)
+        for config in
+            ("diff.context" => "5", "diff.noprefix" => "true", "diff.renames" => "false",
+             "diff.external" => "false", "color.ui" => "always", "core.abbrev" => "12")
+            @test stamp("patch", "9"; config = (config,)) == (0, patch)
+        end
+        @test last(stamp("patch", "9"; base = "main")) != patch
+
+        body = joinpath(mktempdir(), "review.md")
+        write(body, "No defect.\n")
+        rc, out = stamp("post", "9", head[1:10], "success", body)
+        @test rc == 0
+        @test occursin("REVIEW commit_id=$head", out)
+        @test occursin("STATUS state=success description=The review of patch $(patch[1:12])",
+                       out)
+        @test stamp("post", "9", "0"^40, "success", body) == (1, "")
+        @test first(stamp("post", "9", "success", body)) == 2
+
+        reviews = "<!-- review-patch $patch success -->"
+        seen = "success The review of patch $(patch[1:12])"
+        @test !occursin("STATUS", last(stamp("carry", "9")))
+        @test occursin("STATUS state=success", last(stamp("carry", "9"; reviews)))
+        @test !occursin("STATUS", last(stamp("carry", "9"; reviews, seen)))
+        @test !occursin("STATUS", last(stamp("carry", "9"; reviews, base = "main")))
+        @test occursin("STATUS state=pending",
+                       last(stamp("carry", "9"; reviews, seen, base = "main")))
+        @test occursin("STATUS state=success",
+                       last(stamp("carry", "9"; reviews,
+                                  seen = "pending The patch changed after the review")))
+    end
     @testset "a sweep title that names no current path is reported and refused" begin
         #=
         Both sweep jobs find a sweep issue by the path its title names. Forty-nine tickets named a

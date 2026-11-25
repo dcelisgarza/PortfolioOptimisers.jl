@@ -45,7 +45,9 @@ name.
   A map issue holds `one branch dev-<feature>` or `each ticket`.
   `bash code_health/lands_on.sh issue <number>` checks the line.
 - **Load the `land-work` skill before the first edit of work that lands**, and before you open,
-  stack, review or merge a pull request. It holds the branch, the base and the push of each route.
+  stack or review a pull request. It holds the branch, the base and the push of each route.
+- **Never merge a pull request into `main`, and never turn on auto-merge.** Open it, and stop. The
+  maintainer merges it after a review.
 - **Name a branch for its feature**, with the prefix `dev-`, for example
   `dev-concentration-limit`. A branch that holds research alone can take the prefix `research-`,
   which runs no CI and does not merge.

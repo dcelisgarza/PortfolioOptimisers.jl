@@ -72,14 +72,21 @@ parse() {
     fi
 }
 
-# `#<n>` -> `open <head>`, `merged <head>`, `closed <head>`. A `dev-` branch -> `open <branch>`, or
-# `gone <branch>` when origin does not have it.
+# `#<n>` -> `open <head>`, `merged <head>`, `closed <head>`. A `dev-` branch -> the same for its newest
+# pull request. With no pull request it is `open <branch>`, or `gone <branch>` when origin does not
+# have it. The pull request comes first, because a merge does not delete the branch.
 target_state() {
-    local target=$1
+    local target=$1 state
+    local jq='(if .merged_at then "merged" else .state end) + " " + .head.ref'
     if [[ $target == \#* ]]; then
-        gh api "repos/{owner}/{repo}/pulls/${target#\#}" \
-           --jq '(if .merged_at then "merged" else .state end) + " " + .head.ref' </dev/null ||
+        gh api "repos/{owner}/{repo}/pulls/${target#\#}" --jq "$jq" </dev/null ||
             bad "$target is not a pull request."
+        return
+    fi
+    state=$(gh api "repos/{owner}/{repo}/pulls?state=all&head={owner}:$target" \
+               --jq ".[0] // empty | $jq" </dev/null) || return 1
+    if [ -n "$state" ]; then
+        echo "$state"
     elif [ -n "$(gh api "repos/{owner}/{repo}/git/matching-refs/heads/$target" \
                     --jq ".[] | select(.ref == \"refs/heads/$target\") | .ref" </dev/null)" ]; then
         echo "open $target"
@@ -89,9 +96,11 @@ target_state() {
 }
 
 check_issue() {
-    local n=$1 parsed route target title state path rc=0 known
-    title=$(gh issue view "$n" --json title --jq .title </dev/null)
-    parsed=$(gh issue view "$n" --json body --jq .body </dev/null | parse) || return $?
+    local n=$1 parsed route target title body state path rc=0 known
+    title=$(gh issue view "$n" --json title --jq .title </dev/null) || return 1
+    # Not a pipe into `parse`, which reads a failure of `gh` as a body with no line.
+    body=$(gh issue view "$n" --json body --jq .body </dev/null) || return 1
+    parsed=$(parse <<<"$body") || return $?
     IFS=$'\t' read -r route target <<<"$parsed"
     case "$route" in
     "stacked on" | "same branch" | "own branch" | dev)
@@ -100,7 +109,7 @@ check_issue() {
             case "$route ${state%% *}" in
             *" open") ;;
             "own branch merged" | "own branch gone" | "dev merged" | "dev gone") ;;
-            *) bad "#$n says \`$route $target\`, and $target is ${state%% *}. The route is \`own branch\` now." || rc=1 ;;
+            *) bad "#$n says \`$route $target\`, and $target is ${state%% *}. Pick the route again." || rc=1 ;;
             esac
         fi
         ;;
@@ -151,7 +160,7 @@ pr_agrees() {
 }
 
 check_pr() {
-    local pr=$1 head base body n parsed route target rc=0
+    local pr=$1 head base body text n parsed route target rc=0
     head=$(gh api "repos/{owner}/{repo}/pulls/$pr" --jq .head.ref </dev/null)
     base=$(gh api "repos/{owner}/{repo}/pulls/$pr" --jq .base.ref </dev/null)
     body=$(gh api "repos/{owner}/{repo}/pulls/$pr" --jq '.body // ""' </dev/null)
@@ -161,7 +170,12 @@ check_pr() {
     # a stack has no linked issue. The keyword in the body is read instead.
     for n in $(grep -oiE '\b(close[sd]?|fix(e[sd])?|resolve[sd]?):? #[0-9]+' <<<"$body" |
         grep -oE '[0-9]+$' | sort -un); do
-        if ! parsed=$(gh issue view "$n" --json body --jq .body </dev/null | parse 2>&1); then
+        if ! text=$(gh issue view "$n" --json body --jq .body </dev/null); then
+            echo "#$n: gh gave no body." >&2
+            rc=1
+            continue
+        fi
+        if ! parsed=$(parse 2>&1 <<<"$text"); then
             echo "#$n: $parsed" >&2
             rc=1
             continue

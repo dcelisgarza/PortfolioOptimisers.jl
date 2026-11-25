@@ -8,7 +8,7 @@ name: Route
 # - The check `Route` of a pull request is red when its base, or its number, does not agree with
 #   the route of an issue that it closes.
 # - A push to a pull request carries the `Review` status to the new head when its diff did not
-#   change (`code_health/review_stamp.sh`).
+#   change, and a change of its base takes the status away (`code_health/review_stamp.sh`).
 #
 # No merge waits for a job of this file. It has no push run, so ADR 0220 skips nothing here.
 
@@ -72,9 +72,10 @@ jobs:
       pull-requests: read
       statuses: write
     steps:
+      # The default ref is the merge of the head into the base, which is where this file came from. So
+      # the scripts are there also for a branch that started before they were on its base.
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
       - name: Carry the review to the new head
         if: ${{ !cancelled() }}
