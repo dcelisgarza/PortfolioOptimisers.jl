@@ -40,6 +40,13 @@ Keywords correspond to the struct's fields.
   - `r1`: Recursively updated through [`factory`](@ref).
   - `r2`: Recursively updated through [`factory`](@ref).
 
+## View parameters
+
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
+
+  - `r1`: Recursively viewed through [`port_opt_view`](@ref).
+  - `r2`: Recursively viewed through [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -84,11 +91,11 @@ julia> RiskRatio(; r1 = Range(), r2 = WorstRealisation())([0.125, -0.25, 0.0625,
     """
     $(field_dict[:r1])
     """
-    @fprop r1
+    @fprop @vprop r1
     """
     $(field_dict[:r2])
     """
-    @fprop r2
+    @fprop @vprop r2
     function RiskRatio(r1::OptimisationRiskMeasure, r2::OptimisationRiskMeasure)
         return new{typeof(r1), typeof(r2)}(r1, r2)
     end
@@ -159,6 +166,13 @@ The two fields take precedence over a `sca` keyword of the caller. The ratio doe
   - `r1`: Recursively updated through [`factory`](@ref).
   - `r2`: Recursively updated through [`factory`](@ref).
 
+## View parameters
+
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
+
+  - `r1`: Recursively viewed through [`port_opt_view`](@ref).
+  - `r2`: Recursively viewed through [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -203,7 +217,7 @@ NonOptimisationRiskRatio
     """
     $(field_dict[:r1_vec])
     """
-    @fprop r1
+    @fprop @vprop r1
     """
     $(field_dict[:sca_r1])
     """
@@ -211,7 +225,7 @@ NonOptimisationRiskRatio
     """
     $(field_dict[:r2_vec])
     """
-    @fprop r2
+    @fprop @vprop r2
     """
     $(field_dict[:sca_r2])
     """
@@ -292,13 +306,15 @@ end
 
 Groups the two ratio measures whose value is one risk divided by another risk.
 
-Both members hold their two risks in the fields `r1` and `r2`, so one method of [`supports_precomputed_returns`](@ref) answers for both. Their [`expected_risk`](@ref) methods stay separate, because only [`NonOptimisationRiskRatio`](@ref) carries a scalariser for each field.
+Both members hold their two risks in the fields `r1` and `r2`, so one method of [`supports_precomputed_returns`](@ref), of [`needs_previous_weights`](@ref) and of [`reader_frames`](@ref) answers for both. Their [`expected_risk`](@ref) methods stay separate, because only [`NonOptimisationRiskRatio`](@ref) carries a scalariser for each field.
 
 # Related
 
   - [`RiskRatio`](@ref)
   - [`NonOptimisationRiskRatio`](@ref)
   - [`supports_precomputed_returns`](@ref)
+  - [`needs_previous_weights`](@ref)
+  - [`reader_frames`](@ref)
   - [`expected_risk`](@ref)
 """
 const RkRatioRM = Union{RiskRatio, NonOptimisationRiskRatio}
@@ -317,6 +333,86 @@ Returns `true` only when both constituent risk measures support precomputed retu
 """
 function supports_precomputed_returns(r::RkRatioRM)
     return supports_precomputed_returns(r.r1) && supports_precomputed_returns(r.r2)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether [`RkRatioRM`](@ref) `r` reads the previous portfolio weights.
+
+The ratio reads them when one of its sides does, such as a [`TurnoverRiskMeasure`](@ref) whose `fixed` is `false`. A side that is a vector reads them when one of its measures does.
+
+# Related
+
+  - [`RkRatioRM`](@ref)
+  - [`needs_previous_weights`](@ref)
+"""
+function needs_previous_weights(r::RkRatioRM)
+    return needs_previous_weights(r.r1) || needs_previous_weights(r.r2)
+end
+"""
+    reader_frames(r::RkRatioRM, path::AbstractString, refit::Bool) -> ReturnsFrames
+
+Return the frames of the readers inside the two sides of a ratio measure, for the frame walk of a head.
+
+A side can hold a risk measure with a reader, such as an [`UncertaintySetVariance`](@ref) with a prior of its own. Each of those readers belongs to the group of the head that holds the ratio. A ratio with no reader builds no path, because [`holds_reader`](@ref) answers first.
+
+# Algorithm
+
+ 1. When neither `r.r1` nor `r.r2` holds a reader, by [`holds_reader`](@ref), return the empty [`ReturnsFrames`](@ref).
+ 2. Otherwise walk the fields of `r` with [`field_frames`](@ref).
+
+# Arguments
+
+  - `r`: The ratio measure.
+  - $(arg_dict[:frame_path])
+  - $(arg_dict[:frame_refit])
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames of the two sides.
+
+# Related
+
+  - [`reader_frames`](@ref)
+  - [`field_frames`](@ref)
+  - [`holds_reader`](@ref)
+  - [`RkRatioRM`](@ref)
+"""
+function reader_frames(r::RkRatioRM, path::AbstractString, refit::Bool)
+    return if holds_reader(r.r1, refit) || holds_reader(r.r2, refit)
+        field_frames(r, path, refit)
+    else
+        ReturnsFrames()
+    end
+end
+"""
+    holds_reader(x, refit::Bool) -> Bool
+    holds_reader(v::AbstractVector, refit::Bool) -> Bool
+
+Return whether `x` adds a frame to the group of the head that holds it.
+
+The function asks [`reader_frames`](@ref) at the empty path and drops the paths of the answer, so it needs no list of the types that hold a reader. A vector answers for its elements and builds no path for them.
+
+# Arguments
+
+  - $(arg_dict[:frame_x])
+  - $(arg_dict[:frame_refit])
+
+# Returns
+
+  - `flag::Bool`: Whether `x` states the Excess Frame or holds a raw reader.
+
+# Related
+
+  - [`reader_frames`](@ref)
+  - [`ReturnsFrames`](@ref)
+"""
+function holds_reader(x, refit::Bool)::Bool
+    fr = reader_frames(x, "", refit)
+    return fr.excess || !isempty(fr.raw)
+end
+function holds_reader(v::AbstractVector, refit::Bool)::Bool
+    return any(x -> holds_reader(x, refit), v)
 end
 # Precomputed-returns contract for the ratio composites: decompose onto the series, mirroring
 # the `(w, X, fees)` decomposition of their `expected_risk` methods. Each component routes

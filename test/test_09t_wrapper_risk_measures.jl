@@ -172,6 +172,176 @@ end
         @test basename.(owners) == ["19_RatioRiskMeasure.jl"]
     end
 
+    @testset "A walk enters the sides of a ratio (#2330)" begin
+        X = _X607
+        T, N = size(X)
+        wb = fill(1 / N, N)
+        bv = X * wb .+ 0.001
+        Bm = 0.5 .* X
+        nx = ["A$i" for i in 1:N]
+        rdv = ReturnsResult(; nx = nx, X = X, nb = ["BM"], B = bv)
+        rdm = ReturnsResult(; nx = nx, X = X, nb = nx, B = Bm)
+        td = TrackingRiskMeasure(; tr = DataBenchmarkTracking())
+        ts = TrackingRiskMeasure(; tr = ReturnsTracking(; w = bv))
+        sd = StandardDeviation()
+        ratios(t) = (RiskRatio(; r1 = t, r2 = Variance()),
+                     RiskRatio(; r1 = Variance(), r2 = t),
+                     RiskRatio(; r1 = RiskRatio(; r1 = t, r2 = sd), r2 = Variance()),
+                     NonOptimisationRiskRatio(; r1 = [ConditionalValueatRisk(), t],
+                                              sca1 = MaxScalariser(), r2 = t),
+                     MeanReturnRiskRatio(; rk = t),
+                     MeanReturnRiskRatio(; rk = [ConditionalValueatRisk(), t]),
+                     ExpectedReturnRiskRatio(; rk = t),
+                     RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb, fixed = true),
+                                             r = RiskRatio(; r1 = t, r2 = sd)))
+        @testset "The data benchmark" begin
+            for (r, rs) in zip(ratios(td), ratios(ts))
+                @test PO.holds_data_benchmark(r)
+                @test !PO.holds_data_benchmark(rs)
+                # A composite with no data benchmark, and a reader with no rows, give the
+                # composite itself.
+                @test PO.bind_data_benchmark(rs, rdv) === rs
+                @test PO.bind_data_benchmark(r, nothing) === r
+                # A second bind replaces the first one.
+                br = PO.bind_data_benchmark(PO.bind_data_benchmark(r, rdm), rdv)
+                prv = prior(EmpiricalPrior(), rdv)
+                @test expected_risk(br, _w607, prv) == expected_risk(rs, _w607, prv)
+            end
+            # The value level binds the rows. A vector benchmark is the series, and a matrix
+            # gives the series of the benchmarks of the assets.
+            for (r, rs) in zip((MeanReturnRiskRatio(; rk = td),
+                                NonOptimisationRiskRatio(; r1 = MeanReturn(), r2 = [td, td])),
+                               (MeanReturnRiskRatio(; rk = ts),
+                                NonOptimisationRiskRatio(; r1 = MeanReturn(), r2 = [ts, ts])))
+                @test expected_risk(r, _w607, rdv) == expected_risk(rs, _w607, rdv)
+                @test expected_risk(r, _w607, rdm) ==
+                      expected_risk(PO.bind_data_benchmark(r, rdm), _w607, X)
+                @test expected_risk(r, _w607, rdm) != expected_risk(r, _w607, rdv)
+            end
+            @test_throws ArgumentError expected_risk(MeanReturnRiskRatio(; rk = td), _w607,
+                                                     ReturnsResult(; nx = nx, X = X))
+            # The hierarchical heads read the bound ratio.
+            for mk in (r -> HierarchicalRiskParity(; r = r),
+                       r -> HierarchicalEqualRiskContribution(; ri = r, ro = r))
+                wd = optimise(mk(ratios(td)[1]), rdv).w
+                @test wd == optimise(mk(ratios(ts)[1]), rdv).w
+                @test !isapprox(wd, optimise(mk(Variance()), rdv).w; rtol = 1e-2)
+                @test isa(optimise(mk(ratios(td)[1]), rdm).retcode, OptimisationSuccess)
+            end
+            # A matrix benchmark follows the assets that are investable.
+            am = trues(T, N)
+            am[:, N] .= false
+            Xn = copy(X)
+            Xn[.!am] .= NaN
+            k = 1:(N - 1)
+            rdn = ReturnsResult(; nx = nx, X = Xn, nb = nx, B = Bm,
+                                pnl = AssetPanel(; amsk = am, emsk = copy(am)))
+            rdk = ReturnsResult(; nx = nx[k], X = X[:, k], nb = nx[k], B = Bm[:, k])
+            wn = optimise(HierarchicalRiskParity(; r = ratios(td)[1]), rdn).w
+            @test iszero(wn[N])
+            @test wn[k] ≈ optimise(HierarchicalRiskParity(; r = ratios(td)[1]), rdk).w
+        end
+        @testset "The predicate of the bind follows the types, and costs nothing" begin
+            for r in (Variance(), VarianceSkewKurtosis(), ConditionalValueatRisk(),
+                      LowOrderMoment(; mu = ones(N)), RiskRatio(), MeanReturnRiskRatio(),
+                      ExpectedReturnRiskRatio(), NonOptimisationRiskRatio(),
+                      TrackingError(; tr = WeightsTracking(; w = wb), err = 0.01),
+                      RiskTrackingError(; tr = WeightsTracking(; w = wb), r = Variance(),
+                                        err = 0.01), wb, nothing)
+                @test !PO.holds_data_benchmark(r)
+                @test PO.bind_data_benchmark(r, rdv) === r
+            end
+            @test PO.holds_data_benchmark(RiskTrackingError(;
+                                                            tr = WeightsTracking(; w = wb),
+                                                            r = td, err = 0.01))
+            @test PO.holds_data_benchmark([TrackingError(; tr = DataBenchmarkTracking(),
+                                                         err = 0.01)])
+            # A vector that holds no data benchmark comes back with no copy.
+            vm = [Variance(), ConditionalValueatRisk(), Range()]
+            bytes(v, rd) = @allocated PO.bind_data_benchmark(v, rd)
+            PO.bind_data_benchmark(vm, rdv)
+            bytes(vm, rdv)
+            @test PO.bind_data_benchmark(vm, rdv) === vm
+            @test iszero(bytes(vm, rdv))
+        end
+        @testset "The previous weights" begin
+            tn = TurnoverRiskMeasure(; w = wb)
+            tf = TurnoverRiskMeasure(; w = wb, fixed = true)
+            for f in ((a, b) -> RiskRatio(; r1 = a, r2 = b),
+                      (a, b) -> NonOptimisationRiskRatio(; r1 = a, r2 = b),
+                      (a, b) -> NonOptimisationRiskRatio(; r1 = [a, Variance()], r2 = [b]))
+                @test PO.needs_previous_weights(f(tn, tf))
+                @test PO.needs_previous_weights(f(tf, tn))
+                @test !PO.needs_previous_weights(f(tf, tf))
+            end
+            @test PO.needs_previous_weights(HierarchicalRiskParity(;
+                                                                   r = RiskRatio(; r1 = tn,
+                                                                                 r2 = sd)))
+        end
+        @testset "The view of the assets" begin
+            i = [1, 3]
+            tw = TrackingRiskMeasure(; tr = WeightsTracking(; w = wb))
+            vw(r) = PO.port_opt_view(r, i, X)
+            @test vw(RiskRatio(; r1 = tw, r2 = sd)).r1.tr.w == wb[i]
+            @test vw(RiskRatio(; r1 = sd, r2 = tw)).r2.tr.w == wb[i]
+            @test vw(NonOptimisationRiskRatio(; r1 = [sd, tw], r2 = tw)).r1[2].tr.w == wb[i]
+            @test vw(MeanReturnRiskRatio(; rk = tw)).rk.tr.w == wb[i]
+            mu = collect(1.0:N)
+            rt = ArithmeticReturn(; mu = mu)
+            ve = vw(ExpectedReturnRiskRatio(; rt = rt, rk = [tw]))
+            @test ve.rt.mu == mu[i]
+            @test ve.rk[1].tr.w == wb[i]
+            @test vw(ExpectedReturn(; rt = rt)).rt.mu == mu[i]
+            @test vw(RiskRatio()) === RiskRatio()
+            # A head cuts the sides of the ratio to the assets that are investable.
+            am = trues(T, N)
+            am[:, N] .= false
+            Xn = copy(X)
+            Xn[.!am] .= NaN
+            k = 1:(N - 1)
+            rdn = ReturnsResult(; nx = nx, X = Xn,
+                                pnl = AssetPanel(; amsk = am, emsk = copy(am)))
+            rdk = ReturnsResult(; nx = nx[k], X = X[:, k])
+            S = cov(X)
+            for (r, rk) in (((RiskRatio(; r1 = Variance(; sigma = S), r2 = sd)),
+                             (RiskRatio(; r1 = Variance(; sigma = S[k, k]), r2 = sd))),
+                            ((RiskRatio(; r1 = tw, r2 = Variance())),
+                             (RiskRatio(;
+                                        r1 = TrackingRiskMeasure(; tr = WeightsTracking(; w = wb[k])),
+                                        r2 = Variance()))))
+                wn = optimise(HierarchicalRiskParity(; r = r), rdn).w
+                @test iszero(wn[N])
+                @test wn[k] ≈ optimise(HierarchicalRiskParity(; r = rk), rdk).w
+            end
+        end
+        @testset "The readers" begin
+            un = DeltaUncertaintySet(; pe = EmpiricalPrior())
+            ux = DeltaUncertaintySet(; pe = EmpiricalPrior(; x_src = ExcessSource()))
+            usv, usx = UncertaintySetVariance(; ucs = un),
+                       UncertaintySetVariance(; ucs = ux)
+            fr(r) = PO.reader_frames(r, "r", false)
+            @test fr(RiskRatio(; r1 = usv, r2 = Variance())).raw == ["r.r1.ucs.pe"]
+            @test fr(RiskRatio(; r1 = Variance(), r2 = usv)).raw == ["r.r2.ucs.pe"]
+            @test fr(NonOptimisationRiskRatio(; r1 = [sd, usv], r2 = usv)).raw ==
+                  ["r.r1[2].ucs.pe", "r.r2.ucs.pe"]
+            @test fr(RiskRatio(; r1 = usx, r2 = Variance())).excess
+            for r in (RiskRatio(), NonOptimisationRiskRatio(; r1 = [sd, Variance()]),
+                      RiskRatio(; r1 = td, r2 = sd))
+                @test !fr(r).excess && isempty(fr(r).raw)
+            end
+            @test PO.holds_reader([sd, usv], false)
+            @test !PO.holds_reader([sd, Variance()], false)
+            # The head names the reader that its warning missed.
+            pex = EmpiricalPrior(; x_src = ExcessSource())
+            @test_logs (:warn, r"r\.r1\.ucs\.pe") HierarchicalRiskParity(;
+                                                                         r = RiskRatio(;
+                                                                                       r1 = usv,
+                                                                                       r2 = sd),
+                                                                         opt = HierarchicalOptimiser(;
+                                                                                                     pe = pex))
+        end
+    end
+
     @testset "EqualRisk splits every cluster evenly" begin
         @test EqualRisk()([0.5, 0.3, 0.2, 0.0]) === 0.25
         @test EqualRisk()(Float32[0.6, 0.4]) === 0.5f0

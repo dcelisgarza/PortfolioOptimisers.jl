@@ -1072,7 +1072,7 @@ The function rebuilds an object through its keyword constructor only when a part
  1. When `x` holds no data benchmark, or `rd` is not a [`ReturnsResult`](@ref), return `x` unchanged. A data benchmark of a reader with no returns data stays unbound, and [`tracking_benchmark`](@ref) refuses it there.
  2. On a [`DataBenchmarkTracking`](@ref), refuse an `rd` that carries no benchmark. Otherwise return a new `DataBenchmarkTracking` that holds `rd.B`.
  3. On a [`TrackingError`](@ref), bind its `tr` field.
- 4. Bind each element of a vector, and return the vector itself when no element changes.
+ 4. Bind each element of a vector, and return the vector itself when no element changes. A vector for which [`holds_data_benchmark`](@ref) is `false` comes back without a new vector.
 
 # Arguments
 
@@ -1108,6 +1108,7 @@ true
 
   - [`DataBenchmarkTracking`](@ref)
   - [`TrackingError`](@ref)
+  - [`holds_data_benchmark`](@ref)
   - [`tracking_benchmark`](@ref)
   - [`ReturnsResult`](@ref)
   - [`rebuild_struct`](@ref)
@@ -1125,8 +1126,48 @@ function bind_data_benchmark(tr::TrackingError, rd)
     return bound === tr.tr ? tr : rebuild_struct(tr, (; tr = bound))
 end
 function bind_data_benchmark(v::AbstractVector, rd)
+    if !holds_data_benchmark(v)
+        return v
+    end
     bound = [bind_data_benchmark(x, rd) for x in v]
     return all(splat(===), zip(bound, v)) ? v : bound
+end
+"""
+    holds_data_benchmark(x) -> Bool
+    holds_data_benchmark(tr::DataBenchmarkTracking) -> Bool
+    holds_data_benchmark(tr::TrackingError) -> Bool
+    holds_data_benchmark(v::AbstractVector) -> Bool
+
+Return whether `x` holds a [`DataBenchmarkTracking`](@ref) that [`bind_data_benchmark`](@ref) binds.
+
+The predicate guards the bind of a vector and of a composite risk measure, so a value that holds no data benchmark pays nothing for the bind. The types decide the answer, so it is a constant for a single value and for a vector of one concrete type. A vector of mixed types pays one dynamic call for each element, with no allocation. [`data_benchmark_path`](@ref) finds the path of a data benchmark for an error message. It walks every field of the tree, so a constructor calls it and a fit does not.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`DataBenchmarkTracking`](@ref): return `true`, also when it already holds a `B`.
+ 2. A [`TrackingError`](@ref): answer for its `tr` field.
+ 3. A vector of numbers: return `false`. Any other vector: return whether one of its elements holds a data benchmark.
+ 4. Any other value: return `false`. The risk measures add their own methods.
+
+# Related
+
+  - [`bind_data_benchmark`](@ref)
+  - [`data_benchmark_path`](@ref)
+  - [`DataBenchmarkTracking`](@ref)
+"""
+function holds_data_benchmark(::Any)
+    return false
+end
+function holds_data_benchmark(::DataBenchmarkTracking)
+    return true
+end
+function holds_data_benchmark(tr::TrackingError)
+    return holds_data_benchmark(tr.tr)
+end
+function holds_data_benchmark(v::AbstractVector)
+    return eltype(v) <: Number ? false : any(holds_data_benchmark, v)
 end
 
 export IndependentVariableTracking, DependentVariableTracking, WeightsTracking,

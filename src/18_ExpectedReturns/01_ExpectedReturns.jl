@@ -615,6 +615,12 @@ The type has **no** scalariser. The return axis sums and never scalarises.
 
   - `rt`: Recursively updated through [`factory`](@ref).
 
+## View parameters
+
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
+
+  - `rt`: Recursively viewed through [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -650,7 +656,7 @@ ExpectedReturn
     """
     $(field_dict[:rt])
     """
-    @fprop rt
+    @fprop @vprop rt
     function ExpectedReturn(settings::HierarchicalRiskMeasureSettings, rt::JRE_VecJRE)
         if isa(rt, VecJRE)
             @argcheck(!isempty(rt), IsEmptyError("rt cannot be empty"))
@@ -771,6 +777,13 @@ The field takes precedence over a `sca` keyword of the caller. A `sca` that the 
   - `rt`: Recursively updated through [`factory`](@ref).
   - `rk`: Recursively updated through [`factory`](@ref).
 
+## View parameters
+
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
+
+  - `rt`: Recursively viewed through [`port_opt_view`](@ref).
+  - `rk`: Recursively viewed through [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -820,11 +833,11 @@ ExpectedReturnRiskRatio
     """
     $(field_dict[:rt])
     """
-    @fprop rt
+    @fprop @vprop rt
     """
     $(field_dict[:rk])
     """
-    @fprop rk
+    @fprop @vprop rk
     """
     $(field_dict[:sca_rk])
     """

@@ -184,6 +184,12 @@ Keywords correspond to the struct's fields.
   - `rt`: Recursively updated through [`factory`](@ref).
   - `rk`: Recursively updated through [`factory`](@ref).
 
+## View parameters
+
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
+
+  - `rk`: Recursively viewed through [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -231,7 +237,7 @@ MeanReturnRiskRatio
     """
     $(field_dict[:rk])
     """
-    @fprop rk
+    @fprop @vprop rk
     """
     $(field_dict[:sca_rk])
     """

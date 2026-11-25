@@ -1134,3 +1134,22 @@ A `ConstraintBlock` holds concentration rules, such as the UCITS 5/10/40 rule, i
 
 - **An entropy pooling prior with `OptimEntropyPooling`, the default optimiser, and a prior probability of zero** meets its views. With `alg = LogEntropyPooling()`, v0.34.7 stopped at the start of the solve and reported success, and the posterior missed the views. With `alg = ExpEntropyPooling()`, v0.34.7 could miss a view when an observation of zero prior probability held an extreme value. `JuMPEntropyPooling` had neither defect.
 - **An `EntropyPoolingPrior` or a `MeucciEntropyPoolingPrior` with a prior probability of zero at an extreme return**, such as a crash that `w` removes, meets its views under every optimiser. v0.34.7 scaled each view with the return that the prior removes. A kurtosis view could miss its target by a third of it. An entropic value at risk view gave the prior back, with no error, or raised an error about the grid or about a `NaN` coefficient. The views now read the mean row of the other observations there, so the posterior moves by rounding when the removed returns are ordinary.
+
+## From v0.34.9 to v0.34.10
+
+### [Calls that now succeed](@id migration-0-34-10-ratio-success)
+
+- **A `DataBenchmarkTracking` inside a `RiskRatio`, a `NonOptimisationRiskRatio`, a `MeanReturnRiskRatio` or an `ExpectedReturnRiskRatio`** reads the benchmark of the returns data. v0.34.9 raised an `ArgumentError` in `HierarchicalRiskParity`, `HierarchicalEqualRiskContribution`, `RiskLoss` and `expected_risk`, because no reader bound it.
+- **A ratio measure or an `ExpectedReturn` that holds per-asset data, with an asset that is not investable.** The data are a covariance matrix, benchmark weights, turnover weights or expected returns. v0.34.9 raised a `DimensionMismatch`, because it did not cut the parts of the measure to the investable assets.
+
+### [Results that move](@id migration-0-34-10-ratio-numbers)
+
+- **The walk-forward of an optimiser whose `RiskRatio` holds previous weights**, such as a `TurnoverRiskMeasure` or a `WeightsTracking` whose `fixed` is `false`, runs its folds in sequence and gives each fold the weights of the fold before. v0.34.9 ran the folds in parallel, and each fold read the weights that the caller gave.
+
+### [Warnings that are new](@id migration-0-34-10-ratio-warnings)
+
+- **A `RiskRatio` or a `NonOptimisationRiskRatio` that holds a reader with no `x_src`**, such as an `UncertaintySetVariance` whose uncertainty set has a prior of its own, in a head with a reader that states `x_src = ExcessSource()`. The head names the reader in its warning, as it does for the other measures. Such a reader that states `x_src = ExcessSource()` also drops the observations at which a vector benchmark has a gap.
+
+### [If you extend the library](@id migration-0-34-10-ratio-extending)
+
+- **A risk measure of your own that holds a tracking part** and adds a method of the internal `PortfolioOptimisers.bind_data_benchmark` also adds one of `PortfolioOptimisers.holds_data_benchmark`, which the bind of a vector and of a composite reads first. A measure that declares the part in `PortfolioOptimisers.deferred_slots` needs neither.
