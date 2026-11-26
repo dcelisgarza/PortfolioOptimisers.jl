@@ -676,7 +676,8 @@ end
 """
     subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
                                 wb::WeightBounds, wf::WeightFinaliser,
-                                ress::VecOpt, w::VecNum_VecVecNum, ctx::Tuple = ())
+                                ress::VecOpt, w::VecNum_VecVecNum, ctx::FinaliserContext =
+                                     (nothing, nothing, nothing, nothing, false))
 
 Average the subset weights over all the assets, and finalise the average under the weight bounds.
 
@@ -716,7 +717,9 @@ On an efficient frontier, the method runs the steps once for each point.
 """
 function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
                                      wb::WeightBounds, wf::WeightFinaliser, ress::VecOpt,
-                                     ::VecNum, ctx::Tuple = ())
+                                     ::VecNum,
+                                     ctx::FinaliserContext = (nothing, nothing, nothing,
+                                                              nothing, false))
     w = zeros(eltype(ress[1].w), N)
     for i in 1:n_subsets
         idx = view(asset_idx, :, i)
@@ -728,7 +731,9 @@ function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::
 end
 function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
                                      wb::WeightBounds, wf::WeightFinaliser, ress::VecOpt,
-                                     ws::VecVecNum, ctx::Tuple = ())
+                                     ws::VecVecNum,
+                                     ctx::FinaliserContext = (nothing, nothing, nothing,
+                                                              nothing, false))
     M = length(ws)
     w = [zeros(eltype(ress[1].w[i]), N) for i in 1:M]
     for i in 1:n_subsets

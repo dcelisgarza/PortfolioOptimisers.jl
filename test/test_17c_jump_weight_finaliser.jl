@@ -48,8 +48,9 @@ hrp(; kwargs...) = HierarchicalRiskParity(; opt = hopt(; kwargs...))
                              opto = InverseVolatility()),
              Stacking(; wb, wf, opti = [InverseVolatility(), EqualWeighted()],
                       opto = InverseVolatility()),
-             SubsetResampling(; wb, wf, opt = InverseVolatility(), subset_size = 6,
-                              n_subsets = 4)]
+             # An asset in no subset holds a zero, which a relative deviation divides by.
+             SubsetResampling(; wb, wf = wfa, opt = InverseVolatility(), subset_size = 6,
+                              n_subsets = 4, rng = StableRNG(7))]
     for h in heads
         res = optimise(h, rd)
         @test success(res)

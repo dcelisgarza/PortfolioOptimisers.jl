@@ -260,12 +260,28 @@ function sub_portfolio_cv(cv)
     return !hasfield(typeof(cv), :rng) ? cv : copy(cv)
 end
 """
+    const FinaliserContext = Tuple{Option{<:AbstractPriorResult}, Option{<:ReturnsResult},
+                                   Option{<:UniverseSets}, Option{<:Fees}, Bool}
+
+The context that a meta head gives its weight finaliser: `(pr, rd, sets, fees, strict)`, which [`finalise_weight_bounds`](@ref) takes after the weights.
+
+# Related
+
+  - [`outer_optimisation_finaliser`](@ref)
+  - [`subset_resampling_finaliser`](@ref)
+  - [`finalise_weight_bounds`](@ref)
+"""
+const FinaliserContext = Tuple{Option{<:AbstractPriorResult}, Option{<:ReturnsResult},
+                               Option{<:UniverseSets}, Option{<:Fees}, Bool}
+"""
     outer_optimisation_finaliser(wb::WeightBounds, wf::WeightFinaliser, resi::VecOpt,
                                  rco::OptimisationReturnCode, w::VecNum, wi::MatNum,
-                                 ctx::Tuple = ())
+                                 ctx::FinaliserContext =
+                                     (nothing, nothing, nothing, nothing, false))
     outer_optimisation_finaliser(wb::WeightBounds, wf::WeightFinaliser, resi::VecOpt,
                                  rcos::VecOptRetCode, ws::VecVecNum, wi::MatNum,
-                                 ctx::Tuple = ())
+                                 ctx::FinaliserContext =
+                                     (nothing, nothing, nothing, nothing, false))
 
 Combine the inner and outer weights of a meta-optimiser, and finalise them under its weight bounds.
 
@@ -320,7 +336,8 @@ The method for an efficient frontier runs these steps once for each pair of `rco
 """
 function outer_optimisation_finaliser(wb::WeightBounds, wf::WeightFinaliser, resi::VecOpt,
                                       rco::OptimisationReturnCode, w::VecNum, wi::MatNum,
-                                      ctx::Tuple = ())
+                                      ctx::FinaliserContext = (nothing, nothing, nothing,
+                                                               nothing, false))
     w = wi * w
     retcode, w = finalise_weight_bounds(wf, wb, w, ctx...)
     wb_flag = isa(retcode, OptimisationFailure)
@@ -346,7 +363,8 @@ function outer_optimisation_finaliser(wb::WeightBounds, wf::WeightFinaliser, res
 end
 function outer_optimisation_finaliser(wb::WeightBounds, wf::WeightFinaliser, resi::VecOpt,
                                       rcos::VecOptRetCode, ws::VecVecNum, wi::MatNum,
-                                      ctx::Tuple = ())
+                                      ctx::FinaliserContext = (nothing, nothing, nothing,
+                                                               nothing, false))
     retcode_w = [outer_optimisation_finaliser(wb, wf, resi, rco, w, wi, ctx)
                  for (rco, w) in zip(rcos, ws)]
     return map(x -> x[1], retcode_w), map(x -> x[2], retcode_w)
