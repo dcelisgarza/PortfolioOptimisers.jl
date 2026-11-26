@@ -106,6 +106,256 @@ w_held = [0.3, 0.2, 0.1, 0.3, 0.1]
          0.5 0.0 0.5
          0.5 0.3 0.2]
     @test PO.held_gap_pairs(U, Y) == [(3, 3)]
+    # Weights of a wrong size raise the error of the product, also on a gapped window.
+    @test_throws DimensionMismatch PO.held_gap_pairs([0.5, 0.5], Y)
+    @test_throws DimensionMismatch PO.held_gap_pairs([[0.5, 0.3, 0.2], [0.5, 0.5]], Y)
+    @test_throws DimensionMismatch PO.held_gap_pairs(U[1:2, :], Y)
+end
+
+# `performance_summary` of weights or of a result reads a gap as `predict` does (#1992).
+@testset "performance_summary filters the gaps of the returns once" begin
+    figs = (:n_periods, :ann_return, :ann_volatility, :sharpe, :sharpe_stderr, :sortino,
+            :calmar, :max_drawdown, :cvar)
+    agree(a, b) = all(f -> isapprox(getproperty(a, f), getproperty(b, f); nans = true),
+                      figs)
+    # A late listing and an early delisting of two assets.
+    Xg = copy(X)
+    Xg[1:30, 2] .= NaN
+    Xg[150:end, 4] .= NaN
+    Xz = map(x -> isfinite(x) ? x : 0.0, Xg)
+    rdg = ReturnsResult(; nx = nx, X = Xg)
+    w0 = [0.5, 0.0, 0.3, 0.0, 0.2]
+    wh = [0.4, 0.1, 0.3, 0.0, 0.2]
+    fees = Fees(; l = 0.001)
+
+    # A gap at a zero weight is silent, also under `strict`, and every figure is finite.
+    for strict in (false, true)
+        ps = @test_logs min_level=Logging.Warn performance_summary(w0, rdg, fees;
+                                                                   strict = strict)
+        @test agree(ps, performance_summary(w0[[1, 3, 5]], X[:, [1, 3, 5]], fees))
+        @test all(f -> isfinite(getproperty(ps, f)), figs)
+        ps = @test_logs min_level=Logging.Warn performance_summary(w0, Xg, fees;
+                                                                   strict = strict)
+        @test agree(ps, performance_summary(w0, X, fees))
+    end
+
+    # A Held Gap is one warning that names the asset, and it contributes zero.
+    ps = @test_logs (:warn, r"Assets \[\"b\"\] carry") performance_summary(wh, rdg)
+    @test agree(ps, performance_summary(wh, Xz))
+    @test ps.n_eff == performance_summary(wh, X).n_eff
+    @test_logs (:warn, r"Assets \[2\] carry") performance_summary(wh, Xg)
+    @test_throws ArgumentError performance_summary(wh, rdg; strict = true)
+    @test_throws ArgumentError performance_summary(wh, Xg; strict = true)
+
+    # Many weight vectors are filtered once, so one warning names each held asset.
+    W = [wh, [0.4, 0.0, 0.3, 0.1, 0.2]]
+    pv = @test_logs (:warn, r"Assets \[\"b\", \"d\"\] carry") performance_summary(W, rdg)
+    for j in eachindex(W)
+        @test pv.ann_return[j] ≈ performance_summary(W[j], Xz).ann_return
+    end
+    @test_throws ArgumentError performance_summary(W, rdg; strict = true)
+
+    # A weight path judges each pair by the weights of its own observation.
+    U = repeat(wh', T)
+    U[1:30, 2] .= 0
+    pu = @test_logs min_level=Logging.Warn performance_summary(U, rdg; strict = true)
+    @test agree(pu, performance_summary(U, Xz))
+
+    # A result reads its universe and its names through its mask, and agrees with `predict`.
+    res = optimise(EqualWeighted(), rd)
+    pr_w = @test_logs (:warn, r"Assets \[\"b\", \"d\"\] carry") match_mode=:any predict(res,
+                                                                                        rdg)
+    ps = @test_logs (:warn, r"Assets \[\"b\", \"d\"\] carry") performance_summary(res, rdg)
+    @test agree(ps, performance_summary(pr_w))
+    @test_throws ArgumentError performance_summary(res, rdg; strict = true)
+    Xd = copy(Xg)
+    Xd[:, 1] .= NaN
+    resm = optimise(EqualWeighted(), ReturnsResult(; nx = nx, X = Xd[40:140, :]))
+    @test PO.result_investable_mask(resm) == BitVector([0, 1, 1, 1, 1])
+    rdd = ReturnsResult(; nx = nx, X = Xd)
+    ps = @test_logs (:warn, r"Assets \[\"b\", \"d\"\] carry") performance_summary(resm, rdd)
+    @test agree(ps, performance_summary([0.25, 0.25, 0.25, 0.25], Xz[:, 2:5]))
+
+    # A vector of results takes `strict` too.
+    pc = performance_summary([res, resm], rdd)
+    @test all(isfinite, pc.ann_return)
+    @test_throws ArgumentError performance_summary([res, resm], rdd; strict = true)
+    @test performance_summary([res, res], rd; strict = true).sharpe ==
+          fill(performance_summary(res, rd).sharpe, 2)
+
+    # A series and a prediction are scored as they are, so they take no `strict`.
+    @test_throws MethodError performance_summary(X * w0; strict = true)
+    @test_throws MethodError performance_summary(pr_w; strict = true)
+
+    # The type is inferred, and a wrong size raises the error of the product.
+    @test @inferred(performance_summary(w0, Xg)) isa PerformanceSummaryResult
+    @test @inferred(performance_summary(w0, rdg)) isa PerformanceSummaryResult
+    @test_throws DimensionMismatch performance_summary([0.5, 0.5], Xg)
+    @test_throws DimensionMismatch performance_summary([0.5, 0.5], X)
+end
+
+# The value-level verbs of a `ReturnsResult` or a result read a gap as `predict` does (#2313).
+@testset "A value-level verb of a ReturnsResult filters the gaps once" begin
+    Xg = copy(X)
+    Xg[1:30, 2] .= NaN
+    Xg[150:end, 4] .= NaN
+    Xz = map(x -> isfinite(x) ? x : 0.0, Xg)
+    rdg = ReturnsResult(; nx = nx, X = Xg, nb = ["idx"], B = vec(sum(X; dims = 2)) ./ N)
+    rdz = ReturnsResult(; nx = nx, X = Xz, nb = ["idx"], B = rdg.B)
+    w0 = [0.5, 0.0, 0.3, 0.0, 0.2]
+    wh = [0.4, 0.1, 0.3, 0.0, 0.2]
+    fees = Fees(; l = 0.001)
+    cvar = ConditionalValueatRisk()
+    rs = [cvar, LowOrderMoment()]
+    named = (:warn, r"Assets \[\"b\"\] carry")
+
+    # A tail measure of the bare matrix is finite and wrong, and a moment measure is `NaN`.
+    @test isfinite(expected_risk(cvar, wh, Xg))
+    @test !isapprox(expected_risk(cvar, wh, Xg), expected_risk(cvar, wh, Xz))
+    @test isnan(expected_risk(LowOrderMoment(), wh, Xg))
+
+    U = repeat(wh', T)
+    figs = ((v, d; kw...) -> expected_risk(cvar, v, d; kw...),
+            (v, d; kw...) -> expected_risk(LowOrderMoment(), v, d, fees; kw...),
+            (v, d; kw...) -> expected_risk(MaxScalariser(), rs, v, d; kw...),
+            (v, d; kw...) -> risk_contribution(cvar, v, d; kw...),
+            (v, d; kw...) -> risk_contribution(rs, v, d, fees; marginal = true, kw...),
+            (v, d; kw...) -> risk_gradient(cvar, v, d; kw...))
+    for f in figs
+        # A gap at a zero weight is silent, also under `strict`.
+        for strict in (false, true)
+            got = @test_logs min_level=Logging.Warn f(w0, rdg; strict = strict)
+            @test got == f(w0, Xz)
+        end
+        @test f(w0, rdg)[1] ≈ f(w0, X)[1]
+        # A Held Gap contributes zero, with one warning that names the asset.
+        got = @test_logs named f(wh, rdg)
+        @test got == f(wh, Xz)
+        @test_throws ArgumentError f(wh, rdg; strict = true)
+    end
+    # A weight path judges each pair by the weights of its own observation.
+    for r in (cvar, [cvar, WorstRealisation()])
+        @test @test_logs(named, expected_risk(r, U, rdg)) == expected_risk(r, U, Xz)
+        @test_throws ArgumentError expected_risk(r, U, rdg; strict = true)
+    end
+    U[1:30, 2] .= 0
+    @test @test_logs(min_level = Logging.Warn,
+                     expected_risk(cvar, U, rdg; strict = true)) ==
+          expected_risk(cvar, U, Xz)
+    # A population is filtered once, so one warning names each held asset.
+    W = [wh, [0.4, 0.0, 0.3, 0.1, 0.2]]
+    for r in (cvar, rs)
+        got = @test_logs (:warn, r"Assets \[\"b\", \"d\"\] carry") expected_risk(r, W, rdg)
+        @test got == expected_risk(r, W, Xz)
+    end
+    # The benchmark of the returns data still binds, and the measure reads the filtered rows.
+    te = TrackingRiskMeasure(; tr = DataBenchmarkTracking())
+    @test @test_logs(named, expected_risk(te, wh, rdg)) == expected_risk(te, wh, rdz)
+
+    # Returns with no gap are not copied, and returns data with no `X` raise as before.
+    @test PO.investable_reduction(rd, wh, nothing, true)[2] === rd
+    @test PO.investable_reduction(rdg, wh, nothing, false)[2].X == Xz
+    rd0 = ReturnsResult()
+    @test PO.investable_reduction(rd0, wh, nothing, true)[2] === rd0
+    @test_throws PO.IsNothingError expected_risk(cvar, wh, rd0)
+    @test @inferred(expected_risk(cvar, w0, rdg)) isa Float64
+    @test @inferred(risk_gradient(cvar, w0, rdg)) isa Vector{Float64}
+    @test_throws DimensionMismatch expected_risk(cvar, [0.5, 0.5], rdg)
+
+    # A result agrees with `predict` on a `ReturnsResult` and on a matrix.
+    res = optimise(EqualWeighted(), rd)
+    both = (:warn, r"Assets \[\"b\", \"d\"\] carry")
+    want = @test_logs both match_mode=:any expected_risk(cvar, predict(res, rdg))
+    @test @test_logs(both, expected_risk(cvar, res, rdg)) ≈ want
+    @test @test_logs(both, expected_risk(rs, res, rdg; sca = MaxScalariser())) ≈
+          expected_risk(MaxScalariser(), rs, res.w, Xz)
+    @test @test_logs((:warn, r"Assets \[2, 4\] carry"), expected_risk(cvar, res, Xg)) ≈ want
+    @test_throws ArgumentError expected_risk(cvar, res, rdg; strict = true)
+    @test_throws ArgumentError expected_risk(cvar, res, Xg; strict = true)
+    # The message of a masked result names the columns of the caller.
+    Xd = copy(Xg)
+    Xd[:, 1] .= NaN
+    resm = optimise(EqualWeighted(), ReturnsResult(; nx = nx, X = Xd[40:140, :]))
+    @test PO.result_investable_mask(resm) == BitVector([0, 1, 1, 1, 1])
+    want = expected_risk(cvar, fill(0.25, 4), Xz[:, 2:5])
+    @test @test_logs(both, expected_risk(cvar, resm, ReturnsResult(; nx = nx, X = Xd))) ≈
+          want
+    @test @test_logs((:warn, r"Assets \[2, 4\] carry"), expected_risk(cvar, resm, Xd)) ≈
+          want
+end
+
+# A regression of a caller whose method takes no `active_mask` keyword. The struct lives at
+# top level because `@testset` cannot hold a `struct`.
+struct NoMaskRegression <: PO.AbstractTimeSeriesRegressionEstimator end
+function PO.regression(::NoMaskRegression, X::PO.MatNum, F::PO.MatNum)
+    return Regression(; M = transpose(F \ X))
+end
+
+@testset "factor_risk_contribution filters the gaps of the returns it measures" begin
+    rngf = StableRNG(56781234)
+    F = randn(rngf, T, 2) ./ 100
+    re = Regression(; M = randn(rngf, N, 2), b = zeros(N))
+    Xg = copy(X)
+    Xg[1:30, 2] .= NaN
+    Xz = map(x -> isfinite(x) ? x : 0.0, Xg)
+    rdg = ReturnsResult(; nx = nx, X = Xg, nf = ["f1", "f2"], F = F)
+    w0 = [0.5, 0.0, 0.3, 0.1, 0.1]
+    wh = [0.4, 0.1, 0.3, 0.0, 0.2]
+    cvar = ConditionalValueatRisk()
+    f(v, d; kw...) = factor_risk_contribution(cvar, v, d; re = re, rd = rdg, kw...)
+    @test @test_logs(min_level = Logging.Warn, f(w0, rdg; strict = true)) == f(w0, Xz)
+    @test @test_logs((:warn, r"Assets \[\"b\"\] carry"), f(wh, rdg)) == f(wh, Xz)
+    @test_throws ArgumentError f(wh, rdg; strict = true)
+    @test !isapprox(f(wh, Xg), f(wh, Xz))
+    # A prior that rebuilds its scenarios keeps the gaps in `original_X`, and the attribution
+    # reads that matrix. Asset 3 is not investable, so the message names the positions of the
+    # caller and not those of the view.
+    Xo = copy(Xg)
+    Xo[1:30, 4] .= NaN
+    Xs = copy(X)
+    Xs[:, 3] .= NaN
+    mu = collect(pr.mu)
+    sigma = collect(pr.sigma)
+    mu[3] = NaN
+    sigma[3, :] .= NaN
+    sigma[:, 3] .= NaN
+    prf = LowOrderPrior(; X = Xs, o_X = Xo, mu = mu, sigma = sigma, rr = re,
+                        fpr = prior(EmpiricalPrior(), F))
+    wp = [0.4, 0.1, 0.0, 0.2, 0.3]
+    Xoz = map(x -> isfinite(x) ? x : 0.0, Xo)
+    g(v; kw...) = factor_risk_contribution(cvar, v, prf; kw...)
+    @test @test_logs((:warn, r"Assets \[2, 4\] carry"), g(wp)) ≈
+          factor_risk_contribution(cvar, wp[keep], Xoz[:, keep];
+                                   re = PO.port_opt_view(re, keep))
+    @test_throws ArgumentError g(wp; strict = true)
+    # With no mask, the message names the columns.
+    pro = LowOrderPrior(; X = X, o_X = Xo, mu = pr.mu, sigma = pr.sigma, rr = re,
+                        fpr = prior(EmpiricalPrior(), F))
+    @test @test_logs((:warn, r"Assets \[2, 4\] carry"),
+                     factor_risk_contribution(cvar, wp, pro)) ≈ f(wp, Xoz)
+    # A regression estimator fits each asset on the rows where its return is finite, so the
+    # default `StepwiseRegression` fits the loadings of `rd` with its gap and raises no
+    # `BoundsError` (#2370). The loadings of asset 2 are those of its own history.
+    sw = StepwiseRegression()
+    @test regression(sw, Xg, F).M[2, :] ≈
+          regression(sw, Xg[31:end, 2:2], F[31:end, :]).M[1, :]
+    # The active mask of an Asset Panel states the same universe as the gap.
+    amsk = trues(size(X))
+    amsk[1:30, 2] .= false
+    rdp = ReturnsResult(; nx = nx, X = X, nf = ["f1", "f2"], F = F,
+                        pnl = AssetPanel(; amsk = amsk, emsk = copy(amsk)))
+    for res in (sw, DimensionReductionRegression())
+        rr = regression(res, Xg, F)
+        frc = factor_risk_contribution(cvar, wh, rdg; re = res, rd = rdg)
+        @test frc ≈ factor_risk_contribution(cvar, wh, Xz; re = rr)
+        @test sum(frc) ≈ expected_risk(cvar, wh, Xz)
+        @test PO.refit_factor_regression(res, rdp).M ≈ rr.M
+        @test PO.reads_active_mask(res)
+    end
+    # A regression that does not read the mask gets the returns alone, as before the mask
+    # reached the fit, so a method with no keyword fits a panel with a mask.
+    @test !PO.reads_active_mask(NoMaskRegression())
+    @test regression(NoMaskRegression(), rdp).M ≈ transpose(F \ X)
 end
 
 @testset "investable_reduction: the value-level door reduces, names and passes through" begin

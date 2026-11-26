@@ -199,9 +199,9 @@ function result_investable_view(res::OptimisationResult, pr::Option{<:MatNum_Pr}
            result_investable_fees(imsk, res, fees), nothing_scalar_array_view(nx, imsk)
 end
 """
-    expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult, X::MatNum, fees = nothing; sca = nothing, kwargs...)
+    expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult, X::MatNum, fees = nothing; sca = nothing, strict = false, kwargs...)
     expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult, pr = nothing, fees = nothing; sca = nothing, kwargs...)
-    expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM, res::OptimisationResult, X::MatNum, fees = nothing; kwargs...)
+    expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM, res::OptimisationResult, X::MatNum, fees = nothing; strict = false, kwargs...)
     expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM, res::OptimisationResult, pr = nothing, fees = nothing; kwargs...)
 
 Computes the expected risk of the weights of an [`OptimisationResult`](@ref).
@@ -214,10 +214,13 @@ The argument `r` is one measure or a vector of measures. The scalariser `sca` sc
 
 The method that takes a prior gives the whole of `pr` to the kernel, so a measure of the caller resolves against it. A slot that the measure does not state takes the field of the prior, and a Deferred Quantity is fitted, as in `expected_risk(r, w, pr)`. Pass a matrix instead to state every slot yourself.
 
+A gap in the returns of the caller, a [`ReturnsResult`](@ref) or a matrix, becomes zero once, through [`filter_held_gaps`](@ref). So the figure agrees with [`predict`](@ref) and [`performance_summary`](@ref) of the same result. A gap at a zero weight gives no message. A Held Gap gives a warning, or an `ArgumentError` under `strict = true`.
+
 # Algorithm
 
- 1. View the weights, the returns data and the fee on the investable universe of `res` with [`result_investable_view`](@ref).
- 2. Return `expected_risk(sca, r, w, X, fees; kwargs...)` or `expected_risk(sca, r, w, pr, fees; kwargs...)` of the viewed values.
+ 1. Set the gaps of a matrix of the caller to zero with [`filter_held_gaps`](@ref). The weight method sets those of a [`ReturnsResult`](@ref).
+ 2. View the weights, the returns data and the fee on the investable universe of `res` with [`result_investable_view`](@ref).
+ 3. Return `expected_risk(sca, r, w, X, fees; kwargs...)` or `expected_risk(sca, r, w, pr, fees; kwargs...)` of the viewed values.
 
 # Related
 
@@ -227,6 +230,7 @@ The method that takes a prior gives the whole of `pr` to the kernel, so a measur
   - [`resolve_risk_inputs`](@ref)
   - [`result_investable_mask`](@ref)
   - [`result_investable_view`](@ref)
+  - [`filter_held_gaps`](@ref)
 """
 function expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult, X::MatNum,
                        fees::Option{<:Fees} = nothing; sca::Option{<:Scalariser} = nothing,
@@ -240,7 +244,9 @@ function expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult,
 end
 function expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM,
                        res::OptimisationResult, X::MatNum, fees::Option{<:Fees} = nothing;
-                       kwargs...)
+                       strict::Bool = false, kwargs...)
+    # The filter runs before the view, so its message names the columns of the caller.
+    X = filter_held_gaps(res.w, X, strict)
     _, w, X, fees = result_investable_view(res, X, fees)
     return expected_risk(sca, r, w, X, fees; kwargs...)
 end
