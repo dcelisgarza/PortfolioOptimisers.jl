@@ -49,6 +49,7 @@ $(DocStringExtensions.FIELDS)
         sst::TD_Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
         sglt::TD_Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
         sgst::TD_Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
+        conc::TD_Option{<:Union{CnlE_Cnl, AbstractVector}} = nothing,
         tn::TD_Option{<:Union{TnE_Tn, AbstractVector}} = nothing,
         sets::TD_Option{<:UniverseSets} = nothing,
         tr::TD_Option{<:Tr_VecTr} = nothing,
@@ -70,12 +71,12 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields. A slot typed [`TD_Option`](@ref) can hold a [`TimeDependent`](@ref) schedule in place of a static value, as the slot of the same name in [`JuMPOptimiser`](@ref) can.
 
-`lcse`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn` and `ple` take a vector that mixes the members of their element type. The keyword constructor narrows it through [`narrow_mixed_vector`](@ref).
+`lcse`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `conc`, `tn` and `ple` take a vector that mixes the members of their element type. The keyword constructor narrows it through [`narrow_mixed_vector`](@ref).
 
 ## Validation
 
   - If `sbgt` or `gbgt` is a number: it is finite and `>= 0`.
-  - If `lcse`, `cte`, `smtx`, `sgmtx`, `tn`, `tr`, `ple`, `l2`, `lp` or `lpc` is a vector: `!isempty`.
+  - If `lcse`, `cte`, `smtx`, `sgmtx`, `conc`, `tn`, `tr`, `ple`, `l2`, `lp` or `lpc` is a vector: `!isempty`.
   - If `card`, `l2c`, `linfc`, `l1` or `linf` is a number: it is finite and `> 0`.
   - `lp` holds no norm-ceiling rule, and `lpc` holds no ambiguity-radius rule, see [`assert_penalty_coefficient_role`](@ref) and [`assert_norm_ceiling_role`](@ref).
   - The shapes of `scard`, `smtx`, `slt` and `sst` agree, see [`assert_subgroup_mip_fields`](@ref). The shapes of `sgcarde`, `sgmtx`, `sglt` and `sgst` agree, see [`assert_subgrouped_mip_fields`](@ref).
@@ -163,6 +164,10 @@ julia> (opt.wb.ub, opt.card, opt.cbe.card)
     """
     sgst
     """
+    $(field_dict[:conc])
+    """
+    conc
+    """
     $(field_dict[:tn_jmp])
     """
     tn
@@ -242,6 +247,7 @@ julia> (opt.wb.ub, opt.card, opt.cbe.card)
                              sst::TD_Option{<:BtE_Bt_VecOptBtE_Bt},
                              sglt::TD_Option{<:BtE_Bt_VecOptBtE_Bt},
                              sgst::TD_Option{<:BtE_Bt_VecOptBtE_Bt},
+                             conc::TD_Option{<:CnlE_Cnl_VecCnlE_Cnl},
                              tn::TD_Option{<:TnE_Tn_VecTnE_Tn},
                              sets::TD_Option{<:UniverseSets}, tr::TD_Option{<:Tr_VecTr},
                              ple::TD_Option{<:PlCE_PlC_VecPlCE_PlC},
@@ -262,8 +268,9 @@ julia> (opt.wb.ub, opt.card, opt.cbe.card)
             assert_nonempty_nonneg_finite_val(gbgt, :gbgt)
         end
         # `map` compiles one call for each slot, so the slots of different types are not boxed.
-        map(((lcse, :lcse), (cte, :cte), (smtx, :smtx), (sgmtx, :sgmtx), (tn, :tn),
-             (tr, :tr), (ple, :ple), (l2, :l2), (lp, :lp), (lpc, :lpc))) do (x, name)
+        map(((lcse, :lcse), (cte, :cte), (smtx, :smtx), (sgmtx, :sgmtx), (conc, :conc),
+             (tn, :tn), (tr, :tr), (ple, :ple), (l2, :l2), (lp, :lp), (lpc, :lpc))) do (x,
+                                                                                        name)
             if isa(x, AbstractVector)
                 @argcheck(!isempty(x), IsEmptyError("$name cannot be empty"))
             end
@@ -286,27 +293,29 @@ julia> (opt.wb.ub, opt.card, opt.cbe.card)
         assert_subgroup_mip_fields(scard, smtx, slt, sst)
         assert_subgrouped_mip_fields(sgcarde, sgmtx, sglt, sgst)
         if any(name_keyed,
-               (wb, lt, st, lcse, gcarde, sgcarde, smtx, sgmtx, slt, sst, sglt, sgst, tn))
+               (wb, lt, st, lcse, gcarde, sgcarde, smtx, sgmtx, slt, sst, sglt, sgst, conc,
+                tn))
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when estimator-type fields are provided"))
         end
         assert_time_dependent_substitution(ConstraintBlock,
                                            (; wb, sbgt, gbgt, lt, st, lcse, cte, gcarde,
-                                            sgcarde, smtx, sgmtx, slt, sst, sglt, sgst, tn,
-                                            sets, tr, ple, ccnt, cobj, ss, card, scard, l2c,
-                                            lpc, linfc, l1, l2, lp, linf, xbgt),
+                                            sgcarde, smtx, sgmtx, slt, sst, sglt, sgst,
+                                            conc, tn, sets, tr, ple, ccnt, cobj, ss, card,
+                                            scard, l2c, lpc, linfc, l1, l2, lp, linf, xbgt),
                                            constraint_block_td_defaults())
         return new{typeof(wb), typeof(sbgt), typeof(gbgt), typeof(lt), typeof(st),
                    typeof(lcse), typeof(cte), typeof(gcarde), typeof(sgcarde), typeof(smtx),
                    typeof(sgmtx), typeof(slt), typeof(sst), typeof(sglt), typeof(sgst),
-                   typeof(tn), typeof(sets), typeof(tr), typeof(ple), typeof(ccnt),
-                   typeof(cobj), typeof(ss), typeof(card), typeof(scard), typeof(l2c),
-                   typeof(lpc), typeof(linfc), typeof(l1), typeof(l2), typeof(lp),
-                   typeof(linf), typeof(xbgt)}(wb, sbgt, gbgt, lt, st, lcse, cte, gcarde,
-                                               sgcarde, smtx, sgmtx, slt, sst, sglt, sgst,
-                                               tn, sets, tr, ple, ccnt, cobj, ss, card,
-                                               scard, l2c, lpc, linfc, l1, l2, lp, linf,
-                                               xbgt)
+                   typeof(conc), typeof(tn), typeof(sets), typeof(tr), typeof(ple),
+                   typeof(ccnt), typeof(cobj), typeof(ss), typeof(card), typeof(scard),
+                   typeof(l2c), typeof(lpc), typeof(linfc), typeof(l1), typeof(l2),
+                   typeof(lp), typeof(linf), typeof(xbgt)}(wb, sbgt, gbgt, lt, st, lcse,
+                                                           cte, gcarde, sgcarde, smtx,
+                                                           sgmtx, slt, sst, sglt, sgst,
+                                                           conc, tn, sets, tr, ple, ccnt,
+                                                           cobj, ss, card, scard, l2c, lpc,
+                                                           linfc, l1, l2, lp, linf, xbgt)
     end
 end
 function ConstraintBlock(; wb::TD_Option{<:WbE_Wb} = WeightBounds(),
@@ -324,6 +333,7 @@ function ConstraintBlock(; wb::TD_Option{<:WbE_Wb} = WeightBounds(),
                          sst::TD_Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
                          sglt::TD_Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
                          sgst::TD_Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
+                         conc::TD_Option{<:Union{CnlE_Cnl, AbstractVector}} = nothing,
                          tn::TD_Option{<:Union{TnE_Tn, AbstractVector}} = nothing,
                          sets::TD_Option{<:UniverseSets} = nothing,
                          tr::TD_Option{<:Tr_VecTr} = nothing,
@@ -350,6 +360,7 @@ function ConstraintBlock(; wb::TD_Option{<:WbE_Wb} = WeightBounds(),
                            narrow_mixed_vector(sst, Option{<:BtE_Bt}, :sst),
                            narrow_mixed_vector(sglt, Option{<:BtE_Bt}, :sglt),
                            narrow_mixed_vector(sgst, Option{<:BtE_Bt}, :sgst),
+                           narrow_mixed_vector(conc, CnlE_Cnl, :conc),
                            narrow_mixed_vector(tn, TnE_Tn, :tn), sets, tr,
                            narrow_mixed_vector(ple, PlCE_PlC, :ple), ccnt, cobj, ss, card,
                            scard, l2c, lpc, linfc, l1, l2, lp, linf, xbgt)
@@ -507,7 +518,7 @@ The method of the owner calls it, see `port_opt_view(opt::JuMPOptimiser, i, X)` 
 
 # Algorithm
 
- 1. View at `i` the slots that can hold a value for each asset: `wb`, `lt`, `st`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn`, `lcse`, `sets`, `ccnt` and `cobj`. When `smtx` and `sgmtx` hold the same object, view it once, so that the two views are one object too. The same holds for `slt` and `sglt`, and for `sst` and `sgst`.
+ 1. View at `i` the slots that can hold a value for each asset: `wb`, `lt`, `st`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `conc`, `tn`, `lcse`, `sets`, `ccnt` and `cobj`. When `smtx` and `sgmtx` hold the same object, view it once, so that the two views are one object too. The same holds for `slt` and `sglt`, and for `sst` and `sgst`.
  2. View `tr` at `i` with `args`. A tracking measure gives the returns matrix `X` in `args` to the risk measure that it tracks.
  3. Keep every other slot. An estimator in `cte`, `gcarde` or `sgcarde` resolves its names against the viewed `sets`. A precomputed constraint in one of them keeps its width, because no view can narrow its matrix, see `port_opt_view(::LinearConstraint, i)`. `ple` reads the viewed prior of the owner. The other slots hold no value for each asset.
  4. Rebuild the block with its keyword constructor, which checks the viewed slots again.
@@ -534,7 +545,8 @@ function port_opt_view(cbe::ConstraintBlock, i, args...)::ConstraintBlock
     return rebuild_struct(cbe,
                           (; wb = port_opt_view(cbe.wb, i), lt = port_opt_view(cbe.lt, i),
                            st = port_opt_view(cbe.st, i), lcse = port_opt_view(cbe.lcse, i),
-                           smtx, sgmtx, slt, sst, sglt, sgst, tn = port_opt_view(cbe.tn, i),
+                           smtx, sgmtx, slt, sst, sglt, sgst,
+                           conc = port_opt_view(cbe.conc, i), tn = port_opt_view(cbe.tn, i),
                            sets = port_opt_view(cbe.sets, i),
                            tr = port_opt_view(cbe.tr, i, args...),
                            ccnt = port_opt_view(cbe.ccnt, i),
@@ -638,13 +650,13 @@ $(DocStringExtensions.FIELDS)
                             sgmtx::Option{<:MatNum_VecMatNum},
                             slt::Option{<:Bt_VecOptBt}, sst::Option{<:Bt_VecOptBt},
                             sglt::Option{<:Bt_VecOptBt}, sgst::Option{<:Bt_VecOptBt},
-                            tn::Option{<:Tn_VecTn}, plr::Option{<:PlC_VecPlC},
-                            l2c::Option{<:Number}, lpc::Option{<:LpReg_VecLpReg},
-                            linfc::Option{<:Number}, l1::Option{<:Number},
-                            l2::Option{<:L2Reg_VecL2Reg}, lp::Option{<:LpReg_VecLpReg},
-                            linf::Option{<:Number}, card::Option{<:Integer},
-                            scard::Option{<:Int_VecInt}, ss::Option{<:Number},
-                            xbgt::Bool, sbgt::Option{<:Num_BgtRg},
+                            conc::Option{<:Cnl_VecCnl}, tn::Option{<:Tn_VecTn},
+                            plr::Option{<:PlC_VecPlC}, l2c::Option{<:Number},
+                            lpc::Option{<:LpReg_VecLpReg}, linfc::Option{<:Number},
+                            l1::Option{<:Number}, l2::Option{<:L2Reg_VecL2Reg},
+                            lp::Option{<:LpReg_VecLpReg}, linf::Option{<:Number},
+                            card::Option{<:Integer}, scard::Option{<:Int_VecInt},
+                            ss::Option{<:Number}, xbgt::Bool, sbgt::Option{<:Num_BgtRg},
                             gbgt::Option{<:Num_BgtRg},
                             ccnt::Option{<:JuMPConstr_VecJuMPConstr},
                             cobj::Option{<:JuMPObj_VecJuMPObj}) -> ResolvedConstraintBlock
@@ -725,6 +737,10 @@ Builds the Result from the values of stage 2 and the slots of the block that sta
     """
     sgst
     """
+    $(field_dict[:conc])
+    """
+    conc
+    """
     $(field_dict[:tnr])
     """
     tn
@@ -803,7 +819,8 @@ Builds the Result from the values of stage 2 and the slots of the block that sta
                                      sgmtx::Option{<:MatNum_VecMatNum},
                                      slt::Option{<:Bt_VecOptBt}, sst::Option{<:Bt_VecOptBt},
                                      sglt::Option{<:Bt_VecOptBt},
-                                     sgst::Option{<:Bt_VecOptBt}, tn::Option{<:Tn_VecTn},
+                                     sgst::Option{<:Bt_VecOptBt},
+                                     conc::Option{<:Cnl_VecCnl}, tn::Option{<:Tn_VecTn},
                                      plr::Option{<:PlC_VecPlC}, l2c::Option{<:Number},
                                      lpc::Option{<:LpReg_VecLpReg}, linfc::Option{<:Number},
                                      l1::Option{<:Number}, l2::Option{<:L2Reg_VecL2Reg},
@@ -816,14 +833,15 @@ Builds the Result from the values of stage 2 and the slots of the block that sta
         return new{typeof(pr), typeof(rd), typeof(wb), typeof(lt), typeof(st), typeof(lcsr),
                    typeof(ctr), typeof(gcardr), typeof(sgcardr), typeof(smtx),
                    typeof(sgmtx), typeof(slt), typeof(sst), typeof(sglt), typeof(sgst),
-                   typeof(tn), typeof(plr), typeof(l2c), typeof(lpc), typeof(linfc),
-                   typeof(l1), typeof(l2), typeof(lp), typeof(linf), typeof(card),
-                   typeof(scard), typeof(ss), typeof(xbgt), typeof(sbgt), typeof(gbgt),
-                   typeof(ccnt), typeof(cobj)}(pr, rd, wb, lt, st, lcsr, ctr, gcardr,
-                                               sgcardr, smtx, sgmtx, slt, sst, sglt, sgst,
-                                               tn, plr, l2c, lpc, linfc, l1, l2, lp, linf,
-                                               card, scard, ss, xbgt, sbgt, gbgt, ccnt,
-                                               cobj)
+                   typeof(conc), typeof(tn), typeof(plr), typeof(l2c), typeof(lpc),
+                   typeof(linfc), typeof(l1), typeof(l2), typeof(lp), typeof(linf),
+                   typeof(card), typeof(scard), typeof(ss), typeof(xbgt), typeof(sbgt),
+                   typeof(gbgt), typeof(ccnt), typeof(cobj)}(pr, rd, wb, lt, st, lcsr, ctr,
+                                                             gcardr, sgcardr, smtx, sgmtx,
+                                                             slt, sst, sglt, sgst, conc, tn,
+                                                             plr, l2c, lpc, linfc, l1, l2,
+                                                             lp, linf, card, scard, ss,
+                                                             xbgt, sbgt, gbgt, ccnt, cobj)
     end
 end
 function ResolvedConstraintBlock(; pr::Option{<:AbstractPriorResult},
@@ -836,20 +854,20 @@ function ResolvedConstraintBlock(; pr::Option{<:AbstractPriorResult},
                                  sgmtx::Option{<:MatNum_VecMatNum},
                                  slt::Option{<:Bt_VecOptBt}, sst::Option{<:Bt_VecOptBt},
                                  sglt::Option{<:Bt_VecOptBt}, sgst::Option{<:Bt_VecOptBt},
-                                 tn::Option{<:Tn_VecTn}, plr::Option{<:PlC_VecPlC},
-                                 l2c::Option{<:Number}, lpc::Option{<:LpReg_VecLpReg},
-                                 linfc::Option{<:Number}, l1::Option{<:Number},
-                                 l2::Option{<:L2Reg_VecL2Reg}, lp::Option{<:LpReg_VecLpReg},
-                                 linf::Option{<:Number}, card::Option{<:Integer},
-                                 scard::Option{<:Int_VecInt}, ss::Option{<:Number},
-                                 xbgt::Bool, sbgt::Option{<:Num_BgtRg},
-                                 gbgt::Option{<:Num_BgtRg},
+                                 conc::Option{<:Cnl_VecCnl}, tn::Option{<:Tn_VecTn},
+                                 plr::Option{<:PlC_VecPlC}, l2c::Option{<:Number},
+                                 lpc::Option{<:LpReg_VecLpReg}, linfc::Option{<:Number},
+                                 l1::Option{<:Number}, l2::Option{<:L2Reg_VecL2Reg},
+                                 lp::Option{<:LpReg_VecLpReg}, linf::Option{<:Number},
+                                 card::Option{<:Integer}, scard::Option{<:Int_VecInt},
+                                 ss::Option{<:Number}, xbgt::Bool,
+                                 sbgt::Option{<:Num_BgtRg}, gbgt::Option{<:Num_BgtRg},
                                  ccnt::Option{<:JuMPConstr_VecJuMPConstr},
                                  cobj::Option{<:JuMPObj_VecJuMPObj})::ResolvedConstraintBlock
     return ResolvedConstraintBlock(pr, rd, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx,
-                                   sgmtx, slt, sst, sglt, sgst, tn, plr, l2c, lpc, linfc,
-                                   l1, l2, lp, linf, card, scard, ss, xbgt, sbgt, gbgt,
-                                   ccnt, cobj)
+                                   sgmtx, slt, sst, sglt, sgst, conc, tn, plr, l2c, lpc,
+                                   linfc, l1, l2, lp, linf, card, scard, ss, xbgt, sbgt,
+                                   gbgt, ccnt, cobj)
 end
 function ResolvedConstraintBlock(cbe::ConstraintBlock; pr, rd, wb, lcsr, gcardr, ctr, plr,
                                  l2c, lpc, linfc, l1, l2, lp, linf)::ResolvedConstraintBlock
@@ -859,11 +877,12 @@ function ResolvedConstraintBlock(cbe::ConstraintBlock; pr, rd, wb, lcsr, gcardr,
                                    lcsr = lcsr, ctr = ctr, gcardr = gcardr,
                                    sgcardr = cbe.sgcarde, smtx = cbe.smtx,
                                    sgmtx = cbe.sgmtx, slt = cbe.slt, sst = cbe.sst,
-                                   sglt = cbe.sglt, sgst = cbe.sgst, tn = cbe.tn, plr = plr,
-                                   l2c = l2c, lpc = lpc, linfc = linfc, l1 = l1, l2 = l2,
-                                   lp = lp, linf = linf, card = cbe.card, scard = cbe.scard,
-                                   ss = cbe.ss, xbgt = cbe.xbgt, sbgt = cbe.sbgt,
-                                   gbgt = cbe.gbgt, ccnt = cbe.ccnt, cobj = cbe.cobj)
+                                   sglt = cbe.sglt, sgst = cbe.sgst, conc = cbe.conc,
+                                   tn = cbe.tn, plr = plr, l2c = l2c, lpc = lpc,
+                                   linfc = linfc, l1 = l1, l2 = l2, lp = lp, linf = linf,
+                                   card = cbe.card, scard = cbe.scard, ss = cbe.ss,
+                                   xbgt = cbe.xbgt, sbgt = cbe.sbgt, gbgt = cbe.gbgt,
+                                   ccnt = cbe.ccnt, cobj = cbe.cobj)
 end
 """
     const VecRcb = AbstractVector{<:ResolvedConstraintBlock}
@@ -948,8 +967,9 @@ A slot is a stage 1 slot when its value follows a view at the mask, so the two o
  1. Resolve the thresholds `lt` and `st` with [`threshold_constraints`](@ref).
  2. Resolve the sub-grouped cardinality constraint `sgcarde` with [`linear_constraints`](@ref), with integer values. Its columns are the sub-groups and not the assets, so a view does not change it.
  3. Resolve the sub-group matrices `smtx` and `sgmtx` with [`asset_sets_matrix`](@ref), and the sub-group thresholds `slt`, `sst`, `sglt` and `sgst` with [`threshold_constraints`](@ref). When the two slots of a pair hold one object, resolve it once with [`shared_pair_resolution`](@ref).
- 4. Resolve the turnover constraints `tn` with [`turnover_constraints`](@ref).
- 5. Return `cbe` rebuilt with the resolved slots, with [`rebuild_struct`](@ref).
+ 4. Resolve the concentration rules `conc` with [`concentration_limit_constraints`](@ref). The matrix of a rule follows a view at the mask, as `smtx` does.
+ 5. Resolve the turnover constraints `tn` with [`turnover_constraints`](@ref).
+ 6. Return `cbe` rebuilt with the resolved slots, with [`rebuild_struct`](@ref).
 
 # Arguments
 
@@ -972,8 +992,8 @@ function resolve_constraint_block_names(cbe::ConstraintBlock, strict::Bool,
                                         datatype::DataType)::ConstraintBlock
     sets = cbe.sets
     thr = x -> threshold_constraints(x, sets; datatype = datatype, strict = strict)
-    smtx, sgmtx = shared_pair_resolution(x -> asset_sets_matrix(x, sets), cbe.smtx,
-                                         cbe.sgmtx)
+    smtx, sgmtx = shared_pair_resolution(x -> asset_sets_matrix(x, sets; strict = strict),
+                                         cbe.smtx, cbe.sgmtx)
     slt, sglt = shared_pair_resolution(thr, cbe.slt, cbe.sglt)
     sst, sgst = shared_pair_resolution(thr, cbe.sst, cbe.sgst)
     return rebuild_struct(cbe,
@@ -981,6 +1001,8 @@ function resolve_constraint_block_names(cbe::ConstraintBlock, strict::Bool,
                            sgcarde = linear_constraints(cbe.sgcarde, sets; datatype = Int,
                                                         strict = strict), smtx, sgmtx, slt,
                            sst, sglt, sgst,
+                           conc = concentration_limit_constraints(cbe.conc, sets;
+                                                                  strict = strict),
                            tn = turnover_constraints(cbe.tn, sets; datatype = datatype,
                                                      strict = strict)))
 end
@@ -1219,7 +1241,7 @@ Phase 1:
  1. When `prefix` is not empty, register the weights of the model under it, with the owner `Symbol("")`. Add the weight bounds, the net budget `bgt`, and the short and gross budgets of the block. [`set_block_weight_constraints!`](@ref) does both.
  2. Mark `sdp_phylogeny` on the owner of the weights when `cbr.plr` holds a semidefinite phylogeny, with [`mark_sdp_phylogeny!`](@ref). Every variance on the weights then takes the semidefinite formulation, so a variance of the owner that the objective minimises holds down the lift that the rows of phase 2 bind.
  3. Add the linear rows `lcsr`, then the centrality rows `ctr`, with [`set_linear_weight_constraints!`](@ref).
- 4. Add the MIP kinds with [`set_mip_constraints!`](@ref), the exact cost budget of a [`BudgetCosts`](@ref) whose `xbgt` is `true` with [`set_cost_budget_mip_constraints!`](@ref), then the sub-group MIP kinds with [`set_smip_constraints!`](@ref).
+ 4. Add the MIP kinds with [`set_mip_constraints!`](@ref), the exact cost budget of a [`BudgetCosts`](@ref) whose `xbgt` is `true` with [`set_cost_budget_mip_constraints!`](@ref), then the sub-group MIP kinds with [`set_smip_constraints!`](@ref), then the concentration rules with [`set_concentration_constraints!`](@ref).
  5. Add the turnover ceilings with [`set_turnover_constraints!`](@ref).
  6. Add the tracking errors `tr` with [`set_tracking_error_constraints!`](@ref), on the prior of the block.
  7. Add the norm ceilings `l2c`, `lpc` and `linfc`, then the penalties `l1`, `l2`, `lp` and `linf`.
@@ -1272,6 +1294,7 @@ function set_block_constraints!(model::JuMP.Model, cbr::ResolvedConstraintBlock,
     set_cost_budget_mip_constraints!(model, bgt, wb, ss)
     set_smip_constraints!(model, wb, cbr.scard, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst,
                           ss; prefix = prefix)
+    set_concentration_constraints!(model, cbr.conc, wb, ss; prefix = prefix)
     set_turnover_constraints!(model, cbr.tn; prefix = prefix)
     set_tracking_error_constraints!(model, cbr.pr, tr, owner, plr, fees, b1;
                                     prefix = prefix, kwargs...)

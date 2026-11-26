@@ -384,3 +384,5 @@ The result is an index and not a key.
 function nested_index(tag::Symbol, i)
     return Symbol(tag, i)
 end
+
+public state_set!
