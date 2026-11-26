@@ -789,11 +789,11 @@ Where:
   - `ucs`: Fitted mean uncertainty set, an estimator of one, or `nothing`.
   - `mu::Num_VecNum`: Fallback centre. The centre that the set carries wins over it.
   - $(arg_dict[:pw])
-  - `mtx_sqrt`: Square-root algorithm of the matrix of an ellipsoid, or `nothing` for the plain Cholesky factor. The other sets ignore it.
+  - `mtx_sqrt`: Square-root algorithm of the matrix of an ellipsoid, or `nothing` for the plain Cholesky factor. An ellipsoid that states its factor `chol`, and the other sets, ignore it.
 
 # Validation
 
-  - Ellipsoid: `ucs.sigma` has a square root under `mtx_sqrt`, as [`matrix_square_root`](@ref) states. Raises a `LinearAlgebra.PosDefException`.
+  - Ellipsoid with no factor: `ucs.sigma` has a square root under `mtx_sqrt`, as [`matrix_square_root`](@ref) states, through [`ellipsoid_chol`](@ref). Raises a `LinearAlgebra.PosDefException`.
 
 # Returns
 
@@ -820,7 +820,7 @@ end
 function ucs_expected_return(ucs::EllipsoidalUncertaintySet, mu::Num_VecNum, w::VecNum,
                              mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     mu = something(ucs.val, mu)
-    G = transpose(matrix_square_root(mtx_sqrt, ucs.sigma))
+    G = ellipsoid_chol(ucs, mtx_sqrt)
     return dot_scalar(mu, w) - ucs.k * LinearAlgebra.norm(G * w)
 end
 function ucs_expected_return(ucs::L1UncertaintySet, mu::Num_VecNum, w::VecNum,

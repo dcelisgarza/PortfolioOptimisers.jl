@@ -718,7 +718,7 @@ Where:
   - $(math_dict[:w_port])
   - ``\\kappa``: Radius of the ellipsoid, the `k` field of the set. The set is ``(\\boldsymbol{\\mu} - \\hat{\\boldsymbol{\\mu}})^\\intercal \\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}^{-1} (\\boldsymbol{\\mu} - \\hat{\\boldsymbol{\\mu}}) \\leq \\kappa^{2}``.
   - ``\\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}``: Shape matrix of the ellipsoid, the `sigma` field of the set.
-  - ``\\mathbf{G}``: Transpose of the square root of ``\\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}`` that [`matrix_square_root`](@ref) takes under `mtx_sqrt`, the `mtx_sqrt` of the [`ArithmeticReturn`](@ref). `nothing` takes the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. So ``\\lVert \\mathbf{G}\\boldsymbol{w} \\rVert_2^{2} = \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma}_{\\boldsymbol{\\mu}} \\boldsymbol{w}``.
+  - ``\\mathbf{G}``: The factor `chol` of the set when it states one, and otherwise the transpose of the square root of ``\\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}`` that [`matrix_square_root`](@ref) takes under `mtx_sqrt`, the `mtx_sqrt` of the [`ArithmeticReturn`](@ref). [`ellipsoid_chol`](@ref) reads it. `nothing` takes the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. So ``\\lVert \\mathbf{G}\\boldsymbol{w} \\rVert_2^{2} = \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma}_{\\boldsymbol{\\mu}} \\boldsymbol{w}``.
 
 # JuMP formulation
 
@@ -762,7 +762,7 @@ function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::EllipsoidalUncer
     sc = get_constraint_scale(model)
     w = get_w(model, prefix)
     mu = something(ucs.val, mu)
-    G = transpose(matrix_square_root(mtx_sqrt, ucs.sigma))
+    G = ellipsoid_chol(ucs, mtx_sqrt)
     k = ucs.k
     x_eucs_w = state_set!(model, prefix, :x_eucs_w_, i, JuMP.@expression(model, G * w))
     t_eucs_gw = state_set!(model, prefix, :t_eucs_gw_, i, JuMP.@variable(model))

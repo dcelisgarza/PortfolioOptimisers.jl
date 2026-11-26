@@ -1670,7 +1670,8 @@ $(DocStringExtensions.FIELDS)
         sigma::MatNum,
         k::Number,
         class::AbstractUncertaintySetClass,
-        val::Option{<:ArrNum} = nothing
+        val::Option{<:ArrNum} = nothing,
+        chol::Option{<:MatNum} = nothing
     ) -> EllipsoidalUncertaintySet
 
 The keywords are the fields of the struct.
@@ -1682,6 +1683,7 @@ The keywords are the fields of the struct.
   - `!(k isa Bool)`, else an `ArgumentError`. The converter to [`NormBallUncertaintySet`](@ref) puts `k` in its radius `kappa`, which also refuses a `Bool`.
   - `k > 0`.
   - If `val` is an array, `length(val) == size(sigma, 1)`. The rule reads a length and not a size, so it holds on the two axes. On the mean axis, `val` is a vector of length ``N`` beside an ``N \\times N`` shape matrix. On the covariance axis, it is an ``N \\times N`` covariance matrix beside an ``N^{2} \\times N^{2}`` shape matrix.
+  - If `chol` is a matrix, `!isempty(chol)` and `size(chol, 2) == size(sigma, 1)`. The constructor does not check that `transpose(chol) * chol` is `sigma`, because that check costs as much as the root.
 
 # Examples
 
@@ -1691,7 +1693,8 @@ EllipsoidalUncertaintySet
   sigma ┼ 2×2 Matrix{Float64}
       k ┼ Float64: 2.5
   class ┼ SigmaUncertaintySetClass()
-    val ┴ nothing
+    val ┼ nothing
+   chol ┴ nothing
 ```
 
 # Related
@@ -1723,9 +1726,13 @@ EllipsoidalUncertaintySet
     $(field_dict[:val_ucs])
     """
     val
+    """
+    Optional factor ``\\mathbf{G}`` of the shape matrix, with ``\\mathbf{G}^{\\intercal} \\mathbf{G}`` equal to `sigma`, or `nothing`. The cone of the model and the worst-case value read it in place of a square root of `sigma`, so a consumer that evaluates many portfolios pays for the root one time. A risk measure or a return term fills it under its own `mtx_sqrt` when it resolves the set, and a stated factor wins over that algorithm. [`ellipsoid_chol`](@ref) reads it.
+    """
+    chol
     function EllipsoidalUncertaintySet(sigma::MatNum, k::Number,
                                        class::AbstractUncertaintySetClass,
-                                       val::Option{<:ArrNum})
+                                       val::Option{<:ArrNum}, chol::Option{<:MatNum})
         @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
         assert_matrix_issquare(sigma, :sigma)
         @argcheck(!isa(k, Bool),
@@ -1735,18 +1742,86 @@ EllipsoidalUncertaintySet
             @argcheck(length(val) == size(sigma, 1),
                       DimensionMismatch("val ($(length(val))) must match sigma ($(size(sigma, 1)))"))
         end
-        return new{typeof(sigma), typeof(k), typeof(class), typeof(val)}(sigma, k, class,
-                                                                         val)
+        if isa(chol, MatNum)
+            @argcheck(!isempty(chol), IsEmptyError("chol cannot be empty"))
+            @argcheck(size(chol, 2) == size(sigma, 1),
+                      DimensionMismatch("the columns of chol ($(size(chol, 2))) must match sigma ($(size(sigma, 1)))"))
+        end
+        return new{typeof(sigma), typeof(k), typeof(class), typeof(val), typeof(chol)}(sigma,
+                                                                                       k,
+                                                                                       class,
+                                                                                       val,
+                                                                                       chol)
     end
 end
 function EllipsoidalUncertaintySet(sigma::MatNum, k::Number,
-                                   class::AbstractUncertaintySetClass)::EllipsoidalUncertaintySet
-    return EllipsoidalUncertaintySet(sigma, k, class, nothing)
+                                   class::AbstractUncertaintySetClass,
+                                   val::Option{<:ArrNum} = nothing)::EllipsoidalUncertaintySet
+    return EllipsoidalUncertaintySet(sigma, k, class, val, nothing)
 end
 function EllipsoidalUncertaintySet(; sigma::MatNum, k::Number,
                                    class::AbstractUncertaintySetClass,
-                                   val::Option{<:ArrNum} = nothing)::EllipsoidalUncertaintySet
-    return EllipsoidalUncertaintySet(sigma, k, class, val)
+                                   val::Option{<:ArrNum} = nothing,
+                                   chol::Option{<:MatNum} = nothing)::EllipsoidalUncertaintySet
+    return EllipsoidalUncertaintySet(sigma, k, class, val, chol)
+end
+"""
+    ellipsoid_chol(ucs::EllipsoidalUncertaintySet, mtx_sqrt) -> AbstractMatrix
+
+Return the factor ``\\mathbf{G}`` of the shape matrix ``\\mathbf{\\Omega}`` of an ellipsoid, with ``\\mathbf{G}^{\\intercal} \\mathbf{G} = \\mathbf{\\Omega}``.
+
+The factor that the set states wins. A set with no factor takes the transpose of the square root of its `sigma` under `mtx_sqrt`, which [`matrix_square_root`](@ref) takes. The cone of the model and the worst-case value read the factor through this function, so the two refuse the same matrices and read the same root.
+
+# Validation
+
+  - When `ucs.chol` is `nothing`, `ucs.sigma` has a square root under `mtx_sqrt`, as [`matrix_square_root`](@ref) states. Raises a `LinearAlgebra.PosDefException`.
+
+# Arguments
+
+  - `ucs`: Ellipsoidal uncertainty set, on the mean axis or on the covariance axis.
+  - `mtx_sqrt`: Square-root algorithm of `ucs.sigma`, or `nothing` for the plain Cholesky factor. A set with a factor ignores it.
+
+# Returns
+
+  - `G::AbstractMatrix`: The factor, `ucs.chol` or a lazy transpose of the square root.
+
+# Related
+
+  - [`EllipsoidalUncertaintySet`](@ref)
+  - [`matrix_square_root`](@ref)
+  - [`resolve_ellipsoid_chol`](@ref)
+"""
+function ellipsoid_chol(ucs::EllipsoidalUncertaintySet{<:Any, <:Any, <:Any, <:Any, Nothing},
+                        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm})
+    return transpose(matrix_square_root(mtx_sqrt, ucs.sigma))
+end
+function ellipsoid_chol(ucs::EllipsoidalUncertaintySet, ::Any)
+    return ucs.chol
+end
+"""
+    resolve_ellipsoid_chol(ucs, mtx_sqrt)
+
+Return the set `ucs` with the factor of its shape matrix filled, for an [`EllipsoidalUncertaintySet`](@ref) with no factor.
+
+A risk measure calls it when it resolves its set, so every later value and every cone of the model read one root, and the root is taken one time. Every other set, an estimator, `nothing`, and an ellipsoid with a factor return unchanged.
+
+# Validation
+
+  - `ucs.sigma` of an ellipsoid with no factor has a square root under `mtx_sqrt`, as [`matrix_square_root`](@ref) states. Raises a `LinearAlgebra.PosDefException`.
+
+# Related
+
+  - [`ellipsoid_chol`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
+  - [`UncertaintySetVariance`](@ref)
+"""
+function resolve_ellipsoid_chol(ucs, ::Any)
+    return ucs
+end
+function resolve_ellipsoid_chol(ucs::EllipsoidalUncertaintySet{<:Any, <:Any, <:Any, <:Any,
+                                                               Nothing},
+                                mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm})
+    return rebuild_struct(ucs, (; chol = copy(ellipsoid_chol(ucs, mtx_sqrt))))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1760,7 +1835,7 @@ The set bounds a vectorised covariance. So its shape matrix is on the ``N^{2}`` 
  1. Take `nothing_scalar_array_view(risk_ucs.val, i)`, the fitted ``N \\times N`` covariance restricted to the selected assets. It takes the plain asset index, and it returns `nothing` unchanged. This step is first, because step 2 writes a new value to `i`.
  2. Find `N` as `floor(Int, sqrt(size(risk_ucs.sigma, 1)))` from the shape matrix. Expand `i` with `fourth_moment_index_generator(N, i)`, which gives the positions of the selected assets in the vectorised covariance.
  3. Take `view(risk_ucs.sigma, i, i)` with the expanded index, which gives the restricted shape matrix.
- 4. Rebuild the set from the two views with [`rebuild_struct`](@ref). `k` and `class` do not change. The method does not calibrate the radius again on the smaller dimension. So under every radius algorithm except [`GeneralKUncertaintyAlgorithm`](@ref), the view is more conservative than a fit on the subset.
+ 4. Rebuild the set from the two views with [`rebuild_struct`](@ref), and with the columns of `chol` at the expanded index, which factor the restricted shape matrix. `k` and `class` do not change. The method does not calibrate the radius again on the smaller dimension. So under every radius algorithm except [`GeneralKUncertaintyAlgorithm`](@ref), the view is more conservative than a fit on the subset.
 
 # Arguments
 
@@ -1786,7 +1861,13 @@ function port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any,
     # index, whereas the N^2 x N^2 shape matrix takes the fourth-moment index.
     val = nothing_scalar_array_view(risk_ucs.val, i)
     i = fourth_moment_index_generator(floor(Int, sqrt(size(risk_ucs.sigma, 1))), i)
-    return rebuild_struct(risk_ucs, (; sigma = view(risk_ucs.sigma, i, i), val = val))
+    return rebuild_struct(risk_ucs,
+                          (; sigma = view(risk_ucs.sigma, i, i), val = val,
+                           chol = if isnothing(risk_ucs.chol)
+                               nothing
+                           else
+                               view(risk_ucs.chol, :, i)
+                           end))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1801,7 +1882,7 @@ The frame is zero and not `NaN`, because the shape matrix is geometry. The same 
 
  1. Find the positions of the investable pairs in the vectorised covariance with [`coverage_pair_index`](@ref), in the order of [`fourth_moment_index_generator`](@ref).
  2. Make a zero frame of `length(imsk)^2` rows and columns. Write `set.sigma` at those positions on the two axes.
- 3. Rebuild the set from the frame, with `pr.sigma` as `val`, with [`rebuild_struct`](@ref). `k` and `class` do not change.
+ 3. Rebuild the set from the frame, with `pr.sigma` as `val` and the factor `chol` expanded by [`expand_chol_columns`](@ref), with [`rebuild_struct`](@ref). `k` and `class` do not change.
 
 # Arguments
 
@@ -1829,7 +1910,29 @@ function expand_investable_ucs(set::EllipsoidalUncertaintySet{<:MatNum, <:Any,
     N2 = length(imsk)^2
     sigma = zeros(eltype(set.sigma), N2, N2)
     sigma[idx, idx] = set.sigma
-    return rebuild_struct(set, (; sigma = sigma, val = pr.sigma))
+    return rebuild_struct(set,
+                          (; sigma = sigma, val = pr.sigma,
+                           chol = expand_chol_columns(set.chol, idx, N2)))
+end
+"""
+    expand_chol_columns(chol, idx, n)
+
+Write the columns of the factor `chol` of a shape matrix at the positions `idx` of a zero frame of `n` columns.
+
+A factor ``\\mathbf{G}`` of ``\\mathbf{\\Omega}`` gives ``\\mathbf{G}^{\\intercal} \\mathbf{G}`` equal to the frame of ``\\mathbf{\\Omega}`` with zero outside `idx`, so the expanded factor is a factor of the expanded shape matrix of [`expand_investable_ucs`](@ref). It keeps the rows of `chol`. `nothing` returns `nothing`.
+
+# Related
+
+  - [`expand_investable_ucs`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
+"""
+function expand_chol_columns(::Nothing, ::Any, ::Integer)
+    return nothing
+end
+function expand_chol_columns(chol::MatNum, idx, n::Integer)
+    G = zeros(eltype(chol), size(chol, 1), n)
+    G[:, idx] = chol
+    return G
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1842,7 +1945,7 @@ The set bounds a mean vector, so its shape matrix and its centre are both on the
 
  1. Take `view(risk_ucs.sigma, i, i)`, the ``N \\times N`` shape matrix restricted to the selected assets on the two dimensions.
  2. Take `nothing_scalar_array_view(risk_ucs.val, i)`, the fitted mean vector restricted to the same assets. It returns `nothing` unchanged.
- 3. Rebuild the set from the two views with [`rebuild_struct`](@ref). `k` and `class` do not change. The method does not calibrate the radius again on the smaller dimension. So under every radius algorithm except [`GeneralKUncertaintyAlgorithm`](@ref), the view is more conservative than a fit on the subset.
+ 3. Rebuild the set from the two views with [`rebuild_struct`](@ref), and with the columns `i` of `chol`, which factor the restricted shape matrix. `k` and `class` do not change. The method does not calibrate the radius again on the smaller dimension. So under every radius algorithm except [`GeneralKUncertaintyAlgorithm`](@ref), the view is more conservative than a fit on the subset.
 
 # Arguments
 
@@ -1865,7 +1968,12 @@ function port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any,
                        args...)::EllipsoidalUncertaintySet
     return rebuild_struct(risk_ucs,
                           (; sigma = view(risk_ucs.sigma, i, i),
-                           val = nothing_scalar_array_view(risk_ucs.val, i)))
+                           val = nothing_scalar_array_view(risk_ucs.val, i),
+                           chol = if isnothing(risk_ucs.chol)
+                               nothing
+                           else
+                               view(risk_ucs.chol, :, i)
+                           end))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1879,7 +1987,7 @@ The frame is zero and not `NaN`, because the shape matrix is geometry. The same 
 # Algorithm
 
  1. Make a zero frame of `length(imsk)` rows and columns. Write `set.sigma` at `(imsk, imsk)`.
- 2. Rebuild the set from the frame, with `pr.mu` as `val`, with [`rebuild_struct`](@ref). `k` and `class` do not change.
+ 2. Rebuild the set from the frame, with `pr.mu` as `val` and the factor `chol` expanded by [`expand_chol_columns`](@ref), with [`rebuild_struct`](@ref). `k` and `class` do not change.
 
 # Arguments
 
@@ -1905,7 +2013,9 @@ function expand_investable_ucs(set::EllipsoidalUncertaintySet{<:MatNum, <:Any,
     N = length(imsk)
     sigma = zeros(eltype(set.sigma), N, N)
     sigma[imsk, imsk] = set.sigma
-    return rebuild_struct(set, (; sigma = sigma, val = pr.mu))
+    return rebuild_struct(set,
+                          (; sigma = sigma, val = pr.mu,
+                           chol = expand_chol_columns(set.chol, imsk, N)))
 end
 """
     box_quantile_bounds(::Type{TE}, get_ij, N::Integer, q::Number, kwargs) where {TE}

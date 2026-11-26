@@ -1547,18 +1547,72 @@ end
     @test UncertaintySetVariance().mtx_sqrt === EigenFallbackSquareRoot()
     w = fill(1 / N_ms, N_ms)
     W = w * transpose(w)
-    # The value reads the quadratic form of the matrix, so it takes no square root, and the
-    # algorithm of the measure does not move it.
+    # The value reads the factor that the cone reads, so it refuses the matrices that the
+    # model refuses.
     val = dot(w, S_ms, w) + 5e-3 * sqrt(dot(vec(W), Om, vec(W)))
-    @test isapprox(PO.ucs_variance(e0, S_ms, w), val; rtol = 1e-14)
-    for alg in (nothing, algs_ms...)
+    @test_throws PosDefException PO.ucs_variance(e0, S_ms, w, nothing)
+    @test_throws PosDefException UncertaintySetVariance(; ucs = e0, sigma = S_ms,
+                                                        mtx_sqrt = nothing)(w)
+    @test_throws PosDefException factory(UncertaintySetVariance(; ucs = e0,
+                                                                mtx_sqrt = nothing), pr_ms)
+    for alg in algs_ms
+        # The eigen square root is exact, and the ridge moves the value by its ridge alone.
+        @test isapprox(PO.ucs_variance(e0, S_ms, w, alg), val; rtol = 1e-10)
+        # The factory takes the root one time, and the value of the resolved measure reads it.
         r = UncertaintySetVariance(; ucs = e0, sigma = S_ms, mtx_sqrt = alg)
-        @test isapprox(r(w), val; rtol = 1e-14)
+        rf = factory(r, pr_ms)
+        G = rf.ucs.chol
+        # The ridge gives a triangular factor, and the eigen square root a dense one.
+        @test isa(G, AbstractMatrix) && rf.ucs.sigma === Om
+        @test G == PO.ellipsoid_chol(e0, alg)
+        @test isapprox(rf(w), r(w); rtol = 1e-14)
+        # A resolved set keeps its factor in a second factory, and in the fit of the optimiser.
+        @test factory(rf, pr_ms).ucs.chol === G
+        @test PO.ucs_risk_measure(rf, rd_ms, pr_ms) === rf
+        @test PO.ucs_risk_measure(r, rd_ms, pr_ms).ucs.chol == G
     end
-    # A form that rounding takes below zero counts as zero.
-    eneg = EllipsoidalUncertaintySet(; sigma = Matrix(-1e-18I, N_ms^2, N_ms^2), k = 5e-3,
+    # A matrix that is not positive semidefinite has no square root under any algorithm,
+    # and the value, the factory and the hierarchical optimisers refuse it with the model.
+    Oneg = Matrix(-1.0I, N_ms^2, N_ms^2)
+    eneg = EllipsoidalUncertaintySet(; sigma = Oneg, k = 1.0,
                                      class = SigmaUncertaintySetClass())
-    @test PO.ucs_variance(eneg, S_ms, w) == dot(w, S_ms, w)
+    rneg = UncertaintySetVariance(; ucs = eneg, sigma = Matrix(1.0I, N_ms, N_ms))
+    @test_throws PosDefException rneg(w)
+    @test_throws PosDefException factory(rneg, pr_ms)
+    @test_throws PosDefException PO.ucs_risk_measure(rneg, rd_ms, pr_ms)
+    @test_throws PosDefException optimise(HierarchicalRiskParity(; r = rneg,
+                                                                 opt = HierarchicalOptimiser(;
+                                                                                             pe = pr_ms)),
+                                          rd_ms)
+    # A factor that the set states wins over the algorithm, so it serves a singular matrix
+    # under the plain Cholesky factor.
+    G0 = copy(PO.ellipsoid_chol(e0, EigenFallbackSquareRoot()))
+    es = EllipsoidalUncertaintySet(; sigma = Om, k = 5e-3,
+                                   class = SigmaUncertaintySetClass(), chol = G0)
+    @test PO.ellipsoid_chol(es, nothing) === G0
+    rs = UncertaintySetVariance(; ucs = es, sigma = S_ms, mtx_sqrt = nothing)
+    @test isapprox(rs(w), val; rtol = 1e-10)
+    @test factory(rs, pr_ms).ucs === es
+    @test_throws IsEmptyError EllipsoidalUncertaintySet(; sigma = Om, k = 5e-3,
+                                                        class = SigmaUncertaintySetClass(),
+                                                        chol = zeros(0, 0))
+    @test_throws DimensionMismatch EllipsoidalUncertaintySet(; sigma = Om, k = 5e-3,
+                                                             class = SigmaUncertaintySetClass(),
+                                                             chol = G0[:, 2:end])
+    # The view of a factor is a factor of the view, and the expansion of a factor is a factor
+    # of the expansion.
+    iv = [1, 3, 4]
+    vs = PO.port_opt_view(es, iv)
+    @test transpose(vs.chol) * vs.chol ≈ vs.sigma
+    @test isapprox(PO.ucs_variance(vs, S_ms[iv, iv], w[iv], nothing),
+                   PO.ucs_variance(PO.port_opt_view(e0, iv), S_ms[iv, iv], w[iv]);
+                   rtol = 1e-10)
+    @test isnothing(PO.port_opt_view(e0, iv).chol)
+    imsk = BitVector([true, false, true, true, false, false])
+    ex = PO.expand_investable_ucs(PO.port_opt_view(es, findall(imsk)), imsk, pr_ms)
+    @test transpose(ex.chol) * ex.chol ≈ ex.sigma
+    @test isnothing(PO.expand_investable_ucs(PO.port_opt_view(e0, findall(imsk)), imsk,
+                                             pr_ms).chol)
     @test_throws PosDefException optimise(MeanRisk(;
                                                    r = UncertaintySetVariance(; ucs = e0,
                                                                               mtx_sqrt = nothing),
@@ -1584,6 +1638,9 @@ end
     @test_throws PosDefException NormBallUncertaintySet(e0, nothing)
     nb = NormBallUncertaintySet(e0)
     @test maximum(abs, nb.L * nb.L' - Om) < 1e-15
+    # A stated factor wins over the algorithm of the converter too.
+    nbs = NormBallUncertaintySet(es, nothing)
+    @test nbs.L == transpose(G0)
 end
 
 @testset "The ellipsoid of an ArithmeticReturn" begin
@@ -1605,6 +1662,17 @@ end
         @test PO.no_bounds_returns_estimator(ret).mtx_sqrt === alg
         @test PO.factory(ret, pr_ms).mtx_sqrt === alg
     end
+    # A factor that the set states serves the value and the model under the plain Cholesky
+    # factor, which refuses the singular matrix itself.
+    Gm = copy(PO.ellipsoid_chol(em, EigenFallbackSquareRoot()))
+    ems = EllipsoidalUncertaintySet(; sigma = Smu, k = 2.0, class = MuUncertaintySetClass(),
+                                    chol = Gm)
+    res = solve(ArithmeticReturn(; ucs = ems, mtx_sqrt = nothing))
+    @test isa(res.retcode, OptimisationSuccess)
+    @test isapprox(PO.ucs_expected_return(ems, pr_ms.mu, res.w, nothing),
+                   dot(pr_ms.mu, res.w) - 2.0 * sqrt(dot(res.w, Smu, res.w)); rtol = 1e-8)
+    @test isapprox(value_ms(res, :ret_),
+                   PO.ucs_expected_return(ems, pr_ms.mu, res.w, nothing); rtol = 1e-6)
 end
 
 @testset "RelaxedRiskBudgeting on a prior without a factor" begin

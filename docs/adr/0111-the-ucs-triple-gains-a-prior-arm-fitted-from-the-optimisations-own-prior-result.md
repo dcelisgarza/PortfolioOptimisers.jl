@@ -266,5 +266,10 @@ about 15 ns for each measure and no allocation, once for each optimisation. Two 
 the same measurement: a keyword of `factory`, and the data passed to every measure, each added 64
 bytes for each measure of a mixed vector.
 
-The value over an ellipsoid reads the quadratic form of its matrix. A hierarchical head evaluates
-about `3 N` portfolios, and the root of the `N^2` by `N^2` matrix was taken at each one.
+A hierarchical head evaluates about `3 N` portfolios, and the value over an ellipsoid took the root
+of the `N^2` by `N^2` matrix at each one. The set now holds the factor of its matrix as `chol`, and
+`factory` and `ucs_risk_measure` fill it one time under the `mtx_sqrt` of the measure. The value and
+the cone of the model read the same factor, so the value refuses every matrix that the model
+refuses. The quadratic form of the matrix needs no root, but it lost: it gave a number for an
+indefinite matrix, and for a singular one under the plain Cholesky factor, where the model raised
+(#2379).
