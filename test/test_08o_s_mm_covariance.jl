@@ -55,7 +55,8 @@ end
             @test sqrt(POS.bisquare_constant(0.5, p)) ≈ c0 rtol = 1e-7
             @test sqrt(POS.mm_constant(BisquareReweighting(), p)) ≈ c1 rtol = 1e-7
         end
-        @test POS.bisquare_efficiency(3, POS.mm_constant(BisquareReweighting(), 3)) ≈ 0.95
+        @test POS.bisquare_efficiency(ShapeEfficiency(), 3,
+                                      POS.mm_constant(BisquareReweighting(), 3)) ≈ 0.95
     end
     @testset "Outliers" begin
         Y, clean, bad = s_outlier_sample(StableRNG(2255), 400, 4, 20, 20)
@@ -171,13 +172,82 @@ end
         # A low efficiency moves the lower bound of the search of the constant.
         for eff in (0.01, 0.001)
             c2 = POS.mm_constant(BisquareReweighting(; eff = eff), 3)
-            @test POS.bisquare_efficiency(3, c2) ≈ eff
+            @test POS.bisquare_efficiency(ShapeEfficiency(), 3, c2) ≈ eff
         end
         @test POS.chisq_truncated_moment(3, Inf, [0.0, 1.0]) ≈ 3
         @test POS.s_refine(DetS(), BisquareRho(), X, [(s.mu, s.sigma)], false, k, b) ==
               [(s.mu, s.sigma)]
         @test POS.show_fields(SCovariance()) == (:me, :rho, :bdp, :alg, :q)
         @test POS.show_fields(MMCovariance()) == (:s, :rw, :q)
+    end
+    @testset "The other options (#2365)" begin
+        # `CovSest(method = "rocke")`: its iterations stop about 1e-4 short of the minimum.
+        r = StatsAPI.fit(SCovariance(; rho = RockeRho()), X)
+        @test r.mu ≈ [0.389349062364076626, -0.068150707505010899, 0.448542613726419015] rtol = 1e-3
+        @test r.sigma ≈ [3.61373552146385135 0.29932628507077286 0.30935797332677606
+                         0.29932628507077286 1.73620520856611682 -0.76947690307871042
+                         0.30935797332677611 -0.76947690307871042 2.35555360483499232] rtol = 1e-3
+        @test median(r.d2) ≈ quantile(POS.Distributions.Chisq(3), 0.5)
+        @test all(w -> 0 <= w <= 1, r.w)
+        g, b = POS.s_tuning(RockeRho(), 0.5, 100, 3)
+        @test g == 1
+        @test b ≈ 0.485
+        g8, _ = POS.s_tuning(RockeRho(), 0.5, 300, 8)
+        @test g8 ≈ quantile(POS.Distributions.Chisq(8), 0.9) / 8 - 1
+        @test POS.srho(RockeRho(), 1.0, g8) == 0.5
+        @test POS.srho(RockeRho(), 1 - 2 * g8, g8) == 0
+        @test POS.srho(RockeRho(), 1 + 2 * g8, g8) == 1
+        @test POS.srho_weight(RockeRho(), 1.0, g8) == 1
+        @test POS.srho_weight(RockeRho(), 1 + 2 * g8, g8) == 0
+        # `CovMMest(eff.shape = FALSE)` from the start `sdet`.
+        lo = BisquareReweighting(; target = LocationEfficiency())
+        m = StatsAPI.fit(MMCovariance(; rw = lo), X)
+        @test sqrt(POS.mm_constant(lo, 3)) ≈ 5.4902491720703317 rtol = 1e-7
+        @test sqrt(POS.mm_constant(lo, 1)) ≈ 4.685 rtol = 1e-4
+        @test m.mu ≈ [0.36552643973540061, -0.11309528305381154, 0.29215635967462883] rtol = 1e-6
+        @test m.sigma ≈ [4.1586999642984121550 -0.0089014103776141138 1.4263024934877999161
+                         -0.0089014103776141138 1.4290203470558620058 -0.5580078051460625188
+                         1.4263024934877999161 -0.5580078051460625188 3.5309686315429109627] rtol = 1e-6
+        # Each search reaches the minimum that `DetS` finds.
+        s = StatsAPI.fit(SCovariance(), X)
+        for alg in
+            (FastS(; seed = 1), RobustStartS(), RobustStartS(; ce = TylerCovariance()))
+            @test StatsAPI.fit(SCovariance(; alg = alg), X).sigma ≈ s.sigma rtol = 1e-6
+        end
+        @test cov(SCovariance(; alg = FastS(; seed = 7)), X) ==
+              cov(SCovariance(; alg = FastS(; seed = 7)), X)
+        med = vec(median(X; dims = 1))
+        @test StatsAPI.fit(SCovariance(; alg = RobustStartS()), X; mean = med).mu ≈ med
+        @test StatsAPI.fit(SCovariance(; alg = FastS(; seed = 1)), X; mean = med).sigma ≈
+              StatsAPI.fit(SCovariance(), X; mean = med).sigma rtol = 1e-6
+        # A draw of p + 1 rows of data with ties can be singular, so the start grows.
+        Xt = round.(randn(StableRNG(3), 60, 2))
+        rng = StableRNG(4)
+        sizes = map(1:50) do _
+            mu, S = POS.fasts_random_start(rng, Xt, nothing)
+            !isnothing(POS.scatter_cholesky(S))
+        end
+        @test all(sizes)
+        runs = POS.s_refine(FastS(; n_starts = 4, n_best = 2), BisquareRho(), X,
+                            [(s.mu, s.sigma), (vec(mean(X; dims = 1)), cov(X)),
+                             (s.mu, 2 .* s.sigma), (zeros(3), Matrix(1.0I, 3, 3))], false,
+                            POS.s_tuning(BisquareRho(), 0.5, 100, 3)...)
+        @test length(runs) == 2
+        # The start estimator of `RobustStartS` takes the views and the weights.
+        T = [2.0 0.1 0.0; 0.1 1.0 0.0; 0.0 0.0 0.5]
+        ce = SCovariance(;
+                         alg = RobustStartS(;
+                                            ce = MCDCovariance(;
+                                                               me = SimpleExpectedReturns(),
+                                                               shr = MCDShrinkage(;
+                                                                                  tgt = T),
+                                                               ssc = nothing)))
+        @test size(POS.port_opt_view(ce, [1, 3]).alg.ce.shr.tgt) == (2, 2)
+        w = POS.StatsBase.Weights(fill(1.0, 100))
+        @test POS.factory(ce, w).alg.ce.me.w === w
+        @test_throws DomainError RockeRho(; arp = 1)
+        @test_throws DomainError FastS(; n_starts = 0)
+        @test_throws DomainError FastS(; n_starts = 3, n_best = 5)
     end
     @testset "Refusals" begin
         @test_throws DomainError SCovariance(; bdp = 0.6)

@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.4"
 julia_syntax = "1.0.2"
-commit = "5ff3c2a58c"
+commit = "0f1f6c3448"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { code = 35, doc = 0, comment = 5, blank = 4, total = 44 }
@@ -205,9 +205,9 @@ commit = "5ff3c2a58c"
 "src/05_Moments/40_RobustCovariance/08_TylerShrinkage.jl" = { code = 179, doc = 201, comment = 2, blank = 105, total = 487 }
 "src/05_Moments/40_RobustCovariance/09_TylerCovariance.jl" = { code = 119, doc = 259, comment = 0, blank = 117, total = 495 }
 "src/05_Moments/40_RobustCovariance/10_RobustExpectedReturns.jl" = { code = 24, doc = 59, comment = 2, blank = 29, total = 114 }
-"src/05_Moments/40_RobustCovariance/11_SRho.jl" = { code = 51, doc = 162, comment = 0, blank = 87, total = 300 }
-"src/05_Moments/40_RobustCovariance/12_SCovariance.jl" = { code = 105, doc = 317, comment = 0, blank = 146, total = 568 }
-"src/05_Moments/40_RobustCovariance/13_MMCovariance.jl" = { code = 75, doc = 195, comment = 0, blank = 91, total = 361 }
+"src/05_Moments/40_RobustCovariance/11_SRho.jl" = { code = 94, doc = 264, comment = 0, blank = 132, total = 490 }
+"src/05_Moments/40_RobustCovariance/12_SCovariance.jl" = { code = 166, doc = 432, comment = 0, blank = 189, total = 787 }
+"src/05_Moments/40_RobustCovariance/13_MMCovariance.jl" = { code = 77, doc = 202, comment = 0, blank = 91, total = 370 }
 "src/06_Distance/01_Base_Distance.jl" = { code = 24, doc = 228, comment = 0, blank = 93, total = 345 }
 "src/06_Distance/02_Distance.jl" = { code = 162, doc = 350, comment = 0, blank = 157, total = 669 }
 "src/06_Distance/03_DistanceDistance.jl" = { code = 39, doc = 132, comment = 0, blank = 58, total = 229 }
