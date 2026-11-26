@@ -5,7 +5,7 @@
 julia = "1.13.4"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "74b5c19437"
+commit = "1c77d61de1"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 6, cog_sum = 4, arg_sum = 16, macros = [] }
@@ -320,7 +320,7 @@ commit = "74b5c19437"
 "src/16_RiskMeasures/15_TurnoverRiskMeasure.jl" = { cyc = 2, cog = 2, arg = 3, cyc_sum = 8, cog_sum = 4, arg_sum = 6, macros = ["@propagatable"] }
 "src/16_RiskMeasures/16_TrackingRiskMeasure.jl" = { cyc = 3, cog = 3, arg = 7, cyc_sum = 37, cog_sum = 25, arg_sum = 65, macros = ["@propagatable"] }
 "src/16_RiskMeasures/17_VarianceSkewKurtosis.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 36, cog_sum = 10, arg_sum = 50, macros = ["@propagatable"] }
-"src/16_RiskMeasures/18_GenericValueatRiskRange.jl" = { cyc = 2, cog = 1, arg = 3, cyc_sum = 17, cog_sum = 3, arg_sum = 25, macros = ["@propagatable"] }
+"src/16_RiskMeasures/18_GenericValueatRiskRange.jl" = { cyc = 2, cog = 1, arg = 4, cyc_sum = 25, cog_sum = 4, arg_sum = 39, macros = ["@propagatable"] }
 "src/16_RiskMeasures/19_RatioRiskMeasure.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 9, cog_sum = 5, arg_sum = 9, macros = ["@propagatable"] }
 "src/16_RiskMeasures/20_EqualRiskMeasure.jl" = { cyc = 1, cog = 1, arg = 1, cyc_sum = 4, cog_sum = 1, arg_sum = 3, macros = [] }
 "src/16_RiskMeasures/21_MedianAbsoluteDeviationRisk.jl" = { cyc = 3, cog = 3, arg = 4, cyc_sum = 24, cog_sum = 6, arg_sum = 48, macros = ["@propagatable"] }
