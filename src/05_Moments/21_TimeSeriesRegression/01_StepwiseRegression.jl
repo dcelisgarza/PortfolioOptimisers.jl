@@ -836,7 +836,7 @@ Runs one stepwise search per asset and assembles the loadings matrix from the fi
 
 Each asset has its own search. The search of one asset reads only the column of that asset and `F`, so one asset cannot change the factor set of another. An asset whose entry of `re.included` holds a factor set takes that set, and no search runs for it.
 
-An asset fits on the observations where its return is finite and `active_mask` is `true`, as [`asset_fit_rows`](@ref) states. So an asset that lists late gets the loadings of its own history, and a gap changes no other asset.
+An asset fits on the observations where its return is finite and `active_mask` is `true`, as [`asset_fit_rows`](@ref) states. So an asset that lists late gets the loadings of its own history, and a gap changes no other asset. An asset whose factor set leaves no residual on those observations is a Saturated Fit. It gets the model with the intercept alone and a warning, as [`asset_fit_coefficients`](@ref) states.
 
 # Algorithm
 
@@ -860,16 +860,16 @@ An asset fits on the observations where its return is finite and `active_mask` i
 
   - The rules of [`assert_finite_factor_rows`](@ref) for `F`.
   - The rules of [`assert_stepwise_included`](@ref) for `re.included`, `X` and `F`.
-  - The rules of [`asset_fit_rows`](@ref): `active_mask` has the size of `X`, and every asset carries at least one finite and active return.
+  - The rules of [`asset_fit_rows`](@ref): `active_mask` has the size of `X`, and every asset carries at least two finite and active returns.
 
 # Returns
 
   - `reg::Regression`: Regression result that holds:
 
       + `b`: Intercept of each asset, a view of the first column of `rr`.
-      + `M`: Coefficient of each asset and factor, a view of the remaining columns of `rr`. A factor that the asset does not use has an exact zero. A whole row is zero when the asset uses no factor. An empty entry of `re.included` gives such a row with no warning. A search that selects no factor gives it too, and [`stepwise_factor_set`](@ref) warns. [`BackwardElimination`](@ref) under a [`MinMaxValStepwiseRegressionCriterion`](@ref) can select no factor, and a [`PValue`](@ref) search selects none when no factor has a p-value.
+      + `M`: Coefficient of each asset and factor, a view of the remaining columns of `rr`. A factor that the asset does not use has an exact zero. A whole row is zero when the asset uses no factor. An empty entry of `re.included` gives such a row with no warning. A search that selects no factor gives it too, and [`stepwise_factor_set`](@ref) warns. [`BackwardElimination`](@ref) under a [`MinMaxValStepwiseRegressionCriterion`](@ref) can select no factor, and a [`PValue`](@ref) search selects none when no factor has a p-value. A Saturated Fit gives a row of zeros too, and [`asset_fit_coefficients`](@ref) warns.
       + `L`: Not set. The regression runs in the original factor basis, so `reg.L` returns `reg.M` through the `swap(L, M)` property rule of the result, and `size(reg.L, 2)` is the number of columns of `F`.
-      + `edof`: Degrees of freedom of the residuals of each asset, which [`residual_count`](@ref) reads off the fit of the asset. Under an unpenalised target it is the number of observations of the fit of the asset less the intercept and the factors that the search selected for that asset, an integer. Under a penalised target it is the real count that [`ElasticNetFit`](@ref) states. The count reads the selected factors alone, and not the search that selected them.
+      + `edof`: Degrees of freedom of the residuals of each asset, which [`residual_count`](@ref) reads off the fit of the asset. Under an unpenalised target it is the number of observations of the fit of the asset less the intercept and the factors that the search selected for that asset, an integer. Under a penalised target it is the real count that [`ElasticNetFit`](@ref) states. The count reads the selected factors alone, and not the search that selected them. It is positive for every asset, because a Saturated Fit keeps the intercept alone.
 
 # Related
 
@@ -910,9 +910,9 @@ The asset fits on `rows`, the observations where its return is finite and active
 
  1. When `rows` is a vector, cut `re`, `x` and `F` to `rows`, take `tgt` again from the cut `re`, and do the steps below on the cut data.
  2. Take the factor set of asset `i` with [`stepwise_factor_set`](@ref), and call it `included`.
- 3. Fit `tgt` to a column of ones and the columns `included` of `F`, and read its coefficients. Call them `params`. Fit the intercept column alone when `included` is empty.
+ 3. Fit `tgt` to a column of ones and the columns `included` of `F` with [`asset_fit_coefficients`](@ref), and call its coefficients `params`. Fit the intercept column alone when `included` is empty. A Saturated Fit, which leaves no residual, gets the intercept alone and a warning, and its factors get zeros.
  4. Write `params[1]` into `rr[i, 1]`, and the remaining coefficients into the columns of `rr` that `included` names, in the order of `included`. A selected factor whose coefficient the penalty of a penalised target set to zero writes that zero.
- 5. Return [`residual_count`](@ref) of the fit and its design. This is the number of degrees of freedom that the fit leaves in the residuals of the asset.
+ 5. Return the residual count of the fit, which [`asset_fit_coefficients`](@ref) reads with [`residual_count`](@ref). This is the number of degrees of freedom that the fit leaves in the residuals of the asset.
 
 # Arguments
 
@@ -948,11 +948,10 @@ function stepwise_asset_fit!(rr::MatNum, re::StepwiseRegression,
     ovec = range(one(eltype(F)), one(eltype(F)); length = length(x))
     included = stepwise_factor_set(re, x, F, i)
     x1 = !isempty(included) ? [ovec view(F, :, included)] : reshape(ovec, :, 1)
-    fri = StatsAPI.fit(tgt, x1, x)
-    params = StatsAPI.coef(fri)
+    params, nu = asset_fit_coefficients(tgt, x1, x, i)
     rr[i, 1] = params[1]
     view(rr, i, 2:size(rr, 2))[included] = view(params, 2:lastindex(params))
-    return residual_count(fri, x1)
+    return nu
 end
 """
     pin_regression_choice(re::StepwiseRegression{<:Any, <:Any, <:Any, <:PinnedChoice},

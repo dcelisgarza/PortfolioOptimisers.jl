@@ -34,6 +34,7 @@ pin_regression_choice(re::AbstractTimeSeriesRegressionEstimator, ::MatNum, ::Mat
 glm_weights
 glm_fit_kwargs
 PortfolioOptimisers.assert_finite_factor_rows
+asset_fit_coefficients
 ```
 
 ## References

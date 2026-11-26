@@ -7,7 +7,7 @@ Description = "Dimension reduction regression, private API of PortfolioOptimiser
 ```@docs
 DimensionReductionTarget
 ReducedBasisFit
-_regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum, sigma::VecNum, x1::MatNum, Vp::MatNum, mu_r::VecNum = mu)
+_regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum, sigma::VecNum, x1::MatNum, Vp::MatNum, i::Integer, mu_r::VecNum = mu)
 prep_dim_red_reg
 dimension_reduction_map
 pin_regression_choice(re::DimensionReductionRegression{<:Any, <:Any, <:Any, <:PinnedChoice, Nothing}, ::MatNum, F::MatNum, w::Option{<:ObsWeights} = nothing)

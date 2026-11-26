@@ -2129,6 +2129,8 @@ A cell is in the fit when its return is finite and the active mask admits it, wh
 
 When every cell of an asset is in the fit, its entry is `nothing`, and the fit takes the path of a complete column, with no copy and no cut of the observation weights.
 
+Each fit has an intercept, so an asset needs two cells in the fit: one for the intercept and one for the residual. A fit with more parameters than the cells less one is a Saturated Fit, and [`asset_fit_coefficients`](@ref) refits it on the intercept alone. So two cells are enough for every model.
+
 # Arguments
 
   - $(arg_dict[:X])
@@ -2140,7 +2142,7 @@ When every cell of an asset is in the fit, its entry is `nothing`, and the fit t
 # Validation
 
   - `active_mask`, when it is not `nothing`, has the size of `X`. Otherwise, the function throws a `DimensionMismatch`.
-  - Each asset has at least one cell in the fit. Otherwise, the function throws an [`IsNonFiniteError`](@ref) that names the asset.
+  - Each asset has at least two cells in the fit. Otherwise, the function throws an [`IsNonFiniteError`](@ref) that names the asset and its count, or an `ArgumentError` when the sample holds fewer than two observations and no gap.
 
 # Returns
 
@@ -2168,12 +2170,65 @@ function asset_fit_rows(x::VecNum, a::Option{<:AbstractVector{<:Bool}},
     # The method is compiled for the type of `a`, so the test of `nothing` folds away.
     live = t -> (isnothing(a) || a[t]) && isfinite(x[t])
     if all(live, eachindex(x))
+        @argcheck(length(x) >= 2,
+                  ArgumentError("a time-series regression fits an intercept for each asset, so it needs at least two observations, one for the intercept and one for the residual, and the sample holds $(length(x)). Fit over a longer sample."))
         return nothing
     end
     rows = findall(live, eachindex(x))
-    @argcheck(!isempty(rows),
-              IsNonFiniteError("asset $i carries no finite and active return in the $(length(x)) observations of the sample, so a regression has no observation to fit its loadings on. Remove the asset from the sample, or fit over a window in which it is listed."))
+    @argcheck(length(rows) >= 2,
+              IsNonFiniteError("asset $i carries $(length(rows)) finite and active return(s) in the $(length(x)) observations of the sample, and a time-series regression needs at least two, one for the intercept and one for the residual. Remove the asset from the sample, or fit over a window in which it is listed."))
     return rows
+end
+"""
+    asset_fit_coefficients(tgt::AbstractRegressionTarget, x1::MatNum, x::VecNum,
+                           i::Integer) -> Tuple{Vector, Real}
+
+Fits the model of one asset of a time-series regression, and refits a Saturated Fit on the intercept alone.
+
+A Saturated Fit leaves no residual degree of freedom: an asset with fewer cells in the fit than the parameters of its model plus one. Its coefficients interpolate the returns and are not an estimate, and its residual variance is zero, so a factor prior reads the asset as a pure factor bet. The function reads the residual count of the fit with [`residual_count`](@ref). When the count is not positive, it warns, names the asset, and fits the intercept column alone. Each factor column then gets a coefficient of zero, as a column that the pivot of `GLM` drops. A fit that leaves a residual does not change. A penalised target states its own count, so a penalised fit on more columns than rows keeps its coefficients while its count is positive.
+
+[`asset_fit_rows`](@ref) gives each asset at least two cells, so the fit of the intercept alone leaves a residual.
+
+# Algorithm
+
+ 1. Fit `tgt` to `x1` and `x`, and read its residual count `nu`. Return the coefficients and `nu` when `nu` is positive.
+ 2. Otherwise warn, and fit `tgt` to the first column of `x1`, the column of ones, and `x`.
+ 3. Return a vector of zeros of the width of `x1` with the intercept of step 2 first, and the residual count of the fit of step 2.
+
+# Arguments
+
+  - `tgt`: Regression target, with its first column named by `factory(tgt, InterceptColumn(1))`.
+  - `x1`: The design of the asset, with the column of ones first, `observations × parameters`.
+  - `x`: Returns of asset `i`, `observations × 1`.
+  - `i`: Index of the asset, which names it in the warning.
+
+# Returns
+
+  - `params::Vector`: One coefficient for each column of `x1`, with the intercept first.
+  - `nu::Real`: The residual count of the fit whose coefficients the function returns.
+
+# Related
+
+  - [`residual_count`](@ref)
+  - [`asset_fit_rows`](@ref)
+  - [`StepwiseRegression`](@ref)
+  - [`DimensionReductionRegression`](@ref)
+"""
+function asset_fit_coefficients(tgt::AbstractRegressionTarget, x1::MatNum, x::VecNum,
+                                i::Integer)
+    fri = StatsAPI.fit(tgt, x1, x)
+    nu = residual_count(fri, x1)
+    if nu > zero(nu)
+        return StatsAPI.coef(fri), nu
+    end
+    @warn("Asset $i: the fit spends every one of its $(size(x1, 1)) observations on its $(size(x1, 2)) parameters, and leaves no residual. The asset gets an intercept-only model, and its row of the loadings matrix is all zeros.",
+          maxlog = log_limit(:warn), _id = @log_id())
+    x0 = x1[:, 1:1]
+    f0 = StatsAPI.fit(tgt, x0, x)
+    c0 = StatsAPI.coef(f0)
+    params = zeros(eltype(c0), size(x1, 2))
+    params[1] = c0[1]
+    return params, residual_count(f0, x0)
 end
 """
     pin_regression_choice(re::AbstractTimeSeriesRegressionEstimator, X::MatNum, F::MatNum,

@@ -992,8 +992,51 @@ end
         Xd = copy(Xg)
         Xd[:, 3] .= NaN
         for re in (StepwiseRegression(), DimensionReductionRegression())
-            @test_throws r"asset 3 carries no finite and active return" regression(re, Xd,
-                                                                                   F)
+            @test_throws r"asset 3 carries 0 finite and active return" regression(re, Xd, F)
+        end
+    end
+
+    @testset "A Saturated Fit keeps the intercept alone (#2371)" begin
+        # Asset 2 has two finite returns. A model with a factor on two rows interpolates them
+        # and leaves no residual, so both estimators fit the intercept alone and warn.
+        Xs = [y ynoise y .+ ynoise]
+        Xs[1:(T - 2), 2] .= NaN
+        last2 = (T - 1):T
+        w = AnalyticWeights(collect(range(0.5, 1.5; length = T)))
+        for re in (StepwiseRegression(), DimensionReductionRegression(),
+                   factory(StepwiseRegression(), w), factory(DimensionReductionRegression(), w))
+            rr = @test_logs((:warn, r"Asset 2: the fit spends every one of its 2"),
+                            match_mode = :any, regression(re, Xs, F))
+            wt = if isnothing(PO.regression_target_weights(if re isa StepwiseRegression
+                                                               re.tgt
+                                                           else
+                                                               re.retgt
+                                                           end))
+                ones(2)
+            else
+                w[last2]
+            end
+            @test iszero(rr.M[2, :]) && rr.b[2] ≈ sum(wt .* Xs[last2, 2]) / sum(wt)
+            @test rr.edof[2] == 1
+            # The other assets fit as they do without asset 2.
+            rf = regression(re, Xs[:, [1, 3]], F)
+            @test rr.M[[1, 3], :] ≈ rf.M && rr.edof[[1, 3]] == rf.edof
+        end
+        # A factor set that a caller pins saturates in the same way on three rows.
+        Xp = Xs[(T - 2):T, :]
+        Xp[1, 2] = ynoise[T - 2]
+        rp = @test_logs((:warn, r"Asset 1: the fit spends every one of its 3"),
+                        regression(StepwiseRegression(; included = [[1, 2], [1], Int[]]),
+                                   Xp, F[(T - 2):T, :]))
+        @test iszero(rp.M[1, :]) && rp.b[1] ≈ mean(Xp[:, 1]) && rp.edof == [2, 1, 2]
+        @test rp.M[2, 1] != 0
+        # Under two rows no model leaves a residual, so the regression refuses and names the
+        # count: an asset with one finite return, or a sample of one observation.
+        X1 = copy(Xs)
+        X1[T - 1, 2] = NaN
+        for re in (StepwiseRegression(), DimensionReductionRegression())
+            @test_throws r"asset 2 carries 1 finite and active return" regression(re, X1, F)
+            @test_throws ArgumentError regression(re, Xs[T:T, [1, 3]], F[T:T, :])
         end
     end
 
@@ -1178,7 +1221,7 @@ end
         w = pweights(range(0.5, 1.5; length = T))
         function roundtrip(re)
             x1, Vp, mu, sigma = PO.prep_dim_red_reg(re, F)
-            beta = PO._regression(re, y, mu, sigma, x1, Vp).beta
+            beta = PO._regression(re, y, mu, sigma, x1, Vp, 1).beta
             pred = beta[1] .+ F * beta[2:end]
             pred_pc = StatsAPI.predict(StatsAPI.fit(re.retgt, x1, y))
             return maximum(abs, pred .- pred_pc)
@@ -1203,7 +1246,7 @@ end
         # Equations 4.18 to 4.20 computed by hand against `_regression`.
         re = DimensionReductionRegression()
         x1, Vp, mu, sigma = PO.prep_dim_red_reg(re, F)
-        beta = PO._regression(re, y, mu, sigma, x1, Vp).beta
+        beta = PO._regression(re, y, mu, sigma, x1, Vp, 1).beta
         beta_pc = StatsAPI.coef(StatsAPI.fit(re.retgt, x1, y))[2:end]
         @test isapprox(beta[2:end], Vp * beta_pc ./ sigma)
         @test isapprox(beta[1], mean(y) - dot(beta[2:end], mu))
@@ -3262,7 +3305,7 @@ end
     function gap(re, y)
         x1, Vp, mu, sigma = PO.prep_dim_red_reg(re, F)
         fitted = S.predict(S.fit(factory(re.retgt, InterceptColumn(1)), x1, y), x1)
-        beta = PO._regression(re, y, mu, sigma, x1, Vp).beta
+        beta = PO._regression(re, y, mu, sigma, x1, Vp, 1).beta
         return maximum(abs.(fitted .- (beta[1] .+ F * beta[2:end])))
     end
     weighted(tgt) = factory(DimensionReductionRegression(; retgt = tgt), aw)
