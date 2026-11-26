@@ -38,7 +38,8 @@ The conversion keeps every gap in the returns, and it returns an [`AssetPanel`](
 `rd.pnl` that states which assets have data on each date. A table with no gap gives
 `rd.pnl === nothing`, because every asset has data on every date. To fill a gap inside the listing span,
 use [`PriceGapFill`](@ref). To drop the assets or the dates with too much missing data, use
-[`MissingDataFilter`](@ref). The page
+[`MissingDataFilter`](@ref). To find the prices that jump, such as an unrecorded split, use
+[`price_jumps`](@ref), and to drop those assets, use [`PriceJumpFilter`](@ref). The page
 [Data preprocessing and the ingestion layer](@ref example-data-preprocessing-and-the-ingestion-layer)
 covers these steps in depth.
 =#

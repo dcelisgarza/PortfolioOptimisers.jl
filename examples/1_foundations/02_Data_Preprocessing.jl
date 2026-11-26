@@ -23,7 +23,8 @@ in the universe and the ones the library can estimate at each observation.
 
 Neither function deletes an observation or an asset. A row deleted because one asset has a gap
 there is a row lost for every other asset. Deleting is a separate step,
-[`MissingDataFilter`](@ref), and so is filling, [`PriceGapFill`](@ref). Each is fitted on a
+[`MissingDataFilter`](@ref) or [`PriceJumpFilter`](@ref), and so is filling,
+[`PriceGapFill`](@ref). Each is fitted on a
 training window, which records its choice of assets, and applied to later windows with that same
 choice. We call such a step a universe policy. If a walk-forward chose the assets afresh on every
 window, it would score each fold against a universe that the future of that fold chose.
@@ -168,8 +169,8 @@ date.
 
 Asset 3 is missing for about 63% of the window. Keeping it costs nothing, because an optimiser
 leaves it out of every window whose coverage universe excludes it. If you want it gone from the
-universe, use [`MissingDataFilter`](@ref), the only step that deletes an asset or an observation.
-It is a universe policy too. We fit it on the table, and the fit records the assets that pass the
+universe, use [`MissingDataFilter`](@ref), which deletes the assets and the observations with too
+few prices. It is a universe policy too. We fit it on the table, and the fit records the assets that pass the
 threshold. Applied to a later window, the filter keeps those assets and does not choose
 again from that window's own data.
 =#
@@ -178,7 +179,30 @@ mdf = fit_preprocessing(MissingDataFilter(; col_thr = 0.5), pr)
 println("Assets kept after the 50% column filter: $(length(mdf.nx)) of $N")
 
 #=
-## 7. Optimise on the result
+## 7. Find the prices that jump
+
+A price table can also hold a move that the market never made, such as a split that the vendor did
+not record, or a bad tick. [`price_jumps`](@ref) lists every move above a factor between two
+consecutive prices of an asset, also across a gap, and it changes no data. We write a split of ten
+to one into a copy of the table to show the report.
+=#
+
+vals_split = copy(vals)
+vals_split[(T ÷ 2):end, 1] ./= 10
+pr_split = price_ingestion(PriceIngestion(), TimeArray(ts, vals_split, Symbol.(nx)))
+pretty_table(DataFrame(price_jumps(pr_split)); title = "Price jumps above a factor of 5")
+
+#=
+The library cannot tell a split from a real move, so you decide what the jump means. When you know
+the cause, correct the price. When you do not, [`PriceJumpFilter`](@ref) drops each asset that
+jumps in the training window. It is a universe policy, so a later window keeps the fitted assets.
+=#
+
+pjf = fit_preprocessing(PriceJumpFilter(), pr_split)
+println("Assets kept after the jump filter: $(length(pjf.nx)) of $N")
+
+#=
+## 8. Optimise on the result
 
 A [`ReturnsResult`](@ref) that holds a panel goes into the rest of the package like any other,
 with no extra arguments. The optimiser finds the coverage universe of the window from the returns
@@ -207,7 +231,7 @@ pretty_table(DataFrame(; table = ["carried", "filled with the held price"],
              title = "Estimable assets and assets with a weight above 1e-6")
 
 #=
-## 8. Plot the gaps
+## 9. Plot the gaps
 
 A heatmap of the missing prices shows the three kinds of gap. The wide band is asset 3's late
 listing, the short block is asset 2's halt, and the scattered dots are the single-day gaps.
@@ -226,9 +250,10 @@ heatmap(1:N, 1:T, Float64.(ismissing.(vals)); xlabel = "Asset", ylabel = "Day",
   - [`prices_to_returns`](@ref) computes the returns and keeps every gap. The
     [`AssetPanel`](@ref) it returns states which assets the library can estimate on which dates.
   - [`PriceGapFill`](@ref) fills a held gap with a price convention and writes nothing outside the
-    listing span. [`MissingDataFilter`](@ref) deletes the assets with too few prices, and no other
-    step deletes anything. Both are fitted on a training window and applied to later windows, so a
-    later window never chooses its own universe.
+    listing span. [`MissingDataFilter`](@ref) deletes the assets with too few prices, and
+    [`PriceJumpFilter`](@ref) deletes the assets whose price jumps. No other step before the
+    conversion deletes anything. Each is fitted on a training window and applied to later windows,
+    so a later window never chooses its own universe.
 
 [The point-in-time universe](@ref user-guide-the-point-in-time-universe) takes a table with gaps
 through these steps to a walk-forward, and shows where a fitted fill goes in a [`Pipeline`](@ref)
