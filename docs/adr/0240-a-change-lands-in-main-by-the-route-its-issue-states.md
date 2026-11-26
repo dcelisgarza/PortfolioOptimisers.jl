@@ -266,6 +266,64 @@ Two other forms were rejected. With `dev` for every small issue, the pull reques
 its fix. With the pull request for every issue, it grows past its one feature, and a fix that
 `main` needs waits for its review.
 
+## Amendment (2026-11-24)
+
+The `**Lands on:**` line could not say that work depends on an open pull request. Ten sweep tickets
+of the files of #2281, and two of #2277, said `dev`, and `dev` had none of the files. #2297 said
+`dev` and was blocked by #2277. #2307 needed code of #2308, and its line and its body named two
+different events to wait for. The tracker had eight spellings of `own branch`. The maintainer ruled
+that the line also states whether the work goes on a stacked pull request, on another branch, or on
+the same branch.
+
+1. **The ladder.** The table of § *The routes* sorts by the kind of the change. The place of the
+   change comes first now. The first true row of the table in `CLAUDE.md` § *Parallel sessions*
+   gives the value. The three tests of the amendment on issues from a review give `same branch`, and
+   they hold for an issue that any work gives rise to. A sweep sub-issue edits the files that a pull
+   request adds, so it is exempt. An independent issue from a review still takes `own branch`.
+2. **The values.** `own branch`, `dev`, `same branch #<pr>`, `stacked on <target>`, `map #<map>` and
+   `no code` for an issue. `own branch after <target>` and `dev after <target>` for work that waits.
+   `one branch dev-<feature>` and `each ticket` for a map. A target is `#<pr>`, or `dev-<feature>`
+   while the branch has no pull request. `same branch #<pr>` replaces `#<pr>`. The value ends the
+   line. `code_health/lands_on.sh` owns the grammar, and it refuses free text.
+3. **A sweep ticket.** `sweep_triage.jl` writes `dev` when `dev` or `main` has the file. When neither
+   has it, the plan is refused without `--after`, which gives `dev after <target>`.
+4. **A stack.** A pull request is standalone, with the base `main`, or it is a layer, with the branch
+   of another pull request as its base. GitHub applies the rules of `main` to each layer, shows the
+   diff of the layer alone, and merges from the bottom up, with one squash commit for each layer. A
+   layer takes the name `dev-<feature>`, because the required checks are the push checks. A stack has
+   three layers at most, because a push to a layer makes each layer above it run the CI again. One
+   session owns a stack and force-pushes its layers. `dev` and a map branch are never force-pushed.
+   The first stack is #2308 and #2311. Each push check ran on the upper layer, and GitHub marked that
+   layer `behind` while the live ruleset asked for a current base. So a stack needs item 2 of § *For
+   every route*, with `strict_required_status_checks_policy = false`.
+5. **The review.** A session that is not the author reviews each pull request. GitHub refuses the
+   approval of a pull request by its author, and one account does the work. So
+   `code_health/review_stamp.sh` records a review of the kind comment, and the commit status `Review`
+   on the head. The record holds the patch id of the diff against the base, so that the status goes to
+   a new head when the diff did not change. No ruleset requires the status yet.
+6. **The checks.** The workflow `Route` labels each issue with its route, compares a pull request
+   with the routes of the issues that it closes, and carries the review. No merge waits for it.
+7. **The steps.** The `land-work` skill owns the steps of each route. `CLAUDE.md` holds the ladder,
+   and the `sweep-conform` skill holds the gates.
+
+Two forms were rejected. With a label on the pull request alone, the session that files an issue
+makes no choice. With one value for work that depends, a sweep ticket that can wait makes a layer,
+and each layer costs a full run of the CI.
+
+## Amendment (2026-11-25)
+
+Sessions turned on auto-merge for #2323 and #2325, as § *Own branch* told them to. Both merged with no
+review. The maintainer ruled that `main` takes no commit from a session.
+
+1. **The merge.** The maintainer merges each pull request into `main`, whatever its route. A session
+   opens the pull request and stops. It runs no `gh pr merge`, with or without `--auto`. This replaces
+   the auto-merge of § *Own branch*, of § *Map*, and of the amendment on issues from a review.
+2. **The review of a known head.** `review_stamp.sh post` takes the sha that the reviewer read, and it
+   refuses another head. A change of the base of a pull request changes its diff and not its head, so
+   the status `Review` then becomes `pending`.
+3. **A target that is a branch.** A merge does not delete the branch now, so the state of a
+   `dev-<feature>` target is that of its newest pull request.
+
 ## Amendment (2026-11-25, the runs of an old head)
 
 The amendment of 2026-11-24 of ADR 0220 changes what happens to the runs of a branch. It replaces

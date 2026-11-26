@@ -812,7 +812,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the [routing target](@ref PIPELINE_ROUTING_TARGETS) that a constraint result names by its type alone, or `nothing`.
 
-Four result types name one optimiser field each. A [`WeightBounds`](@ref) goes to `:wb`, a [`LinearConstraint`](@ref) to `:lcse`, a phylogeny constraint result to `:ple`, and a [`RiskBudget`](@ref) to `:rkb`. Every other type returns `nothing`, and needs a target beside it, see [`TargetedConstraint`](@ref).
+Five result types name one optimiser field each. A [`WeightBounds`](@ref) goes to `:wb`, a [`LinearConstraint`](@ref) to `:lcse`, a phylogeny constraint result to `:ple`, a [`ConcentrationLimit`](@ref) to `:conc`, and a [`RiskBudget`](@ref) to `:rkb`. Every other type returns `nothing`, and needs a target beside it, see [`TargetedConstraint`](@ref).
 
 This function is the only part of the fan-out that the type decides. It also decides whether the value of a step needs a wrapper. [`add_constraint_result`](@ref) wraps a value only when the value cannot name its own target, so the `constraints` slot holds a bare result where it can.
 
@@ -833,6 +833,7 @@ implicit_constraint_target(::WeightBounds)::Symbol = :wb
 implicit_constraint_target(::LinearConstraint)::Symbol = :lcse
 implicit_constraint_target(::AbstractPhylogenyConstraintResult)::Symbol = :ple
 implicit_constraint_target(::RiskBudget)::Symbol = :rkb
+implicit_constraint_target(::ConcentrationLimit)::Symbol = :conc
 implicit_constraint_target(::Any) = nothing
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

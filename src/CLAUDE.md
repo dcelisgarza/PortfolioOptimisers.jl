@@ -9,8 +9,8 @@ routes every subject that this list does not name.
 
 - **The standing test picks a design, and correctness wins over convenience.** A break of an
   interface is not a cost, and a name of the break goes in the commit and in
-  `docs/src/migration.md`. [`julia-source-code.instructions.md`][sc] § *A design is chosen by
-  the standing test*.
+  `docs/src/next_release/<feature>.md`. [`julia-source-code.instructions.md`][sc] § *A design is
+  chosen by the standing test*.
 - **An estimator never holds a Result**, except a Partial Fit State.
   [`julia-source-code.instructions.md`][sc] § *Estimator, Algorithm, and Result Roles*, and
   [ADR 0106](../docs/adr/0106-a-partial-fit-state-is-the-one-result-an-estimator-holds.md).

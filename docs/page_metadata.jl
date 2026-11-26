@@ -5,11 +5,11 @@
 # now carry their own:
 #
 #   * A HAND-WRITTEN page — the landing page, the capability catalogue, the API introduction,
-#     the migration guide, the references page, the contribute pages, and every Literate
-#     source under `user_guide/` and `examples/` — carries a `Description = "…"` in a
-#     `@meta` block of its source. The census in `test/test_64_docs_page_metadata_census.jl`
-#     checks that the line exists, is not the default, is unique across the site, and fits
-#     the length a search engine shows.
+#     the migration guide, the pages of the next release, the references page, the contribute
+#     pages, and every Literate source under `user_guide/` and `examples/` — carries a
+#     `Description = "…"` in a `@meta` block of its source. The census in
+#     `test/test_64_docs_page_metadata_census.jl` checks that the line exists, is not the
+#     default, is unique across the site, and fits the length a search engine shows.
 #
 #   * A MIRROR page — one of the pages under `docs/src/public_api/` and
 #     `docs/src/private_api/` that ADR 0128's migration generates, one pair per source file —
