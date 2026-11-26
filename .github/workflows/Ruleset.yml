@@ -1,0 +1,40 @@
+name: Ruleset
+
+# The settings of `main` live outside the tree, so a change to one leaves no diff. The live ruleset
+# asked for a current base, which ADR 0220 and ADR 0240 refuse, and each merge then made the other
+# pull requests run about three hours of CI again. This job compares the ruleset with
+# `.github/rulesets/protect-main.json`, which is the decision. No merge waits for it.
+
+on:
+  schedule:
+    # Each day, 05:00 UTC.
+    - cron: "0 5 * * *"
+  push:
+    branches:
+      - main
+    paths:
+      - .github/rulesets/**
+      - .github/ruleset_check.py
+      - .github/workflows/Ruleset.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ruleset:
+    name: The ruleset of main agrees with its file
+    if: github.repository == 'dcelisgarza/PortfolioOptimisers.jl'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Compare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          id="$(gh api "repos/$GH_REPO/rulesets" --jq '.[] | select(.name == "Protect Main") | .id')"
+          [ -n "$id" ] || { echo "::error::There is no ruleset Protect Main."; exit 1; }
+          gh api "repos/$GH_REPO/rulesets/$id" > live.json
+          python3 -I .github/ruleset_check.py .github/rulesets/protect-main.json < live.json
