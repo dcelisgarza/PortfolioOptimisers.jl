@@ -1134,14 +1134,3 @@ A `ConstraintBlock` holds concentration rules, such as the UCITS 5/10/40 rule, i
 
 - **An entropy pooling prior with `OptimEntropyPooling`, the default optimiser, and a prior probability of zero** meets its views. With `alg = LogEntropyPooling()`, v0.34.7 stopped at the start of the solve and reported success, and the posterior missed the views. With `alg = ExpEntropyPooling()`, v0.34.7 could miss a view when an observation of zero prior probability held an extreme value. `JuMPEntropyPooling` had neither defect.
 - **An `EntropyPoolingPrior` or a `MeucciEntropyPoolingPrior` with a prior probability of zero at an extreme return**, such as a crash that `w` removes, meets its views under every optimiser. v0.34.7 scaled each view with the return that the prior removes. A kurtosis view could miss its target by a third of it. An entropic value at risk view gave the prior back, with no error, or raised an error about the grid or about a `NaN` coefficient. The views now read the mean row of the other observations there, so the posterior moves by rounding when the removed returns are ordinary.
-
-## From v0.37 to v0.38
-
-### [The block of a weight finaliser](@id migration-0-38-weight-finaliser)
-
-`JuMPWeightFinaliser` holds a `ConstraintBlock` in the new field `cbe`, so a clustering or naive optimiser takes each slot of a block, such as `card`, `conc`, `lcse` or `tn`. A finaliser that states no slot gives the weights of v0.37. Code that builds it by keyword does not change.
-
-- **`JuMPWeightFinaliser`** takes five positional arguments, `slv`, `cbe`, `sc`, `so` and `alg`, where v0.37 took four. Write `JuMPWeightFinaliser(slv, ConstraintBlock(; wb = nothing), sc, so, alg)`, or use the keyword constructor. The type parameters gain one entry after the one of `slv`, and the show of the finaliser prints the rows of `cbe`.
-- **A `ConstraintBlock` with a slot keyed by name and no `sets`** raised an `IsNothingError` at its construction. The constructor of its owner now raises it: `JuMPOptimiser`, `ProgrammeAllocationSet`, or the optimiser that holds the finaliser.
-- **A weight finaliser of your own** takes the context of the head. Write `PortfolioOptimisers.opt_weight_bounds(wf::MyFinaliser, wb, w, ctx...)` where v0.37 took `opt_weight_bounds(wf::MyFinaliser, wb, w)`. The context is `pr`, `rd`, `sets`, `fees` and `strict`.
-- **A deviation of your own for `JuMPWeightFinaliser`**, a subtype of `JuMPWeightFinaliserFormulation`, gives its deviation to `PortfolioOptimisers.set_divergence_objective!`, so the penalties of the block join the objective. A method that sets the objective itself still runs, and it ignores a penalty.

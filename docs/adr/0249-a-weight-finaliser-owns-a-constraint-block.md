@@ -51,7 +51,7 @@ maintainer settled its form in a grilling session on 2026-11-23 (#2258).
 ## Consequences
 
 - A user subtype of `WeightFinaliser` takes the context arguments, and the positional constructor
-  of `JuMPWeightFinaliser` takes `cbe` after `slv`. `docs/src/migration.md` names both.
+  of `JuMPWeightFinaliser` takes `cbe` after `slv`. `docs/src/next_release/weight-finaliser-block.md` names both.
 - The finaliser loads after the block and the geometries, in `17_Optimisation/12_JuMPWeightFinaliser.jl`.
 - The risk ceilings `r` and the return floor `ret` of a `ProgrammeAllocationSet` are not slots of
   the block, so the finaliser has neither.
