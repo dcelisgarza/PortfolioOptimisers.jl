@@ -1,8 +1,8 @@
 ```@meta
-Description = "S rho functions, private API of PortfolioOptimisers.jl: m_scale, chisq_truncated_moment, bisquare_constant, bisquare_efficiency."
+Description = "S rho, private API of PortfolioOptimisers.jl: m_scale, chisq_truncated_moment, bisquare_constant, bisquare_efficiency."
 ```
 
-# S rho functions: private API
+# S rho: private API
 
 ```@docs
 PortfolioOptimisers.m_scale

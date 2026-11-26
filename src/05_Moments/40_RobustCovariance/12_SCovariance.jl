@@ -145,11 +145,11 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> SCovariance()
 SCovariance
-     me ┼ nothing
-    rho ┼ BisquareRho()
-    bdp ┼ Float64: 0.5
-    alg ┼ DetS()
-      q ┴ Float64: 0.975
+   me ┼ nothing
+  rho ┼ BisquareRho()
+  bdp ┼ Float64: 0.5
+  alg ┼ DetS()
+    q ┴ Float64: 0.975
 ```
 
 # Related

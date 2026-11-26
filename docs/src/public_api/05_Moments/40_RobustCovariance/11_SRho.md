@@ -1,8 +1,8 @@
 ```@meta
-Description = "S rho functions, public API of PortfolioOptimisers.jl: AbstractSRho, BisquareRho, s_tuning, srho, srho_weight."
+Description = "S rho, public API of PortfolioOptimisers.jl: AbstractSRho, BisquareRho, s_tuning, srho, srho_weight."
 ```
 
-# S rho functions
+# S rho
 
 ```@docs
 AbstractSRho

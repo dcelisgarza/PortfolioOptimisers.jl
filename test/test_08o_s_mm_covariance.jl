@@ -134,8 +134,10 @@ end
                                      false, k, b, 1)
         @test !done
         # A low efficiency moves the lower bound of the search of the constant.
-        c2 = POS.mm_constant(BisquareReweighting(; eff = 0.01), 3)
-        @test POS.bisquare_efficiency(3, c2) ≈ 0.01
+        for eff in (0.01, 0.001)
+            c2 = POS.mm_constant(BisquareReweighting(; eff = eff), 3)
+            @test POS.bisquare_efficiency(3, c2) ≈ eff
+        end
         @test POS.chisq_truncated_moment(3, Inf, [0.0, 1.0]) ≈ 3
         @test POS.s_refine(DetS(), BisquareRho(), X, [(s.mu, s.sigma)], false, k, b) ==
               [(s.mu, s.sigma)]

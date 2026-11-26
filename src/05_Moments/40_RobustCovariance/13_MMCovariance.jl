@@ -61,7 +61,7 @@ end
 
 Returns the tuning constant ``c^2`` of the bisquare function at which the shape of the M-step has the efficiency `rw.eff` at the normal model.
 
-The efficiency of [`bisquare_efficiency`](@ref) rises with ``c^2``, so a bisection finds the constant. The interval starts at ``p`` and doubles its bounds until it holds the constant.
+The efficiency of [`bisquare_efficiency`](@ref) rises with ``c^2``, so a bisection finds the constant. The interval starts at ``[p/2, p]``. Its lower bound halves and its upper bound doubles until it holds the constant.
 
 # Arguments
 
@@ -79,7 +79,8 @@ The efficiency of [`bisquare_efficiency`](@ref) rises with ``c^2``, so a bisecti
 """
 function mm_constant(rw::BisquareReweighting, p::Integer)
     excess(c2) = bisquare_efficiency(p, c2) - rw.eff
-    lo, hi = float(p) / 2, float(p)
+    hi = p * one(rw.eff)
+    lo = hi / 2
     while excess(lo) > 0
         lo /= 2
     end
@@ -242,11 +243,11 @@ Keywords correspond to the struct's fields.
 julia> MMCovariance()
 MMCovariance
    s ┼ SCovariance
-     │      me ┼ nothing
-     │     rho ┼ BisquareRho()
-     │     bdp ┼ Float64: 0.5
-     │     alg ┼ DetS()
-     │       q ┴ Float64: 0.975
+     │    me ┼ nothing
+     │   rho ┼ BisquareRho()
+     │   bdp ┼ Float64: 0.5
+     │   alg ┼ DetS()
+     │     q ┴ Float64: 0.975
   rw ┼ BisquareReweighting
      │   eff ┴ Float64: 0.95
    q ┴ Float64: 0.975
