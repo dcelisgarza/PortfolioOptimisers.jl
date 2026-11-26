@@ -108,19 +108,18 @@
         @test f.flq.w == pw
     end
 
-    @testset "The view splits the two axes at the mask and its complement" begin
-        # This is what replaces a dedicated door verb. `port_opt_view` is handed the
-        # **unreduced** returns matrix, so it derives the complement from `size(X, 2)` and
-        # the indices it was given. Asset 3 of four leaves the universe.
+    @testset "The door splits the two axes at the mask and its complement" begin
+        # Asset 3 of four leaves the universe. `investable_fees_view` is the one verb that
+        # splits, because a mask says that an asset left and an index does not.
         X = rand(7, 4)
-        i = [1, 2, 4]
+        imsk = BitVector([1, 1, 0, 1])
         w = [0.1, 0.2, 0.3, 0.4]
         fees = Fees(; tn = Turnover(; w = w, val = [0.001, 0.002, 0.010, 0.003]),
                     l = [0.01, 0.02, 0.03, 0.04], s = [0.05, 0.06, 0.07, 0.08],
                     fl = [1.0, 2.0, 3.0, 4.0], fs = [5.0, 6.0, 7.0, 8.0],
                     lq = Turnover(; w = w, val = [0.001, 0.002, 0.010, 0.003]),
                     flq = Turnover(; w = w, val = [9.0, 10.0, 11.0, 12.0]))
-        v = PortfolioOptimisers.port_opt_view(fees, i, X)
+        v = PortfolioOptimisers.investable_fees_view(fees, imsk, X)
 
         # The five per-asset fields keep the assets the portfolio holds.
         @test collect(v.l) == [0.01, 0.02, 0.04]
@@ -135,6 +134,7 @@
         @test collect(v.lq.val) == [0.010]
         @test collect(v.flq.w) == [0.3]
         @test collect(v.flq.val) == [11.0]
+        @test v.imsk == imsk
 
         # The clock and the tolerance ride through untouched.
         @test v.kwargs == fees.kwargs
@@ -143,42 +143,145 @@
         # Every asset investable means nothing exited, so both carriers go. A `Turnover`
         # refuses an empty `w`, so `nothing` is the answer the type asks for as well as the
         # answer the rule asks for.
-        vall = PortfolioOptimisers.port_opt_view(fees, [1, 2, 3, 4], X)
+        vall = PortfolioOptimisers.investable_fees_view(fees, trues(4), X)
         @test isnothing(vall.lq)
         @test isnothing(vall.flq)
         @test collect(vall.l) == fees.l
 
-        # The estimator takes the same two axes.
-        fest = FeesEstimator(; tn = TurnoverEstimator(; w = w, val = 0.001),
-                             l = [0.01, 0.02, 0.03, 0.04],
-                             lq = TurnoverEstimator(; w = w, val = 0.010),
-                             flq = TurnoverEstimator(; w = w, val = 5.0))
-        ve = PortfolioOptimisers.port_opt_view(fest, i, X)
-        @test collect(ve.l) == [0.01, 0.02, 0.04]
-        @test collect(ve.tn.w) == [0.1, 0.2, 0.4]
-        @test collect(ve.lq.w) == [0.3]
-        @test collect(ve.flq.w) == [0.3]
-        @test ve.dl === fest.dl
-        @test ve.kwargs == fest.kwargs
+        # The mask and every vector of the fee are on the unreduced universe.
+        @test_throws DimensionMismatch PortfolioOptimisers.investable_fees_view(fees, imsk,
+                                                                                5)
+        short = Fees(; lq = Turnover(; w = [0.3], val = 0.01))
+        @test_throws DimensionMismatch PortfolioOptimisers.investable_fees_view(short, imsk,
+                                                                                4)
     end
 
-    @testset "A caller that hands no matrix leaves the carriers alone" begin
-        # Without the unreduced matrix there is no complement to derive, so the fallback
-        # slices the five per-asset fields and passes the carriers through. They already sit
-        # on their own axis, so that is the correct answer rather than a degraded one.
+    @testset "A view is a selection, so it slices every term at one index" begin
+        # An asset outside a selection is an asset of another part. It did not leave.
+        X = rand(7, 4)
         w = [0.1, 0.2, 0.3, 0.4]
-        fees = Fees(; l = [0.01, 0.02, 0.03, 0.04],
-                    lq = Turnover(; w = w, val = [0.001, 0.002, 0.010, 0.003]))
-        v = PortfolioOptimisers.port_opt_view(fees, [1, 2, 4])
-        @test collect(v.l) == [0.01, 0.02, 0.04]
-        @test collect(v.lq.w) == w
-        # The estimator takes the same fallback (#1912).
-        fest = FeesEstimator(; l = [0.01, 0.02, 0.03, 0.04],
-                             lq = TurnoverEstimator(; w = w, val = 0.010))
-        ve = PortfolioOptimisers.port_opt_view(fest, [1, 2, 4])
-        @test ve isa FeesEstimator
-        @test collect(ve.l) == [0.01, 0.02, 0.04]
-        @test collect(ve.lq.w) == w
+        val = [0.001, 0.002, 0.010, 0.003]
+        fees = Fees(; tn = Turnover(; w = w, val = val), l = [0.01, 0.02, 0.03, 0.04],
+                    lq = Turnover(; w = w, val = val), flq = Turnover(; w = w, val = 5.0))
+        for v in (PortfolioOptimisers.port_opt_view(fees, [4, 3]),
+                  PortfolioOptimisers.port_opt_view(fees, [4, 3], X))
+            @test collect(v.l) == [0.04, 0.03]
+            @test collect(v.tn.w) == collect(v.lq.w) == collect(v.flq.w) == [0.4, 0.3]
+            @test collect(v.lq.val) == [0.003, 0.010]
+            @test v.flq.val == 5.0
+            @test isnothing(v.imsk)
+            # A departure inside the selection finds its own rate.
+            d = PortfolioOptimisers.investable_fees_view(v, BitVector([1, 0]), 2)
+            @test collect(d.lq.w) == [0.3]
+            @test collect(d.lq.val) == [0.010]
+        end
+        # The exits of a marked fee are outside every selection of the axis that it holds.
+        red = PortfolioOptimisers.investable_fees_view(fees, BitVector([1, 1, 0, 1]), 4)
+        rv = PortfolioOptimisers.port_opt_view(red, [3, 1])
+        @test collect(rv.l) == [0.04, 0.01]
+        @test isnothing(rv.lq) && isnothing(rv.flq) && isnothing(rv.imsk)
+        # The estimator takes the same view (#1912).
+        fest = FeesEstimator(; tn = TurnoverEstimator(; w = w, val = 0.001),
+                             l = [0.01, 0.02, 0.03, 0.04], s = Dict("a" => 0.1),
+                             lq = TurnoverEstimator(; w = w, val = 0.010),
+                             flq = TurnoverEstimator(; w = w, val = 5.0), dl = 0.5)
+        for ve in (PortfolioOptimisers.port_opt_view(fest, [4, 3]),
+                   PortfolioOptimisers.port_opt_view(fest, [4, 3], X))
+            @test ve isa FeesEstimator
+            @test collect(ve.l) == [0.04, 0.03]
+            @test ve.s === fest.s
+            @test collect(ve.tn.w) == collect(ve.lq.w) == collect(ve.flq.w) == [0.4, 0.3]
+            @test ve.dl === fest.dl
+            @test ve.kwargs == fest.kwargs
+        end
+    end
+
+    @testset "A selection with a departure charges the rate of the asset that left" begin
+        using StableRNGs, LinearAlgebra, Clarabel
+        # Asset 3 of eight delists, inside each selection. The exit rate names the asset.
+        Xs = randn(StableRNG(1), 300, 8) ./ 100 .+ 0.0005
+        Xd = copy(Xs)
+        Xd[200:end, 3] .= NaN
+        rdd = ReturnsResult(; nx = string.("A", 1:8), X = Xd)
+        fees = Fees(;
+                    lq = Turnover(; w = fill(0.125, 8), val = collect(1:8) ./ 1000,
+                                  fixed = true))
+        slv = Solver(; name = :cl, solver = Clarabel.Optimizer,
+                     check_sol = (; allow_local = true, allow_almost = true),
+                     settings = Dict("verbose" => false))
+        wbs = WeightBounds(; lb = 0.0, ub = 1.0)
+        hopt = HierarchicalOptimiser(; fees = fees)
+        for opt in (MeanRisk(; opt = JuMPOptimiser(; slv = slv, fees = fees, wb = wbs)),
+                    InverseVolatility(; fees = fees), EqualWeighted(; fees = fees),
+                    HierarchicalRiskParity(; opt = hopt),
+                    HierarchicalEqualRiskContribution(; opt = hopt),
+                    NestedClustered(; opti = InverseVolatility(), opto = InverseVolatility(),
+                                    fees = fees))
+            for i in (1:8, [2, 3, 5, 7], [1, 3, 4, 5, 6])
+                res = optimise(PortfolioOptimisers.port_opt_view(opt, i, Xd),
+                               PortfolioOptimisers.port_opt_view(rdd, i))
+                @test collect(res.fees.lq.val) == [0.003]
+                @test collect(res.fees.lq.w) == [0.125]
+            end
+        end
+        # A cross-validation on a selection of columns, with the departure inside it.
+        ivf = InverseVolatility(; fees = fees)
+        cols = [2, 3, 5, 7]
+        p = cross_val_predict(ivf, rdd, IndexWalkForward(250, 50); cols = cols)
+        @test all(x -> collect(x.res.fees.lq.val) == [0.003], p.pred)
+        # A measure that reads its own coskewness at the columns reads the whole matrix, in
+        # both verbs that cut the columns.
+        prh = prior(HighOrderPriorEstimator(), ReturnsResult(; nx = rdd.nx, X = Xs))
+        opn = MeanRisk(; r = NegativeSkewness(; sk = prh.sk, V = prh.V),
+                       opt = JuMPOptimiser(; pe = HighOrderPriorEstimator(), slv = slv,
+                                           wb = wbs))
+        rdf = ReturnsResult(; nx = rdd.nx, X = Xs)
+        pn = cross_val_predict(opn, rdf, IndexWalkForward(250, 50); cols = cols)
+        @test all(x -> length(x.res.w) == 4, pn.pred)
+        pm = cross_val_predict(opn, rdf,
+                               MultipleRandomised(IndexWalkForward(250, 50);
+                                                  subset_size = 4, n_subsets = 3,
+                                                  rng = StableRNG(3), seed = 3))
+        @test all(p -> all(x -> length(x.res.w) == 4, p.pred), pm.pred)
+        @test all(p -> all(x -> isa(x.res.retcode, OptimisationSuccess), p.pred), pm.pred)
+        # The benchmark of a tracking rule is a portfolio. It pays the exit of an asset that
+        # left, and no exit in a window or a selection that no asset left.
+        wb8 = fill(0.125, 8)
+        tr = WeightsTracking(; w = wb8,
+                             fees = Fees(;
+                                         lq = Turnover(; w = wb8,
+                                                       val = collect(1:8) ./ 100)))
+        charge(t, Z) = Z * t.w - PortfolioOptimisers.tracking_benchmark(t, Z)
+        @test all(abs.(charge(tr, Xs)) .< 1e-14)
+        @test all(abs.(charge(PortfolioOptimisers.port_opt_view(tr, 1:4, Xs), Xs[:, 1:4])) .<
+                  1e-14)
+        imsk = BitVector([1, 1, 0, 1, 1, 1, 1, 1])
+        ix = PortfolioOptimisers.InvestableIndex(imsk)
+        @test ix == findall(imsk)
+        @test size(ix) == (7,)
+        @test IndexStyle(typeof(ix)) === IndexLinear()
+        @test PortfolioOptimisers.selection_index(ix) === ix.idx
+        @test PortfolioOptimisers.selection_index([2, 1]) == [2, 1]
+        trm = PortfolioOptimisers.port_opt_view(tr, ix, Xd)
+        @test charge(trm, Xs[:, imsk]) ≈ fill(0.03 * 0.125, 300)
+        # A cluster of the reduced universe pays no exit.
+        @test all(abs.(charge(PortfolioOptimisers.port_opt_view(trm, 1:3),
+                              Xs[:, [1, 2, 4]])) .< 1e-14)
+        # The entry of a fit gives the index, and a meta-optimiser keeps it from its inner
+        # heads, which charge no exit of their parent.
+        prd = prior(EmpiricalPrior(), rdd)
+        trk = JuMPOptimiser(; slv = slv, wb = wbs, pe = prd,
+                            cbe = ConstraintBlock(;
+                                                  tr = TrackingError(; tr = tr, err = 0.1)))
+        _, _, optv, _ = PortfolioOptimisers.investable_reduction(prd, trk, rdd)
+        @test collect(optv.cbe.tr.tr.fees.lq.val) == [0.03]
+        ncov = PortfolioOptimisers.port_opt_view(NestedClustered(;
+                                                                 opti = MeanRisk(;
+                                                                                 opt = trk),
+                                                                 opto = InverseVolatility()),
+                                                 ix, Xd)
+        @test collect(ncov.opti.opt.cbe.tr.tr.fees.lq.val) == (collect(1:8) ./ 100)[imsk]
+        @test isnothing(ncov.opti.opt.cbe.tr.tr.fees.imsk)
     end
 
     @testset "An Investable Mask drives the split, end to end" begin
@@ -223,15 +326,17 @@
         @test collect(opt_v.fees.tn.w) == w[keep]
         @test collect(opt_v.fees.tn.val) == qval[keep]
 
-        # The liquidation carriers keep the one asset that left, and its rate is the rate
-        # the caller stated for it.
-        @test collect(opt_v.fees.lq.w) == [w[k]]
-        @test collect(opt_v.fees.lq.val) == [qval[k]]
-        @test collect(opt_v.fees.flq.w) == [w[k]]
-        @test collect(opt_v.fees.flq.val) == [fval[k]]
+        # The fit resolves and splits its fee before the reduction, so the view of the
+        # optimiser is a slice, and the split is that of the door.
+        @test collect(opt_v.fees.lq.w) == w[keep]
+        red = PortfolioOptimisers.investable_fees_view(fees, imsk, prn.X)
+        @test collect(red.lq.w) == [w[k]]
+        @test collect(red.lq.val) == [qval[k]]
+        @test collect(red.flq.w) == [w[k]]
+        @test collect(red.flq.val) == [fval[k]]
 
         # The two axes partition the universe: nothing is counted twice, nothing is lost.
-        @test length(opt_v.fees.l) + length(opt_v.fees.lq.w) == N
+        @test length(red.l) + length(red.lq.w) == N
 
         # The natural setting: solve the problem. The optimisation reduces at its entry,
         # solves on the four surviving assets, and expands the weights back to the full
@@ -271,7 +376,7 @@
         opte = JuMPOptimiser(; pe = prn, fees = fest, sets = sets, slv = slv)
         _, _, opte_v, _ = PortfolioOptimisers.investable_reduction(prn, opte, rd)
 
-        # The estimator's carriers land on the same complement as the result's.
+        # The view of the estimator is the view of the result.
         @test collect(opte_v.fees.lq.w) == collect(opt_v.fees.lq.w)
         @test collect(opte_v.fees.flq.w) == collect(opt_v.fees.flq.w)
         @test collect(opte_v.fees.tn.w) == collect(opt_v.fees.tn.w)
@@ -287,13 +392,13 @@
         # Resolving on the FULL sets first, then viewing, reaches exactly the two axes the
         # hand-written `Fees` reached.
         resolved_first = fees_constraints(fest, sets)
-        split_after = PortfolioOptimisers.port_opt_view(resolved_first, keep, prn.X)
+        split_after = PortfolioOptimisers.investable_fees_view(resolved_first, imsk, prn.X)
         @test collect(split_after.l) == lval[keep]
         @test collect(split_after.lq.w) == [w[k]]
         @test collect(split_after.lq.val) == [qval[k]]
         @test collect(split_after.flq.val) == [fval[k]]
-        @test collect(split_after.lq.w) == collect(opt_v.fees.lq.w)
-        @test collect(split_after.lq.val) == collect(opt_v.fees.lq.val)
+        @test collect(split_after.lq.w) == collect(red.lq.w)
+        @test collect(split_after.lq.val) == collect(red.lq.val)
     end
 
     @testset "Both axes are charged, and the row sums reproduce the series" begin

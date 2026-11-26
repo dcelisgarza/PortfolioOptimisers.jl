@@ -35,3 +35,25 @@ Estimator sibling is the thing that *computes* the data). The deviation is delib
   part of the Phase-5 ergonomics release, so no deprecation shim was kept.
 - No `factory`/`port_opt_view` methods: finite allocation is terminal post-processing, never
   sub-selected by meta-optimisers or Cross-Validation.
+
+## Amendment (2026-11-25)
+
+The allocators and the input have views, and no allocator records a cut
+([#2348](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/2348)).
+
+A caller who selects assets views the allocator and the input at one index, as the estimators of
+the continuous optimisers and the returns data are viewed at one index.
+
+- **The allocators** tag `unit`, `sets` and `fb` `@vprop`. The field `idx` of v0.34.7 goes. It held
+  the positions that a view kept, so that a `LotUnitEstimator` resolved on the whole universe. No
+  other estimator records a cut, and nothing compared the positions with the input. A name that a
+  view left out is now a name outside the `sets` of the view, as in the view of every other
+  constraint. The lots still resolve in `optimise`, in the number type of the input.
+- **The input** lifts its fee onto the axis of `w`, views each term with its asset, and reduces it
+  again at the view of `imsk`. So an exit charge is in the view of its asset alone, and the views
+  of a partition add to the whole. The rule `upw` runs on the whole book before the cut. The cash
+  and the collateral belong to the account, so a view keeps them.
+
+Refused: a view that resolves the lots. It fixes the number type before the input is known, and it
+reports a wrong name of a fallback that never runs. Refused: `lq` and `flq` whole in each view,
+because two views of one book at disjoint assets then each charge all the exits.

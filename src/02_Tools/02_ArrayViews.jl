@@ -18,7 +18,7 @@ View of a value at the asset index `i`, where the value can be `nothing`, a scal
 
 # Algorithm
 
-The method that Julia selects is the algorithm. Each step is one method, and no method allocates a copy of the data.
+The method that Julia selects is the algorithm. Each step is one method, and no method allocates a copy of the data. Each view takes the index through [`selection_index`](@ref), so an [`InvestableIndex`](@ref) gives the view that its vector of integers gives.
 
  1. `x` carries no asset axis, because it is `nothing`, a scalar, a pair, a dictionary, a value algorithm, a set of dynamic weights, an estimator, an algorithm or a `StatsBase.CovarianceEstimator`: return `x` itself.
  2. `x` is a vector: return `view(x, i)`, one entry per selected asset.
@@ -73,13 +73,14 @@ function nothing_scalar_array_view(x::Union{Nothing, Number, Pair, VecPair, Dict
     return x
 end
 function nothing_scalar_array_view(x::AbstractVector, i)
-    return view(x, i)
+    return view(x, selection_index(i))
 end
 function nothing_scalar_array_view(x::VecScalar, i)
-    return VecScalar(; v = view(x.v, i), s = x.s)
+    return VecScalar(; v = view(x.v, selection_index(i)), s = x.s)
 end
 function nothing_scalar_array_view(x::AbstractMatrix, i)
-    return view(x, i, i)
+    j = selection_index(i)
+    return view(x, j, j)
 end
 function nothing_scalar_array_view(x::AbstractVector{<:Union{AbstractVector, AbstractMatrix,
                                                              VecScalar}}, i)
@@ -189,6 +190,99 @@ function port_opt_view(x::AbstractVector{<:Union{Nothing, AbstractEstimator,
                                                  AbstractAlgorithm, AbstractResult}}, i,
                        args...; kwargs...)
     return [port_opt_view(xi, i, args...; kwargs...) for xi in x]
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Holds the index of the investable assets, and the mask that it comes from.
+
+The index of a view names the assets that stay. It does not say what the other assets are. In a cluster, a subset or a selection of columns, they are assets of another part, and nothing happens to them. At the entry of a fit they left the **Investable Mask**, and each position in one of them is sold. The entry gives this index to its views, so a type that charges the sale can tell the two cases apart. [`WeightsTracking`](@ref) is that type: the fee of its benchmark goes through [`investable_fees_view`](@ref) at the mask. Every other type reads the index as a vector of integers, and the view of an array takes that vector alone.
+
+A meta-optimiser gives a plain vector to the view of its inner optimisers, through [`selection_index`](@ref), because a fit charges a forced exit at its outer level only.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    InvestableIndex(
+        imsk::BitVector
+    ) -> InvestableIndex
+
+`idx` is `findall(imsk)`.
+
+# Examples
+
+```jldoctest
+julia> i = PortfolioOptimisers.InvestableIndex(BitVector([true, false, true]))
+2-element PortfolioOptimisers.InvestableIndex:
+ 1
+ 3
+
+julia> view([10, 20, 30], i) == [10, 30]
+true
+```
+
+# Related
+
+  - [`port_opt_view`](@ref)
+  - [`selection_index`](@ref)
+  - [`investable_reduction`](@ref)
+  - [`coverage_reduction`](@ref)
+  - [`WeightsTracking`](@ref)
+"""
+struct InvestableIndex <: AbstractVector{Int}
+    """
+    Positions of the assets on the mask, in ascending order.
+    """
+    idx::Vector{Int}
+    """
+    Investable Mask, over the universe before the reduction.
+    """
+    imsk::BitVector
+    function InvestableIndex(imsk::BitVector)
+        return new(findall(imsk), imsk)
+    end
+end
+Base.size(i::InvestableIndex) = size(i.idx)
+Base.IndexStyle(::Type{InvestableIndex}) = IndexLinear()
+Base.@propagate_inbounds Base.getindex(i::InvestableIndex, k::Int) = i.idx[k]
+"""
+    selection_index(i)
+    selection_index(i::InvestableIndex) -> Vector{Int}
+
+Give the index of a view as a selection, which says nothing about the assets that it leaves out.
+
+A meta-optimiser calls it before it views an inner optimiser. A fit charges a forced exit at its outer level only, so the inner optimiser must not read the departures of its parent. The view of an array calls it too, because an array has no use for the mask.
+
+# Algorithm
+
+ 1. On an [`InvestableIndex`](@ref), return its `idx`.
+ 2. On any other index, return it.
+
+# Arguments
+
+  - `i`: Indices of the assets that the view keeps.
+
+# Returns
+
+  - `i`: The same indices, with no mask.
+
+# Related
+
+  - [`InvestableIndex`](@ref)
+  - [`nothing_scalar_array_view`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`NestedClustered`](@ref)
+  - [`Stacking`](@ref)
+  - [`SubsetResampling`](@ref)
+"""
+function selection_index(i)
+    return i
+end
+function selection_index(i::InvestableIndex)
+    return i.idx
 end
 """
     view_child(v, i, args...)

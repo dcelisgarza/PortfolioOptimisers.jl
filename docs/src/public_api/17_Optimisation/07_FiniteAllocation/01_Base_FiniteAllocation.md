@@ -18,6 +18,7 @@ AssetRedistribution
 SideRedistribution
 PortfolioOptimisers.unpriced_weights
 FiniteAllocationInput
+port_opt_view(fai::FiniteAllocationInput, i, args...)
 factory(res::FiniteAllocationOptimisationResult, fb::Option{<:FOptE_FOpt_FbChain})
 ```
 

@@ -60,19 +60,18 @@
     # The detector must find a shortcut, or the empty census below passes in silence. The
     # probe is a local function with the exact shape of the removed shortcuts, and a generic
     # method beside it.
-    fb_slot(fb) = DiscreteAllocation{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                     fb}
+    fb_slot(fb) = DiscreteAllocation{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, fb}
     probe_optimise(::fb_slot(Nothing), ::Any) = :shortcut
     probe_optimise(::DiscreteAllocation, ::Any) = :driver
     probe = nothing_pins(methods(probe_optimise))
     @test length(probe) == 1
-    @test probe[1][3] == [probe[1][4]] == [9]
+    @test probe[1][3] == [probe[1][4]] == [8]
     # The same shape with the estimator type in a `where` clause.
     probe_where(::E, ::Any) where {E <: fb_slot(Nothing)} = :shortcut
     probe_where(::DiscreteAllocation, ::Any) = :driver
     probe = nothing_pins(methods(probe_where))
     @test length(probe) == 1
-    @test probe[1][3] == [probe[1][4]] == [9]
+    @test probe[1][3] == [probe[1][4]] == [8]
 
     # The methods of the package and of its extensions, whose root module is the extension.
     # The list must hold the driver, or a filter that keeps nothing passes in silence.
@@ -87,13 +86,13 @@
                     idxs, ", fb at ", fbpos, ")") for (m, T, idxs, fbpos) in shortcuts]
     @test isempty(sites)
 
-    # The site that miscounted, pinned by name. `fb` is the ninth field, and an estimator
+    # The site that miscounted, pinned by name. `fb` is the eighth field, and an estimator
     # without a fallback reaches the same driver as an estimator with one.
     @test fieldnames(DiscreteAllocation) ==
-          (:slv, :sc, :so, :wf, :unit, :sets, :idx, :strict, :fb)
+          (:slv, :sc, :so, :wf, :unit, :sets, :strict, :fb)
     da_type(fb) = DiscreteAllocation{Any, Float64, Float64,
                                      PortfolioOptimisers.JuMPWeightFinaliserFormulation,
-                                     LotUnit{Int}, Nothing, Nothing, Bool, fb}
+                                     LotUnit{Int}, Nothing, Bool, fb}
     no_fb = which(PortfolioOptimisers.optimise,
                   Tuple{da_type(Nothing), FiniteAllocationInput})
     with_fb = which(PortfolioOptimisers.optimise,

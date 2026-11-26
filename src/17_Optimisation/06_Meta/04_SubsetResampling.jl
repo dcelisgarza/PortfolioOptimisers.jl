@@ -615,7 +615,8 @@ function port_opt_view(sr::SubsetResampling, i, X::MatNum, args...)::SubsetResam
     wb = port_opt_view(sr.wb, i)
     fees = port_opt_view(sr.fees, i, X)
     sets = port_opt_view(sr.sets, i)
-    opt = port_opt_view(sr.opt, i, X)
+    # An inner head reads no departure of its parent, so its view takes a plain index.
+    opt = port_opt_view(sr.opt, selection_index(i), X)
     return SubsetResampling(; pe = pe, wb = wb, fees = fees, sets = sets, opt = opt,
                             wf = sr.wf, ex = sr.ex, subset_size = sr.subset_size,
                             n_subsets = sr.n_subsets, max_comb = sr.max_comb, rng = sr.rng,

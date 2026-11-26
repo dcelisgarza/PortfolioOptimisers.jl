@@ -1134,3 +1134,34 @@ A `ConstraintBlock` holds concentration rules, such as the UCITS 5/10/40 rule, i
 
 - **An entropy pooling prior with `OptimEntropyPooling`, the default optimiser, and a prior probability of zero** meets its views. With `alg = LogEntropyPooling()`, v0.34.7 stopped at the start of the solve and reported success, and the posterior missed the views. With `alg = ExpEntropyPooling()`, v0.34.7 could miss a view when an observation of zero prior probability held an extreme value. `JuMPEntropyPooling` had neither defect.
 - **An `EntropyPoolingPrior` or a `MeucciEntropyPoolingPrior` with a prior probability of zero at an extreme return**, such as a crash that `w` removes, meets its views under every optimiser. v0.34.7 scaled each view with the return that the prior removes. A kurtosis view could miss its target by a third of it. An entropic value at risk view gave the prior back, with no error, or raised an error about the grid or about a `NaN` coefficient. The views now read the mean row of the other observations there, so the posterior moves by rounding when the removed returns are ordinary.
+
+## From v0.34 to v0.35
+
+### [Views of a finite allocation](@id migration-0-35-allocators)
+
+`DiscreteAllocation` and `GreedyAllocation` no longer have the field `idx`. A view of an allocator is the view of every other optimiser: `port_opt_view` slices `unit` and `sets` and views `fb`. `FiniteAllocationInput` has a view too, so give one index to both.
+
+- **`DiscreteAllocation`** takes eight positional arguments, where v0.34.8 took nine. Remove the argument after `sets`, or use the keyword constructor. The type parameters lose the entry after the one of `sets`.
+- **`GreedyAllocation`** takes four positional arguments, where v0.34.8 took five. Remove the argument after `sets`, or use the keyword constructor. The type parameters lose the entry after the one of `sets`.
+- **The show** of both types loses the row `idx ┼ nothing`.
+- **The keyword `idx`** raises a `MethodError`. View the allocator instead.
+- **A `LotUnitEstimator` that names an asset that the view left out** raises an `ArgumentError` under `strict`, and logs a warning otherwise, as a name-keyed constraint of a viewed `MeanRisk` does. v0.34.8 gave no diagnostic. Resolve the unit on the whole universe first: `LotUnit` from `lot_unit_constraints(unit, sets; strict = true)` has no name left to resolve.
+- **A `key` of a `LotUnitEstimator`** that names another universe must start with the `xkey` of the `sets`, so that the view slices it, as the docstring of `UniverseSets` states. v0.34.8 also followed a view with any key.
+- **`UniformValues` as a lot unit** reads the number of assets of the view.
+
+### [The fee of a finite allocation](@id migration-0-35-allocation-fee)
+
+`FiniteAllocationInput` sends its fee through `investable_fees_view`, as every continuous optimisation does.
+
+- **A fee that you reduced by hand** states its mask in its own field: `Fees(; l, lq, imsk)`. v0.34.8 marked it with the `imsk` of the input. An unmarked fee with a vector that is not as long as `w` raises a `DimensionMismatch` at the construction.
+- **An unmarked fee with `lq` or `flq`, and no mask,** charges no exit, because no asset left. v0.34.8 charged the whole book as a forced exit.
+- **An unmarked fee over the whole universe, with a mask,** now answers. v0.34.8 raised a `DimensionMismatch` in `optimise`.
+- **The internal functions** `mark_fees` and `two_axis_fees_view` are gone.
+
+### [The view of a fee](@id migration-0-35-fee-view)
+
+`port_opt_view` of a `Fees` or a `FeesEstimator` slices every term at the index, `lq` and `flq` included. v0.34.8 sliced `lq` and `flq` at the assets outside the index when the call had a matrix, and kept them whole when it had none. `investable_fees_view` is the one function that puts them on the assets that left, and it raises a `DimensionMismatch` for a mask or a fee of another width.
+
+- **Results that move.** An optimiser with `lq` or `flq`, viewed at a selection of assets, in a window that an asset of the selection leaves. This is the case of `cross_val_predict` with `cols`, and of a view by hand. It charged the exit at the rate of another asset. A `WeightsTracking` with `lq` or `flq` in its fees charged the whole book in a window that no asset left, and the other assets in a cluster. It now charges the exits of its own universe.
+- **`MultipleRandomised` and `cross_val_predict` with `cols`** give the view of the optimiser the matrix before the cut. A `NegativeSkewness` with its own `sk` and `V` raised a `BoundsError`, or read the columns of other assets.
+- **A `port_opt_view` method of your own** that slices a fee needs no matrix. A method that must know that the assets outside the index left can dispatch on `PortfolioOptimisers.InvestableIndex`.

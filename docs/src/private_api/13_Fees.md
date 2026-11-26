@@ -18,9 +18,9 @@ calc_asset_fixed_liquidation_fees
 add_liquidation_terms
 assert_short_fee_convex
 override_fee_amortisation
-two_axis_fees_view
+assert_fees_width
+assert_fee_term_width
 strip_liquidation_charges
-mark_fees
 lift_fees
 lift_fee_rate
 lift_turnover

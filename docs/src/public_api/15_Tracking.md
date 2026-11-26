@@ -9,6 +9,7 @@ AbstractTrackingAlgorithm
 IndependentVariableTracking
 DependentVariableTracking
 WeightsTracking
+port_opt_view(tr::WeightsTracking, i::PortfolioOptimisers.InvestableIndex, args...)
 ReturnsTracking
 DataBenchmarkTracking
 TrackingError

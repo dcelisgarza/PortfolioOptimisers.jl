@@ -364,7 +364,6 @@ end
                                                :calibration_series_matrix => "one method for each series marker: the drawdown forms call `absolute_drawdown_arr`, which 3 functions share, and `relative_drawdown_arr`, which 2 functions share (rule 3, #2098)",
                                                # The portfolio quantities, src/13_Fees.jl to src/15_Tracking.jl (#2099).
                                                :lift_fee_rate => "one method for each form of a fee rate: the vector and the `nothing` forms call `expand_investable_weights`, which 13 functions share (rule 3, #2099)",
-                                               :tracking_benchmark => "one method for each tracking target: the `WeightsTracking` form calls `calc_net_returns`, a shared public verb, and no other method of `tracking_benchmark` calls it, so no driver gives the same answer (rule 3, #2089, #2099)",
                                                # src/16_RiskMeasures (#2100).
                                                :sel => "one method for each form of a slot: the uncertainty-set forms call `ucs_selector`, which 2 functions share, and the other forms call `nothing_scalar_array_selector` (rule 3, #2100)",
                                                :owa_l_moment_crm => "2 functions share its callee `ncrra_weights` (rule 3, #2100)",

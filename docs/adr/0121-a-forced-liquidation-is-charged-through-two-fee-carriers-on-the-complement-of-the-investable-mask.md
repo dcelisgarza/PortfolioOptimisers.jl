@@ -254,3 +254,35 @@ The Schur optimiser gains its fees
 result carries the fee with the carriers. The fold therefore charges a forced exit on a Schur
 result as it does on a hierarchical one. The fit strips no carrier, because no sub-problem of the
 Schur allocation reads a fee.
+
+## Amendment (2026-11-25)
+
+A view of a fee is a selection, and only the door splits the axes
+([#2348](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/2348)).
+
+`port_opt_view(fees, i, X)` sliced the five per-asset fields at `i` and the two carriers at the
+complement of `i`. One verb had two meanings. At the entry of a fit, the assets outside `i` left.
+In a selection of columns, a cluster or a subset, they are assets of another part. The carriers of
+a viewed fee were then on the wrong axis, and an inner fit whose window delisted an asset sliced
+them a second time. On eight assets with the exit rates `0.001` to `0.008`, a view at
+`[2, 3, 5, 7]` of any head charged the exit of asset 3 at `0.004`, the rate of asset 4, and a view
+at `[1, 3, 4, 5, 6]` charged it at `0.007`. No test viewed a fee twice.
+
+- **`port_opt_view` of an unmarked fee slices all seven terms at `i`**, with no matrix.
+  `FeesEstimator` tags all seven `@vprop`. A view of a marked fee drops the carriers, because an
+  exit is outside every selection of the axis that the fee holds, and a fit charges it at its
+  outer level only. `two_axis_fees_view` goes into `investable_fees_view`, its one reader, which
+  now refuses a fee of another width with the `DimensionMismatch` that this ADR names.
+- **The entry of a fit gives its views an `InvestableIndex`**, an integer vector that also holds
+  the mask. `WeightsTracking` reads it and sends the fee of its benchmark through
+  `investable_fees_view`. It read the complement of the view with no door, so a benchmark paid the
+  exit of the whole book in a window that no asset left, and of the other clusters in a cluster.
+  It now pays the exits of its own universe, and no other. The refused option *the mask travels
+  through the view* is not taken: no view method learns an argument, because the mask travels in
+  the index.
+- **A meta-optimiser gives a plain index to its inner heads**, so no inner benchmark pays the
+  exits of its parent.
+- **The finite allocation takes the same door.** `FiniteAllocationInput` sends its fee through
+  `investable_fees_view`, and `mark_fees` goes. An unmarked fee beside a mask was marked as a
+  reduced one and failed on its width, and an unmarked carrier with no mask charged the whole book.
+  A fee that a caller reduced by hand states its mask in `imsk`.

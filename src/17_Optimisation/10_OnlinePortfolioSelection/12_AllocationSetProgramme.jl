@@ -961,13 +961,13 @@ function programme_investable_reduction(::Nothing, set::AbstractAllocationSet,
 end
 function programme_investable_reduction(imsk::BitVector, set::AbstractAllocationSet,
                                         X::ReturnsResult, pr::Option{<:AbstractPriorResult})
-    idx = findall(imsk)
+    idx = InvestableIndex(imsk)
     # The view drops the Non-Investable Axis, so the set declares it after the view, as
     # `investable_reduction` declares it for a head. Stage 2 of the block then drops a row
     # that names a departed asset, and does not refuse the name.
     return non_investable_universe(port_opt_view(set, idx, X.X),
-                                   non_investable_names(X.nx, imsk)), port_opt_view(X, idx),
-           port_opt_view(pr, idx)
+                                   non_investable_names(X.nx, imsk)),
+           port_opt_view(X, idx.idx), port_opt_view(pr, idx.idx)
 end
 function programme_investable_reduction(::BitVector, ::AbstractAllocationSet, ::Any, ::Any)
     return throw(IsNothingError("an Investable Mask is read on the rows that the head holds, so a mask with no rows cannot be reduced on."))

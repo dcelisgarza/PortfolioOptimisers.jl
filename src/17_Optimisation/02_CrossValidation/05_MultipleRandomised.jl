@@ -761,8 +761,8 @@ function path_fit_and_predict(opt::OptE_TD, rd::ReturnsResult, train_idx, test_i
     # on time-dependent entries (predictions are sorted for reporting only, after the
     # loop); the user keys entries off ctx.train_idx[ctx.i] / ctx.test_idx[ctx.i].
     function asset_view(i)
-        rdi = port_opt_view(rd, cols[i])
-        return (port_opt_view(opt, cols[i], rdi.X), rdi)
+        # The view indexes the matrix by `cols[i]`, so it reads the matrix before the cut.
+        return (port_opt_view(opt, cols[i], rd.X), port_opt_view(rd, cols[i]))
     end
     predictions, est = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
                                  test_idx = test_idx, path_id = id, fold_view = asset_view,

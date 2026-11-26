@@ -247,6 +247,8 @@ Keywords correspond to the struct's fields.
   - `fees`: Recursively viewed through [`port_opt_view`](@ref).
   - `w`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
+At the entry of a fit, the index is an [`InvestableIndex`](@ref). The fee then goes through [`investable_fees_view`](@ref) at its mask, so the benchmark pays the exit of each asset that left, as the portfolio does.
+
 # Examples
 
 ```jldoctest
@@ -297,6 +299,39 @@ function WeightsTracking(; fees::Option{<:Fees} = nothing, w::VecNum,
 end
 function needs_previous_weights(tr::WeightsTracking)::Bool
     return !tr.fixed
+end
+"""
+    port_opt_view(tr::WeightsTracking, i::InvestableIndex, args...)
+
+Return a [`WeightsTracking`](@ref) of the investable assets, whose fee charges the forced exits of the benchmark.
+
+The benchmark is a portfolio, so it also sells its position in an asset that left. Any other index selects assets and says nothing about the rest, so the generic view slices the fee with the weights.
+
+# Algorithm
+
+ 1. Reduce `tr.fees` to the mask of `i` with [`investable_fees_view`](@ref).
+ 2. View `tr.w` at `i`, and rebuild `tr`.
+
+# Arguments
+
+  - `tr`: The [`WeightsTracking`](@ref) to view.
+  - `i`: The index that the entry of a fit gives.
+  - `args...`: Ignored.
+
+# Returns
+
+  - `tr::WeightsTracking`: The benchmark of the investable assets.
+
+# Related
+
+  - [`WeightsTracking`](@ref)
+  - [`InvestableIndex`](@ref)
+  - [`investable_fees_view`](@ref)
+  - [`tracking_benchmark`](@ref)
+"""
+function port_opt_view(tr::WeightsTracking, i::InvestableIndex, args...)::WeightsTracking
+    return WeightsTracking(; fees = investable_fees_view(tr.fees, i.imsk, length(i.imsk)),
+                           w = view(tr.w, i), fixed = tr.fixed)
 end
 """
     factory(tr::WeightsTracking, w::VecNum)
@@ -405,11 +440,11 @@ end
 
 Compute the net return series of the benchmark weights of a [`WeightsTracking`](@ref).
 
-This method states no definition of its own. It is [`calc_net_returns(tr.w, X, tr.fees)`](@ref), so the fee follows the amortisation that `calc_net_returns` reads from `tr.fees.fa`. Take the three-period matrix `[0.01 0.02 -0.01 0.03; 0.03 0.04 0.02 -0.02; -0.01 0.005 0.01 0.04]` and ``\\boldsymbol{w}_{b} = [0.3,\\, 0.2,\\, 0.4,\\, 0.1]``. The benchmark is `[0.006, 0.023, 0.006]` with no fee, and `[0.005, 0.022, 0.005]` under `Fees(; l = 0.001)`, whose fee is `0.001`.
+This method states no definition of its own. It is [`calc_net_returns`](@ref) of `tr.w` and `X` with the fee that [`investable_fees_view`](@ref) gives for no mask. An unmarked fee charges no forced exit, because no asset left the universe of `X`. A fee that the entry of a fit marked keeps its exits. The fee follows the amortisation that `calc_net_returns` reads from `tr.fees.fa`. Take the three-period matrix `[0.01 0.02 -0.01 0.03; 0.03 0.04 0.02 -0.02; -0.01 0.005 0.01 0.04]` and ``\\boldsymbol{w}_{b} = [0.3,\\, 0.2,\\, 0.4,\\, 0.1]``. The benchmark is `[0.006, 0.023, 0.006]` with no fee, and `[0.005, 0.022, 0.005]` under `Fees(; l = 0.001)`, whose fee is `0.001`.
 
 # Algorithm
 
- 1. Forward `tr.w`, `X` and `tr.fees` to [`calc_net_returns`](@ref).
+ 1. Take the fee of `tr` through [`investable_fees_view`](@ref) with no mask, and forward it with `tr.w` and `X` to [`calc_net_returns`](@ref).
  2. A `nothing` `tr.fees` reaches the `args...` method of [`calc_net_returns`](@ref), which returns `X * tr.w`. It does not reach the `Fees` method, so it charges no fee.
  3. A [`Fees`](@ref) `tr.fees` reaches the `Fees` method, which gives `X * tr.w` to [`charge_fees`](@ref).
 
@@ -444,7 +479,7 @@ julia> PortfolioOptimisers.tracking_benchmark(tr, X)
   - [`tracking_benchmark(tr::ReturnsTracking, X::VecNum_MatNum)`](@ref): The sibling, which reads only the number of rows of the return matrix.
 """
 function tracking_benchmark(tr::WeightsTracking, X::MatNum)
-    return calc_net_returns(tr.w, X, tr.fees)
+    return calc_net_returns(tr.w, X, investable_fees_view(tr.fees, nothing, X))
 end
 """
 $(DocStringExtensions.TYPEDEF)

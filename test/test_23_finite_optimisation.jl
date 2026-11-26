@@ -361,7 +361,7 @@ end
     cash = 1e4
     T = 2
     fees = Fees(; l = [0.001, 0.002, 0.003], lq = Turnover(; w = [0.25], val = [0.01]),
-                flq = Turnover(; w = [0.25], val = [5.0]))
+                flq = Turnover(; w = [0.25], val = [5.0]), imsk = imsk)
     # `prev_cash` defaults to `cash`, so the exit sold `1e4 * 0.25`. `lq` is a rate over
     # `T` periods and `flq` is a currency amount charged one time.
     liq = T * 0.01 * cash * 0.25 + 5.0
@@ -371,12 +371,16 @@ end
         fai = FiniteAllocationInput(; w = w, prices = prices, cash = cash, horizon = T,
                                     fees = fees, imsk = imsk)
         @test fai.imsk === imsk
-        # Without the mask the fee stays on the shorter axis, and the full-length side
-        # selector runs off its end. That is the `BoundsError` of #914.
-        @test_throws BoundsError optimise(ga,
-                                          FiniteAllocationInput(; w = w, prices = prices,
-                                                                cash = cash, horizon = T,
-                                                                fees = fees))
+        # An unmarked fee is a statement over the whole universe, so the input refuses a
+        # reduced fee that does not say so. That was the `BoundsError` of #914.
+        for kw in ((;), (; imsk = imsk))
+            @test_throws DimensionMismatch FiniteAllocationInput(; w = w, prices = prices,
+                                                                 cash = cash, horizon = T,
+                                                                 fees = PO.rebuild_struct(fees,
+                                                                                          (;
+                                                                                           imsk = nothing)),
+                                                                 kw...)
+        end
         for alloc in (da, ga)
             r = optimise(alloc, fai)
             cost = collect(r.cost)
@@ -397,21 +401,64 @@ end
         # book that pays no other fee owes it alone.
         fai = FiniteAllocationInput(; w = w, prices = prices, cash = cash, horizon = T,
                                     fees = Fees(; lq = Turnover(; w = [0.25], val = [0.01]),
-                                                flq = Turnover(; w = [0.25], val = [5.0])),
-                                    imsk = imsk)
+                                                flq = Turnover(; w = [0.25], val = [5.0]),
+                                                imsk = imsk))
         for alloc in (da, ga)
             r = optimise(alloc, fai)
             @test isapprox(r.fees, liq)
             @test isapprox(sum(collect(r.cost)) + r.cash + r.fees, cash)
         end
-        # A short-only book has an empty long side, and the exit still reaches the report.
-        # `lq` is stated by hand here, so no mask puts the zero-weight assets on that side.
-        fais = FiniteAllocationInput(; w = [-0.6, -0.4], prices = [10.0, 20.0], cash = cash,
-                                     horizon = T,
+        # A short book still pays the exit, which falls on its long side.
+        fais = FiniteAllocationInput(; w = [-0.6, -0.4, 0.0], prices = [10.0, 20.0, 30.0],
+                                     cash = cash, horizon = T,
                                      fees = Fees(;
-                                                 lq = Turnover(; w = [0.25], val = [0.01])))
+                                                 lq = Turnover(; w = [0.25], val = [0.01]),
+                                                 imsk = BitVector([1, 1, 0])))
         rs = optimise(ga, fais)
         @test isapprox(rs.fees, T * 0.01 * cash * 0.25)
+        # A side with no asset still owes the charge that its `SideFees` states.
+        sf = PO.SideFees(T, nothing, nothing, nothing, nothing, 25.0)
+        for side in (PO.finite_sub_allocation!(Float64[], Float64[], 1, cash, 0.0, sf, ga),
+                     PO.finite_sub_allocation(Float64[], Float64[], 1, cash, 0.0, sf, da))
+            @test side[4] == cash - 25.0
+            @test side[5] == 25.0
+        end
+    end
+
+    @testset "the fee of the input takes the door of every fit" begin
+        # The caller states every term over the whole universe, the exits included.
+        full = Fees(; l = [0.001, 0.002, 0.003, 0.004],
+                    tn = Turnover(; w = fill(0.25, 4), val = 0.001),
+                    lq = Turnover(; w = fill(0.25, 4), val = [0.01, 0.02, 0.03, 0.04]),
+                    flq = Turnover(; w = fill(0.25, 4), val = [1.0, 2.0, 3.0, 4.0]))
+        mk(; kw...) = FiniteAllocationInput(; w = w, prices = prices, cash = cash,
+                                            horizon = T, kw...)
+        # No mask: no asset left, so no exit is charged. It was the whole book.
+        fn = mk(; fees = full)
+        @test isnothing(fn.fees.lq) && isnothing(fn.fees.flq)
+        @test optimise(ga, fn).fees == optimise(ga,
+                   mk(; fees = PO.rebuild_struct(full, (; lq = nothing, flq = nothing)))).fees
+        # With a mask, the exit is that of the asset that left. It was a `DimensionMismatch`.
+        fm = mk(; fees = full, imsk = imsk)
+        @test fm.fees.imsk == imsk
+        @test fm.fees.lq.val == [0.02] && fm.fees.flq.val == [2.0]
+        @test optimise(ga, fm).fees ==
+              optimise(ga, mk(; fees = PO.investable_fees_view(full, imsk, 4))).fees
+        # A result with a mask takes a fee of the caller over the whole universe.
+        res = PO.NaiveOptimisationResult(; pr = nothing, wb = nothing,
+                                         retcode = PO.OptimisationSuccess(),
+                                         w = [0.5, 0.3, 0.2], imsk = imsk, fb = nothing)
+        @test FiniteAllocationInput(res; prices = prices, horizon = T, fees = full).fees.lq.val ==
+              [0.02]
+        # Each vector of the fee must be on the universe of `w`.
+        for bad in
+            (Fees(; l = [0.1, 0.2]), Fees(; s = [0.1, 0.2]), Fees(; fl = [0.1, 0.2]),
+             Fees(; fs = [0.1, 0.2]), Fees(; tn = Turnover(; w = [0.5, 0.5])),
+             Fees(; lq = Turnover(; w = [0.5, 0.5], val = 0.1)),
+             Fees(; flq = Turnover(; w = [0.5, 0.5], val = [1.0, 2.0])))
+            @test_throws DimensionMismatch mk(; fees = bad)
+            @test_throws DimensionMismatch mk(; fees = bad, imsk = imsk)
+        end
     end
 
     @testset "the input reads what a fitted optimisation carries" begin
@@ -434,8 +481,8 @@ end
         @test FiniteAllocationInput(res; prices = prices, cash = cash, w = w).w == w
         faif = FiniteAllocationInput(res; prices = prices, cash = cash, horizon = T,
                                      fees = fees, imsk = imsk)
-        # A caller's reduced fee is theirs, marked with the mask they state (#1067).
-        @test faif.fees.l === fees.l && faif.fees.lq === fees.lq
+        # A marked fee stays as it is (#1067).
+        @test faif.fees === fees
         @test faif.fees.imsk == imsk == faif.imsk
         # A marked fee supplies the mask the caller leaves out, and a marked fee beside a
         # different mask is refused, so the fee is the one source of the axes it is on.
@@ -447,9 +494,6 @@ end
                                                          cash = cash, horizon = T,
                                                          fees = marked,
                                                          imsk = BitVector([1, 1, 0, 1]))
-        @test PO.mark_fees(nothing, imsk) == (nothing, imsk)
-        @test PO.mark_fees(fees, nothing) == (fees, nothing)
-        @test PO.mark_fees(marked, imsk) == (marked, imsk)
         # A marked fee allocates as the hand-built input does.
         @test optimise(ga, faim).fees == optimise(ga, faif).fees
         # A result carrying no prior at all derives no horizon, and the input then takes
@@ -1276,9 +1320,9 @@ end
         @test_throws DimensionMismatch optimise(DiscreteAllocation(; slv = mip_slv,
                                                                    unit = LotUnit([1, 2]),
                                                                    fb = nothing), fai)
-        @test PO.allocation_lot_unit(LotUnit(0.5), nothing, nothing, false, fai) == 0.5
+        @test PO.allocation_lot_unit(LotUnit(0.5), nothing, false, fai) == 0.5
         @test PO.allocation_lot_unit(LotUnitEstimator(; val = Dict("C" => 10.0)), sets,
-                                     nothing, false, fai) == [1.0, 1.0, 10.0]
+                                     false, fai) == [1.0, 1.0, 10.0]
         # The default fallback of the discrete allocator buys the same lots.
         u = LotUnitEstimator(; val = Dict("C" => 10.0))
         da = DiscreteAllocation(; slv = mip_slv, unit = u, sets = sets, strict = true)
@@ -1349,96 +1393,147 @@ end
         @test rl.shares[2] < 0
     end
 
-    # A selection cuts the asset axis, and the allocator follows it (#1991). The estimator
-    # resolves on the whole universe and then keeps the selected assets.
+    # A selection cuts the asset axis, and the allocator and its input follow it. The view
+    # of an allocator is the view of every other estimator (#1991, #2348).
     @testset "a view of an allocator follows a cut of the assets" begin
         usets = UniverseSets(;
                              dict = Dict("nx" => ["A", "B", "C", "D"], "g" => ["A", "C"],
-                                         "isin" => ["a", "b", "c", "d"]))
+                                         "nx_isin" => ["a", "b", "c", "d"]))
         l = [100.0, 0.5, 1.0, 0.25]
-        u = LotUnitEstimator(; val = Dict("A" => 100, "B" => 0.5, "D" => 0.25))
+        u = LotUnitEstimator(; val = Dict("B" => 0.5, "D" => 0.25))
+        w4 = FiniteAllocationInput(; w = [0.0, 0.6, 0.0, 0.4],
+                                   prices = [10.0, 71.0, 20.0, 129.0], cash = 1000.0)
         wc = FiniteAllocationInput(; w = [0.6, 0.4], prices = [71.0, 129.0], cash = 1000.0)
         ga = GreedyAllocation(; unit = u, sets = usets, strict = true)
         da = DiscreteAllocation(; slv = mip_slv, unit = u, sets = usets, strict = true)
-
-        # A cut name gives no refusal under `strict`, and no warning without it.
         for i in ([2, 4], BitVector([0, 1, 0, 1]), 2:2:4)
             for a in (ga, da)
                 v = PO.port_opt_view(a, i)
-                @test v.unit === u
-                @test v.sets === usets
-                @test v.idx == [2, 4]
-                r = optimise(v, wc)
+                @test v.sets.dict["nx"] == ["B", "D"]
+                r = optimise(v, PO.port_opt_view(w4, i))
                 @test r.shares ==
                       optimise(PO.rebuild_struct(a, (; unit = LotUnit(l[[2, 4]]))), wc).shares
                 @test is_lot_multiple(collect(r.shares), [0.5, 0.25])
             end
         end
         # The fallback views the same assets.
-        @test PO.port_opt_view(da, [2, 4]).fb.idx == [2, 4]
-        # The loose form logs nothing for a cut name.
-        vl = PO.port_opt_view(GreedyAllocation(; unit = u, sets = usets), [2, 4])
-        @test (@test_logs optimise(vl, wc)).shares ==
+        @test PO.port_opt_view(da, [2, 4]).fb.sets.dict["nx"] == ["B", "D"]
+        # A name that the view left out is a name outside its universe, as in the view of a
+        # constraint of any other optimiser: a refusal under `strict`, and a warning without.
+        uc = LotUnitEstimator(; val = Dict("A" => 100, "B" => 0.5, "D" => 0.25))
+        cut = PO.port_opt_view(GreedyAllocation(; unit = uc, sets = usets, strict = true),
+                               [2, 4])
+        @test_throws ArgumentError optimise(cut, wc)
+        loose = PO.port_opt_view(GreedyAllocation(; unit = uc, sets = usets), [2, 4])
+        @test (@test_logs (:warn,) optimise(loose, wc)).shares ==
               optimise(PO.port_opt_view(ga, [2, 4]), wc).shares
-        # A name outside the whole universe is still refused.
-        vz = PO.port_opt_view(GreedyAllocation(;
-                                               unit = LotUnitEstimator(; val = "Z" => 0.5),
-                                               sets = usets, strict = true), [2, 4])
-        @test_throws ArgumentError optimise(vz, wc)
+        # A resolved unit has no name left to resolve.
+        whole = lot_unit_constraints(uc, usets; strict = true)
+        vr = PO.port_opt_view(GreedyAllocation(; unit = whole), [2, 4])
+        @test optimise(vr, wc).shares == optimise(PO.port_opt_view(ga, [2, 4]), wc).shares
 
         # A view of a view indexes the assets that the first view kept, in the stated order.
-        v2 = PO.port_opt_view(PO.port_opt_view(ga, BitVector([1, 1, 0, 1])), [3, 1])
-        @test v2.idx == [4, 1]
-        @test PO.allocation_lot_unit(v2.unit, v2.sets, v2.idx, true, wc) == [0.25, 100.0]
-        # The whole axis keeps every asset.
-        @test PO.port_opt_view(ga, :).idx == 1:4
+        gv = GreedyAllocation(; unit = LotUnit(l), sets = usets)
+        v2 = PO.port_opt_view(PO.port_opt_view(gv, BitVector([1, 1, 0, 1])), [3, 1])
+        @test PO.allocation_lot_unit(v2.unit, v2.sets, v2.strict, wc) == [0.25, 100.0]
+        @test v2.sets.dict["nx"] == ["D", "A"]
+        @test PO.port_opt_view(ga, :).sets.dict["nx"] == usets.dict["nx"]
 
-        # The group, the vector, the scalar and the keyed forms resolve on the whole universe.
+        # The vector, the scalar and the keyed forms follow the view.
         lots(unit, i) =
-            let v = PO.port_opt_view(GreedyAllocation(; unit = unit, sets = usets,
-                                                      strict = true), i)
-                PO.allocation_lot_unit(v.unit, v.sets, v.idx, v.strict, wc)
+            let v = PO.port_opt_view(GreedyAllocation(; unit = unit, sets = usets), i)
+                PO.allocation_lot_unit(v.unit, v.sets, v.strict, wc)
             end
-        @test lots(LotUnitEstimator(; val = "g" => 10.0), [3, 4]) == [10.0, 1.0]
         @test lots(LotUnitEstimator(; val = l), [4, 1]) == [0.25, 100.0]
         @test lots(LotUnitEstimator(; val = 0.5), [4, 1]) == 0.5
-        @test lots(LotUnitEstimator(; val = Dict("a" => 5.0, "d" => 2.0), key = "isin"),
-                   [3, 4]) == [1.0, 2.0]
+        @test lots(LotUnitEstimator(; val = Dict("c" => 5.0, "d" => 2.0), key = "nx_isin"),
+                   [3, 4]) == [5.0, 2.0]
         # The number type comes from the input, as with no view.
         w32 = FiniteAllocationInput(; w = Float32[0.6, 0.4], prices = Float32[71, 129],
                                     cash = 1000.0f0)
         v32 = PO.port_opt_view(ga, [2, 4])
-        @test eltype(PO.allocation_lot_unit(v32.unit, v32.sets, v32.idx, true, w32)) ==
-              Float32
+        @test eltype(PO.allocation_lot_unit(v32.unit, v32.sets, true, w32)) == Float32
 
         # A resolved lot unit is sliced, and a scalar one is kept.
         vu = PO.port_opt_view(DiscreteAllocation(; slv = mip_slv, unit = LotUnit(l)),
                               [2, 4])
         @test vu.unit.val == [0.5, 0.25]
         @test vu.fb.unit.val == [0.5, 0.25]
-        @test isnothing(vu.idx)
         @test PO.port_opt_view(GreedyAllocation(; unit = LotUnit(0.5)), [2, 4]).unit.val ==
               0.5
         # No fallback views to none, and a precomputed fallback stays as it is.
         @test isnothing(PO.port_opt_view(ga, [2, 4]).fb)
-        rg = optimise(ga,
+        rg = optimise(GreedyAllocation(),
                       FiniteAllocationInput(; w = fill(0.25, 4), prices = fill(1.0, 4),
                                             cash = 1000.0))
         @test PO.port_opt_view(GreedyAllocation(; fb = rg), [2, 4]).fb === rg
+    end
 
-        # The constructors refuse an `idx` that no estimator reads, an empty one, and one
-        # that does not index the universe. A stated mask reads as its positions do.
-        for f in (kw -> GreedyAllocation(; kw...),
-                  kw -> DiscreteAllocation(; slv = mip_slv, kw...))
-            @test_throws ArgumentError f((; unit = LotUnit(l), idx = [1, 2]))
-            @test_throws PO.IsEmptyError f((; unit = u, sets = usets, idx = Int[]))
-            for i in ([2, 5], [0, 1], [true, false])
-                @test_throws DomainError f((; unit = u, sets = usets, idx = i))
+    # A view of the input keeps each value of an asset with its asset (#2348).
+    @testset "a view of the input" begin
+        ga = GreedyAllocation()
+        p4 = [10.0, 20.0, 30.0, 40.0]
+        full = Fees(; l = [0.001, 0.002, 0.003, 0.004], fl = [1.0, 2.0, 3.0, 4.0],
+                    tn = Turnover(; w = fill(0.25, 4), val = [0.001, 0.002, 0.003, 0.004]),
+                    lq = Turnover(; w = fill(0.25, 4), val = [0.01, 0.02, 0.03, 0.04]),
+                    flq = Turnover(; w = fill(0.25, 4), val = [1.0, 2.0, 3.0, 4.0]))
+        # The charge of the exits of a book, and nothing else.
+        exits(f) = PO.allocation_side_fees(f.fees, f.horizon, f.prev_cash,
+                                           trues(length(f.w)), falses(length(f.w)),
+                                           falses(length(f.w)))[1].liq
+        imsk = BitVector([1, 0, 0, 1])
+        fai = FiniteAllocationInput(; w = [0.6, 0.0, 0.0, 0.4], prices = p4, cash = 1e4,
+                                    prev_cash = 2e4, horizon = 2, fees = full, imsk = imsk)
+        # The exits of a partition of the book add to those of the book, also in another
+        # order and in a view of a view. Each part used to charge them all (#2335).
+        @test exits(fai) ≈ 2 * 2e4 * 0.25 * (0.02 + 0.03) + 2.0 + 3.0
+        a = PO.port_opt_view(fai, [1, 2])
+        b = PO.port_opt_view(fai, [4, 3])
+        @test exits(a) ≈ 2 * 2e4 * 0.25 * 0.02 + 2.0
+        @test exits(b) ≈ 2 * 2e4 * 0.25 * 0.03 + 3.0
+        @test exits(a) + exits(b) ≈ exits(fai)
+        @test exits(PO.port_opt_view(PO.port_opt_view(fai, [4, 3, 1]), [3, 1])) == 0
+        @test exits(PO.port_opt_view(fai, imsk)) == 0
+        @test b.w == [0.4, 0.0] && b.prices == [40.0, 30.0]
+        @test b.imsk == BitVector([1, 0])
+        @test b.fees.imsk == b.imsk
+        @test b.fees.l == [0.004] && b.fees.tn.w == [0.25]
+        @test b.fees.fl == [4.0]
+        # The whole axis allocates the book, and the greedy allocator gives the same shares
+        # in another order.
+        for (alloc, is) in ((ga, (:, [4, 2, 1, 3], 1:4, trues(4))),
+                            (DiscreteAllocation(; slv = mip_slv, fb = nothing), (:, 1:4)))
+            r = optimise(alloc, fai)
+            for i in is
+                ri = optimise(alloc, PO.port_opt_view(fai, i))
+                @test ri.shares ≈ r.shares[i]
+                @test ri.fees ≈ r.fees
+                @test ri.cash ≈ r.cash
             end
-            mk = f((; unit = u, sets = usets, idx = BitVector([0, 1, 0, 1])))
-            @test optimise(mk, wc).shares ==
-                  optimise(f((; unit = u, sets = usets, idx = [2, 4])), wc).shares
-            @test PO.port_opt_view(mk, [2]).idx == [4]
         end
+        # The account keeps its values, and the cut weight stays in the cash.
+        @test b.cash == 1e4 && b.prev_cash == 2e4 && b.horizon == 2
+        @test b.ca === fai.ca
+        # A book with no asset to trade is refused.
+        @test_throws PO.IsEmptyError PO.port_opt_view(fai, [2, 3])
+        # No fee and no mask, and a fee with no exit.
+        f0 = PO.port_opt_view(FiniteAllocationInput(; w = fill(0.25, 4), prices = p4),
+                              [2, 3])
+        @test isnothing(f0.fees) && isnothing(f0.imsk)
+        f1 = PO.port_opt_view(FiniteAllocationInput(; w = fill(0.25, 4), prices = p4,
+                                                    horizon = 1, fees = full), [2, 3])
+        @test f1.fees.l == [0.002, 0.003] && isnothing(f1.fees.lq) && isnothing(f1.imsk)
+        # The rule of the unpriced assets reads the whole book, and its positions are those
+        # of the book: the weight of asset 3 goes to asset 2, in each view.
+        fu = FiniteAllocationInput(; w = [0.5, 0.3, 0.2], prices = [10.0, 20.0, NaN],
+                                   cash = 1000.0, upw = AssetRedistribution(; idx = 2))
+        @test PO.port_opt_view(fu, [2, 3]).w ≈ [0.5, 0.0]
+        @test PO.port_opt_view(fu, [1, 3]).w ≈ [0.5, 0.0]
+        @test PO.port_opt_view(fu, [2]).w ≈ [0.5]
+        @test isnothing(PO.port_opt_view(fu, [2, 3]).upw)
+        rule(w, umsk) = [w[1] + sum(w[umsk]); w[2]; 0.0]
+        fr = FiniteAllocationInput(; w = [0.5, 0.3, 0.2], prices = [10.0, 20.0, NaN],
+                                   cash = 1000.0, upw = rule)
+        @test PO.port_opt_view(fr, [2, 1]).w ≈ [0.3, 0.7]
     end
 end
