@@ -150,7 +150,7 @@ quietly(f) = with_logger(f, NullLogger())
         po = PortfolioOptimisers
         # A struct with `@vprop` fields lists them; any other struct lists its estimator fields.
         @test po.asset_axis_fields(EqualWeighted(; sets = good)) ==
-              (:wb, :fees, :sets, :fb, :cache)
+              (:wb, :fees, :sets, :wf, :fb, :cache)
         # A JuMP head holds its `sets` in its Constraint Block, so the walk reaches the universe
         # through `cbe` (#2039).
         jo = JuMPOptimiser(; slv = slv, sets = good)
