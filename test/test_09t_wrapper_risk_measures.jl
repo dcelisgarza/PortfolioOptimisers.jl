@@ -150,6 +150,61 @@ end
         @test isnan(expected_risk(RiskRatio(; r1 = Variance(), r2 = sd), wz, prz))
     end
 
+    @testset "A ratio carries its scale into a vector of measures" begin
+        v, cv = Variance(), ConditionalValueatRisk()
+        rr = RiskRatio(; settings = HierarchicalRiskMeasureSettings(; scale = 2.5), r1 = v,
+                       r2 = cv)
+        @test fieldnames(RiskRatio) == (:settings, :r1, :r2)
+        @test RiskRatio(; r1 = v, r2 = cv).settings.scale == 1
+        # Each verb that rebuilds the measure keeps the settings.
+        @test factory(rr, _pr607).settings === rr.settings
+        @test PO.port_opt_view(rr, 1:3).settings === rr.settings
+        rk, vk = expected_risk(rr, _w607, _pr607), expected_risk(v, _w607, _pr607)
+        # The scale does not act on a single measure, and the scales of the sides never act.
+        @test rk == vk / expected_risk(cv, _w607, _pr607)
+        sides = RiskRatio(; r1 = Variance(; settings = RiskMeasureSettings(; scale = 3.0)),
+                          r2 = ConditionalValueatRisk(;
+                                                      settings = RiskMeasureSettings(;
+                                                                                     scale = 7.0)))
+        @test expected_risk(sides, _w607, _pr607) == rk
+        for (sca, agg) in ((nothing, vk + 2.5 * rk), (MaxScalariser(), max(vk, 2.5 * rk)),
+                           (MinScalariser(), min(vk, 2.5 * rk)))
+            @test expected_risk([v, rr], _w607, _pr607; sca = sca) ≈ agg
+            # The vector form of the gradient is the one of the scalarised value.
+            g = risk_gradient([v, rr], _w607, _pr607; sca = sca)
+            gs = risk_gradient(v, _w607, _pr607), 2.5 * risk_gradient(rr, _w607, _pr607)
+            want = isnothing(sca) ? gs[1] + gs[2] : agg == vk ? gs[1] : gs[2]
+            @test isapprox(g, want; rtol = 1e-6)
+        end
+        # A vector of one measure gives the weights of that measure, at any scale.
+        opt = HierarchicalOptimiser(; pe = _pr607)
+        hrp(r, sca = nothing) = optimise(HierarchicalRiskParity(; r = r, sca = sca,
+                                                                opt = opt)).w
+        herc(r, sca = nothing) = optimise(HierarchicalEqualRiskContribution(; ri = r,
+                                                                            ro = r,
+                                                                            scai = sca,
+                                                                            scao = sca,
+                                                                            opt = opt)).w
+        for f in (hrp, herc)
+            @test f([rr]) ≈ f(rr)
+            # The scale moves the combination. A large scale leaves the ratio alone, and a
+            # scale of zero leaves the other measure alone.
+            big = RiskRatio(; settings = HierarchicalRiskMeasureSettings(; scale = 1e12),
+                            r1 = v, r2 = cv)
+            zro = RiskRatio(; settings = HierarchicalRiskMeasureSettings(; scale = 0.0),
+                            r1 = v, r2 = cv)
+            @test isapprox(f([v, big]), f(rr); rtol = 1e-8)
+            @test f([v, zro]) ≈ f(v)
+            @test f([v, big], MaxScalariser()) ≈ f(rr)
+            @test !isapprox(f([v, rr]), f([v, big]); rtol = 1e-6)
+        end
+        # The other readers of `settings.scale`: the returns path, and the score of a member.
+        rp = RiskRatio(; settings = HierarchicalRiskMeasureSettings(; scale = 2.5),
+                       r1 = Range(), r2 = WorstRealisation())
+        @test PO.expected_risk_from_returns([Range(), rp], _x607) == 0.625 + 2.5 * 2.5
+        @test PO.oriented_member_score(rp, _x607) == -6.25
+    end
+
     @testset "The numerator decides the polarity of a ratio" begin
         bib = PO.bigger_is_better
         @test bib(NonOptimisationRiskRatio(; r1 = MeanReturn(), r2 = Variance()))

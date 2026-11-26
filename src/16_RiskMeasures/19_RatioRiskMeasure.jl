@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Measures the risk of `r1` divided by the risk of `r2`, for a hierarchical optimiser.
 
-`r1` is the numerator and `r2` is the denominator. Both sides are optimisation risk measures, so a hierarchical optimiser can use the ratio as its risk. The ratio follows IEEE division: a denominator of zero gives `Inf` or `-Inf`, and `0 / 0` gives `NaN`. [`bigger_is_better`](@ref) of the ratio is that of `r1`. The ratio is homogeneous of the degree of `r1` minus the degree of `r2`. When the two degrees are equal, the contributions of [`risk_contribution`](@ref) sum to zero and not to the ratio.
+`r1` is the numerator and `r2` is the denominator. Both sides are optimisation risk measures, so a hierarchical optimiser can use the ratio as its risk. `settings.scale` weights the ratio in a vector of measures, and the `scale` of `r1` and of `r2` does not act. The ratio follows IEEE division: a denominator of zero gives `Inf` or `-Inf`, and `0 / 0` gives `NaN`. [`bigger_is_better`](@ref) of the ratio is that of `r1`. The ratio is homogeneous of the degree of `r1` minus the degree of `r2`. When the two degrees are equal, the contributions of [`risk_contribution`](@ref) sum to zero and not to the ratio.
 
 # Mathematical definition
 
@@ -27,6 +27,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     RiskRatio(;
+        settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
         r1::OptimisationRiskMeasure = Variance(),
         r2::OptimisationRiskMeasure = ConditionalValueatRisk()
     ) -> RiskRatio
@@ -45,25 +46,27 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> RiskRatio()
 RiskRatio
-  r1 ┼ Variance
-     │    settings ┼ RiskMeasureSettings
-     │             │   scale ┼ Float64: 1.0
-     │             │      ub ┼ nothing
-     │             │     rke ┴ Bool: true
-     │       sigma ┼ nothing
-     │        chol ┼ nothing
-     │          rc ┼ nothing
-     │         alg ┼ SquaredSOCRiskExpr()
-     │    mtx_sqrt ┼ EigenFallbackSquareRoot()
-     │   ratio_alg ┼ SquareRootRatio()
-     │      corner ┴ nothing
-  r2 ┼ ConditionalValueatRisk
-     │   settings ┼ RiskMeasureSettings
-     │            │   scale ┼ Float64: 1.0
-     │            │      ub ┼ nothing
-     │            │     rke ┴ Bool: true
-     │      alpha ┼ Float64: 0.05
-     │          w ┴ nothing
+  settings ┼ HierarchicalRiskMeasureSettings
+           │   scale ┴ Float64: 1.0
+        r1 ┼ Variance
+           │    settings ┼ RiskMeasureSettings
+           │             │   scale ┼ Float64: 1.0
+           │             │      ub ┼ nothing
+           │             │     rke ┴ Bool: true
+           │       sigma ┼ nothing
+           │        chol ┼ nothing
+           │          rc ┼ nothing
+           │         alg ┼ SquaredSOCRiskExpr()
+           │    mtx_sqrt ┼ EigenFallbackSquareRoot()
+           │   ratio_alg ┼ SquareRootRatio()
+           │      corner ┴ nothing
+        r2 ┼ ConditionalValueatRisk
+           │   settings ┼ RiskMeasureSettings
+           │            │   scale ┼ Float64: 1.0
+           │            │      ub ┼ nothing
+           │            │     rke ┴ Bool: true
+           │      alpha ┼ Float64: 0.05
+           │          w ┴ nothing
 ```
 
 On a returns path whose Range is 0.625 and whose worst realisation is 0.25, the ratio is 2.5.
@@ -76,11 +79,16 @@ julia> RiskRatio(; r1 = Range(), r2 = WorstRealisation())([0.125, -0.25, 0.0625,
 # Related
 
   - [`HierarchicalRiskMeasure`](@ref)
+  - [`HierarchicalRiskMeasureSettings`](@ref)
   - [`OptimisationRiskMeasure`](@ref)
   - [`NonOptimisationRiskRatio`](@ref)
   - [`homogeneity_degree`](@ref)
 """
 @propagatable @concrete struct RiskRatio <: HierarchicalRiskMeasure
+    """
+    $(field_dict[:settings_rm])
+    """
+    settings
     """
     $(field_dict[:r1])
     """
@@ -89,13 +97,16 @@ julia> RiskRatio(; r1 = Range(), r2 = WorstRealisation())([0.125, -0.25, 0.0625,
     $(field_dict[:r2])
     """
     @fprop r2
-    function RiskRatio(r1::OptimisationRiskMeasure, r2::OptimisationRiskMeasure)
-        return new{typeof(r1), typeof(r2)}(r1, r2)
+    function RiskRatio(settings::HierarchicalRiskMeasureSettings,
+                       r1::OptimisationRiskMeasure, r2::OptimisationRiskMeasure)
+        return new{typeof(settings), typeof(r1), typeof(r2)}(settings, r1, r2)
     end
 end
-function RiskRatio(; r1::OptimisationRiskMeasure = Variance(),
+function RiskRatio(;
+                   settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
+                   r1::OptimisationRiskMeasure = Variance(),
                    r2::OptimisationRiskMeasure = ConditionalValueatRisk())::RiskRatio
-    return RiskRatio(r1, r2)
+    return RiskRatio(settings, r1, r2)
 end
 # Deferrable slots — see `deferred_slots`. The two measures carry their own, so both the check
 # and the derived recursion in `resolve_deferred_quantities` reach them through the children.
