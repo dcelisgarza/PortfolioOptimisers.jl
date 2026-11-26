@@ -883,7 +883,7 @@ function fit_pipeline_from_state(pipe::Pipeline, cache::Option{<:ReturnsBufferSt
         end
         fitted[i], ctx = run_group_step(maybe_inject_step(step, ctx), ctx, gsrcs[i])
     end
-    fitted[k], ctx = fit_owner_from_state(owner, idx, length(rd0.nx), ctx)
+    fitted[k], ctx = fit_owner_from_state(owner, idx, rd0, ctx)
     for i in (k + 1):n
         fitted[i], ctx = run_group_step(maybe_inject_step(pipe.steps[i], ctx), ctx,
                                         gsrcs[i])
@@ -978,8 +978,10 @@ function fit_data_step_from_state(sel::AbstractAssetSelector, rd0::ReturnsResult
     return res, idx[pos]
 end
 """
-    fit_owner_from_state(pe::AbstractPriorEstimator, idx, n::Integer, ctx::PipelineContext)
-    fit_owner_from_state(opt::OptimisationEstimator, idx, n::Integer, ctx::PipelineContext)
+    fit_owner_from_state(pe::AbstractPriorEstimator, idx, rd0::ReturnsResult,
+                         ctx::PipelineContext)
+    fit_owner_from_state(opt::OptimisationEstimator, idx, rd0::ReturnsResult,
+                         ctx::PipelineContext)
 
 Reads the row owner of a folded [`Pipeline`](@ref) out over the surviving assets, and writes its slot.
 
@@ -996,35 +998,37 @@ The method views the state of the owner to the surviving assets through [`view_o
   - [`optimise`](@ref)
   - [`inject_context`](@ref)
 """
-function fit_owner_from_state(pe::AbstractPriorEstimator, idx, n::Integer,
+function fit_owner_from_state(pe::AbstractPriorEstimator, idx, rd0::ReturnsResult,
                               ctx::PipelineContext)
-    pe = view_owner(pe, idx, n, ctx)
+    pe = view_owner(pe, idx, rd0)
     pr = prior(pe)
     @argcheck(length(pr.mu) == length(idx),
               ArgumentError("the `$(typeof(pe).name.name)` owning the rows read out over $(length(pr.mu)) assets where $(length(idx)) survive the universe steps before it: its state has no asset view, so a selection that moves between two steps cannot be expressed as a view of it. Put the universe steps after the prior, or hold a prior whose state `port_opt_view` slices."))
     return pr, set_slot(ctx, :prior, pr)
 end
-function fit_owner_from_state(opt::OptimisationEstimator, idx, n::Integer,
+function fit_owner_from_state(opt::OptimisationEstimator, idx, rd0::ReturnsResult,
                               ctx::PipelineContext)
-    opt = inject_context(view_owner(opt, idx, n, ctx), ctx)
+    opt = inject_context(view_owner(opt, idx, rd0), ctx)
     res = optimise(opt)
     return res, set_slot(ctx, :opt, res)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Views the row owner's state to the surviving assets, and leaves it alone when every one of the `n` assets survives in its own order.
+Views the row owner's state to the surviving assets, and leaves it alone when every asset of `rd0` survives in its own order.
+
+`idx` indexes the universe of `rd0`, so the view reads the matrix of `rd0`, before the universe steps cut it. A risk measure that holds its own higher moments views them at `idx` and reads the columns `idx` of that matrix, as in [`cross_val_predict`](@ref) with `cols`.
 
 # Related
 
   - [`fit_owner_from_state`](@ref)
   - [`port_opt_view`](@ref)
 """
-function view_owner(est, idx, n::Integer, ctx::PipelineContext)
-    if idx == 1:n
+function view_owner(est, idx, rd0::ReturnsResult)
+    if idx == 1:length(rd0.nx)
         return est
     end
-    return port_opt_view(est, idx, ctx.returns.X)
+    return port_opt_view(est, idx, rd0.X)
 end
 """
     pipeline_fold_fit(pipe::AbstractPipelineEstimator, data::Prices_RR, train_idx::VecInt, cols = :)

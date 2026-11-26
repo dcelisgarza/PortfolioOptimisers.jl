@@ -795,4 +795,4 @@ function observation_axis(::AbstractArray{<:Any, 3})::Int
     return 3
 end
 
-public port_opt_view, obs_weights_view
+public port_opt_view, obs_weights_view, InvestableIndex, selection_index

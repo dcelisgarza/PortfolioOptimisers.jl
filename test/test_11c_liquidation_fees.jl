@@ -244,6 +244,16 @@
                                                   rng = StableRNG(3), seed = 3))
         @test all(p -> all(x -> length(x.res.w) == 4, p.pred), pm.pred)
         @test all(p -> all(x -> isa(x.res.retcode, OptimisationSuccess), p.pred), pm.pred)
+        # The online read-out of a pipeline views its row owner at the assets that a
+        # selector keeps, here `A3`, `A6`, `A7` and `A8`, so it reads the matrix before the
+        # cut too. It read the cut matrix and raised a `BoundsError`.
+        po = cross_val_predict(Pipeline(;
+                                        steps = (ScoreSelector(; score = SCM(),
+                                                               rule = RankRule(; best = 4)),
+                                                 opn)), rdf,
+                               OnlineIndexWalkForward(250, 50))
+        @test all(x -> length(x.res.w) == 4 && isa(x.res.retcode, OptimisationSuccess),
+                  po.pred)
         # The benchmark of a tracking rule is a portfolio. It pays the exit of an asset that
         # left, and no exit in a window or a selection that no asset left.
         wb8 = fill(0.125, 8)

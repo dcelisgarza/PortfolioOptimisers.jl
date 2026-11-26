@@ -1448,6 +1448,14 @@ end
         @test lots(LotUnitEstimator(; val = 0.5), [4, 1]) == 0.5
         @test lots(LotUnitEstimator(; val = Dict("c" => 5.0, "d" => 2.0), key = "nx_isin"),
                    [3, 4]) == [5.0, 2.0]
+        # A group keeps its members that the view kept. A member that the view left out is
+        # outside the universe of the view, as in a group of any other viewed constraint: a
+        # warning, and a refusal under `strict`.
+        gu = LotUnitEstimator(; val = "g" => 10.0)
+        @test (@test_logs (:warn,) lots(gu, [3, 4])) == [10.0, 1.0]
+        gs = PO.port_opt_view(GreedyAllocation(; unit = gu, sets = usets, strict = true),
+                              [3, 4])
+        @test_throws ArgumentError PO.allocation_lot_unit(gs.unit, gs.sets, gs.strict, wc)
         # The number type comes from the input, as with no view.
         w32 = FiniteAllocationInput(; w = Float32[0.6, 0.4], prices = Float32[71, 129],
                                     cash = 1000.0f0)

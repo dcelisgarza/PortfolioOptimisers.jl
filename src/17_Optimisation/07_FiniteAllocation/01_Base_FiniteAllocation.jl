@@ -1054,6 +1054,8 @@ Return the [`FiniteAllocationInput`](@ref) of the assets `i`, the book in which 
 
 Give the allocator the same index, so that the lots and the input are on one axis. Each value of an asset goes with it: its weight, its price, its fees, its previous money, and the charge of its forced exit. So the views of a partition of the book hold each forced exit one time. The weight of an asset that `i` leaves out stays in the cash of the account, as the weight of an Unpriced Asset with `upw = nothing` does.
 
+The view keeps the cash and the collateral rule `ca`, because they belong to the account. So each view can tie up the whole collateral cap, and the allocations of the views of a partition add to the allocation of the book only when no cap binds. To split one account among the parts, rebuild each view with its own `cash`.
+
 # Algorithm
 
  1. When an asset has a `NaN` price, give the weights to [`unpriced_weights`](@ref) with the rule `fai.upw`. The rule reads the whole book, so the positions and the sides that it states are those of the book.

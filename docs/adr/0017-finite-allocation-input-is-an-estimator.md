@@ -50,9 +50,12 @@ the continuous optimisers and the returns data are viewed at one index.
   view left out is now a name outside the `sets` of the view, as in the view of every other
   constraint. The lots still resolve in `optimise`, in the number type of the input.
 - **The input** lifts its fee onto the axis of `w`, views each term with its asset, and reduces it
-  again at the view of `imsk`. So an exit charge is in the view of its asset alone, and the views
-  of a partition add to the whole. The rule `upw` runs on the whole book before the cut. The cash
-  and the collateral belong to the account, so a view keeps them.
+  again at the view of `imsk`. So an exit charge is in the view of its asset alone, and the exit
+  charges of the views of a partition add to those of the whole. The rule `upw` runs on the whole
+  book before the cut. The cash and the collateral belong to the account, so a view keeps them. A
+  view is the book in which only its assets trade, and not a part of the account. So the
+  allocations of a partition do not add to the whole when a collateral cap binds: each view can
+  tie up the whole cap.
 
 Refused: a view that resolves the lots. It fixes the number type before the input is known, and it
 reports a wrong name of a fallback that never runs. Refused: `lq` and `flq` whole in each view,

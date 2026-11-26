@@ -17,7 +17,7 @@ observation_axis
 
 ## View functions
 
-An optimisation over a subset of the assets, such as each inner optimisation of [`NestedClustered`](@ref), needs the part of every input that belongs to those assets. The functions below take that part of a vector, a matrix or a higher moment, and return `nothing` or a scalar unchanged. [`fourth_moment_index_generator`](@ref) gives the indices that select the entries of the subset from a fourth-moment matrix. [`view_child`](@ref) views one field of an estimator for [`port_opt_view`](@ref), and keeps a precomputed optimisation result, such as a fallback, as it is. An [`PortfolioOptimisers.InvestableIndex`](@ref) is the index that the entry of a fit gives to its views, and it tells an asset that left the universe from an asset of another part.
+An optimisation over a subset of the assets, such as each inner optimisation of [`NestedClustered`](@ref), needs the part of every input that belongs to those assets. The functions below take that part of a vector, a matrix or a higher moment, and return `nothing` or a scalar unchanged. [`fourth_moment_index_generator`](@ref) gives the indices that select the entries of the subset from a fourth-moment matrix. [`view_child`](@ref) views one field of an estimator for [`port_opt_view`](@ref), and keeps a precomputed optimisation result, such as a fallback, as it is.
 
 ```@docs
 nothing_scalar_array_view
@@ -26,8 +26,6 @@ nothing_scalar_array_getindex
 nothing_scalar_array_getindex_odd_order
 fourth_moment_index_generator
 view_child
-PortfolioOptimisers.InvestableIndex
-selection_index
 obs_weights_index
 obs_weights_fields
 ```
