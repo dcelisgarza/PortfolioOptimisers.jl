@@ -17,6 +17,7 @@ PortfolioOptimisers.buffer_returns_result
 PortfolioOptimisers.buffer_column_view
 PortfolioOptimisers.buffer_panel
 PortfolioOptimisers.online_selection_result
+PortfolioOptimisers.online_selection_failure
 PortfolioOptimisers.batch_from_state(::OnlinePortfolioSelection)
 PortfolioOptimisers.held_timestamps(opt::OnlinePortfolioSelection)
 PortfolioOptimisers.update_online_estimator(opt::Union{OnlinePortfolioSelection, PreviousWeights})

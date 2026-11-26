@@ -97,17 +97,23 @@ PortfolioOptimisers.rows_needed(::StatedLoss) = 0
         @test isa(res.retcode, OptimisationSuccess)
         @test res.w[N] == 0 && sum(res.w) == 1
         # Measured over the roster: 1e-5 under the Gram programme, the accuracy of its solver,
-        # and 3e-11 elsewhere.
-        for alg in roster
-            n = isa(alg, FollowTheLeader) || isa(alg, NewtonStep) ? 40 : 120
-            (w8, o), (w7, _) = quiet() do
-                return books(alg, rd, n), books(alg, pd, n)
+        # and 3e-11 elsewhere. The two runs of the leader on a `MeanRisk` give its solver the
+        # same inputs here, but inputs that differ by a rounding move its books by 1.3e-5, and
+        # the CI run of #2358 measured 1.2e-5. So each rule that solves takes the accuracy of
+        # its solver.
+        for (k, alg) in enumerate(roster)
+            @testset "$(k). $(nameof(typeof(alg)))" begin
+                n = isa(alg, FollowTheLeader) || isa(alg, NewtonStep) ? 40 : 120
+                (w8, o), (w7, _) = quiet() do
+                    return books(alg, rd, n), books(alg, pd, n)
+                end
+                solves = (isa(alg, NewtonStep) && isa(alg.proj, GramProjection)) ||
+                         (isa(alg, FollowTheLeader) && isa(alg.opt, MeanRisk))
+                tol = solves ? 1e-4 : 1e-9
+                @test maximum(t -> maxerr(w8[t][1:7], w7[t]), 1:n) < tol
+                @test all(w -> iszero(w[N]), w8)
+                @test success(o)
             end
-            gram = isa(alg, NewtonStep) && isa(alg.proj, GramProjection)
-            tol = gram ? 1e-4 : 1e-9
-            @test maximum(t -> maxerr(w8[t][1:7], w7[t]), 1:n) < tol
-            @test all(w -> iszero(w[N]), w8)
-            @test success(o)
         end
         # The default rule of the family is the exponentiated gradient over the listed names.
         full = optimise(OPS(), rows(pd, 1:5)).w
@@ -313,6 +319,30 @@ PortfolioOptimisers.rows_needed(::StatedLoss) = 0
                                             w0 = [1.0, 0.0, 0.0], fb = fb), rh))
         @test isa(held(nothing).retcode, OptimisationFailure)
         @test isa(held(EqualWeighted()).retcode, OptimisationSuccess)
+        # A residue of a rounding on the active assets is no mass. The CI run of #2358 left
+        # about 2e-16 there, and the read-out renormalised it to a book above the caps.
+        function residue_head(noise)
+            o = OPS(; alg = BuyAndHold(), set = set, w0 = [1.0, 0.0, 0.0])
+            o = po.partial_fit!(o, rows(rh, 1:2))
+            o.cache.w[2:3] .= noise
+            o.cache.st.u[2:3] .= noise
+            return quiet(() -> po.partial_fit!(o, rows(rh, 3:3)))
+        end
+        @test isa(optimise(residue_head([2.06e-16, 2.14e-16])).retcode, OptimisationFailure)
+        @test residue_head([2.06e-16, 2.14e-16]).cache.st.u[2:3] == [0.5, 0.5]
+        # A real mass on the active assets is not enough when their bounds miss the budget:
+        # the step holds the book of the departed asset, and no renormalisation of it lies in
+        # the set.
+        heldm(fb) = quiet(() -> optimise(OPS(; alg = BuyAndHold(), set = set,
+                                             w0 = [0.8, 0.1, 0.1], fb = fb), rh))
+        @test isa(heldm(nothing).retcode, OptimisationFailure)
+        @test occursin("bounds", heldm(nothing).retcode.res)
+        @test heldm(EqualWeighted()).w ≈ [0, 0.5, 0.5]
+        # The same book under bounds that reach the budget reads out in proportion.
+        free = BoundedAllocationSet(; wb = WeightBounds(; lb = 0.0, ub = [1.0, 0.6, 0.6]))
+        rf = quiet(() -> optimise(OPS(; alg = BuyAndHold(), set = free,
+                                      w0 = [0.8, 0.1, 0.1]), rh))
+        @test isa(rf.retcode, OptimisationSuccess) && rf.w[1] == 0 && sum(rf.w) ≈ 1
     end
 
     @testset "The mask of the row meets the mask of a reader" begin
@@ -372,6 +402,17 @@ PortfolioOptimisers.rows_needed(::StatedLoss) = 0
         @test po.price_adjusted_allocation([0.5, 0.5], x) ≈ [0.55, 0.5] ./ 1.05
         w = [0.25, 0.75]
         @test po.renormalised_view(w, nothing) === w
+        # A part whose mass is a rounding has no proportion, at any scale of the vector.
+        @test po.below_rounding(4e-16, [1.0, 4e-16])
+        @test !po.below_rounding(1e-14, [1.0, 1e-14])
+        @test !po.below_rounding(1e-20, [1e-12, 1e-20])
+        @test po.below_rounding(0, [1, 0]) &&
+              !po.below_rounding(1 // 10^9, [1 // 1, 0 // 1])
+        @test po.renormalised_view([1.0, 1e-16, 3e-16], [2, 3]) == [0.5, 0.5]
+        @test po.renormalised_view([1.0, 1e-14, 3e-14], [2, 3]) ≈ [0.25, 0.75]
+        @test po.renormalised_view([1e-12, 1e-20, 3e-20], [2, 3]) ≈ [0.25, 0.75]
+        @test po.parked_iterate([1.0, 1e-16, 3e-16], [0.0, 0.2, 0.8],
+                                BitVector([0, 1, 1])) == [0.0, 0.2, 0.8]
         imsk = BitVector([1, 0])
         @test po.investable_belief(w, nothing) === w
         @test po.investable_belief(w, imsk) == [1.0]

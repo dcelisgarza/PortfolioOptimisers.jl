@@ -289,6 +289,16 @@ fund over the listed names, and it read a stale finite return of an inactive ass
   the active assets**, the reading of `renormalised_view` and of the amendment above. So a step that is
   not held gives mass to an active asset. The `OptimisationFailure` stays for a last row with no active
   asset, and for a hold on a book of departed assets, and the fallback answers both.
+- **A mass that is a rounding is no mass.** `renormalised_view`, `parked_iterate` and the Recursion
+  Result read a part whose sum is within `budget_rounding` of zero, scaled by the mass of the vector
+  (`below_rounding`), as a part with no mass. The capped Euclidean projection renormalises a step that
+  is in the set up to `budget_rounding`, as `project_simplex` does, so a zero stays exact under every
+  bound. The CI run of the pull request showed the need: the root of such a step lifted the zeros of a
+  held book by about 1e-16 on one machine, and the Recursion Result renormalised that residue to a book
+  above its caps, with `OptimisationSuccess`.
+- **The Recursion Result fails when the bounds at the active assets admit no allocation on the budget**
+  (`feasible_bounds`). The step at such a row holds the book of the departed assets, and no
+  renormalisation of it lies in the set, whatever its mass on the active assets.
 
 So on a panel with an asset that never lists, the book of every rule is the book of the same rule over
 the other assets, to rounding. Rejected alternatives:

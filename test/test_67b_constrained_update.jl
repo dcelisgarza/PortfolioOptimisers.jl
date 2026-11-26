@@ -294,6 +294,35 @@ end
         @test po.project_simplex([1 // 2, 0 // 1, 1 // 2]) == [1 // 2, 0 // 1, 1 // 2]
         @test po.project_simplex([1 // 1, 1 // 1]) == [1 // 2, 1 // 2]
         @test po.project_simplex([1 // 2, 0 // 1, 1 // 4]) == [7 // 12, 1 // 12, 1 // 3]
+        # Under caps the root of such a step is a rounding, and a sum below one lifted the
+        # zeros by about 1e-16 on some machines (the CI run of #2358). The cap is on the
+        # zero asset alone, so no real clip moves weight onto it.
+        caps = po.resolve_allocation_set(BoundedAllocationSet(;
+                                                              wb = WeightBounds(; lb = 0.0,
+                                                                                ub = [1.0,
+                                                                                      0.5,
+                                                                                      1.0,
+                                                                                      1.0])),
+                                         4, false, Float64)
+        e = EuclideanProjection()
+        vl = [0.5, 0.0, 0.25, 0.25] .* (1 - 2 * eps())
+        @test po.project(e, caps, vl, vl) == clamp.(vl ./ sum(vl), 0.0, caps.wb.ub)
+        @test po.project(e, caps, vl, vl)[2] == 0
+        @test po.bounded_quadratic_projection(vl, caps.wb, [1.0, 0.0, 2.0, 3.0])[2] == 0
+        wc = [1 / 3, 0.0, 1 / 3, 1 / 3]
+        for _ in 1:1000
+            wc = po.project(e, caps,
+                            po.price_adjusted_allocation(wc, 1 .+ 0.02 .* randn(rng, 4)),
+                            wc)
+        end
+        @test wc[2] == 0 && isapprox(sum(wc), 1; atol = 1e-14) && all(wc .<= caps.wb.ub)
+        # An entry at a cap stays at it. A step outside the bounds, or off the budget by
+        # more than the rounding, takes the root, and the root lifts a zero there.
+        vu = [0.5, 0.5, 0.0, 0.0] .* (1 + 2 * eps())
+        @test po.project(e, caps, vu, vu)[2] <= 0.5
+        @test po.project(e, caps, [0.5, 0.7, 0.0, 0.0], vu) ≈ [0.5, 0.5, 0.0, 0.0]
+        @test po.project(e, caps, [0.5, 0.0, 0.25, 0.2], vu) ≈
+              [0.5125, 0.0125, 0.2625, 0.2125]
     end
 
     @testset "Parity 3: the programme under a slack constraint equals the closed form" begin

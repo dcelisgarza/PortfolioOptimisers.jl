@@ -1147,6 +1147,8 @@ An online step removes an asset that the asset panel marks inactive at the row, 
 - **A rule of your own** gets `NaN` in `x` at an inactive asset, where v0.34 gave one. Take `imsk = PortfolioOptimisers.investable_mask(x)`, take the step on the assets of the mask, and pass the mask to `PortfolioOptimisers.project` as the last argument. `PortfolioOptimisers.price_adjusted_allocation` reads the `NaN` as one. A `NaN` that the rule does not remove gives an `OptimisationFailure`.
 - **`online_update!` of `BuyAndHold`, `AggregatingAlgorithm` and `SwitchingWeighting`** reads a state. Write `PortfolioOptimisers.rule_state_seed(alg, w)` where you wrote `nothing`.
 - **A restart of an `ExpectationMaximisation` on a `DoublingTrickRate`** projects the start onto the set again, as the restart of a `MirrorDescent` does. So it meets a turnover ceiling of a `ProgrammeAllocationSet`.
+- **`optimise(opt)` with no data, on a head whose bounds at the active assets do not reach the budget,** gives an `OptimisationFailure`, and the fallback answers it. v0.34 renormalised the held book over the active assets, so the Result broke the bounds of its own set.
+- **The Euclidean and diagonal projections under bounds other than the simplex** renormalise a raw step that is in the set up to rounding, as the projection onto the simplex does. A zero weight then stays exactly zero, and the weights move by a rounding at most.
 
 ### [Online steps that cannot price an asset](@id migration-0-35-unpriced)
 

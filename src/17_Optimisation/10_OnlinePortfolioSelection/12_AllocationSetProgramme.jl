@@ -1125,13 +1125,14 @@ Where:
   - ``u^{+}_i``: Entry of the iterate after the step for asset ``i``.
   - ``\\mathcal{I}``: Assets of the mask.
 
-When the iterate has no mass on the mask, the function returns `v` on the mask and a zero outside it, with [`investable_book`](@ref).
+When the iterate has no mass on the mask, or a mass that is a rounding by [`below_rounding`](@ref), the function returns `v` on the mask and a zero outside it, with [`investable_book`](@ref).
 
 # Related
 
   - [`MirrorDescentState`](@ref)
   - [`AllocationIterateState`](@ref)
   - [`investable_book`](@ref)
+  - [`below_rounding`](@ref)
 """
 function parked_iterate(::AbstractVector, v::AbstractVector, ::Nothing)
     return v
@@ -1139,7 +1140,7 @@ end
 function parked_iterate(u::AbstractVector, v::AbstractVector, imsk::BitVector)
     s = sum(view(u, imsk))
     b = investable_book(v, imsk)
-    return iszero(s) ? b : ifelse.(imsk, s .* b, u)
+    return below_rounding(s, u) ? b : ifelse.(imsk, s .* b, u)
 end
 """
     programme_investable_reduction(imsk::Nothing, set::AbstractAllocationSet, X::Option{<:ReturnsResult}, pr)

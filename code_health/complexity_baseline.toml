@@ -5,7 +5,7 @@
 julia = "1.13.4"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "7df7ab6116"
+commit = "5f1e63d3f0"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 6, cog_sum = 4, arg_sum = 16, macros = [] }
@@ -420,9 +420,9 @@ commit = "7df7ab6116"
 "src/17_Optimisation/07_FiniteAllocation/03_GreedyFiniteAllocation.jl" = { cyc = 9, cog = 14, arg = 7, cyc_sum = 23, cog_sum = 21, arg_sum = 34, macros = [] }
 "src/17_Optimisation/08_RiskMeasureCompatibility.jl" = { cyc = 2, cog = 2, arg = 2, cyc_sum = 15, cog_sum = 6, arg_sum = 15, macros = [] }
 "src/17_Optimisation/09_OnlineOptimisation.jl" = { cyc = 5, cog = 4, arg = 6, cyc_sum = 89, cog_sum = 32, arg_sum = 142, macros = [] }
-"src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { cyc = 5, cog = 7, arg = 10, cyc_sum = 113, cog_sum = 71, arg_sum = 144, macros = ["@propagatable"] }
+"src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { cyc = 7, cog = 7, arg = 10, cyc_sum = 123, cog_sum = 76, arg_sum = 147, macros = ["@propagatable"] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { cyc = 4, cog = 3, arg = 7, cyc_sum = 56, cog_sum = 27, arg_sum = 105, macros = [] }
-"src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { cyc = 7, cog = 8, arg = 8, cyc_sum = 97, cog_sum = 69, arg_sum = 85, macros = [] }
+"src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { cyc = 8, cog = 8, arg = 8, cyc_sum = 100, cog_sum = 72, arg_sum = 92, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { cyc = 8, cog = 4, arg = 7, cyc_sum = 51, cog_sum = 19, arg_sum = 56, macros = ["@forward_properties"] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { cyc = 3, cog = 4, arg = 7, cyc_sum = 74, cog_sum = 32, arg_sum = 144, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/06_SecondSetRules.jl" = { cyc = 5, cog = 5, arg = 7, cyc_sum = 58, cog_sum = 27, arg_sum = 109, macros = [] }

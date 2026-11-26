@@ -9,7 +9,7 @@ The head is a naive optimiser. It fits no moment and solves no programme of its 
 
 **The online verbs run the same recursion.** `partial_fit!(opt, rd)` folds each row into the state as the Block Step. A fold of `k` rows is `k` single-row updates, so a walk-forward with `test_size = k` holds the Next-Period Allocation of the end of the block for `k` periods. `optimise(opt)` with no data is the **Recursion Result**. It wraps the allocation of the state in a Result and runs no batch path. So `optimise(opt)` after a fold of rows `1:t` equals `optimise(opt, rd[1:t])` exactly, at every `test_size`. The held path of a walk-forward differs from the batch pass in two ways. The target set at the start of a block drifts over the block, and the Block Step sets the cadence of the trades.
 
-**The Start Allocation** is `w0`, `nothing` by default. When it is absent, the recursion starts at `1/N` over the whole pinned universe, and the unlisted names are included. The fund holds the listed legs alone, and an update reads the start on the assets active at the row, renormalised. So the fund is the recursion that starts over the listed names alone, under every rule. A rule that multiplies its own allocation keeps the weight of an unlisted leg on its iterate, and gives the leg that weight when it lists. A caller gives a weight of zero to such a leg through `w0`. The rule's step then decides what a zero does. The exponentiated-gradient step keeps a zero at zero, so that asset never gets weight. A Euclidean step that moves no weight onto the asset keeps the zero exact too, because [`project_simplex`](@ref) only renormalises a raw step that is on the simplex up to rounding. Buy-and-hold is such a step. A Euclidean step that moves weight onto the asset, as the passive-aggressive step does, gives it weight, and a gap at that asset is then a Held Gap.
+**The Start Allocation** is `w0`, `nothing` by default. When it is absent, the recursion starts at `1/N` over the whole pinned universe, and the unlisted names are included. The fund holds the listed legs alone, and an update reads the start on the assets active at the row, renormalised. So the fund is the recursion that starts over the listed names alone, under every rule. A rule that multiplies its own allocation keeps the weight of an unlisted leg on its iterate, and gives the leg that weight when it lists. A caller gives a weight of zero to such a leg through `w0`. The rule's step then decides what a zero does. The exponentiated-gradient step keeps a zero at zero, so that asset never gets weight. A Euclidean step that moves no weight onto the asset keeps the zero exact too, because [`project_simplex`](@ref) on the simplex, and [`bounded_quadratic_projection`](@ref) under other bounds, only renormalise a raw step that is in the set up to rounding. Buy-and-hold is such a step. A Euclidean step that moves weight onto the asset, as the passive-aggressive step does, gives it weight, and a gap at that asset is then a Held Gap.
 
 A given `w0` is over the pinned names, and the head pins and views it with them. The first step projects it once onto the Allocation Set in the rule's geometry, as it projects the uniform start, so a start outside the set becomes feasible and is never refused. A set that reads the head's rows has no constraints before the first row, so it holds the start as given until the first update. The start reaches the first Online Update as `w`. A rule that steps from `w` continues from it. A rule whose next allocation is not a step from `w` replaces it at that update. The constant rebalanced portfolio returns its own `w`, an expert mixture returns the mix of its experts, and the Newton step solves its Gram. Such a rule can still carry `w0` forward. The gradient of the Newton step reads `w`, and an expert that steps from `w` starts at `w0`. Under every rule, the fund holds `w0` for exactly one period.
 
@@ -957,7 +957,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns the Recursion Result, the allocation of the state as a [`NaiveOptimisationResult`](@ref) over the assets active at the last folded row.
 
-This function reads the state and writes nothing, so every call on one state returns the same Result. Its retcode is an [`OptimisationSuccess`](@ref). Its `res` is the [`HeldStep`](@ref) record of the last folded row when that row was held, and `nothing` otherwise. A reduced allocation with no mass is the one failure from which a rule cannot recover. It happens when every held asset is inactive at the last row. This function then returns an [`OptimisationFailure`](@ref) with `NaN` weights, so that a fallback chain continues.
+This function reads the state and writes nothing, so every call on one state returns the same Result. Its retcode is an [`OptimisationSuccess`](@ref). Its `res` is the [`HeldStep`](@ref) record of the last folded row when that row was held, and `nothing` otherwise. Two cases have no allocation to read out, and a rule cannot recover from either. The first is a reduced allocation with no mass, or with a mass that is a rounding by [`below_rounding`](@ref). It happens when every held asset is inactive at the last row. The second is a set whose bounds at the active assets admit no allocation on the budget, by [`feasible_bounds`](@ref). A step at such a row is held, so the book keeps the departed assets, and no renormalisation of it lies in the set. In both cases this function returns an [`OptimisationFailure`](@ref) with `NaN` weights, so that a fallback chain continues.
 
 # Mathematical definition
 
@@ -974,16 +974,17 @@ Where:
   - ``\\mathcal{I}``: Investable Mask of the Result, the assets active at the last folded row, or every asset under a static panel.
   - $(math_dict[:T])
 
-The Result expands ``\\bar{\\boldsymbol{w}}`` back over the pinned universe with a zero at every asset outside ``\\mathcal{I}``. The weights are defined when the denominator is positive and every ``w_{T+1,i}`` is finite.
+The Result expands ``\\bar{\\boldsymbol{w}}`` back over the pinned universe with a zero at every asset outside ``\\mathcal{I}``. The weights are defined when the denominator is positive and above the rounding of the budget, and every ``w_{T+1,i}`` is finite.
 
 # Algorithm
 
  1. Read the active mask `imsk` of the last folded row, and form `idx`, the indices of the active assets, or every index when `imsk` is `nothing`.
  2. View the head's set at `idx`, giving `set`, and slice the allocation to `w`.
  3. Resolve the head's fee against the full set, and view it at the Investable Mask through [`investable_fees_view`](@ref), giving `fees`.
- 4. Sum `w` to `s`. When no asset is active, `s` is not positive, or an entry of `w` is not finite, return an [`OptimisationFailure`](@ref) with `NaN` weights and no bounds.
+ 4. Sum `w` to `s`. When no asset is active, `s` is not positive or is a rounding of the allocation of the state by [`below_rounding`](@ref), or an entry of `w` is not finite, return an [`OptimisationFailure`](@ref) with `NaN` weights and no bounds, through [`online_selection_failure`](@ref).
  5. Resolve the weight bounds of `set` over the active assets, giving `wb`. The resolution reads the rows that the head holds, viewed at the active assets, so a bound that reads the returns, such as a [`ScoreWeightBounds`](@ref), scores the rows of the last step.
- 6. Return `w ./ s` with `wb`, `fees` and an [`OptimisationSuccess`](@ref) whose `res` is the hold record of the state.
+ 6. When `wb` admits no allocation on the budget, by [`feasible_bounds`](@ref), return an [`OptimisationFailure`](@ref) in the same way.
+ 7. Return `w ./ s` with `wb`, `fees` and an [`OptimisationSuccess`](@ref) whose `res` is the hold record of the state.
 
 # Arguments
 
@@ -1012,21 +1013,49 @@ function online_selection_result(opt::OnlinePortfolioSelection,
                                                  strict = opt.strict, datatype = eltype(w)),
                                 imsk, N)
     s = sum(w)
-    if iszero(Nr) || !(s > zero(s)) || !all(isfinite, w)
+    if iszero(Nr) || !(s > zero(s)) || below_rounding(s, state.w) || !all(isfinite, w)
         # No asset is active at the last row, or the recursion's mass sits on none of
         # them: there is no allocation to read out, and no universe to bound.
-        return NaiveOptimisationResult(; pr = nothing, wb = nothing,
-                                       retcode = OptimisationFailure(;
-                                                                     res = "the recursion's allocation has no mass on the assets active at the last folded row, so no Next-Period Allocation can be read out."),
-                                       w = fill(convert(eltype(w), NaN), Nr), imsk = imsk,
-                                       fb = nothing, fees = fees)
+        return online_selection_failure("the recursion's allocation has no mass on the assets active at the last folded row, so no Next-Period Allocation can be read out.",
+                                        w, imsk, fees)
     end
     # A head that keeps no rows has `nothing` here, and its view is `nothing`.
     rows = port_opt_view(buffer_returns_result(state.X), idx)
     wb = weight_bounds_constraints(set.wb, set.sets; rd = rows, N = Nr, strict = opt.strict,
                                    datatype = eltype(w))
+    if !feasible_bounds(wb)
+        # The step at such a row is held, and no renormalisation of its book lies in the set.
+        return online_selection_failure("no allocation summing to one lies between the bounds of the assets active at the last folded row, so no Next-Period Allocation can be read out.",
+                                        w, imsk, fees)
+    end
     retcode, w = OptimisationSuccess(; res = state.hold), w ./ s
     return NaiveOptimisationResult(; pr = nothing, wb = wb, retcode = retcode, w = w,
+                                   imsk = imsk, fb = nothing, fees = fees)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the Recursion Result that has no allocation to read out: an [`OptimisationFailure`](@ref) with the reason `msg`, `NaN` weights over the active assets and no bounds, so that a fallback chain continues.
+
+# Arguments
+
+  - `msg`: The reason of the failure.
+  - `w`: The allocation of the state, sliced to the active assets.
+  - `imsk`: The active mask of the last folded row, or `nothing`.
+  - `fees`: The fees, viewed at the active assets.
+
+# Returns
+
+  - `res::NaiveOptimisationResult`: The failed Recursion Result, `pr = nothing`.
+
+# Related
+
+  - [`online_selection_result`](@ref)
+"""
+function online_selection_failure(msg::AbstractString, w::AbstractVector, imsk, fees)
+    return NaiveOptimisationResult(; pr = nothing, wb = nothing,
+                                   retcode = OptimisationFailure(; res = msg),
+                                   w = fill(convert(eltype(w), NaN), length(w)),
                                    imsk = imsk, fb = nothing, fees = fees)
 end
 """

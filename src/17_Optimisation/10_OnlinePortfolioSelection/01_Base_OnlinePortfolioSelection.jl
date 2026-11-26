@@ -724,15 +724,33 @@ When some ``h_i`` is zero, the norm is a seminorm. Let ``P = \\{i : h_i > 0\\}``
 
 With no positive ``h_i``, ``P`` is empty and the projection is the Euclidean one.
 
+A ``\\boldsymbol{q}`` between its bounds whose sum ``s`` misses one by rounding alone is in the set already, and the projection renormalises it, as [`project_simplex`](@ref) does:
+
+```math
+\\begin{align}
+w^{+}_i &= \\min\\left(\\max\\left(q_i / s,\\, l_i\\right),\\, u_i\\right) \\quad \\text{if } l_j \\leq q_j \\leq u_j \\text{ for every } j \\text{ and } \\lvert s - 1 \\rvert \\leq (N + 1) \\varepsilon\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``w^{+}_i``: Entry of the projection for asset ``i``.
+  - ``s``: Sum of the entries of ``\\boldsymbol{q}``.
+  - $(math_dict[:N])
+  - $(math_dict[:eps_machine])
+
+The bound ``(N + 1) \\varepsilon`` is [`budget_rounding`](@ref). The root of such a step is a rounding, and when ``s < 1`` it lifts every entry at a zero lower bound to ``-\\theta / h_i > 0``. A rule that multiplies its allocation then compounds that residue as a real holding. The quotient keeps such an entry exactly zero, and the clip keeps every entry between its bounds.
+
 # Algorithm
 
  1. Refuse a non-finite `q` with [`assert_finite_raw_step`](@ref), bounds that no allocation on the budget satisfies with [`assert_feasible_bounds`](@ref), and a negative or `NaN` entry of `h`.
- 2. When every entry of `h` is positive, return the projection at the budget one with [`budget_root_projection`](@ref). Stop.
- 3. When no entry of `h` is positive, return the projection at unit weights and the budget one with [`budget_root_projection`](@ref). Stop.
- 4. Otherwise, split the assets into `pos`, where `h` is positive, and `zer`, where it is zero. Clip `q[pos]` to its bounds, and form `r`, the budget that the clipped entries leave.
- 5. When `r` is above the sum of the upper bounds of `zer`, hold `zer` at those bounds, and project `q[pos]` at the budget that they leave with [`budget_root_projection`](@ref). Do the same with the lower bounds when `r` is below their sum.
- 6. Otherwise, keep the clipped `q[pos]`, and project `q[zer]` at unit weights and the budget `r` with [`budget_root_projection`](@ref).
- 7. Return the two parts as one vector.
+ 2. Sum `q`, giving `s`. When every entry of `q` is between its bounds and `abs(s - 1)` is at most [`budget_rounding`](@ref), return `clamp.(q ./ s, lb, ub)`. Stop.
+ 3. When every entry of `h` is positive, return the projection at the budget one with [`budget_root_projection`](@ref). Stop.
+ 4. When no entry of `h` is positive, return the projection at unit weights and the budget one with [`budget_root_projection`](@ref). Stop.
+ 5. Otherwise, split the assets into `pos`, where `h` is positive, and `zer`, where it is zero. Clip `q[pos]` to its bounds, and form `r`, the budget that the clipped entries leave.
+ 6. When `r` is above the sum of the upper bounds of `zer`, hold `zer` at those bounds, and project `q[pos]` at the budget that they leave with [`budget_root_projection`](@ref). Do the same with the lower bounds when `r` is below their sum.
+ 7. Otherwise, keep the clipped `q[pos]`, and project `q[zer]` at unit weights and the budget `r` with [`budget_root_projection`](@ref).
+ 8. Return the two parts as one vector.
 
 # Arguments
 
@@ -755,6 +773,7 @@ With no positive ``h_i``, ``P`` is empty and the projection is the Euclidean one
   - [`project`](@ref)
   - [`budget_root_projection`](@ref)
   - [`breakpoint_root`](@ref)
+  - [`budget_rounding`](@ref)
   - [`EuclideanProjection`](@ref)
   - [`DiagonalProjection`](@ref)
 """
@@ -765,6 +784,12 @@ function bounded_quadratic_projection(q::AbstractVector, wb::WeightBounds,
     # An entry that is negative or `NaN` is in neither `pos` nor `zer` below.
     @argcheck(all(x -> x >= zero(x), h), DomainError(h, "h must be non-negative"))
     lb, ub = wb.lb, wb.ub
+    s = sum(q)
+    # A step already in the set: its root is a rounding that lifts a zero entry.
+    if abs(s - one(s)) <= budget_rounding(typeof(s), length(q)) &&
+       all(i -> lb[i] <= q[i] <= ub[i], eachindex(q, lb, ub))
+        return clamp.(q ./ s, lb, ub)
+    end
     pos = findall(x -> x > zero(x), h)
     if length(pos) == length(h)
         return budget_root_projection(q, lb, ub, h, one(eltype(q)))
@@ -1099,6 +1124,37 @@ function budget_rounding(::Type{T}, n::Integer) where {T <: Union{Integer, Ratio
 end
 function budget_rounding(::Type{T}, n::Integer) where {T}
     return (n + 1) * eps(T)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Checks whether `s`, the sum of a part of the vector `v`, is zero up to the rounding of a sum over `v`.
+
+A part with such a sum holds no mass that the arithmetic can tell from rounding, so it has no proportion. For an allocation on the budget, the bound is [`budget_rounding`](@ref). The bound scales with the mass of `v`, so a vector that does not sum to one, such as the belief variances of a [`ConfidenceWeightedMeanReversion`](@ref), keeps its proportion at any scale. An integer or `Rational` type takes an exact test, because its sums carry no rounding.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\lvert s \\rvert &\\leq b(T, n) \\sum_{i = 1}^{n} \\lvert v_i \\rvert\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``s``: Sum of the part.
+  - ``v_i``: Entry ``i`` of the vector.
+  - ``n``: Number of entries of the vector.
+  - ``b(T, n)``: The bound of [`budget_rounding`](@ref) for the element type ``T`` of ``s``.
+
+# Related
+
+  - [`budget_rounding`](@ref)
+  - [`renormalised_view`](@ref)
+  - [`parked_iterate`](@ref)
+"""
+function below_rounding(s::Number, v::AbstractVector)::Bool
+    return abs(s) <= budget_rounding(typeof(s), length(v)) * sum(abs, v)
 end
 """
     online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet, point::Option{<:AbstractVector} = nothing)
@@ -1870,13 +1926,13 @@ end
 
 Slices an allocation to the selected assets and renormalises it to sum to one, as a copy. A `nothing` allocation stays `nothing`, and a `nothing` selection, the mask of a row with no inactive asset, returns the allocation.
 
-The function spreads the mass that the selection leaves out over the kept assets in proportion. Every per-asset view of an allocation in the family reads it this way, the Recursion Result under a time-varying panel and the view of a rule's own allocation among them. A selection that keeps none of the mass, such as a view of a one-hot allocation to the other assets, has no proportion. It returns the uniform allocation over the kept assets, the Start Allocation of the family.
+The function spreads the mass that the selection leaves out over the kept assets in proportion. Every per-asset view of an allocation in the family reads it this way, the Recursion Result under a time-varying panel and the view of a rule's own allocation among them. A selection that keeps none of the mass, such as a view of a one-hot allocation to the other assets, has no proportion. It returns the uniform allocation over the kept assets, the Start Allocation of the family. A selection whose mass is a rounding, by [`below_rounding`](@ref), keeps none of the mass too. So a residue that a projection leaves at a zero does not become the whole view.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-v_i &= \\begin{cases} w_i \\big/ \\sum_{j \\in I} w_j & \\text{if } \\sum_{j \\in I} w_j \\neq 0\\,, \\\\ 1 / \\lvert I \\rvert & \\text{otherwise}\\,, \\end{cases} \\quad i \\in I\\,.
+v_i &= \\begin{cases} w_i \\big/ \\sum_{j \\in I} w_j & \\text{if } \\left\\lvert \\sum_{j \\in I} w_j \\right\\rvert > b(T, N) \\sum_{j = 1}^{N} \\lvert w_j \\rvert\\,, \\\\ 1 / \\lvert I \\rvert & \\text{otherwise}\\,, \\end{cases} \\quad i \\in I\\,.
 \\end{align}
 ```
 
@@ -1885,11 +1941,14 @@ Where:
   - ``v_i``: Entry of the view for the kept asset ``i``.
   - ``w_i``: Entry of the allocation for asset ``i``.
   - ``I``: Set of the kept assets.
+  - $(math_dict[:N])
+  - ``b(T, N)``: The bound of [`budget_rounding`](@ref) for the element type ``T`` of the allocation.
 
 # Related
 
   - [`OnlinePortfolioSelectionState`](@ref)
   - [`port_opt_view`](@ref)
+  - [`below_rounding`](@ref)
 """
 function renormalised_view(::Nothing, ::Any)
     return nothing
@@ -1900,7 +1959,7 @@ end
 function renormalised_view(w::AbstractVector, i)
     v = w[i]
     s = sum(v)
-    return iszero(s) ? fill(one(s) / length(v), length(v)) : v ./ s
+    return below_rounding(s, w) ? fill(one(s) / length(v), length(v)) : v ./ s
 end
 """
 $(DocStringExtensions.TYPEDEF)

@@ -18,6 +18,7 @@ PortfolioOptimisers.bounded_root
 PortfolioOptimisers.bisection_cap
 PortfolioOptimisers.project_simplex
 PortfolioOptimisers.budget_rounding
+PortfolioOptimisers.below_rounding
 PortfolioOptimisers.gram_geometry
 PortfolioOptimisers.HeldStep
 PortfolioOptimisers.ProjectionStep
