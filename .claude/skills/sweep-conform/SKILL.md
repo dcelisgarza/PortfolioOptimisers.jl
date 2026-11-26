@@ -1,6 +1,6 @@
 ---
 name: sweep-conform
-description: "Make an addition under src/ or ext/ conform to the sweep of #404 before the commit: the manifest row, the unit count, the child map, the coverage entry, the include line, the gate baseline rows, the size headroom, and the two tracker steps no Julia test can reach. Then land the branch in the order that survives a busy base, by the route that the issue states (ADR 0240): dev, a map branch, or a pull request of its own. Use after adding or changing any file under src/ or ext/, before committing, and before any push."
+description: "Make an addition under src/ or ext/ conform to the sweep of #404 before the commit: the manifest row, the unit count, the child map, the coverage entry, the include line, the gate baseline rows, the size headroom, and the two tracker steps no Julia test can reach. Then run the gates in the order that survives a busy base. Use after adding or changing any file under src/ or ext/, before committing, and before any push."
 ---
 
 # Conforming to the sweep
@@ -130,13 +130,8 @@ numbers, and a merge keeps one of them. Lower a ratchet in the commit that does 
 When `main` changed the ratchet after your branch started, rebase, so that you lower the number
 that is current. GitHub shows the conflict on the pull request.
 
-**The landing base.** The `**Lands on:**` line of the issue names the route (ADR 0240). A sweep
-sub-issue lands on `dev` unless its line names another route. `<base>` below is the landing
-base: `origin/main` for a branch of your own, and `origin/dev` or `origin/dev-<feature>` for a
-shared branch. A line that names `#<pr>` makes the head branch of that pull request a shared
-branch. On a shared branch, run
-`bash code_health/gate_stamp.sh base origin/<branch>` once, before the first gate. Every gate,
-stamp and check then measures against it.
+**The landing base.** `<base>` below is the landing base that the `land-work` skill stores for the
+route of the issue. Every gate, stamp and check measures against it.
 
 Sibling work lands on `<base>` while your gates run. A rebase makes a gate or a test stale only
 when the commits that it brings in change a file that the gate or the test reads. A fast gate that
@@ -178,12 +173,12 @@ of cost, the fast ones first, and the slow ones once, on the tree you will push:
    `test_45` holds the manifest row and `test_47` the `include` line. `test_43` and `test_66` hold
    the `public` and `export` declarations, which `sweep_check.jl` does not read. `test_64` holds
    the `Description` line of a mirror page under `docs/src/`, `test_71` refuses an issue number in
-   a docstring, `test_72` holds the prose of every page and docstring, `docs/src/migration.md`
-   among them, `test_74` refuses a word for a mechanism of the code in a string, such as
-   `read-out`, `test_46` holds the names that a standards file cites, and `test_75` holds a new
-   concrete struct. Run them even when your targeted tests leave them out, and run the censuses
-   that `gate_stamp.sh reach` names on a change to any `.md` page too. The push guard refuses a
-   push without a green run of each census that reads a changed text. Each one once reached
+   a docstring, `test_72` holds the prose of every page and docstring, those of
+   `docs/src/next_release/` among them, `test_74` refuses a word for a mechanism of the code in a
+   string, such as `read-out`, `test_46` holds the names that a standards file cites, and `test_75`
+   holds a new concrete struct. Run them even when your targeted tests leave them out, and run the
+   censuses that `gate_stamp.sh reach` names on a change to any `.md` page too. The push guard
+   refuses a push without a green run of each census that reads a changed text. Each one once reached
    `dev` red because a branch did not run it. `test_72` was red on 55 runs, because commits that
    added a row to the migration guide raised its glossary count.
 5. Run the targeted tests bare, with `run_in_background`, through the driver. It wakes you when
@@ -218,16 +213,9 @@ of cost, the fast ones first, and the slow ones once, on the tree you will push:
    block of another file prints. A change to docstring prose reaches neither, and the push needs
    neither.
 8. Commit and fetch. Run `gate_stamp.sh check` again.
-   - **Own branch.** Rebase only if the check names a stamp. Push with
-     `git push origin HEAD:dev-<feature>`. Open one pull request into `main`, with the
-     body that the `pr` skill writes and `Closes #<issue>` in it. Turn on auto-merge with
-     `gh pr merge <number> --auto --squash`. GitHub merges it when the required checks pass.
-   - **Shared branch.** Rebase onto `<base>` if it moved, and push with
-     `git push origin HEAD:<branch>`. The commit message names `Fix #<issue>: …`. Open no pull
-     request of your own.
-   - **Every route.** When the push holds the last part of the work, close the issue with
-     `gh issue close <issue> --comment "Fixed in <sha> on <branch>."`. Do not wait for the merge
-     into `main` (`CLAUDE.md` § *Repo etiquette*).
+   On your own branch, rebase only if the check names a stamp. On a shared branch, rebase onto
+   `<base>` if it moved. The `land-work` skill then gives the push, the pull request, the review and
+   the merge of the route.
 
 Each gate and each test file records a stamp of the tree it measured. The pre-push hook refuses
 the push in three cases, and the refusal names what to do:
