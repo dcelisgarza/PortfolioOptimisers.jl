@@ -1510,13 +1510,15 @@
         prn_gm = LowOrderPrior(; X = Xn_gm, mu = mu_gm, sigma = sigma_gm)
         prk_gm = LowOrderPrior(; X = X_gm[:, [1, 3]], mu = pr_gm.mu[[1, 3]],
                                sigma = pr_gm.sigma[[1, 3], [1, 3]])
-        @test isequal(ys_gm(plot_measures(w0_gm, prn_gm)),
-                      ys_gm(plot_measures(w0_gm[[1, 3]], prk_gm)))
+        # The reduced prior and the prior of two assets sum in a different order, so
+        # the figures agree to the last bit only.
+        @test ys_gm(plot_measures(w0_gm, prn_gm)) ≈
+              ys_gm(plot_measures(w0_gm[[1, 3]], prk_gm))
         @test_logs((:warn, r"Assets \[2\] are not investable"),
                    plot_measures(wh_gm, prn_gm))
         @test_throws ArgumentError plot_measures(wh_gm, prn_gm; strict = true)
-        @test isequal(ys_gm(plot_efficient_frontier([w0_gm, w0_gm], prn_gm)),
-                      ys_gm(plot_efficient_frontier([w0_gm[[1, 3]], w0_gm[[1, 3]]], prk_gm)))
+        @test ys_gm(plot_efficient_frontier([w0_gm, w0_gm], prn_gm)) ≈
+              ys_gm(plot_efficient_frontier([w0_gm[[1, 3]], w0_gm[[1, 3]]], prk_gm))
         @test_logs((:warn, r"Assets \[2\] are not investable"),
                    plot_efficient_frontier([res_gm, res_gm], prn_gm))
         @test_throws ArgumentError plot_efficient_frontier([res_gm, res_gm], prn_gm;
