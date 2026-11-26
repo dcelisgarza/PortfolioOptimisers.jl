@@ -105,6 +105,18 @@ ratio also reads the characteristic of its return terms, the vector that its nor
 The ceiling is an estimate with a margin, because the solution sets `k`, and a stated `ss` replaces
 the constant.
 
-A larger constant at every bound was refused, because a constant that is far above `k` loosens the
-relaxation, and the integrality tolerance of the solver leaves more of a gate open. A model with a
-constant `k` keeps its constant.
+The constant has no factor of its own (#2373, the maintainer's ruling of 2026-11-26). It is the
+bound that the model holds on each term that it releases. With every weight bound finite, a
+constant `k` takes `B`, the exact bound of the gated terms, and a variable `k` takes
+`k_ceil * max(1, B)`. `B` reads the space: the largest bound magnitude of one asset in the asset
+space, and the largest group sum of the magnitudes in a `SubsetMIPSpace`. So a sub-group registers
+its own constant under `mip_key(sp, :ss)`, and every other space shares `:ss`. An infinite bound
+holds nothing, so there the factor `1000` of the largest finite bound stays as the fallback.
+
+A larger constant at every bound was refused, and so was the old factor `1000` beside finite bounds,
+because a constant that is far above the gated terms loosens the relaxation. The integrality
+tolerance of the solver then leaves more of a gate open, and an outer approximation can fail: a
+`MixedIntegerRiskBudgeting` with bounds of `±10` and no budget was `INFEASIBLE` with Pajarito at
+`10^4`, and it solved at every constant from `2` to `1000`. A first solve of the relaxation that
+reads `k` was refused too, because it costs a conic solve for each model, and the `k` of the
+relaxation is not the `k` of the mixed-integer solution.

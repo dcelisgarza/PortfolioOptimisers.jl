@@ -1,96 +1,4 @@
 """
-    get_mip_ss(ss::Number, args...)
-    get_mip_ss(ss::Nothing, wb::WeightBounds, model::JuMP.Model)
-
-Return the big-M constant of the MIP constraints.
-
-A stated `ss` is returned as it is. A `nothing` takes a constant that the library derives from the weight bounds and from the scale of ``k``.
-
-A row on the weights of the model needs a constant at or above the size of ``\\boldsymbol{y} = k \\boldsymbol{w}``, and a row that makes a gate ``k b`` from a binary ``b`` needs one at or above ``k``. When ``k`` is a number, it is one, and the weight bounds alone size the constant. When ``k`` is a variable, a small weight bound says nothing about ``k``. The constant is then also at least the ceiling that the producer of ``k`` recorded.
-
-No ceiling is exact, because the solution sets ``k``. The gate rows keep ``k`` at or below the constant, so state a larger `ss` when ``k`` of the solution is near it, or when a book that meets every constraint fails.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-M &= \\begin{cases}
-1000\\, b & \\text{if } k \\text{ is a number}\\,, \\\\
-\\max\\left(1000\\, b,\\, \\bar{k} \\max\\left(1,\\, b\\right)\\right) & \\text{otherwise}\\,.
-\\end{cases}
-\\end{align}
-```
-
-Where:
-
-  - ``M``: Big-M constant.
-  - ``b``: The largest magnitude of a finite bound of `wb`, and ``1`` when no bound is finite or every finite bound is zero.
-  - $(math_dict[:k_budget])
-  - $(math_dict[:k_ceil])
-
-# Arguments
-
-  - $(arg_dict[:ss_arg])
-  - $(arg_dict[:wb_arg]) The optimiser expands an absent bound to a vector before the MIP builders run, so both sides are vectors.
-  - $(arg_dict[:model])
-
-# Returns
-
-  - `ss::Number`: The big-M constant.
-
-# Related
-
-  - [`mip_constraints`](@ref)
-  - [`set_mip_ss_expr!`](@ref)
-  - [`set_maximum_ratio_scale_ceiling!`](@ref)
-  - [`risk_budgeting_scale_ceiling`](@ref)
-  - [`WeightBounds`](@ref)
-"""
-function get_mip_ss(ss::Number, args...)
-    return ss
-end
-function get_mip_ss(::Nothing, wb::WeightBounds, model::JuMP.Model)
-    lbv = view(wb.lb, isfinite.(wb.lb))
-    ubv = view(wb.ub, isfinite.(wb.ub))
-    lb_mag = isempty(lbv) ? 0.0 : maximum(abs, lbv)
-    ub_mag = isempty(ubv) ? 0.0 : maximum(abs, ubv)
-    b = max(lb_mag, ub_mag)
-    b = ifelse(iszero(b), one(b), b)
-    if isa(get_k(model), Number)
-        return 1000.0 * b
-    end
-    return max(1000.0 * b, shared_get(model, :k_ceil) * max(one(b), b))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Register the big-M scaling constant as the model expression `:ss` and return it.
-
-Asset-space and sub-group MIP builders share the single `:ss` key; the first caller registers it via [`get_mip_ss`](@ref), subsequent callers reuse the registered expression.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - $(arg_dict[:ss_arg])
-  - $(arg_dict[:wb_arg])
-
-# Returns
-
-  - `ss`: The registered scaling-constant expression.
-
-# Related
-
-  - [`get_mip_ss`](@ref)
-  - [`short_mip_threshold_constraints`](@ref)
-  - [`mip_constraints`](@ref)
-"""
-function set_mip_ss_expr!(model::JuMP.Model, ss::Option{<:Number}, wb::WeightBounds)
-    if shared_has(model, :ss)
-        return shared_get(model, :ss)
-    end
-    return shared_set!(model, :ss, JuMP.@expression(model, get_mip_ss(ss, wb, model)))
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the weight space a MIP constraint builder acts on.
@@ -232,6 +140,125 @@ function mip_bounds(::AssetMIPSpace, b::VecNum)
 end
 function mip_bounds(sp::SubsetMIPSpace, b::VecNum)
     return sp.smtx * b
+end
+"""
+    get_mip_ss(ss::Number, args...)
+    get_mip_ss(ss::Nothing, wb::WeightBounds, model::JuMP.Model,
+               sp::AbstractMIPSpace = AssetMIPSpace())
+
+Return the big-M constant of the MIP constraints in the space `sp`.
+
+A stated `ss` is returned as it is. A `nothing` takes the bound that the model holds on each term that the constant releases, with no factor of its own.
+
+A row on the weights of the space, such as a threshold or the pin of the decomposition, is slack when its bit is off only if the constant is at or above the size of the gated term. That term is the expression of [`mip_wx!`](@ref), ``k \\boldsymbol{x}``, where ``\\boldsymbol{x}`` is the weights of the asset space or the sums of the groups of a sub-group space. A row that makes a gate ``k z`` from a binary ``z`` needs a constant at or above ``k``. When every weight bound is finite, the bounds hold ``\\lvert x_i \\rvert \\leq B``, so ``B`` is the constant when ``k`` is a number, and the constant is exact. When ``k`` is a variable, ``k \\leq \\bar{k}`` gives ``\\lvert k x_i \\rvert \\leq \\bar{k} B``, and the constant is ``\\bar{k} \\max(1, B)``, which also holds the gate. A sub-group space gates the sum of a group, so its ``B`` is the bound of the largest group sum, which can be larger than the bound of one asset. The bound holds because a selection matrix has no negative entry.
+
+A constant far above the gated terms is not a safe margin. It loosens the relaxation, and a solver can then fail on a book that meets every constraint. A `MixedIntegerRiskBudgeting` with bounds of `±10`, no budget and a cardinality failed as `INFEASIBLE` with Pajarito at the old constant `1000 b = 10^4`, and it solved at every constant from `2` to `1000`.
+
+An infinite bound holds nothing, so the constant then falls back to ``1000 b``, the largest finite magnitude ``b`` times `1000`, and to at least ``\\bar{k} \\max(1, b)`` when ``k`` is a variable. ``\\bar{k}`` is not exact, because the solution sets ``k``. The gate rows keep ``k`` at or below the constant, so state a larger `ss` when ``k`` of the solution is near it, or when a book that meets every constraint fails.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+M &= \\begin{cases}
+B & \\text{if every bound is finite and } k \\text{ is a number}\\,, \\\\
+\\bar{k} \\max\\left(1,\\, B\\right) & \\text{if every bound is finite and } k \\text{ is a variable}\\,, \\\\
+1000\\, b & \\text{if a bound is infinite and } k \\text{ is a number}\\,, \\\\
+\\max\\left(1000\\, b,\\, \\bar{k} \\max\\left(1,\\, b\\right)\\right) & \\text{otherwise}\\,,
+\\end{cases} \\\\
+B &= \\max_{i} \\left(\\mathbf{S} \\boldsymbol{m}\\right)_{i}\\,, \\quad m_{j} = \\max\\left(\\lvert \\ell_{j} \\rvert,\\, \\lvert u_{j} \\rvert\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``M``: Big-M constant.
+  - ``B``: The bound on the size of each gated term of `sp`, and ``1`` when it is zero.
+  - ``\\mathbf{S}``: The map of `sp` from the bounds of the assets to the bounds of its terms, [`mip_bounds`](@ref). It is the identity for the asset space, and the selection matrix `smtx` for a [`SubsetMIPSpace`](@ref).
+  - ``\\ell_{j}``, ``u_{j}``: The lower and upper bounds of asset ``j``.
+  - ``b``: The largest magnitude of a finite bound of `wb`, and ``1`` when no bound is finite or every finite bound is zero.
+  - $(math_dict[:k_budget])
+  - $(math_dict[:k_ceil])
+
+# Arguments
+
+  - $(arg_dict[:ss_arg])
+  - $(arg_dict[:wb_arg]) The optimiser expands an absent bound to a vector before the MIP builders run, so both sides are vectors.
+  - $(arg_dict[:model])
+  - `sp::AbstractMIPSpace`: The space of the gated terms. Every space except a [`SubsetMIPSpace`](@ref) gates the weights or reads the gate rows alone, so it takes the asset space.
+
+# Returns
+
+  - `ss::Number`: The big-M constant.
+
+# Related
+
+  - [`mip_constraints`](@ref)
+  - [`set_mip_ss_expr!`](@ref)
+  - [`set_maximum_ratio_scale_ceiling!`](@ref)
+  - [`risk_budgeting_scale_ceiling`](@ref)
+  - [`WeightBounds`](@ref)
+"""
+function get_mip_ss(ss::Number, args...)
+    return ss
+end
+function get_mip_ss(::Nothing, wb::WeightBounds, model::JuMP.Model,
+                    sp::AbstractMIPSpace = AssetMIPSpace())
+    finite = all(isfinite, wb.lb) && all(isfinite, wb.ub)
+    # With every bound finite, the bound of each gated term of `sp`, exact for a number `k`.
+    # An infinite bound holds nothing, so the largest finite magnitude stands in for it.
+    m = if finite
+        mip_bounds(sp, max.(abs.(wb.lb), abs.(wb.ub)))
+    else
+        abs.(filter(isfinite, vcat(wb.lb, wb.ub)))
+    end
+    B = maximum(m; init = zero(eltype(m)))
+    B = ifelse(iszero(B), one(B), B)
+    M = isa(get_k(model), Number) ? B : shared_get(model, :k_ceil) * max(one(B), B)
+    return finite ? M : max(1000 * B, M)
+end
+"""
+    set_mip_ss_expr!(model::JuMP.Model, sp::AbstractMIPSpace, ss::Option{<:Number}, wb::WeightBounds)
+    set_mip_ss_expr!(model::JuMP.Model, sp::SubsetMIPSpace, ss::Option{<:Number}, wb::WeightBounds)
+
+Register the big-M constant of the space `sp` as a model expression and return it.
+
+The first caller registers the constant with [`get_mip_ss`](@ref), and every later caller reads the registered expression. The asset space, the factor space and the concentration space share the key `:ss`, with the constant of the asset space: their rows gate the weights, or they read the constant in the gate rows of [`declare_mip_gate!`](@ref) alone. A [`SubsetMIPSpace`](@ref) gates the sums of its groups, which can be larger than the bound of one asset, so it registers its own constant under `mip_key(sp, :ss)`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `sp::AbstractMIPSpace`: The space of the rows that read the constant.
+  - $(arg_dict[:ss_arg])
+  - $(arg_dict[:wb_arg])
+
+# Returns
+
+  - `ss`: The registered expression of the big-M constant.
+
+# Related
+
+  - [`get_mip_ss`](@ref)
+  - [`short_mip_threshold_constraints`](@ref)
+  - [`mip_constraints`](@ref)
+"""
+function set_mip_ss_expr!(model::JuMP.Model, ::AbstractMIPSpace, ss::Option{<:Number},
+                          wb::WeightBounds)
+    if shared_has(model, :ss)
+        return shared_get(model, :ss)
+    end
+    return shared_set!(model, :ss, JuMP.@expression(model, get_mip_ss(ss, wb, model)))
+end
+function set_mip_ss_expr!(model::JuMP.Model, sp::SubsetMIPSpace, ss::Option{<:Number},
+                          wb::WeightBounds)
+    # `mip_key` composes the whole key, so the interface registers it under the empty prefix.
+    pfx = Symbol("")
+    key = mip_key(sp, :ss)
+    if state_has(model, pfx, key)
+        return state_get(model, pfx, key)
+    end
+    return state_set!(model, pfx, key,
+                      JuMP.@expression(model, get_mip_ss(ss, wb, model, sp)))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -740,7 +767,7 @@ function declare_mip_gate!(model::JuMP.Model, sp::AbstractMIPSpace, bin::Symbol,
         return z, z
     end
     sc = get_constraint_scale(model)
-    ssx = set_mip_ss_expr!(model, ss, wb)
+    ssx = set_mip_ss_expr!(model, sp, ss, wb)
     g = state_set!(model, pfx, mip_key(sp, gate),
                    JuMP.@variable(model, [1:N], lower_bound = 0))
     state_set!(model, pfx, mip_key(sp, Symbol(gate, :_ub)),
@@ -823,7 +850,7 @@ function declare_mip_indicators!(model::JuMP.Model, sp::AbstractMIPSpace,
     sc = get_constraint_scale(model)
     # The threshold rows read the big-M expression under every budget, and the gates only under
     # a free one.
-    set_mip_ss_expr!(model, ss, wb)
+    set_mip_ss_expr!(model, sp, ss, wb)
     N = length(wx)
     ilb, ilg = declare_mip_gate!(model, sp, :ilb, :ilf, N, wb, ss)
     isb, isg = declare_mip_gate!(model, sp, :isb, :isf, N, wb, ss)
@@ -862,7 +889,7 @@ only chosen when nothing in the model consumes a held indicator.
 function declare_mip_indicators!(model::JuMP.Model, sp::AbstractMIPSpace,
                                  ::Type{SignIndicators}, wb::WeightBounds, wx::VecNum,
                                  ss::Option{<:Number})
-    set_mip_ss_expr!(model, ss, wb)
+    set_mip_ss_expr!(model, sp, ss, wb)
     N = length(wx)
     xb = model[mip_key(sp, :xbgt_ib)] = JuMP.@variable(model, [1:N], binary = true)
     return SignIndicators(xb)
@@ -947,7 +974,7 @@ function short_mip_threshold_constraints(model::JuMP.Model, sp::AbstractMIPSpace
     wx = mip_wx!(model, sp)
     ind = mip_indicators!(model, sp, LongShortIndicators, wb, wx, ss)
     mip_wb(model, sp, wb, wx, ind)
-    ss = set_mip_ss_expr!(model, ss, wb)
+    ss = set_mip_ss_expr!(model, sp, ss, wb)
     set_threshold_constraints!(model, sp, ind, wx, lt, lt_flag, st, st_flag, ss)
     set_fixed_fees!(model, sp, ind, ffl, ffs, ffl_flag, ffs_flag)
     if xbgt_flag
@@ -1037,7 +1064,7 @@ function mip_constraints(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBoun
         # Registered here rather than read from a local: the held declaration only builds the
         # big-M expression on its free-budget branch, so under a constant budget `ss` is still
         # the raw argument. `set_mip_ss_expr!` is idempotent.
-        ss = set_mip_ss_expr!(model, ss, wb)
+        ss = set_mip_ss_expr!(model, sp, ss, wb)
         pin_decomposition!(model, sp, ind, wx, ss)
     end
     return ind
@@ -1075,7 +1102,7 @@ function sign_mip_constraints(model::JuMP.Model, sp::AbstractMIPSpace, wb::Weigh
                               ss::Option{<:Number})
     wx = mip_wx!(model, sp)
     ind = mip_indicators!(model, sp, SignIndicators, wb, wx, ss)
-    ss = set_mip_ss_expr!(model, ss, wb)
+    ss = set_mip_ss_expr!(model, sp, ss, wb)
     pin_decomposition!(model, sp, ind, wx, ss)
     return ind
 end

@@ -1235,9 +1235,11 @@ end
 
 @testset "MIP indicator bundles and the big-M constant (#1912)" begin
     pe = PortfolioOptimisers
-    # The big-M constant of these books is the largest finite bound times 1000. A stated
-    # `ss` is used as it is. A bound that is absent adds no magnitude, and bounds that are
-    # all absent give 1000. The model keeps the constant under `:ss`.
+    # The big-M constant of these books with a finite bound on every weight is the ceiling of
+    # `k` times the largest bound above one (#2373). An absent bound is infinite, so the
+    # constant falls back to the largest finite bound times 1000, and to 1000 when every
+    # bound is absent. A stated `ss` is used as it is. The model keeps the constant under
+    # `:ss`. `nothing` in the table reads the ceiling.
     Xm = 0.01 .* randn(StableRNG(1919), 60, 5) .+ 0.001
     rdm = ReturnsResult(; nx = string.('A':'E'), X = Xm)
     prm = prior(EmpiricalPrior(), rdm)
@@ -1245,7 +1247,7 @@ end
                   solver = optimizer_with_attributes(HiGHS.Optimizer,
                                                      JuMP.MOI.Silent() => true),
                   check_sol = (; allow_local = true, allow_almost = true))
-    for (ss, wb, expected) in ((nothing, WeightBounds(; lb = 0.0, ub = 1.0), 1000.0),
+    for (ss, wb, expected) in ((nothing, WeightBounds(; lb = 0.0, ub = 1.0), nothing),
                                (7.0, WeightBounds(; lb = 0.0, ub = 1.0), 7.0),
                                (nothing, WeightBounds(; lb = nothing, ub = [0.5, 0.25, 0.5, 0.5, 0.5]), 500.0),
                                (nothing, WeightBounds(; lb = [-2.0, 0.5, 0.0, 0.0, 0.0], ub = nothing), 2000.0),
@@ -1254,8 +1256,35 @@ end
                                 opt = JuMPOptimiser(; pe = prm, slv = slvm, card = 3,
                                                     ss = ss, wb = wb)))
         @test isa(res.retcode, OptimisationSuccess)
-        @test res.model[:ss] == expected
+        @test res.model[:ss] == something(expected, res.model[:k_ceil])
     end
+    # A constant far above the gated terms gives the same book, because each constant
+    # releases its rows.
+    mip_book(obj; kw...) = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = obj,
+                                             opt = JuMPOptimiser(; pe = prm, slv = slvm,
+                                                                 kw...)))
+    kw = (; card = 3, wb = WeightBounds(; lb = 0.0, ub = 1.0))
+    res = mip_book(MaximumRatio(); kw...)
+    @test res.model[:ss] < 1000
+    @test isapprox(res.w, mip_book(MaximumRatio(); kw..., ss = 1000.0).w; atol = 1e-8)
+    # A constant `k` takes the exact bound of the weights, and a sub-group takes the bound of
+    # its largest group sum under a key of its own.
+    th = Threshold(; val = 0.05)
+    kw = (; card = 3, wb = WeightBounds(; lb = -0.5, ub = 0.8), sbgt = 0.3, lt = th,
+          st = th)
+    res = mip_book(MinimumRisk(); kw...)
+    @test isa(res.retcode, OptimisationSuccess)
+    @test pe.mip_indicators(res.model) isa pe.LongShortIndicators
+    @test res.model[:ss] == 0.8
+    @test isapprox(res.w, mip_book(MinimumRisk(); kw..., ss = 1000.0).w; atol = 1e-8)
+    kw = (; wb = WeightBounds(; lb = -0.5, ub = 0.8), sbgt = 0.3,
+          smtx = [1 1 0 0 0; 0 0 1 1 1], scard = 1, slt = th, sst = th)
+    res = mip_book(MinimumRisk(); kw...)
+    @test isa(res.retcode, OptimisationSuccess)
+    @test haskey(res.model, :sw_mip_st_1_)
+    @test !haskey(res.model, :ss)
+    @test res.model[:sss_1_] ≈ 2.4
+    @test isapprox(res.w, mip_book(MinimumRisk(); kw..., ss = 1000.0).w; atol = 1e-8)
     # A stated `ohf` scales `k`, and the gate rows keep `k` at or below the constant, so the
     # constant scales with it (#2302). A constant of 500 made this feasible book fail.
     function solve_ohf(; cap = 0.5, ss = nothing, obj...)
@@ -1353,13 +1382,20 @@ end
         @test isapprox(res.w, ref.w; rtol = 1e-3)
     end
     # Any other objective has a constant `k`, so it records no ceiling, and a small bound
-    # keeps its constant.
+    # is its constant.
     mn = JuMP.Model()
     @test isnothing(pe.set_maximum_ratio_scale_ceiling!(mn, MinimumRisk(),
                                                         ArithmeticReturn(), prm, 1))
     @test !haskey(mn, :k_ceil)
     mn[:k] = 1
-    @test pe.get_mip_ss(nothing, WeightBounds(; lb = [0.0], ub = [0.01]), mn) == 10.0
+    @test pe.get_mip_ss(nothing, WeightBounds(; lb = [0.0], ub = [0.01]), mn) == 0.01
+    @test pe.get_mip_ss(nothing, WeightBounds(; lb = [0.0], ub = [0.0]), mn) == 1.0
+    @test pe.get_mip_ss(nothing, WeightBounds(; lb = [0.0], ub = [Inf]), mn) == 1000.0
+    # A sub-group reads the bound of its largest group sum, and the bounds keep their type.
+    wbs = WeightBounds(; lb = [-1 // 1, 0 // 1, 0 // 1], ub = [1 // 2, 1 // 4, 1 // 4])
+    sps = pe.SubsetMIPSpace([1 1 0; 0 0 1], :s, 1)
+    @test pe.get_mip_ss(nothing, wbs, mn, sps) === 5 // 4
+    @test pe.get_mip_ss(nothing, wbs, mn) === 1 // 1
     # No consumer reads the held indicator of a long-short bundle, so a wrong read fails
     # loudly and does not miscount. A held bundle has no binaries for the slack-closing
     # rows: the held builder pins the decomposition only for a `WeightsFromParts` head.

@@ -242,6 +242,32 @@ end
     end
 end
 
+@testset "RiskBudgeting sweep: the default big-M is the bound of the gated terms (#2373)" begin
+    # With no budget, no row fixes `k`, so the solver moves it up toward the big-M. The old
+    # constant, 1000 times the largest bound, left the rows of a long-short bundle so far
+    # above the gated terms that the solve failed. The ceiling 10 N / 1 = 50 times the bound
+    # 10 is the constant now.
+    th = Threshold(; val = 0.01)
+    kw = (; slv = RBS_MIP, so = 10_000, bgt = nothing, sbgt = nothing, card = 5, lt = th,
+          st = th)
+    wb = WeightBounds(; lb = -10.0, ub = 10.0)
+    res = rbs_solve(MixedIntegerRiskBudgeting(); kw..., wb = wb)
+    @test isa(res.retcode, OptimisationSuccess)
+    @test PO.mip_indicators(res.model) isa PO.LongShortIndicators
+    @test res.model[:ss] == 500
+    @test value(res.model[:k]) < 500
+    @test isapprox(rbs_share(res.w), RBS_B; atol = 5e-5)
+    @test !isa(rbs_solve(MixedIntegerRiskBudgeting(); kw..., wb = wb, ss = 1e4).retcode,
+               OptimisationSuccess)
+    # The bounds do not bind, so the book takes the orthant of the book with no bound, where
+    # an infinite bound keeps the fallback constant.
+    free = rbs_solve(MixedIntegerRiskBudgeting(); kw...,
+                     wb = WeightBounds(; lb = -Inf, ub = Inf))
+    @test free.model[:ss] == 1000
+    z, zf = Int.(sign.(res.w)), Int.(sign.(free.w))
+    @test z * z[1] == zf * zf[1]
+end
+
 @testset "RiskBudgeting sweep: a number target of an even moment scales with the budget (#2275)" begin
     # `k` is the sum of the unscaled weights, so a target `mu` is the target zero on the
     # returns less `mu`.
