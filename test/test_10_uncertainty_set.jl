@@ -1137,10 +1137,15 @@ end
             @test all(min.(proj.lb, proj.ub)[crossed] .> pr40.sigma[crossed])
             slvc = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                           settings = Dict("verbose" => false))
-            fit(ucs) = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = ucs),
-                                         opt = JuMPOptimiser(; pe = pr40, slv = slvc)))
-            @test isa(fit(ue(Posdef())).retcode, OptimisationFailure)
-            @test isa(fit(ue(nothing)).retcode, OptimisationSuccess)
+            solve_over(ucs) = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = ucs),
+                                                opt = JuMPOptimiser(; pe = pr40,
+                                                                    slv = slvc)))
+            # The empty box leaves the worst case unbounded, the status that the warning names.
+            rc = solve_over(ue(Posdef())).retcode
+            @test isa(rc, OptimisationFailure)
+            @test rc.res[:clarabel][:termination_status] ==
+                  PortfolioOptimisers.JuMP.MOI.DUAL_INFEASIBLE
+            @test isa(solve_over(ue(nothing)).retcode, OptimisationSuccess)
         end
         @testset "The scaling parameter reads two sources in order, one moment at a time" begin
             rng = StableRNG(2468)
