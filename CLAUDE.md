@@ -24,53 +24,42 @@ name.
 
 ## Parallel sessions
 
-- **Land the work by the route that its issue states** (ADR 0240). The issue holds a
-  `**Lands on:**` line. When it has none, add the line before your first edit. Choose the route
-  from this table, unless the maintainer names one:
+- **Land the work by the route that its issue states** (ADR 0240). Each issue holds one
+  `**Lands on:**` line. Write it in each issue that you file, and in an issue that you take and that
+  has none, before your first edit. The first true row picks the value, unless the maintainer names
+  one.
 
-  | `**Lands on:**` | For | Branch |
+  | | True when | `**Lands on:**` |
   | --- | --- | --- |
-  | `own branch` | a standalone feature, an important correctness fix, a large performance fix | `dev-<feature>` from `origin/main` |
-  | `dev` | a sweep sub-issue, an ergonomics change, a small performance fix, an unusual composition bug, a docs fix | `dev`, shared |
-  | `map #<map>` | a ticket of a map whose tickets make sense on `main` only together | `dev-<feature>`, shared |
-  | `#<pr>` | an issue from the review of an open pull request, as a part of that pull request | the head branch of the pull request, shared |
+  | A | A decision, a measurement or a research ticket that lands nothing | `no code` |
+  | B | Not a sweep sub-issue, and an open pull request is wrong or incomplete without the work, or makes the defect, makes it worse or makes it reachable, or the work edits what that pull request adds or changes | `same branch #<pr>` |
+  | C | The work needs code that only an open pull request has, it is a review of its own, and it starts now | `stacked on #<pr>` |
+  | D | As row C, but the work can wait for the merge, as a sweep sub-issue can | `own branch after #<pr>`, `dev after #<pr>` |
+  | E | A ticket of a map whose tickets make sense on `main` only together | `map #<map>` |
+  | F | An issue that the review of a pull request found, so it is independent of that pull request | `own branch` |
+  | G | A sweep sub-issue, an ergonomics change, a small performance fix, an unusual composition bug or a docs fix, and `dev` or `main` has the code that it changes | `dev` |
+  | H | Anything else that lands: a standalone feature, an important correctness fix, a large performance fix | `own branch` |
 
-  Write the line in each issue that you file, from the same table.
+  Write `dev-<feature>` in place of `#<pr>` while that branch has no pull request. The value ends the
+  line, and the reason goes below it. For a pull request whose head is `dev`, rows B to D give `dev`.
+  A map issue holds `one branch dev-<feature>` or `each ticket`.
+  `bash code_health/lands_on.sh issue <number>` checks the line.
+- **Load the `land-work` skill before the first edit of work that lands**, and before you open,
+  stack or review a pull request. It holds the branch, the base and the push of each route.
+- **Never merge a pull request into `main`, and never turn on auto-merge.** Open it, and stop. The
+  maintainer merges it after a review.
 - **Name a branch for its feature**, with the prefix `dev-`, for example
-  `dev-concentration-limit`. The name of a map branch is the feature of the map. A branch that
-  holds research alone can take the prefix `research-`. A push to it runs no CI, and it does not
-  merge into `main`. Work that lands moves to a `dev-` branch.
-- **Work in your own worktree.** Create it with the `EnterWorktree` tool before your first edit.
-  For a shared branch, reset the new worktree to `origin/<branch>` before you edit. Then run
-  `bash code_health/gate_stamp.sh base origin/<branch>`, so that the gates measure against it.
+  `dev-concentration-limit`. A branch that holds research alone can take the prefix `research-`,
+  which runs no CI and does not merge.
+- **Work in your own worktree.** Create it with the `EnterWorktree` tool before your first edit, and
+  reset it to the base of the route.
   Leave with `ExitWorktree` `remove`. When `git status --short` is empty and
   `git branch -r --contains HEAD` lists the remote branch that you pushed to, pass
   `discard_changes: true`.
-- **Own branch.** Push with `git push origin HEAD:dev-<feature>`. The push runs the CI.
-  Open one pull request into `main`, and turn on auto-merge with
-  `gh pr merge <number> --auto --squash`. A pull request that needs a ruling of the maintainer
-  opens as a draft, with no auto-merge. Keep the pull request to one feature or one fix. A rebase
-  is necessary only when GitHub shows a conflict with `main`.
-- **Shared branch.** Commit, rebase onto `origin/<branch>`, and push with
-  `git push origin HEAD:<branch>` as a fast-forward. Never force-push it. When `origin` has no
-  `dev`, create it with `git push origin origin/main:refs/heads/dev`, and open a draft
-  pull request into `main`. The maintainer merges `dev` as a batch. A map branch gets one
-  draft pull request too. The session that lands the last ticket of the map turns on auto-merge.
-- **An issue from the review of an open pull request** never takes `dev` by default, and its kind
-  in the table does not choose its route. It is a part of the pull request, and it takes `#<pr>`,
-  when one of these is true:
-  - The fix changes code, text or a test that the pull request adds or changes.
-  - The pull request makes the defect, makes it worse, or makes it reachable.
-  - The pull request is wrong or incomplete without the fix.
-
-  Any other issue is independent, and it takes `own branch`. Write the reason for the route below
-  the `**Lands on:**` line. The head branch is then shared for every session that pushes to it, so
-  the rules of *Shared branch* apply. Write `Waits for #<issue>` in the body of the pull request,
-  and change it to `Closes #<issue>` when the fix is pushed. Turn off auto-merge with
-  `gh pr merge <pr> --disable-auto` until the last such issue closes.
-  When the pull request merged before the fix, the route becomes `own branch`. When `dev` itself is
-  the head branch, a part of its pull request lands on `dev`. A sweep sub-issue keeps the route
-  that its script writes.
+- **Never force-push `dev` or the branch of a map.** Only the session that owns a stack force-pushes
+  its layers.
+- **A change to `CLAUDE.md`, to a skill or to the landing rules lands on `own branch`.** Sessions
+  read these files from `main` and from `dev`, and a job merges `main` into `dev`.
 - **Never commit a change you did not make.** Check `git status`, and stage the files you edited
   by name, never with `git add -A`.
 - **Do not edit a file at the same time as another session.** The session that finishes last
@@ -117,7 +106,6 @@ name.
   reproduction, the file and the line, the cause, the fix you would make, and the reason you did
   not make it. Name the work that found it in the issue, and name the issue in the pull request,
   the commit or the report of that work. Write its `**Lands on:**` line (§ *Parallel sessions*).
-  An issue from the review of a pull request has a rule of its own there.
 - **A name or an interface that a library precedent settles is not the maintainer's decision**,
   and a breaking change is not either (`.github/instructions/julia-source-code.instructions.md`
   § *A design is chosen by the standing test*). A case that the same mechanism reaches belongs to
