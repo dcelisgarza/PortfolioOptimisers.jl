@@ -72,7 +72,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The rho function of Rocke, a translated bisquare whose weights fall on both sides of the typical distance.
 
-With many assets, the squared distances of a normal sample are near their mean ``p``, and few observations are near the centre. The bisquare rho of a high breakdown point then gives a low efficiency, or rejects too few outliers. The rho of [rocke1996](@cite) is zero below ``1 - \\gamma`` and one above ``1 + \\gamma``, where ``t = d^2/s`` is centred at one. Its width ``\\gamma`` comes from the asymptotic rejection probability `arp`, the share of the observations of a normal sample that get the weight zero. The right side of the M-scale is ``\\mathrm{bdp} \\, (1 - p/n)``, see [`s_tuning`](@ref). The scale is not consistent at the normal model, so the fit multiplies the covariance by the median of the squared distances over the median of the ``\\chi^2_p`` distribution, see [`s_consistency`](@ref).
+With many assets, the squared distances of a normal sample are near their mean ``p``, and few observations are near the centre. The bisquare rho of a high breakdown point then gives a low efficiency, or rejects too few outliers. The rho of [rocke1996](@cite) is zero below ``1 - \\gamma`` and one above ``1 + \\gamma``, where ``t = d^2/s`` is centred at one. Its width ``\\gamma`` comes from the asymptotic rejection probability `arp`, the share of the observations of a normal sample that get the weight zero. The right side of the M-scale is ``\\mathrm{bdp} \\, (1 - p/n)``, see [`s_tuning`](@ref). The parity with `rrcov` below holds at the default `bdp = 0.5`, and another `bdp` has no reference value. The M-scale is the root of a monotone equation, which [`m_scale`](@ref) brackets and bisects. The scale is not consistent at the normal model, so the fit multiplies the covariance by the median of the squared distances over the median of the ``\\chi^2_p`` distribution, see [`s_consistency`](@ref).
 
 The R package `rrcov`, version 1.7-7, with `method = "rocke"`, gives the same estimate where its iterations reach the minimum. On five of six parity samples, the two agree to `1e-3`, and the M-scale of this fit is the smaller one. On the sixth, 40 observations of 6 assets, `rrcov` stops at a local minimum whose M-scale is 1.7 % larger than the one that [`DetS`](@ref) finds.
 
@@ -106,6 +106,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `0 < arp < 1`.
+  - At the fit, `arp < 1 - cdf(Chisq(p), p)`, so that the width is positive, see [`s_tuning`](@ref).
 
 # Examples
 
@@ -147,6 +148,8 @@ Returns the tuning constant of the rho function and the right side of the equati
 
 The bisquare rho takes the constant ``c^2`` of [`bisquare_constant`](@ref), and the right side is `bdp`. Neither depends on the number of observations. The Rocke rho takes the width ``\\gamma`` of [`RockeRho`](@ref), and the right side ``\\mathrm{bdp} \\, (1 - p/n)``. At `bdp = 1/2` that is the right side of the largest breakdown point that ``n`` observations of ``p`` assets permit.
 
+The width ``\\gamma`` is positive only when `arp` is below ``1 - F_{\\chi^2_p}(p)``, which is about 0.32 at ``p = 1`` and rises towards one half as ``p`` grows. Otherwise, the method raises a `DomainError`, because every observation would get the weight zero.
+
 # Arguments
 
   - `rho`: The rho function.
@@ -167,7 +170,11 @@ function s_tuning(::BisquareRho, bdp::Number, ::Integer, p::Integer)
     return bisquare_constant(bdp, p), bdp
 end
 function s_tuning(rho::RockeRho, bdp::Number, n::Integer, p::Integer)
-    g = Distributions.quantile(Distributions.Chisq(p), 1 - rho.arp) / p - 1
+    chisq = Distributions.Chisq(p)
+    g = Distributions.quantile(chisq, 1 - rho.arp) / p - 1
+    @argcheck(g > 0,
+              DomainError(rho.arp,
+                          "the width of the Rocke rho is positive only when `arp < 1 - cdf(Chisq(p), p)`, which is $(1 - Distributions.cdf(chisq, p)) for p = $p, got arp = $(rho.arp)"))
     return min(g, one(g)), bdp * (1 - p / n)
 end
 """
@@ -196,13 +203,13 @@ function srho(::BisquareRho, t::Number, c2::Number)
     return r >= 1 ? one(r) : 1 - (1 - r)^3
 end
 function srho(::RockeRho, t::Number, g::Number)
-    u = t - 1
-    return if u < -g
-        zero(t)
-    elseif u > g
-        one(t)
+    v = (t - 1) / g
+    return if v < -1
+        zero(v)
+    elseif v > 1
+        one(v)
     else
-        u / (4 * g) * (3 - abs2(u / g)) + one(t) / 2
+        v * (3 - abs2(v)) / 4 + one(v) / 2
     end
 end
 """
@@ -231,7 +238,8 @@ function srho_weight(::BisquareRho, t::Number, c2::Number)
     return r >= 1 ? zero(r) : (1 - r)^2
 end
 function srho_weight(::RockeRho, t::Number, g::Number)
-    return abs(t - 1) > g ? zero(t) : 1 - abs2((t - 1) / g)
+    v = (t - 1) / g
+    return abs(v) > 1 ? zero(v) : 1 - abs2(v)
 end
 """
     s_consistency(rho::BisquareRho, d2::VecNum, p::Integer) -> Number
@@ -264,10 +272,15 @@ function s_consistency(::RockeRho, d2::VecNum, p::Integer)
 end
 """
     m_scale(rho::AbstractSRho, t::VecNum, k::Number, b::Number, s::Number) -> Number
+    m_scale(rho::RockeRho, t::VecNum, g::Number, b::Number, s::Number) -> Number
 
 Returns the M-scale of the squared distances `t`, the value ``s`` at which the mean of ``\\rho(t_i / s)`` is `b`.
 
-The fixed-point step ``s \\leftarrow s \\, \\overline{\\rho(t/s)} / b`` converges to the scale from any positive start, because the rho function is bounded and does not decrease. The step stops when the relative change is at most `4 * eps`, or after [`S_MAX_ITER`](@ref) steps. A start near the scale, such as the scale of the last step of the fit, needs few steps.
+The mean of ``\\rho(t_i / s)`` does not increase with ``s``, so the root is unique where the mean is not flat.
+
+The general method does the fixed-point step ``s \\leftarrow s \\, \\overline{\\rho(t/s)} / b``. The step converges to the scale from any positive start when ``\\rho(t) / t`` does not increase, as for [`BisquareRho`](@ref). It stops when the relative change is at most `4 * eps`, or after [`S_MAX_ITER`](@ref) steps. A start near the scale, such as the scale of the last step of the fit, needs few steps.
+
+The Rocke rho rises steeply in a band of width ``2 \\gamma``, and ``\\gamma`` falls as the number of assets grows. The fixed-point step then oscillates: from about 20 assets, it stops at no root. So the method for [`RockeRho`](@ref) halves or doubles the start until the two ends of an interval hold the root, and bisects that interval.
 
 # Arguments
 
@@ -300,6 +313,24 @@ function m_scale(rho::AbstractSRho, t::VecNum, k::Number, b::Number, s::Number)
         end
     end
     return s
+end
+function m_scale(rho::RockeRho, t::VecNum, g::Number, b::Number, s::Number)
+    excess = r -> Statistics.mean(x -> srho(rho, x / r, g), t) - b
+    # The ends take the type of the equation, so that the bisection is as fine as the equation.
+    lo = hi = s * one(excess(s))
+    for _ in 1:S_MAX_ITER
+        if excess(lo) >= 0
+            break
+        end
+        lo /= 2
+    end
+    for _ in 1:S_MAX_ITER
+        if excess(hi) <= 0
+            break
+        end
+        hi *= 2
+    end
+    return lo == hi ? lo : Roots.find_zero(excess, (lo, hi), Roots.Bisection())
 end
 """
     chisq_truncated_moment(p::Integer, c2::Number, a::AbstractVector{<:Number}) -> Number

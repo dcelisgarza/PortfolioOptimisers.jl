@@ -55,7 +55,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Searches the S estimate from random starts.
 
-The search of [salibianbarrera2006](@cite) draws `n_starts` random subsets of ``p + 1`` observations, see [`fasts_random_start`](@ref). Each subset gives a start: the mean and the covariance of its observations. The search does `n_refine` I-steps from each start, keeps the `n_best` estimates with the smallest M-scales, does I-steps from each until the estimate does not change, and returns the best. The default number of starts is the one of `method = "sfast"` of the R package `rrcov`, version 1.7-7.
+The search of [salibianbarrera2006](@cite) draws `n_starts` random subsets of ``p + 1`` observations, see [`fasts_random_start`](@ref). Each subset gives a start: the mean and the covariance of its observations. The search does `n_refine` I-steps from each start, keeps the `n_best` estimates with the smallest M-scales, does I-steps from each until the estimate does not change, and returns the best. The default number of starts is the number that the manual of the R package `rrcov`, version 1.7-7, states for `method = "sfast"`.
 
 The search draws random numbers, so the type has the fields `rng` and `seed`. [`resolve_rng`](@ref) combines them when the search runs. With `seed = nothing`, two calls can give two estimates. [`DetS`](@ref) is the default of [`SCovariance`](@ref) for that reason.
 
@@ -645,7 +645,7 @@ end
 
 Does I-steps of an S estimate from the location `mu` and the scatter `S`.
 
-An I-step is a step of the fixed-point equations of [lopuhaa1989](@cite), which state that an S estimate is an M-estimate with the weights of its own rho function. The step does not increase the M-scale. It stops when the relative change of the shape and the change of the location in the metric of the scatter are both below `sqrt(eps)`, or after `maxsteps` steps.
+An I-step is a step of the fixed-point equations of [lopuhaa1989](@cite), which state that an S estimate is an M-estimate with the weights of its own rho function. For a rho function that is concave in ``t``, such as [`BisquareRho`](@ref), the step does not increase the M-scale. [`RockeRho`](@ref) is convex below ``t = 1``, so the step has no such bound, and the search keeps the start with the smallest M-scale. It stops when the relative change of the shape and the change of the location in the metric of the scatter are both below `sqrt(eps)`, or after `maxsteps` steps.
 
 # Algorithm
 
