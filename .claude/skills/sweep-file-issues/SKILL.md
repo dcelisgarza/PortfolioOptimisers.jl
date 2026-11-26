@@ -24,6 +24,10 @@ code_health/sweep_issues.sh apply --dry-run
 code_health/sweep_issues.sh apply
 ```
 
+When neither `dev` nor `main` has the file, the first command refuses. Add `--after '#<pr>'`, or
+`--after dev-<feature>` while the branch has no pull request. The ticket then says
+`dev after <target>`, so that no session takes it before the file is there.
+
 Drop `--file` to plan every file the weekly job would file, which is every row that reads
 `swept = false` under a **closed** child map. Repeat `--file` for more than one path.
 
