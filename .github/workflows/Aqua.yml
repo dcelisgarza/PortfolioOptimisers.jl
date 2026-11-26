@@ -14,6 +14,14 @@ on:
 permissions:
   contents: read
 
+# A push to a `dev-` branch or to a pull request cancels the run of its old head, because a merge
+# reads the new head alone.
+# A manual run gives no `- push` check, so it does not cancel the push run. Every other run has a group
+# of its own, so no run of `main`, `dev` or a tag replaces another. ADR 0220.
+concurrency:
+  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/dev-'))) && github.ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   build:
     # The name carries the event, so the ruleset of `main` can require the push check by a name that
