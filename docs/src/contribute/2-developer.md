@@ -135,23 +135,24 @@ We try to keep a linear history in this repo, so it is important to keep your br
 
 ### How a change reaches `main`
 
-Each issue states its route in a `**Lands on:**` line, and every pull request merges by squash. The decision is ADR 0240.
+Each issue states its route in a `**Lands on:**` line, and every pull request merges by squash. The decision is ADR 0240. The first true row gives the value:
 
-| `**Lands on:**` | For                                                                                                      | Branch                                              |
-|:----------------|:---------------------------------------------------------------------------------------------------------|:----------------------------------------------------|
-| `own branch`    | a standalone feature, an important correctness fix, a large performance fix                              | `dev-<feature>`, with its own pull request          |
-| `dev`           | a sweep sub-issue, an ergonomics change, a small performance fix, an unusual composition bug, a docs fix | `dev`, which the maintainer merges as a batch       |
-| `map #<map>`    | a ticket of a map whose tickets make sense on `main` only together                                       | `dev-<feature>`, one pull request for the map       |
+| True when | `**Lands on:**` | Branch |
+| :---------- | :---------------- | :------- |
+| A decision, a measurement or a research ticket | `no code` | none |
+| Not a sweep sub-issue, and an open pull request is wrong or incomplete without the work, or makes the defect, makes it worse or makes it reachable, or the work edits what that pull request adds or changes | `same branch #<pr>` | the head branch of the pull request |
+| The work needs code that only an open pull request has, and it is a review of its own | `stacked on #<pr>` | `dev-<feature>`, a layer above that pull request |
+| As the row above, but the work can wait for the merge | `own branch after #<pr>`, `dev after #<pr>` | as below, when the merge is there |
+| A ticket of a map whose tickets make sense on `main` only together | `map #<map>` | `dev-<feature>`, one pull request for the map |
+| An issue that the review of a pull request found, and none of the rows above holds | `own branch` | `dev-<feature>`, with its own pull request |
+| A sweep sub-issue, an ergonomics change, a small performance fix, an unusual composition bug or a docs fix, and `dev` or `main` has the code | `dev` | `dev`, which the maintainer merges as a batch |
+| Anything else that lands, such as a standalone feature or an important correctness fix | `own branch` | `dev-<feature>`, with its own pull request |
 
-The maintainer can name another route for an issue.
+The maintainer can name another route for an issue. For a pull request whose head is `dev`, a row that names the pull request gives `dev`. `code_health/lands_on.sh` checks the line, and the workflow `Route` gives each issue a label for its route.
 
-An issue from the review of an open pull request does not take its route from this table. It lands on the head branch of the pull request, and its line is `**Lands on:** #<pr>`, when one of these is true:
+A pull request is **standalone** when its base is `main`. It is a **layer** when its base is the branch of another pull request. GitHub then shows the diff of the layer alone, applies the rules of `main` to it, and merges the layers from the bottom up. A stack has three layers at most. The `land-work` skill under `.claude/skills/` gives the steps.
 
-- The fix changes code, text or a test that the pull request adds or changes.
-- The pull request makes the defect, makes it worse, or makes it reachable.
-- The pull request is wrong or incomplete without the fix.
-
-Any other such issue is independent, and it takes `own branch`. It does not land on `dev`, unless `dev` is the head branch of the pull request. The pull request does not merge while an issue with its number is open.
+A review of each pull request is recorded by `code_health/review_stamp.sh`, as a GitHub review and as the commit status `Review`. A push keeps the status when the diff did not change. A pull request does not merge while an issue that says `same branch` for it is open.
 
 The other rules of a change are these:
 
@@ -279,7 +280,8 @@ To create a new release, you can follow these simple steps:
 
 - Create a branch `dev-release-x.y.z` from `origin/main`. A branch with no `dev` prefix gets no push checks, and its pull request cannot merge.
 
-- Update `version` in `Project.toml`
+- Update `version` in `Project.toml`. No other pull request changes it, unless the maintainer asks to release with that pull request. Such a pull request does the next step too.
+- Run `julia docs/fold_next_release.jl <from> <to>`, for example with `0.34.5 0.35.0`. It moves each page of `docs/src/next_release/` into the migration guide. Then run `julia --project=code_health code_health/prose.jl refresh`.
 - Create a commit "Release vx.y.z", push, create a PR, wait for it to pass, merge the PR.
 - Go back to main screen and click on the latest commit (link: [https://github.com/dcelisgarza/PortfolioOptimisers.jl/commit/main](https://github.com/dcelisgarza/PortfolioOptimisers.jl/commit/main))
 - At the bottom, write `@JuliaRegistrator register`
