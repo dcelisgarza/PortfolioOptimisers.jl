@@ -441,6 +441,12 @@ end
     # (#1919). It reads the value the pair holds.
     @test PO.reads_implied_volatility("iv" => ImpliedVolatility(; ppy = 252))
     @test !PO.reads_implied_volatility("iv" => Covariance())
+    # The walk over the fields allocates nothing, because each moment fit through a panel
+    # reads it (#2384). It still finds a surface nested under a wrapper.
+    ce0 = PortfolioOptimisersCovariance()
+    PO.reads_implied_volatility(ce0)
+    @test @allocated(PO.reads_implied_volatility(ce0)) == 0
+    @test !PO.reads_implied_volatility(ce0) && PO.reads_implied_volatility(ce2)
 end
 
 @testset "A collapse of the implied volatilities reads the finite active cells" begin

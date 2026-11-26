@@ -1244,7 +1244,7 @@ For [`LogWealth`](@ref) the gradient reads the price relative `x` alone. For a [
 The [`LogWealth`](@ref) method returns `-x ./ dot(u, x)`. The [`RiskLoss`](@ref) method runs these steps.
 
  1. When `rows` is `nothing`, or holds fewer than two rows, return the zero vector.
- 2. View the last `min(window, n)` of the `n` rows of `rows`. The head can hold more rows than the loss reads, because another part of the head can need more.
+ 2. View the last `min(window, n)` of the `n` rows of `rows` with [`loss_window`](@ref).
  3. Fit the prior `pr` of the loss on that view, as a batch prior is fitted, on its returns and its Asset Panel. The prior reads its own source, so under `x_src = ExcessSource()` it reads `X - B`. The prior answers `NaN` at an asset outside its Coverage Universe.
  4. Read the Investable Mask of `pr`.
  5. Compute the gradient of the measure on that mask with [`investable_risk_gradient`](@ref), against the rows of the view. It is `NaN` at every other leg.
@@ -1260,11 +1260,10 @@ function loss_gradient(::LogWealth, u::AbstractVector, x::AbstractVector, ::Any)
 end
 function loss_gradient(obj::RiskLoss, u::AbstractVector, ::AbstractVector,
                        rows::Option{<:ReturnsResult})
-    if isnothing(rows) || size(rows.X, 1) < 2
+    window = loss_window(obj, rows)
+    if isnothing(window)
         return zeros(eltype(u), length(u))
     end
-    n = size(rows.X, 1)
-    window = port_opt_view(rows, (n - min(obj.window, n) + 1):n, :)
     pr = prior(obj.pe, window)
     return investable_risk_gradient(obj, u, pr, investable_mask(pr), window)
 end
@@ -1493,11 +1492,11 @@ With a `predictor`, the update runs these steps instead. The Gradient Point `poi
  5. Mix the price relatives into `xm` with [`mixed_relatives`](@ref).
  6. Resolve `obj` against `wh` with [`factory`](@ref). Take the gradient `g` of that objective at `point`, from `xm` and the head's `rows`, with [`loss_gradient`](@ref), and its Investable Mask `imsk`, with [`investable_gradient`](@ref).
  7. Take the first half-step from the secondary iterate `st.v` on `eta .* g` with [`half_step`](@ref), at the mask, which gives `v`. The new secondary iterate is `v`, with the weight that `st.v` keeps at an asset outside the mask, through [`parked_iterate`](@ref).
- 8. Form the hint `m` and the state `ps` of the predictor with [`predict_gradient!`](@ref), from the resolved objective, `g`, `v`, `x` and `xm`. Intersect `imsk` with the mask of the hint, which gives `kmsk`. When the two share no asset, `kmsk` is `imsk`, and the hint is zero on it.
+ 8. Form the hint `m` and the state `ps` of the predictor with [`predict_gradient!`](@ref), from the resolved objective, `g`, `v`, `x` and `xm`. Put a zero in `m` at each asset that the hint cannot price, with [`investable_gradient`](@ref). The hint does not change the mask of the step, which stays `imsk`.
  9. Measure the residual `r` of `g` against the last hint `st.m` with [`hint_residual`](@ref), and shift the residual sums into `res`.
 10. When the schedule reads the past alone, write its statistic `s` from `w` and `x`.
-11. Read the rate of period `t + 1` from a state of the rule that holds the period's row. Take the second half-step from `v` on that rate times `m`, at `kmsk`, which gives the unmixed played iterate `u`.
-12. Form the played allocation from `u` with [`played_allocation`](@ref), on `kmsk`. When `alpha` is positive, project it with [`reprojection`](@ref).
+11. Read the rate of period `t + 1` from a state of the rule that holds the period's row. Take the second half-step from `v` on that rate times `m`, at `imsk`, which gives the unmixed played iterate `u`.
+12. Form the played allocation from `u` with [`played_allocation`](@ref), on `imsk`. When `alpha` is positive, project it with [`reprojection`](@ref).
 13. Return the new state and the played allocation.
 
 # Fields
@@ -1729,7 +1728,7 @@ function online_update!(alg::MirrorDescent, st::MirrorDescentState, w::AbstractV
         # The period count survives the restart: the schedule's stages are cumulative. The
         # start re-enters the set from the book the fund holds, as it entered at the seed,
         # on the assets that the loss prices.
-        imsk = investable_mask(loss_gradient(obj, st.u, x, rows))
+        imsk = loss_mask(obj, st.u, x, rows)
         u0 = reprojection(alg.proj, set, investable_book(st.w0, imsk), wh, imsk)
         return MirrorDescentState(t, parked_iterate(st.w0, u0, imsk), st.w0,
                                   schedule_state_seed(alg.eta, st.w0),

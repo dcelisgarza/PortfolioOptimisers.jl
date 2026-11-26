@@ -1054,7 +1054,7 @@ end
     investable_intersection(a::BitVector, b::Nothing)
     investable_intersection(a::BitVector, b::BitVector)
 
-Intersects the Investable Masks of two readers of one step. A `nothing` mask keeps every asset. Two masks that share no asset give `a`, and the reader of `b` decides what it does on it. The hint of an optimistic step is zero there, and the entry of a programme set refuses the mask with [`allocation_set_priced_mask`](@ref).
+Intersects the Investable Masks of two readers of one step. A `nothing` mask keeps every asset. Two masks that share no asset give `a`, and the entry of a programme set, the reader of `b`, refuses the mask with [`allocation_set_priced_mask`](@ref).
 
 # Related
 
@@ -1091,6 +1091,162 @@ The averages of a Gradient Transform, the gradient mass of an [`AdaptiveSubgradi
 function investable_gradient(g::AbstractVector)
     imsk = investable_mask(g)
     return isnothing(imsk) ? g : ifelse.(imsk, g, zero(eltype(g))), imsk
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Views the rows that a [`RiskLoss`](@ref) reads at a step: the last `min(window, n)` of the `n` rows of `rows`.
+
+The head can hold more rows than the loss reads, because another part of the head can need more. [`loss_gradient`](@ref) and [`loss_mask`](@ref) read the same view, so the two cannot drift.
+
+# Returns
+
+  - `window::Option{ReturnsResult}`: The view, or `nothing` when `rows` is `nothing` or holds fewer than two rows. The loss then reads no rows.
+
+# Related
+
+  - [`RiskLoss`](@ref)
+  - [`loss_gradient`](@ref)
+  - [`loss_mask`](@ref)
+"""
+function loss_window(obj::RiskLoss, rows::Option{<:ReturnsResult})
+    if isnothing(rows) || size(rows.X, 1) < 2
+        return nothing
+    end
+    n = size(rows.X, 1)
+    return port_opt_view(rows, (n - min(obj.window, n) + 1):n, :)
+end
+"""
+    loss_mask(obj::AbstractOnlineObjective, u::AbstractVector, x::AbstractVector, rows)
+    loss_mask(obj::LogWealth, u::AbstractVector, x::AbstractVector, rows)
+    loss_mask(obj::RiskLoss, u::AbstractVector, x::AbstractVector, rows)
+
+Answers the Investable Mask of the period's loss with no gradient.
+
+A restart of a Learning-Rate Schedule re-enters the Start Allocation on the assets that the loss prices, and it takes no step. So it reads the mask alone, and it does not compute the gradient of the measure of a [`RiskLoss`](@ref). The answer is the mask of [`loss_gradient`](@ref) at the same arguments.
+
+# Algorithm
+
+ 1. For an objective of a user, return [`investable_mask`](@ref) of [`loss_gradient`](@ref).
+ 2. For [`LogWealth`](@ref), return `nothing`. Its gradient holds `NaN` at no entry, or at each entry through the dot product, so it has no mask.
+ 3. For a [`RiskLoss`](@ref), return `nothing` when [`loss_window`](@ref) gives no view.
+ 4. Return `nothing` when [`mask_reads_returns`](@ref) of the prior of the loss is `true` and [`window_without_gap`](@ref) of the view is `true`. The prior then prices every asset, so the restart fits no prior, as on rows with no gap before the mask existed.
+ 5. Otherwise fit the prior of the loss on the view, and return its [`investable_mask`](@ref). The gradient is `NaN` exactly off that mask.
+
+!!! warning
+
+    Step 4 changes one result. A prior whose Coverage Policy or `min_obs` needs more rows than the view holds prices no asset, even on a view with no gap. The fit of step 5 raises an `IsEmptyError` for such a prior. After step 4 the restart returns the Start Allocation, and the next step raises the error.
+
+# Related
+
+  - [`loss_gradient`](@ref)
+  - [`loss_window`](@ref)
+  - [`mask_reads_returns`](@ref)
+  - [`window_without_gap`](@ref)
+  - [`investable_mask`](@ref)
+"""
+function loss_mask(obj::AbstractOnlineObjective, u::AbstractVector, x::AbstractVector, rows)
+    return investable_mask(loss_gradient(obj, u, x, rows))
+end
+function loss_mask(::LogWealth, ::AbstractVector, ::AbstractVector, ::Any)
+    return nothing
+end
+function loss_mask(obj::RiskLoss, ::AbstractVector, ::AbstractVector,
+                   rows::Option{<:ReturnsResult})
+    window = loss_window(obj, rows)
+    if isnothing(window) || (mask_reads_returns(obj.pe) && window_without_gap(window))
+        return nothing
+    end
+    return investable_mask(prior(obj.pe, window))
+end
+"""
+    mask_reads_returns(pe::AbstractPriorEstimator) -> Bool
+    mask_reads_returns(pe::EmpiricalPrior) -> Bool
+    mask_reads_returns(est::Union{AbstractEstimator, AbstractCovarianceEstimator}) -> Bool
+    mask_reads_returns(est::Union{ImpliedVolatility, PriorExpectedReturns, CustomValueExpectedReturns}) -> Bool
+    mask_reads_returns(v::AbstractVector) -> Bool
+    mask_reads_returns(p::Pair) -> Bool
+    mask_reads_returns(x) -> Bool
+
+Returns `true` when the Investable Mask of a prior reads only the finiteness of the returns and the active mask of the panel.
+
+Such a prior prices every asset on rows with no gap, see [`window_without_gap`](@ref). So [`loss_mask`](@ref) skips its fit there. A `false` answer is always safe, because the fit then answers the mask.
+
+# Algorithm
+
+Each step is one method, and Julia selects the method from the type of the argument.
+
+ 1. A prior estimator returns `false`. A factor prior reads the factor returns, and a cross-sectional prior reads the Panel Fields.
+ 2. An [`EmpiricalPrior`](@ref) returns `true` when it states no `horizon`, and both `pe.me` and `pe.ce` return `true`. A horizon takes `log(1 + x)`, which is not finite at `x = -1`.
+ 3. An [`ImpliedVolatility`](@ref), a [`PriorExpectedReturns`](@ref) and a [`CustomValueExpectedReturns`](@ref) return `false`. They read the implied volatility surface, an inner prior, and a value of the user.
+ 4. Each other estimator returns `true` when each of its fields returns `true`. A covariance estimator subtypes `StatsBase.CovarianceEstimator` and not `AbstractEstimator`, so the method takes both supertypes.
+ 5. A vector returns `true` when each of its entries returns `true`. A `Pair` returns the result for its value.
+ 6. Each other value returns `true`.
+
+# Interfaces
+
+A moment estimator of a user whose answer for an asset reads an input other than the returns and the panel masks implements `mask_reads_returns(est::MyEstimator) = false`.
+
+# Arguments
+
+  - `pe`: A prior estimator, or a member or a field of one.
+
+# Returns
+
+  - `flag::Bool`: `true` when the mask of the prior reads only the returns and the active mask.
+
+# Related
+
+  - [`loss_mask`](@ref)
+  - [`window_without_gap`](@ref)
+  - [`reads_implied_volatility`](@ref)
+"""
+function mask_reads_returns(::AbstractPriorEstimator)
+    return false
+end
+function mask_reads_returns(pe::EmpiricalPrior)
+    return isnothing(pe.horizon) && mask_reads_returns(pe.me) && mask_reads_returns(pe.ce)
+end
+function mask_reads_returns(est::Union{AbstractEstimator, AbstractCovarianceEstimator})
+    # A tuple of the fields, unrolled at a constant count, reads each field at its own
+    # type, so the walk allocates nothing.
+    fields = ntuple(i -> getfield(est, i), Val(fieldcount(typeof(est))))
+    return all(map(mask_reads_returns, fields))
+end
+function mask_reads_returns(::Union{ImpliedVolatility, PriorExpectedReturns,
+                                    CustomValueExpectedReturns})
+    return false
+end
+function mask_reads_returns(v::AbstractVector)
+    return eltype(v) <: Number || all(mask_reads_returns, v)
+end
+function mask_reads_returns(p::Pair)
+    return mask_reads_returns(p.second)
+end
+function mask_reads_returns(::Any)
+    return true
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Answers whether the rows of a loss hold no gap: every return is finite, every benchmark return is finite, and the panel marks every asset active and estimable at every row.
+
+A prior for which [`mask_reads_returns`](@ref) is `true` then prices every asset, so [`loss_mask`](@ref) skips its fit. The check reads the benchmark of every prior, also one that reads the raw returns, so it can answer `false` where the fit prices every asset. Such an answer costs one fit, and it is never wrong.
+
+# Returns
+
+  - `flag::Bool`: `true` when the rows hold no gap.
+
+# Related
+
+  - [`loss_mask`](@ref)
+  - [`coverage_flags`](@ref)
+"""
+function window_without_gap(rows::ReturnsResult)
+    pnl = rows.pnl
+    return all(coverage_flags(rows.X, pnl; dims = 1)) &&
+           (isnothing(rows.B) || all(isfinite, rows.B)) &&
+           (isnothing(pnl) || isnothing(pnl.emsk) || all(pnl.emsk))
 end
 """
     parked_iterate(u::AbstractVector, v::AbstractVector, imsk::Nothing)
@@ -1437,4 +1593,4 @@ function assert_leader_keeps_programme_set(::FactorRiskContribution,
               ArgumentError("a `FollowTheLeader` over a `FactorRiskContribution` cannot take a `ProgrammeAllocationSet` whose `ple` holds a semidefinite phylogeny, and neither can a leader with a `FactorRiskContribution` in its fallback chain. The re-solve gives the set to the leader as a block. The rows of the phylogeny bind the lift of the asset weights, and the factor head writes no term on that lift, so the rows would bind nothing. Put the phylogeny on a `MeanRisk` leader, or use an `IntegerPhylogeny` on the set."))
     return nothing
 end
-public set_allocation_set_constraints!
+public set_allocation_set_constraints!, mask_reads_returns

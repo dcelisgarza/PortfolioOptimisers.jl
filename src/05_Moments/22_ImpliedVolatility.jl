@@ -954,7 +954,10 @@ Each step is one method, and Julia selects the method from the type of the argum
 """
 function reads_implied_volatility(est::Union{AbstractEstimator,
                                              AbstractCovarianceEstimator})
-    return any(f -> reads_implied_volatility(getfield(est, f)), fieldnames(typeof(est)))
+    # A tuple of the fields, unrolled at a constant count, reads each field at its own
+    # type, so the walk allocates nothing at each moment fit through a panel.
+    fields = ntuple(i -> getfield(est, i), Val(fieldcount(typeof(est))))
+    return any(map(reads_implied_volatility, fields))
 end
 function reads_implied_volatility(::ImpliedVolatility)
     return true

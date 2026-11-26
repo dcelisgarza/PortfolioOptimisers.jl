@@ -873,7 +873,7 @@ function online_update!(alg::MirrorDescent, st::OptimisticMirrorDescentState,
         # The period count survives the restart: the schedule's stages are cumulative. The
         # start re-enters the set from the book the fund holds, as it entered at the seed,
         # on the assets that the loss prices.
-        imsk = investable_mask(loss_gradient(obj, st.u, x, rows))
+        imsk = loss_mask(obj, st.u, x, rows)
         u0 = reprojection(alg.proj, set, investable_book(st.w0, imsk), wh, imsk)
         return OptimisticMirrorDescentState(t, copy(parked_iterate(st.w0, u0, imsk)),
                                             copy(u0), st.w0,
@@ -892,21 +892,20 @@ function online_update!(alg::MirrorDescent, st::OptimisticMirrorDescentState,
     g, imsk = investable_gradient(loss_gradient(obj, something(point, st.u), xm, rows))
     v = half_step(alg, set, st.v, eta .* g, wh, imsk)
     ps, m = predict_gradient!(alg.predictor, st.ps, obj, g, v, x, xm, rows, t)
-    m, pmsk = investable_gradient(m)
-    # The second half-step runs on the assets that the loss and the hint both price. When
-    # they share none it runs on those of the loss, where the hint is zero.
-    kmsk = investable_intersection(imsk, pmsk)
+    # The hint is zero at an asset that it cannot price. The second half-step runs on the
+    # mask of the loss, so the hint does not decide the universe of the step (#2380).
+    m, _ = investable_gradient(m)
     r = hint_residual(alg.proj, g .- st.m)
     res = [st.res[1] + r, st.res[1]]
     s = statistic_after_step(alg.eta, st.s, w, x)
     # The played iterate is formed at the rate of the next period, which the schedule
     # answers from the state `nst` after the row: the paper's `f_{t+1}` at `η_{t+1}`.
     nst = OptimisticMirrorDescentState(t, v, v, st.w0, s, res, m, ps)
-    u = half_step(alg, set, v, learning_rate(alg.eta, t + 1, nst) .* m, wh, kmsk)
-    played = played_allocation(u, alpha, kmsk)
+    u = half_step(alg, set, v, learning_rate(alg.eta, t + 1, nst) .* m, wh, imsk)
+    played = played_allocation(u, alpha, imsk)
     return OptimisticMirrorDescentState(t, parked_iterate(st.v, v, imsk), u, st.w0, s, res,
                                         m, ps),
-           iszero(alpha) ? played : reprojection(alg.proj, set, played, wh, kmsk)
+           iszero(alpha) ? played : reprojection(alg.proj, set, played, wh, imsk)
 end
 export AdaptiveSubgradient, LastGradient, MeanGradient, ForecastGradient, HintResidualRate
 public predictor_state_seed, predict_gradient!, predictor_state_view, copy_predictor_state

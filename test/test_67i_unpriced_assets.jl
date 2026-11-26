@@ -184,31 +184,89 @@ end
         none = GradientProjection(; obj = PartialLoss(fill(NaN, 3)))
         @test_throws DomainError po.online_update!(none, po.rule_state_seed(none, u), u, x,
                                                    nothing, set3)
-        # The second half-step runs on the assets that the loss and the hint both price. The
-        # first moves [1, 2] by the gradient [1, 0] at rate 0.1: [0.45, 0.55]. The hint then
-        # prices the second and the third, so the book is the second alone.
+        # Both half-steps run on the mask of the loss, and the hint is zero where it cannot
+        # price (#2380). The first moves [1, 2] by the gradient [1, 0] at rate 0.1:
+        # [0.45, 0.55]. The hint [0, 1] on them moves the book to [0.5, 0.5], as a hint
+        # that prices every asset with the same values does.
         opti(m) = GradientProjection(; eta = 0.1, obj = PartialLoss([1.0, 0.0, NaN]),
                                      predictor = PartialHint(m))
-        alg = opti([NaN, 1.0, 1.0])
-        st, w = po.online_update!(alg, po.rule_state_seed(alg, u), u, x, nothing, set3)
-        @test w == [0.0, 1.0, 0.0]
+        step(m) = po.online_update!(opti(m), po.rule_state_seed(opti(m), u), u, x, nothing,
+                                    set3)
+        st, w = step([NaN, 1.0, 1.0])
+        @test w ≈ [0.5, 0.5, 0.0] && w == step([0.0, 1.0, 0.0])[2]
         @test st.v ≈ [0.45 * 2 / 3, 0.55 * 2 / 3, 1 / 3]
-        # They share no asset: the hint moves nothing.
-        alg = opti([NaN, NaN, 1.0])
-        st, w = po.online_update!(alg, po.rule_state_seed(alg, u), u, x, nothing, set3)
+        # A hint that prices no asset of the loss moves nothing.
+        st, w = step([NaN, NaN, 1.0])
         @test w ≈ [0.45, 0.55, 0.0] && st.u == w
-        # The hint of a forecaster that prices a part of the universe.
-        hint = GradientProjection(; eta = 1.0,
-                                  predictor = ForecastGradient(;
-                                                               me = PriceLevelExpectedReturns(;
-                                                                                              alg = MovingAverage(;
-                                                                                                                  window = 3))))
-        ho = OPS(; alg = hint)
+        # The hint of a forecaster that prices a part of the universe does not remove an
+        # asset that log wealth prices: the eighth keeps a weight, as under `LastGradient`.
+        fhint = ForecastGradient(;
+                                 me = PriceLevelExpectedReturns(;
+                                                                alg = MovingAverage(;
+                                                                                    window = 3)))
+        ho = OPS(; alg = GradientProjection(; eta = 0.1, predictor = fhint))
         for t in 1:10
             ho = po.partial_fit!(ho, rows(rd, t:t))
-            t < 3 && continue
-            @test ho.cache.w[N] == 0 && sum(ho.cache.w) ≈ 1 && all(isfinite, ho.cache.w)
+            @test ho.cache.w[N] > 0 && sum(ho.cache.w) ≈ 1 && all(isfinite, ho.cache.w)
         end
+    end
+
+    @testset "The mask of a loss with no gradient" begin
+        u, x = fill(1 / N, N), ones(N)
+        @test isnothing(po.loss_mask(LogWealth(), u, x, nothing))
+        part = PartialLoss([1.0, NaN, 2.0])
+        @test po.loss_mask(part, u[1:3], x[1:3], nothing) == BitVector([1, 0, 1])
+        @test isnothing(po.loss_mask(risk, u, x, nothing))
+        @test isnothing(po.loss_mask(risk, u, x, rows(rd, 1:1)))
+        # The mask of the prior is the mask of the gradient: on rows with a panel, with no
+        # panel, and with no gap.
+        for r in (rows(rd, 1:10), rows(rdn, 1:10), rows(pd, 1:10))
+            n = size(r.X, 2)
+            un, xn = fill(1 / n, n), ones(n)
+            @test po.loss_mask(risk, un, xn, r) ==
+                  po.investable_mask(po.loss_gradient(risk, un, xn, r))
+        end
+        @test isnothing(po.loss_mask(risk, fill(1 / 7, 7), ones(7), rows(pd, 1:10)))
+        @test po.loss_mask(risk, u, x, rows(rd, 1:10)) == (1:N .!= N)
+        # A prior whose mask reads the returns alone skips its fit on rows with no gap. The
+        # weighted mean needs 40 rows, so its fit prices no asset of a window of five, and
+        # raises; the skip returns the answer of rows with no gap.
+        ew = RiskLoss(; r = StandardDeviation(), window = 5,
+                      pe = EmpiricalPrior(; me = ExpWeightedExpectedReturns()))
+        u7 = fill(1 / 7, 7)
+        @test isnothing(po.loss_mask(ew, u7, ones(7), rows(pd, 1:10)))
+        @test_throws IsEmptyError po.loss_gradient(ew, u7, ones(7), rows(pd, 1:10))
+        @test_throws IsEmptyError po.loss_mask(ew, fill(1 / 8, 8), ones(8), rows(rd, 1:10))
+    end
+
+    @testset "The prior whose mask reads the returns alone" begin
+        mr = po.mask_reads_returns
+        iv = ImpliedVolatility(; ppy = 252)
+        @test mr(EmpiricalPrior()) &&
+              mr(EmpiricalPrior(; me = ExpWeightedExpectedReturns()))
+        @test !mr(EmpiricalPrior(; horizon = 1))
+        @test !mr(EmpiricalPrior(; me = PriorExpectedReturns()))
+        @test !mr(EmpiricalPrior(; me = CustomValueExpectedReturns()))
+        @test !mr(EmpiricalPrior(; ce = iv))
+        @test !mr(EmpiricalPrior(; ce = PortfolioOptimisersCovariance(; ce = iv)))
+        @test !mr(FactorPrior())
+        @test mr([1.0, 2.0]) && !mr([SimpleExpectedReturns(), PriorExpectedReturns()])
+        @test !mr(:a => PriorExpectedReturns())
+        pe0 = EmpiricalPrior()
+        mr(pe0)
+        @test @allocated(mr(pe0)) == 0
+        # The rows hold no gap: no return, benchmark or mask is missing.
+        wg = po.window_without_gap
+        @test wg(rows(pd, 1:10)) && !wg(rows(rd, 1:10)) && !wg(rows(rdn, 1:10))
+        em = trues(T, 7)
+        em[3, 2] = false
+        pde = ReturnsResult(; nx = nx[1:7], X = X[:, 1:7], ts = ts,
+                            pnl = AssetPanel(; amsk = trues(T, 7), emsk = em))
+        @test !wg(rows(pde, 1:10)) && wg(rows(pde, 4:10))
+        B = fill(0.001, T)
+        B[5] = NaN
+        pdb = ReturnsResult(; nx = nx[1:7], X = X[:, 1:7], ts = ts, B = B)
+        @test !wg(rows(pdb, 1:10)) && wg(rows(pdb, 10:20))
     end
 
     @testset "A forecast step is the step over the priced assets" begin

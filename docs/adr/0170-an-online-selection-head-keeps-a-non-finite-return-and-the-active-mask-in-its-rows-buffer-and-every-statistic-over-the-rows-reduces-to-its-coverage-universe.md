@@ -235,6 +235,17 @@ Two readers of a statistic already removed such a leg and wrote a zero: a `Follo
   and writes a zero outside it. A `ProgrammeAllocationSet` intersects the mask with the one of its
   prior. So on a panel with an asset that never lists, the book is the book of the same rule over
   the other assets, to rounding.
+- **The loss alone sets the mask of an optimistic step.** The hint is zero at an asset that it
+  cannot price, and both half-steps run on the mask of the loss. The regret bound of the
+  optimistic step reads only the residual of the hint, so a zero is a valid hint. An intersection
+  with the mask of the hint gave a book that jumped with the number of assets that the hint
+  priced, and it removed an asset from a log-wealth step under `ForecastGradient` alone (#2380).
+- **A restart reads the mask of the loss, and no gradient** (`loss_mask`, #2381). A `RiskLoss`
+  fits its prior on the window for the mask. It skips the fit when `mask_reads_returns` of the
+  prior is `true` and the window holds no gap, because such a prior then prices every asset. On
+  300 rows with no gap and one restart, the run allocates 96 B more than with no mask at the
+  restart, where a fit there cost 22 960 B. The maintainer accepted the rest, the cost of the
+  new capability (#2382).
 - **The iterate of a `MirrorDescent` keeps its weight at such a leg** (`parked_iterate`), and the
   step moves the rest of its mass alone. The book holds a zero, and the leg comes back at the
   weight of the iterate. A multiplicative step from a zero would hold the zero for ever, which is
