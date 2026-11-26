@@ -1,28 +1,90 @@
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add the rows that bound each entry of the distance matrix `Dt` from below by the absolute value of the matching entry of `Dx`.
+Add one distance variable for each pair of observations, and register the differences of the net portfolio returns of the pairs.
 
-The formulation selects the rows. Both methods state the same feasible set, ``D_{ij} \\geq |\\Delta_{ij}|`` for every pair of observations, so both give the same optimum. [`NormOneConeBrownianDistanceVariance`](@ref) adds one cone of dimension two for each entry on or below the diagonal. [`IneqBrownianDistanceVariance`](@ref) adds two matrix rows of ``T^2`` linear inequalities each. `Dx` is antisymmetric and `Dt` is symmetric, so the entry ``(j, i)`` of each matrix row repeats the entry ``(i, j)`` of the other.
+A pair is ``(i, j)`` with ``i > j``, so the model holds ``P = T (T - 1) / 2`` pairs, column by column of the strict lower triangle. The diagonal of the distance matrix is zero, and the upper triangle repeats the lower one, so neither gets a variable. The two pair formulations of [`set_brownian_distance_mean!`](@ref) call this function.
 
 # JuMP formulation
 
 ## Variables
 
-  - `Dt`: read, the symmetric matrix ``\\mathbf{D}``.
+  - `Dt`: ``\\boldsymbol{d}``, the ``P`` distances of the pairs.
 
-## Constraints
+## Expressions
 
-  - `cbdvariance_noc`: under [`NormOneConeBrownianDistanceVariance`](@ref), ``(s_c D_{ij},\\, s_c \\Delta_{ij}) \\in \\mathcal{K}_{1}``, which is ``D_{ij} \\geq |\\Delta_{ij}|``, ``\\forall\\, 1 \\leq j \\leq i \\leq T``.
-  - `cp_bdvariance`: under [`IneqBrownianDistanceVariance`](@ref), ``s_c (\\mathbf{D} - \\boldsymbol{\\Delta}) \\geq 0``, entry by entry.
-  - `cn_bdvariance`: under [`IneqBrownianDistanceVariance`](@ref), ``s_c (\\mathbf{D} + \\boldsymbol{\\Delta}) \\geq 0``, entry by entry.
+  - `Dx`: ``\\boldsymbol{\\delta}``, with ``\\delta_{p} = \\hat{r}_{i} - \\hat{r}_{j}`` for the pair ``p = (i, j)``.
 
 Each name carries the namespace `prefix`.
 
 Where:
 
-  - ``\\mathbf{D}``: Symmetric ``T \\times T`` matrix variable of the distances between the portfolio returns, with entries ``D_{ij}``.
-  - ``\\boldsymbol{\\Delta}``: The expression `Dx`, the ``T \\times T`` matrix of the differences ``\\Delta_{ij} = \\hat{r}_i - \\hat{r}_j`` of the net portfolio returns ``\\hat{r}_i`` in `net_X`.
+  - ``\\hat{r}_{i}``: The net portfolio return at the period ``i``.
+  - $(math_dict[:T])
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `net_X::VecNum`: The net portfolio returns ``\\hat{\\boldsymbol{r}}``.
+  - `T::Integer`: The number of observations.
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace of the build (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `(Dt, Dx)`: The distance variables and the differences, both of length ``P``.
+
+# Related
+
+  - [`set_brownian_distance_mean!`](@ref)
+"""
+function set_brownian_distance_pairs!(model::JuMP.Model, net_X::VecNum, T::Integer;
+                                      prefix::Symbol = Symbol(""))
+    P = div(T * (T - 1), 2)
+    I = [i for j in 1:(T - 1) for i in (j + 1):T]
+    J = [j for j in 1:(T - 1) for i in (j + 1):T]
+    Dt = state_set!(model, prefix, :Dt, JuMP.@variable(model, [1:P]))
+    Dx = state_set!(model, prefix, :Dx,
+                    JuMP.@expression(model, [p = 1:P], net_X[I[p]] - net_X[J[p]]))
+    return Dt, Dx
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add the rows of the mean pairwise distance of the net portfolio returns to `model`, and return the expression that bounds it from above.
+
+The formulation selects the rows. The mean distance is ``\\bar{D} = \\frac{2}{T^{2}} \\sum_{i > j} |\\hat{r}_{i} - \\hat{r}_{j}|``, and it is also an ordered weighted average of the returns with nondecreasing weights, see [`brownian_distance_owa_weights`](@ref). So the two pair formulations and the two OWA formulations state the same function, and they give the same optimum. They differ in the number and the type of the rows. The pair formulations add ``O(T^{2})`` variables and rows, [`ExactOrderedWeightsArray`](@ref) adds ``2 T`` variables and ``T^{2}`` rows, and [`SortingNetworkOrderedWeightsArray`](@ref) adds ``O(T \\log^{2} T)`` variables and rows.
+
+# JuMP formulation
+
+## Variables
+
+  - `Dt`: created by [`set_brownian_distance_pairs!`](@ref) under the two pair formulations.
+  - `bdvariance_owa_a`, `bdvariance_owa_b`: under [`ExactOrderedWeightsArray`](@ref), the two ``T \\times 1`` variables ``\\boldsymbol{a}`` and ``\\boldsymbol{b}`` of the assignment dual.
+  - `bdvariance_sowa_z`: under [`SortingNetworkOrderedWeightsArray`](@ref), the values that the comparators of the network write.
+
+## Expressions
+
+  - `bdvariance_md_ub`: the expression that bounds the mean distance, ``\\frac{2}{T^{2}} \\boldsymbol{1}^\\intercal \\boldsymbol{d}`` under the pair formulations, ``\\boldsymbol{1}^\\intercal (\\boldsymbol{a} + \\boldsymbol{b})`` under [`ExactOrderedWeightsArray`](@ref), and the risk expression of the network under [`SortingNetworkOrderedWeightsArray`](@ref).
+
+## Constraints
+
+  - `cbdvariance_noc`: under [`NormOneConeBrownianDistanceVariance`](@ref), ``(s_c d_{p},\\, s_c \\delta_{p}) \\in \\mathcal{K}_{1}``, which is ``d_{p} \\geq |\\delta_{p}|``, for each pair ``p``.
+  - `cp_bdvariance`, `cn_bdvariance`: under [`IneqBrownianDistanceVariance`](@ref), ``s_c (\\boldsymbol{d} - \\boldsymbol{\\delta}) \\geq 0`` and ``s_c (\\boldsymbol{d} + \\boldsymbol{\\delta}) \\geq 0``.
+  - `cbdvariance_owa`: under [`ExactOrderedWeightsArray`](@ref), ``s_c (\\hat{r}_{i} \\omega_{j} - a_{j} - b_{i}) \\leq 0`` for each ``i`` and ``j``.
+  - `cbdvariance_sowa_eq`, `cbdvariance_sowa_a`, `cbdvariance_sowa_b`: under [`SortingNetworkOrderedWeightsArray`](@ref), the three blocks of rows of [`set_sorting_network_owa!`](@ref).
+
+The two OWA formulations read the net returns from the `owa` variable of [`set_owa_constraints!`](@ref), which a [`OrderedWeightsArray`](@ref) in the same model shares.
+
+Each name carries the namespace `prefix`.
+
+Where:
+
+  - ``\\boldsymbol{d}``, ``\\boldsymbol{\\delta}``: The distances and the differences of the pairs, from [`set_brownian_distance_pairs!`](@ref).
+  - ``\\omega_{j}``: The OWA weight of the ``j``-th smallest return, from [`brownian_distance_owa_weights`](@ref).
+  - ``\\hat{r}_{i}``: The net portfolio return at the period ``i``.
   - $(math_dict[:T])
   - $(math_dict[:K_q_norm])
   - $(math_dict[:sc_scale])
@@ -31,16 +93,16 @@ Where:
 
 $(val_dict[:relax])
 
-  - The rows bound ``D_{ij}`` from below by ``|\\Delta_{ij}|``, so ``\\mathbf{D}`` is the distance matrix of `net_X` only when every row is tight.
-  - The risk expression of [`set_brownian_distance_risk_constraint!`](@ref) increases in each entry of a non-negative ``\\mathbf{D}``. So the rows are tight when the objective minimises the risk.
-  - Under a bound on the risk and an objective that does not minimise it, an entry of ``\\mathbf{D}`` can exceed ``|\\Delta_{ij}|``. The risk at the true distance matrix is then at or below the risk at ``\\mathbf{D}``, so the bound still holds the value of the functor of [`BrownianDistanceVariance`](@ref).
+  - Each formulation bounds ``\\bar{D}`` from above, and the bound is tight at the minimum of the returned expression. The risk expression of [`set_brownian_distance_risk_constraint!`](@ref) increases in it, so the bound is tight when the objective minimises the risk.
+  - Under a bound on the risk and an objective that does not minimise it, the expression can exceed ``\\bar{D}``. The true risk is then at or below the risk of the model, so the bound still holds the value of the functor of [`BrownianDistanceVariance`](@ref).
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `::BrownianDistanceVarianceFormulation`: The formulation, which selects the rows.
-  - `Dt::MatNum`: ``\\mathbf{D}``.
-  - `Dx::MatNum`: ``\\boldsymbol{\\Delta}``.
+  - The formulation, a member of [`BDVarMeanDistanceFormulations`](@ref).
+  - `X::MatNum`: The asset returns matrix. The OWA formulations read it, and the pair formulations do not.
+  - `net_X::VecNum`: The net portfolio returns ``\\hat{\\boldsymbol{r}}``. The pair formulations read it.
+  - `T::Integer`: The number of observations.
 
 # Keyword arguments
 
@@ -48,85 +110,161 @@ $(val_dict[:relax])
 
 # Returns
 
-  - `nothing`.
+  - `bdvariance_md_ub`: The affine expression that bounds the mean distance from above.
 
 # Related
 
-  - [`set_brownian_distance_risk_constraint!`](@ref)
+  - [`set_brownian_distance_pairs!`](@ref)
+  - [`brownian_distance_owa_weights`](@ref)
+  - [`set_sorting_network_owa!`](@ref)
   - [`set_risk_constraints!`](@ref)
+
+# References
+
+  - $(ref_dict[:goemans2015])
 """
-function set_brownian_distance_variance_constraints!(model::JuMP.Model,
-                                                     ::NormOneConeBrownianDistanceVariance,
-                                                     Dt::MatNum, Dx::MatNum;
-                                                     prefix::Symbol = Symbol(""))
-    T = size(Dt, 1)
+function set_brownian_distance_mean!(model::JuMP.Model,
+                                     ::NormOneConeBrownianDistanceVariance, ::MatNum,
+                                     net_X::VecNum, T::Integer; prefix::Symbol = Symbol(""))
+    Dt, Dx = set_brownian_distance_pairs!(model, net_X, T; prefix = prefix)
+    P = length(Dt)
     sc = get_constraint_scale(model)
     state_set!(model, prefix, :cbdvariance_noc,
-               JuMP.@constraint(model, [j = 1:T, i = j:T],
-                                [sc * Dt[i, j]; sc * Dx[i, j]] in JuMP.MOI.NormOneCone(2)))
-    return nothing
+               JuMP.@constraint(model, [p = 1:P],
+                                [sc * Dt[p]; sc * Dx[p]] in JuMP.MOI.NormOneCone(2)))
+    c2 = 2 * inv(T^2)
+    return state_set!(model, prefix, :bdvariance_md_ub,
+                      JuMP.@expression(model, c2 * sum(Dt)))
 end
-function set_brownian_distance_variance_constraints!(model::JuMP.Model,
-                                                     ::IneqBrownianDistanceVariance,
-                                                     Dt::MatNum, Dx::MatNum;
-                                                     prefix::Symbol = Symbol(""))
+function set_brownian_distance_mean!(model::JuMP.Model, ::IneqBrownianDistanceVariance,
+                                     ::MatNum, net_X::VecNum, T::Integer;
+                                     prefix::Symbol = Symbol(""))
+    Dt, Dx = set_brownian_distance_pairs!(model, net_X, T; prefix = prefix)
     sc = get_constraint_scale(model)
     state_set!(model, prefix, :cp_bdvariance,
                JuMP.@constraint(model, sc * (Dt - Dx) in JuMP.Nonnegatives()))
     state_set!(model, prefix, :cn_bdvariance,
                JuMP.@constraint(model, sc * (Dt + Dx) in JuMP.Nonnegatives()))
-    return nothing
+    c2 = 2 * inv(T^2)
+    return state_set!(model, prefix, :bdvariance_md_ub,
+                      JuMP.@expression(model, c2 * sum(Dt)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Register the risk expression of [`BrownianDistanceVariance`](@ref) over the distance matrix `Dt`, and return it.
+Return the OWA weights whose ordered weighted average of the returns is their mean pairwise distance.
 
-The expression is equation 9 of [bdvar](@cite), the disciplined-convex upper bound on the distance variance that the docstring of [`BrownianDistanceVariance`](@ref) derives. [`QuadRiskExpr`](@ref) states it as a quadratic form in `Dt`. [`RSOCRiskExpr`](@ref) holds each of its two squares with a rotated second-order cone, so the expression is affine in the variables and a bound on the risk is a conic row.
+The weights increase in ``t``, so the OWA is convex, and the two OWA formulations of [`set_brownian_distance_mean!`](@ref) are exact for them.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\bar{D} &= \\frac{1}{T^{2}} \\sum_{i, j} |\\hat{r}_{i} - \\hat{r}_{j}| = \\frac{2}{T^{2}} \\sum_{i > j} |\\hat{r}_{i} - \\hat{r}_{j}| = \\sum_{t = 1}^{T} \\omega_{t}\\, \\hat{r}_{(t)}\\,, \\\\
+\\omega_{t} &= \\frac{2 (2 t - T - 1)}{T^{2}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\bar{D}``: The mean pairwise distance of the net portfolio returns.
+  - ``\\hat{r}_{(t)}``: The ``t``-th smallest net portfolio return. It is the larger value of ``t - 1`` pairs and the smaller value of ``T - t`` pairs, which gives the factor ``2 t - T - 1``.
+  - ``\\omega_{t}``: The OWA weight of ``\\hat{r}_{(t)}``.
+  - $(math_dict[:T])
+
+# Arguments
+
+  - `X::MatNum`: The asset returns matrix. The function reads its element type only.
+  - `T::Integer`: The number of observations.
+
+# Returns
+
+  - `owa_w::Vector`: The ``T`` weights ``\\omega_{t}``, of the element type of `X`.
+
+# Related
+
+  - [`set_brownian_distance_mean!`](@ref)
+  - [`owa_gmd`](@ref)
+"""
+function brownian_distance_owa_weights(X::MatNum, T::Integer)
+    c2 = 2 / (T^2 * one(eltype(X)))
+    return [c2 * (2 * t - T - 1) for t in 1:T]
+end
+function set_brownian_distance_mean!(model::JuMP.Model, ::ExactOrderedWeightsArray,
+                                     X::MatNum, ::VecNum, T::Integer;
+                                     prefix::Symbol = Symbol(""))
+    sc = get_constraint_scale(model)
+    owa = set_owa_constraints!(model, X; prefix = prefix)
+    owa_w = brownian_distance_owa_weights(X, T)
+    ovec = range(one(eltype(X)), one(eltype(X)); length = T)
+    owa_a = state_set!(model, prefix, :bdvariance_owa_a, JuMP.@variable(model, [1:T]))
+    owa_b = state_set!(model, prefix, :bdvariance_owa_b, JuMP.@variable(model, [1:T]))
+    state_set!(model, prefix, :cbdvariance_owa,
+               JuMP.@constraint(model,
+                                sc * (owa * transpose(owa_w) - ovec * transpose(owa_a) -
+                                      owa_b * transpose(ovec)) in JuMP.Nonpositives()))
+    return state_set!(model, prefix, :bdvariance_md_ub,
+                      JuMP.@expression(model, sum(owa_a) + sum(owa_b)))
+end
+function set_brownian_distance_mean!(model::JuMP.Model,
+                                     alg::SortingNetworkOrderedWeightsArray, X::MatNum,
+                                     ::VecNum, T::Integer; prefix::Symbol = Symbol(""))
+    owa_w = brownian_distance_owa_weights(X, T)
+    net = set_sorting_network_owa!(model, alg, X, owa_w; prefix = prefix)
+    state_set!(model, prefix, :bdvariance_sowa_z, net.z)
+    state_set!(model, prefix, :cbdvariance_sowa_eq, net.c_eq)
+    state_set!(model, prefix, :cbdvariance_sowa_a, net.c_a)
+    state_set!(model, prefix, :cbdvariance_sowa_b, net.c_b)
+    return state_set!(model, prefix, :bdvariance_md_ub, net.risk)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Register the risk expression of [`BrownianDistanceVariance`](@ref), the sum of the squares of the scaled centred returns and of the mean distance, and return it.
+
+The expression is equation 9 of [bdvar](@cite) in its closed form, ``2 \\sigma^{2} + \\bar{D}^{2}``, which the docstring of [`BrownianDistanceVariance`](@ref) derives. The variance term reads the returns directly, so it needs no distance variable. The formulation states the two squares.
 
 # JuMP formulation
 
 ## Variables
 
-  - `Dt`: read, the symmetric matrix ``\\mathbf{D}``.
-  - `tDt`: created under [`RSOCRiskExpr`](@ref), the scalar ``t``.
-  - `tsum_Dt`: created under [`RSOCRiskExpr`](@ref), the scalar ``u``.
+  - `t_bdvariance_var`, `t_bdvariance_md`: created under [`RSOCRiskExpr`](@ref), the scalars ``t`` and ``u``.
+  - `bdvariance_dev`: created under [`SquaredSOCRiskExpr`](@ref) by [`set_brownian_distance_deviation!`](@ref).
 
 ## Expressions
 
-  - `bdvariance_risk`: ``\\frac{1}{T^2} \\left( \\lVert \\mathbf{D} \\rVert_F^2 + \\frac{1}{T^2} \\left( \\boldsymbol{1}^\\intercal \\mathbf{D} \\boldsymbol{1} \\right)^2 \\right)`` under [`QuadRiskExpr`](@ref), and ``\\frac{1}{T^2} (t + u)`` under [`RSOCRiskExpr`](@ref).
+  - `bdvariance_risk`: ``\\lVert \\boldsymbol{c} \\rVert_{2}^{2} + m^{2}`` under [`QuadRiskExpr`](@ref), ``t + u`` under [`RSOCRiskExpr`](@ref), and ``\\sigma_{\\mathrm{BD}}^{2}`` under [`SquaredSOCRiskExpr`](@ref).
 
 ## Constraints
 
-  - `rsoc_Dt`: under [`RSOCRiskExpr`](@ref), ``(s_c t,\\, s_c / 2,\\, s_c \\operatorname{vec}(\\mathbf{D})) \\in \\mathcal{K}_{r}``, which is ``t \\geq \\lVert \\mathbf{D} \\rVert_F^2``.
-  - `rsoc_sum_Dt`: under [`RSOCRiskExpr`](@ref), ``(s_c u,\\, s_c / 2,\\, s_c \\boldsymbol{1}^\\intercal \\mathbf{D} \\boldsymbol{1} / T) \\in \\mathcal{K}_{r}``, which is ``u \\geq \\left( \\boldsymbol{1}^\\intercal \\mathbf{D} \\boldsymbol{1} / T \\right)^2``. The factor ``1 / T`` keeps ``u`` of the size of ``t``, so both reach the same relative accuracy in the solver.
+  - `rsoc_bdvariance_var`: under [`RSOCRiskExpr`](@ref), ``(s_c t,\\, s_c / 2,\\, s_c \\boldsymbol{c}) \\in \\mathcal{K}_{r}``, which is ``t \\geq \\lVert \\boldsymbol{c} \\rVert_{2}^{2}``.
+  - `rsoc_bdvariance_md`: under [`RSOCRiskExpr`](@ref), ``(s_c u,\\, s_c / 2,\\, s_c m) \\in \\mathcal{K}_{r}``, which is ``u \\geq m^{2}``.
 
 Each name carries the namespace `prefix`.
 
 Where:
 
-  - ``\\mathbf{D}``: Symmetric ``T \\times T`` matrix variable of the distances between the portfolio returns.
-  - $(math_dict[:T])
-  - ``\\boldsymbol{1}``: Column vector of ones, ``T \\times 1``.
-  - ``\\lVert \\cdot \\rVert_F``: Frobenius norm.
+  - ``\\boldsymbol{c} = \\sqrt{2 / T}\\, (\\hat{\\boldsymbol{r}} - \\mu \\boldsymbol{1})``: The scaled centred returns `xc`, so ``\\lVert \\boldsymbol{c} \\rVert_{2}^{2} = 2 \\sigma^{2}``.
+  - ``m``: The mean distance variable `md`.
+  - ``\\sigma_{\\mathrm{BD}}``: The deviation, ``\\sigma_{\\mathrm{BD}} \\geq \\lVert (\\boldsymbol{c}, m) \\rVert_{2}``.
   - ``t``, ``u``: Epigraph variables of the two squares.
   - ``\\mathcal{K}_{r} = \\{(a, b, \\boldsymbol{x}) : 2 a b \\geq \\lVert \\boldsymbol{x} \\rVert_2^2,\\, a \\geq 0,\\, b \\geq 0\\}``: Rotated second-order cone. The model states it with a [JuMP.RotatedSecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Rotated-Second-Order-Cone).
+  - $(math_dict[:T])
   - $(math_dict[:sc_scale])
 
 ## Relaxation
 
 $(val_dict[:relax])
 
-  - `bdvariance_risk` lies at or above the distance variance ``\\frac{1}{T^2} \\lVert \\mathbf{C}_T \\mathbf{D} \\mathbf{C}_T \\rVert_F^2`` of ``\\mathbf{D}``, with ``\\mathbf{C}_T`` the centring matrix. The gap is ``\\frac{2}{T^3} \\lVert \\mathbf{D} \\boldsymbol{1} \\rVert_2^2``, which is zero only when every entry of ``\\mathbf{D}`` is zero, that is, for a constant series of portfolio returns. On Gaussian returns at ``T = 50`` the bound is 6.9 times the distance variance.
-  - Under [`QuadRiskExpr`](@ref) `bdvariance_risk` is exact in ``\\mathbf{D}``.
-  - Under [`RSOCRiskExpr`](@ref) ``t`` and ``u`` lie at or above their squares, so `bdvariance_risk` lies at or above the expression of [`QuadRiskExpr`](@ref). Both are tight when the objective minimises the risk.
+  - `bdvariance_risk` lies at or above ``\\mathrm{BDVar}(\\hat{\\boldsymbol{r}})``, because ``m`` lies at or above the mean distance, see [`set_brownian_distance_mean!`](@ref). The variance term is exact.
+  - Under [`RSOCRiskExpr`](@ref) and [`SquaredSOCRiskExpr`](@ref) the epigraph variables lie at or above their squares. All three are tight when the objective minimises the risk.
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `::QuadRiskExpr` or `::RSOCRiskExpr`: The risk expression formulation.
-  - `Dt::MatNum`: ``\\mathbf{D}``.
-  - `iT2::Number`: ``1 / T^2``.
+  - `::QuadRiskExpr`, `::RSOCRiskExpr` or `::SquaredSOCRiskExpr`: The risk expression formulation.
+  - `xc::VecNum`: ``\\boldsymbol{c}``.
+  - `md::JuMP.AbstractJuMPScalar`: ``m``.
 
 # Keyword arguments
 
@@ -138,56 +276,121 @@ $(val_dict[:relax])
 
 # Related
 
-  - [`set_brownian_distance_variance_constraints!`](@ref)
+  - [`set_brownian_distance_mean!`](@ref)
+  - [`set_brownian_distance_deviation!`](@ref)
   - [`set_risk_constraints!`](@ref)
+
+# References
+
+  - $(ref_dict[:bdvar])
 """
 function set_brownian_distance_risk_constraint!(model::JuMP.Model, ::QuadRiskExpr,
-                                                Dt::MatNum, iT2::Number;
+                                                xc::VecNum, md::JuMP.AbstractJuMPScalar;
                                                 prefix::Symbol = Symbol(""))
     return state_set!(model, prefix, :bdvariance_risk,
-                      JuMP.@expression(model,
-                                       iT2 * (LinearAlgebra.dot(Dt, Dt) + iT2 * sum(Dt)^2)))
+                      JuMP.@expression(model, LinearAlgebra.dot(xc, xc) + md^2))
 end
 function set_brownian_distance_risk_constraint!(model::JuMP.Model, ::RSOCRiskExpr,
-                                                Dt::MatNum, iT2::Number;
+                                                xc::VecNum, md::JuMP.AbstractJuMPScalar;
                                                 prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
-    tDt = state_set!(model, prefix, :tDt, JuMP.@variable(model))
-    state_set!(model, prefix, :rsoc_Dt,
+    t_var = state_set!(model, prefix, :t_bdvariance_var, JuMP.@variable(model))
+    state_set!(model, prefix, :rsoc_bdvariance_var,
                JuMP.@constraint(model,
-                                [sc * tDt;
-                                 sc * 0.5;
-                                 sc * vec(Dt)] in JuMP.RotatedSecondOrderCone()))
-    # A quadratic `sum(Dt)^2` in the expression is rank one, and the bridge of a bound on the
-    # risk to a second-order cone cannot factor it. The second cone keeps the expression affine.
-    # It holds the mean row sum, so `tsum_Dt` is of the size of `tDt` and both reach the same
-    # relative accuracy.
-    tsum_Dt = state_set!(model, prefix, :tsum_Dt, JuMP.@variable(model))
-    state_set!(model, prefix, :rsoc_sum_Dt,
+                                [sc * t_var; sc * 0.5; sc * xc] in
+                                JuMP.RotatedSecondOrderCone()))
+    t_md = state_set!(model, prefix, :t_bdvariance_md, JuMP.@variable(model))
+    state_set!(model, prefix, :rsoc_bdvariance_md,
                JuMP.@constraint(model,
-                                [sc * tsum_Dt;
-                                 sc * 0.5;
-                                 sc * sum(Dt) / size(Dt, 1)] in
+                                [sc * t_md, sc * 0.5, sc * md] in
                                 JuMP.RotatedSecondOrderCone()))
     return state_set!(model, prefix, :bdvariance_risk,
-                      JuMP.@expression(model, iT2 * (tDt + tsum_Dt)))
+                      JuMP.@expression(model, t_var + t_md))
+end
+function set_brownian_distance_risk_constraint!(model::JuMP.Model, ::SquaredSOCRiskExpr,
+                                                xc::VecNum, md::JuMP.AbstractJuMPScalar;
+                                                prefix::Symbol = Symbol(""))
+    dev = set_brownian_distance_deviation!(model, xc, md; prefix = prefix)
+    return state_set!(model, prefix, :bdvariance_risk, JuMP.@expression(model, dev^2))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add the square root of the risk expression of [`BrownianDistanceVariance`](@ref) to `model` as one second-order cone, and return it.
+
+The risk is the square of the norm of one vector, the scaled centred returns and the mean distance. So one cone of dimension ``T + 2`` bounds its square root. The deviation has degree one in the weights and ``k``, so the bound of the measure acts on it, and [`SquaredSOCRiskExpr`](@ref) squares it to give the risk. A second call with the same `prefix` returns the registered variable and adds no cone.
+
+# JuMP formulation
+
+## Variables
+
+  - `bdvariance_dev`: ``\\sigma_{\\mathrm{BD}}``, the deviation.
+
+## Constraints
+
+  - `cbdvariance_dev_soc`: ``(s_c \\sigma_{\\mathrm{BD}},\\, s_c \\boldsymbol{c},\\, s_c m) \\in \\mathcal{K}_{2}``, which is ``\\sigma_{\\mathrm{BD}} \\geq \\sqrt{\\lVert \\boldsymbol{c} \\rVert_{2}^{2} + m^{2}}``.
+
+Each name carries the namespace `prefix`.
+
+Where:
+
+  - ``\\boldsymbol{c}``, ``m``: The scaled centred returns and the mean distance variable, see [`set_brownian_distance_risk_constraint!`](@ref).
+  - $(math_dict[:K_q_norm])
+  - $(math_dict[:sc_scale])
+
+## Relaxation
+
+$(val_dict[:relax])
+
+  - `bdvariance_dev` lies at or above the square root of the risk expression. A bound on it is exact, because the weights satisfy it when the square root of their risk is at most the bound.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `xc::VecNum`: ``\\boldsymbol{c}``.
+  - `md::JuMP.AbstractJuMPScalar`: ``m``.
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace of the build (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `bdvariance_dev`: The deviation variable.
+
+# Related
+
+  - [`set_brownian_distance_risk_constraint!`](@ref)
+  - [`set_brownian_distance_bounds_expr!`](@ref)
+"""
+function set_brownian_distance_deviation!(model::JuMP.Model, xc::VecNum,
+                                          md::JuMP.AbstractJuMPScalar;
+                                          prefix::Symbol = Symbol(""))
+    return state_build!(model, prefix, :bdvariance_dev) do
+        sc = get_constraint_scale(model)
+        dev = JuMP.@variable(model)
+        state_set!(model, prefix, :cbdvariance_dev_soc,
+                   JuMP.@constraint(model,
+                                    [sc * dev; sc * xc; sc * md] in JuMP.SecondOrderCone()))
+        return dev
+    end
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add the [`BrownianDistanceVariance`](@ref) bound of the net portfolio returns to `model`, and return its risk expression.
 
-`r.alg1` selects the risk expression, and `r.alg2` selects the rows that tie the distance matrix to the returns. When the objective minimises the risk, `bdvariance_risk` equals the functor of the measure at the solved weights.
+`r.alg2` selects the rows of the mean distance, and `r.alg1` selects the risk expression. When the objective minimises the risk, `bdvariance_risk` equals the functor of the measure at the solved weights.
 
 The build is keyed on `prefix` alone, with no measure index. A second call with the same `prefix` uses the registered expression and builds no rows. The settings of the first [`BrownianDistanceVariance`](@ref) take effect, and a second measure logs a warning, because its bound and its scale have no effect.
 
 # Algorithm
 
  1. When `bdvariance_risk` is registered under `prefix`, go to step 6.
- 2. Read the net portfolio return series `net_X` with [`set_net_portfolio_returns!`](@ref), and its length `T`.
- 3. Create `Dt`, and register `Dx`, the matrix of the pairwise differences of `net_X`.
- 4. Register the risk expression of `r.alg1` with [`set_brownian_distance_risk_constraint!`](@ref).
- 5. Add the rows of `r.alg2` with [`set_brownian_distance_variance_constraints!`](@ref).
+ 2. Read the net portfolio return series `net_X` with [`set_net_portfolio_returns!`](@ref), and the number of observations `T` from `pr.X`.
+ 3. Add the rows of the mean distance of `r.alg2` with [`set_brownian_distance_mean!`](@ref), and hold the expression that they return in the variable `md`.
+ 4. Hold the mean of `net_X` in the variable `mu`, and register the scaled centred returns `xc`.
+ 5. Register the risk expression of `r.alg1` with [`set_brownian_distance_risk_constraint!`](@ref).
  6. Convert the bound in `r.settings` to the units of a deviation with [`variance_risk_bounds_val`](@ref), and take the expression that it acts on from [`set_brownian_distance_bounds_expr!`](@ref). The risk expression has degree two in the weights, and the row of [`set_risk_upper_bound!`](@ref) multiplies the bound by ``k``, so under a ratio objective the bound holds only on an expression of degree one.
  7. Add the bound on the deviation and the risk expression with [`set_unindexed_risk_bounds_and_expression!`](@ref), and return the risk expression.
 
@@ -195,22 +398,28 @@ The build is keyed on `prefix` alone, with no measure index. A second call with 
 
 ## Variables
 
-  - `Dt`: created, the symmetric ``T \\times T`` matrix ``\\mathbf{D}``.
-  - `bdvariance_dev`: created by [`set_brownian_distance_bounds_expr!`](@ref) when `r.settings` holds a bound, the square root of the risk expression.
+  - `bdvariance_md`: ``m``, the mean distance.
+  - `bdvariance_mu`: ``\\mu``, the mean of the net portfolio returns.
+  - `bdvariance_dev`: created by [`set_brownian_distance_deviation!`](@ref) when `r.settings` holds a bound or when `r.alg1` is [`SquaredSOCRiskExpr`](@ref), the square root of the risk expression.
 
 ## Expressions
 
-  - `Dx`: ``\\boldsymbol{\\Delta} = \\hat{\\boldsymbol{r}} \\boldsymbol{1}^\\intercal - \\boldsymbol{1} \\hat{\\boldsymbol{r}}^\\intercal``.
+  - `bdvariance_xc`: ``\\boldsymbol{c} = \\sqrt{2 / T}\\, (\\hat{\\boldsymbol{r}} - \\mu \\boldsymbol{1})``.
 
-The two calls register `bdvariance_risk` and the rows, and their docstrings state them. Each name carries the namespace `prefix`.
+## Constraints
+
+  - `cbdvariance_md`: ``s_c (m - \\bar{D}_{\\mathrm{alg}}) = 0``.
+  - `cbdvariance_mu`: ``s_c (\\mu - \\boldsymbol{1}^\\intercal \\hat{\\boldsymbol{r}} / T) = 0``.
+
+The two calls of steps 3 and 5 register their rows and `bdvariance_risk`, and their docstrings state them. Each name carries the namespace `prefix`.
 
 Where:
 
-  - ``\\mathbf{D}``: Symmetric matrix variable of the distances between the portfolio returns.
-  - ``\\boldsymbol{\\Delta}``: Matrix of the differences ``\\Delta_{ij} = \\hat{r}_i - \\hat{r}_j``.
+  - ``\\bar{D}_{\\mathrm{alg}}``: The expression of [`set_brownian_distance_mean!`](@ref), which bounds the mean distance from above.
   - ``\\hat{\\boldsymbol{r}}``: The net portfolio returns `net_X`, ``T \\times 1``.
   - ``\\boldsymbol{1}``: Column vector of ones, ``T \\times 1``.
   - $(math_dict[:T])
+  - $(math_dict[:sc_scale])
 
 ## Relaxation
 
@@ -237,7 +446,7 @@ $(val_dict[:relax])
 
 # Related
 
-  - [`set_brownian_distance_variance_constraints!`](@ref)
+  - [`set_brownian_distance_mean!`](@ref)
   - [`set_brownian_distance_risk_constraint!`](@ref)
   - [`set_unindexed_risk_bounds_and_expression!`](@ref)
 """
@@ -246,20 +455,24 @@ function set_risk_constraints!(model::JuMP.Model, ::Any, r::BrownianDistanceVari
                                prefix::Symbol = Symbol(""), kwargs...)
     bdvariance_risk = state_build!(model, prefix, :bdvariance_risk) do
         X = pr.X
+        T = size(X, 1)
+        sc = get_constraint_scale(model)
         net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
-        T = length(net_X)
-        iT2 = inv(T^2)
-        ovec = range(one(eltype(X)), one(eltype(X)); length = T)
-        Dt = state_set!(model, prefix, :Dt, JuMP.@variable(model, [1:T, 1:T], Symmetric))
-        Dx = state_set!(model, prefix, :Dx,
-                        JuMP.@expression(model,
-                                         net_X * transpose(ovec) - ovec * transpose(net_X)))
+        md_expr = set_brownian_distance_mean!(model, r.alg2, X, net_X, T; prefix = prefix)
+        md = state_set!(model, prefix, :bdvariance_md, JuMP.@variable(model))
+        state_set!(model, prefix, :cbdvariance_md,
+                   JuMP.@constraint(model, sc * (md - md_expr) == 0))
+        iT = inv(T)
+        mu = state_set!(model, prefix, :bdvariance_mu, JuMP.@variable(model))
+        state_set!(model, prefix, :cbdvariance_mu,
+                   JuMP.@constraint(model, sc * (mu - iT * sum(net_X)) == 0))
+        c = sqrt(2 * iT)
+        xc = state_set!(model, prefix, :bdvariance_xc,
+                        JuMP.@expression(model, c * (net_X .- mu)))
         # `set_brownian_distance_risk_constraint!` registers `:bdvariance_risk` itself;
         # the memo re-registers the same value.
-        bdvariance_risk = set_brownian_distance_risk_constraint!(model, r.alg1, Dt, iT2;
-                                                                 prefix = prefix)
-        set_brownian_distance_variance_constraints!(model, r.alg2, Dt, Dx; prefix = prefix)
-        return bdvariance_risk
+        return set_brownian_distance_risk_constraint!(model, r.alg1, xc, md;
+                                                      prefix = prefix)
     end
     ub = variance_risk_bounds_val(SquareRootBound(), r.settings.ub)
     r_expr_ub = set_brownian_distance_bounds_expr!(model, ub, bdvariance_risk;
@@ -275,45 +488,7 @@ end
 
 Return the expression that the bound of a [`BrownianDistanceVariance`](@ref) acts on, and build it when the measure has a bound.
 
-Without a bound, the method returns the risk expression and builds nothing. With a bound, it adds the square root of the risk expression to `model` and returns it. Both formulations of the risk expression state the same quantity, a sum of squares of the distances and of their sum. Its square root is the norm of one vector, so a second-order cone bounds it. The deviation has degree one in the weights and ``k``, and the bound of the measure acts on it. The bound must be in the units of a deviation, as [`variance_risk_bounds_val`](@ref) gives it.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\mathrm{BDVar}(\\mathbf{D}) &= \\frac{1}{T^2} \\sum_{i, j} D_{ij}^2 + \\frac{1}{T^4} \\left(\\sum_{i, j} D_{ij}\\right)^2 = \\left\\lVert \\begin{bmatrix} \\frac{1}{T} \\operatorname{vec}(\\mathbf{D}) \\\\ \\frac{1}{T^2} \\sum_{i, j} D_{ij} \\end{bmatrix} \\right\\rVert_2^2\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathrm{BDVar}(\\mathbf{D})``: The risk expression at the distance matrix ``\\mathbf{D}``.
-  - ``\\mathbf{D}``: Symmetric matrix variable of the distances between the portfolio returns.
-  - $(math_dict[:T])
-
-# JuMP formulation
-
-## Variables
-
-  - `bdvariance_dev`: ``\\sigma_{\\mathrm{BD}}``, the deviation.
-
-## Constraints
-
-  - `cbdvariance_dev_soc`: ``\\left(s_c \\sigma_{\\mathrm{BD}}, \\frac{s_c}{T} \\operatorname{vec}(\\mathbf{D}), \\frac{s_c}{T^2} \\sum_{i, j} D_{ij}\\right) \\in \\mathcal{K}_{2}``, which is ``\\sigma_{\\mathrm{BD}} \\geq \\sqrt{\\mathrm{BDVar}(\\mathbf{D})}``.
-
-Each name carries the namespace `prefix`.
-
-Where:
-
-  - ``\\sigma_{\\mathrm{BD}}``: The deviation variable.
-  - $(math_dict[:K_q_norm])
-  - $(math_dict[:sc_scale])
-
-## Relaxation
-
-$(val_dict[:relax])
-
-  - `bdvariance_dev` lies at or above ``\\sqrt{\\mathrm{BDVar}(\\mathbf{D})}``. A bound on it is exact, because the weights satisfy it when the square root of their risk expression is at most the bound.
+Without a bound, the method returns the risk expression and builds nothing. With a bound, it returns the deviation of [`set_brownian_distance_deviation!`](@ref), which reads the registered `bdvariance_xc` and `bdvariance_md`. Under [`SquaredSOCRiskExpr`](@ref) the risk expression already built the deviation, so the bound adds no cone. The bound must be in the units of a deviation, as [`variance_risk_bounds_val`](@ref) gives it.
 
 # Arguments
 
@@ -328,12 +503,12 @@ $(val_dict[:relax])
 # Returns
 
   - `bdvariance_risk` without a bound.
-  - `bdvariance_dev` with a bound: the deviation variable. A second call with the same `prefix` returns the registered variable.
+  - `bdvariance_dev` with a bound: the deviation variable.
 
 # Related
 
   - [`set_risk_constraints!`](@ref)
-  - [`set_brownian_distance_risk_constraint!`](@ref)
+  - [`set_brownian_distance_deviation!`](@ref)
   - [`variance_risk_bounds_val`](@ref)
   - [`variance_risk_bounds_expr`](@ref)
 """
@@ -345,15 +520,7 @@ end
 function set_brownian_distance_bounds_expr!(model::JuMP.Model, ::RkRtBounds,
                                             ::JuMP.AbstractJuMPScalar;
                                             prefix::Symbol = Symbol(""))
-    return state_build!(model, prefix, :bdvariance_dev) do
-        sc = get_constraint_scale(model)
-        Dt = state_get(model, prefix, :Dt)
-        iT = inv(size(Dt, 1))
-        dev = JuMP.@variable(model)
-        state_set!(model, prefix, :cbdvariance_dev_soc,
-                   JuMP.@constraint(model,
-                                    [sc * dev; sc * iT * vec(Dt); sc * iT^2 * sum(Dt)] in
-                                    JuMP.SecondOrderCone()))
-        return dev
-    end
+    return set_brownian_distance_deviation!(model, state_get(model, prefix, :bdvariance_xc),
+                                            state_get(model, prefix, :bdvariance_md);
+                                            prefix = prefix)
 end

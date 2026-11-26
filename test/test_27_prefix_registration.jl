@@ -67,7 +67,7 @@
               [:W1_vr_sk_kt, :W2_vr_sk_kt, :W3_vr_sk_kt, :L2W1_vr_sk_kt, :M_vr_sk_kt,
                :M_vr_sk_kt_PSD]),
              ("BrownianDistanceVariance", BrownianDistanceVariance(), opt15, w0, rd15,
-              [:Dt, :Dx, :bdvariance_risk])]
+              [:bdvariance_md, :bdvariance_mu, :bdvariance_xc, :bdvariance_risk])]
 
     tr = WeightsTracking(; w = w03)
     mr = MeanRisk(;

@@ -1178,6 +1178,16 @@ message = "invalid builtin function call: getfield"
 count = 2
 rationale = "a-form-its-package-recommends"
 
+# The pair formulations of #2353 register `Dx` and `cbdvariance_noc` as two JuMP containers
+# `[p = 1:P]`, at lines 50 and 133. Measured on 2026-11-26 with Julia 1.13.4: the four reports are
+# the only four of the file, two on each container line.
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/11_BrownianDistanceVarianceConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 4
+rationale = "a-form-its-package-recommends"
+
 [[dismissal]]
 file = "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/16_TrackingRiskMeasureConstraints.jl"
 kind = "BuiltinErrorReport"

@@ -24,8 +24,9 @@ conditional value at risk do not measure. This page shows two of them.
     have fat tails or skewed payoffs that mean-variance optimisation ignores.
 
 !!! warning "Solvers and the size of the sample"
-    - `BrownianDistanceVariance` builds a `T × T` distance matrix inside the model, so the
-    number of extra variables grows with the square of the number of observations. This
+    - `BrownianDistanceVariance` holds the mean distance between pairs of returns inside the
+    model. The default sorting network grows as `T log² T` in the number of observations, and
+    the pair formulations grow as `T²`. The solve time grows faster than the model. This
     example uses 50 observations to keep the model small.
     - `VarianceSkewKurtosis` builds a large semidefinite problem. This example solves it
     with SCS, and you can use another solver that handles large semidefinite problems.
@@ -74,19 +75,21 @@ opt = JuMPOptimiser(; pe = pr, slv = slv)
 #=
 ## 2. Brownian distance variance
 
-### 2.1 `alg2`: the absolute distances
+### 2.1 `alg2`: the mean distance
 
-By default [`BrownianDistanceVariance`](@ref) writes the absolute distances with a norm-one
-cone, `NormOneConeBrownianDistanceVariance`. The model adds one variable for each entry of the
-distance matrix and bounds it with that cone.
+The measure is twice the variance of the portfolio returns plus the square of their mean
+pairwise distance. The variance needs no extra rows, and `alg2` selects the rows of the mean
+distance. The mean distance is an ordered weighted average of the returns, so by default
+[`BrownianDistanceVariance`](@ref) writes it with a sorting network,
+`SortingNetworkOrderedWeightsArray`.
 =#
 
 res_bdvar = optimise(MeanRisk(; r = BrownianDistanceVariance(), opt = opt))
 
 #=
-The other value of `alg2`, `IneqBrownianDistanceVariance`, writes the absolute distances with
-linear inequalities instead of a cone. On a large problem it can be faster, because it avoids a
-large cone.
+`IneqBrownianDistanceVariance` writes one distance variable for each pair of returns, and
+bounds it from below with two linear inequalities. The model grows with the square of the
+number of observations, and on a short sample with few assets it can be the faster choice.
 =#
 
 res_bdvar_ineq = optimise(MeanRisk(;
@@ -97,10 +100,10 @@ res_bdvar_ineq = optimise(MeanRisk(;
 #=
 ### 2.2 `alg1`: the sum of squares
 
-A second choice, `alg1`, sets how the model writes the sum of the squared distances. The
-default, `QuadRiskExpr`, writes it as a quadratic expression. `RSOCRiskExpr` writes it with a
-rotated second-order cone, which can be faster on a dense problem. We print the weights of the
-three formulations side by side.
+A second choice, `alg1`, sets how the model writes the two squares. The default,
+`QuadRiskExpr`, writes them as a quadratic expression. `RSOCRiskExpr` writes each one with a
+rotated second-order cone. The docstring of [`BrownianDistanceVariance`](@ref) gives the
+measured advice for each choice. We print the weights of the three formulations side by side.
 =#
 
 res_bdvar_rsoc = optimise(MeanRisk(; r = BrownianDistanceVariance(; alg1 = RSOCRiskExpr()),
