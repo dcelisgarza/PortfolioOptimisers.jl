@@ -1348,7 +1348,7 @@ end
     res = solve_s(; short_only..., smtx = S, sst = st)
     @test isa(res.retcode, OptimisationSuccess)
     @test all(x -> abs(x) < 1e-8 || x <= -0.3 + 1e-8, S * res.w)
-    sp = PortfolioOptimisers.SubsetMIPSpace([1.0 1.0 0.0; 0.0 0.0 -1.0; 1.0 0.0 0.0], :s, 1)
+    sp = PortfolioOptimisers.SubsetMIPSpace([1.0 1.0 0.0; 0.0 0.0 1.0; 1.0 0.0 0.0], :s, 1)
     sides = PortfolioOptimisers.mip_sides(sp,
                                           WeightBounds(; lb = [0.0, -1.0, 0.0],
                                                        ub = [1.0, 0.0, 0.0]))

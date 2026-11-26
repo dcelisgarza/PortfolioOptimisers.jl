@@ -202,12 +202,12 @@ function mip_bounds(sp::SubsetMIPSpace, b::VecNum)
     return sp.smtx * b
 end
 """
-    mip_sides(sp::AbstractMIPSpace, wb::WeightBounds{<:VecNum, <:VecNum}) -> Tuple
-    mip_sides(sp::SubsetMIPSpace, wb::WeightBounds{<:VecNum, <:VecNum}) -> Tuple
+    mip_sides(sp::AbstractMIPSpace, wb::WeightBounds) -> Tuple
+    mip_sides(sp::SubsetMIPSpace, wb::WeightBounds) -> Tuple
 
 Return the entries of the space `sp` whose bounds admit a long weight, and the entries whose bounds admit a short weight.
 
-An entry admits a long weight when its upper bound is above zero, and a short weight when its lower bound is below zero. The general method reads `wb` on the axis of `sp`, which is the case of the asset space and of the factor space ([`factor_weight_bounds`](@ref)). The optimiser expands an absent bound to an infinite one ([`weight_bounds_constraints`](@ref)), so an absent bound admits its side. A sub-group admits a side when a member with a positive coefficient admits that side, or a member with a negative coefficient admits the other side.
+An entry admits a long weight when its upper bound is above zero, and a short weight when its lower bound is below zero. The general method reads `wb` on the axis of `sp`, which is the case of the asset space and of the factor space ([`factor_weight_bounds`](@ref)). The optimiser expands an absent bound to an infinite one ([`weight_bounds_constraints`](@ref)), so an absent bound admits its side. A sub-group admits a side when one of its members admits that side. The selection matrix holds no negative coefficient, as [`mip_bounds`](@ref) also takes, so the method maps each side through the matrix.
 
 The sign of an entry is a fact of the bounds, and not of the model. So [`run_mip_builder!`](@ref) reads these two vectors to choose the indicator bundle, and not the short part `sw` of the model. An entry that admits both signs needs a long bit and a short bit for a sign-specific feature. An entry that admits one sign needs one held bit, and its bounds give the sign ([`HeldIndicators`](@ref)).
 
@@ -226,14 +226,12 @@ The sign of an entry is a fact of the bounds, and not of the model. So [`run_mip
   - [`run_mip_builder!`](@ref)
   - [`HeldIndicators`](@ref)
 """
-function mip_sides(::AbstractMIPSpace, wb::WeightBounds{<:VecNum, <:VecNum})::Tuple
+function mip_sides(::AbstractMIPSpace, wb::WeightBounds)::Tuple
     return wb.ub .> 0, wb.lb .< 0
 end
-function mip_sides(sp::SubsetMIPSpace, wb::WeightBounds{<:VecNum, <:VecNum})::Tuple
+function mip_sides(sp::SubsetMIPSpace, wb::WeightBounds)::Tuple
     lng, sht = mip_sides(AssetMIPSpace(), wb)
-    pos = sp.smtx .> 0
-    neg = sp.smtx .< 0
-    return (pos * lng + neg * sht) .> 0, (pos * sht + neg * lng) .> 0
+    return sp.smtx * lng .> 0, sp.smtx * sht .> 0
 end
 """
 $(DocStringExtensions.TYPEDEF)
