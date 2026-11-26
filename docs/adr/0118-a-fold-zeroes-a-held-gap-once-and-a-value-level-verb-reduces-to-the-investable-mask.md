@@ -489,8 +489,9 @@ gave a `NaN` p-value at every factor. The search then pushed the index `0` and r
 - The two estimators take an `active_mask` keyword. `asset_fit_rows` reads the mask and the
   finiteness of each column in one pass, so a cell that the mask turns off is a gap of its asset,
   and no returns are copied. `regression(re, rd)` passes the active mask of `rd.pnl` when the panel
-  carries one, and no keyword otherwise, so an estimator of a caller with no keyword still fits
-  returns data with no mask. `refit_factor_regression` is `regression(re, rd)` with its own
+  carries one and `reads_active_mask(re)` is `true`, as a mask-aware variance gets it. The
+  fallback is `false`, so an estimator of a caller with no keyword fits every returns data as
+  before, and a patch release adds no obligation to it. `refit_factor_regression` is `regression(re, rd)` with its own
   refusal, so the two routes do not repeat the fit. `asset_fit_rows` is `public`, because the
   `# Interfaces` section of `AbstractTimeSeriesRegressionEstimator` tells an implementer to call
   it.

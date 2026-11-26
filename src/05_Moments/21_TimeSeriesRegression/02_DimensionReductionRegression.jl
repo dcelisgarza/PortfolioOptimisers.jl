@@ -734,6 +734,9 @@ function regression(re::DimensionReductionRegression, X::MatNum, F::MatNum;
     L = L .* transpose(map(c -> ifelse(sum(c) < zero(eltype(L)), -1, 1), eachcol(L)))
     return Regression(; b = b, M = M, L = L, edof = edof)
 end
+function reads_active_mask(::DimensionReductionRegression)
+    return true
+end
 """
     pin_regression_choice(re::DimensionReductionRegression{<:Any, <:Any, <:Any,
                                                            <:PinnedChoice, Nothing},

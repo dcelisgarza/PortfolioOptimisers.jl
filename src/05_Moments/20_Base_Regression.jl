@@ -41,7 +41,7 @@ To add a time-series regression estimator, subtype `AbstractTimeSeriesRegression
 
 ### Gaps and the active mask
 
-[`regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult)`](@ref) passes the keyword `active_mask`, of the shape of `X`, when the Asset Panel of `rd` carries an active mask, and no keyword otherwise. So a method with no keyword fits returns data with no mask. To fit a panel with a mask, take the keyword, and read [`asset_fit_rows`](@ref) for the rows of each asset, as [`StepwiseRegression`](@ref) and [`DimensionReductionRegression`](@ref) do.
+[`regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult)`](@ref) passes the keyword `active_mask`, of the shape of `X`, when the Asset Panel of `rd` carries an active mask and [`reads_active_mask`](@ref) of the estimator is `true`, and no keyword otherwise. The fallback answers `false`, so a method with no keyword fits every returns data as before. To fit a panel with a mask, take the keyword, read [`asset_fit_rows`](@ref) for the rows of each asset, and add a method of `PortfolioOptimisers.reads_active_mask` that returns `true`, as [`StepwiseRegression`](@ref) and [`DimensionReductionRegression`](@ref) do.
 
 # Examples
 
@@ -2044,7 +2044,7 @@ The method calls `regression(re, X, rd.F)` on the observations that it keeps. A 
  3. With [`shared_series_fit`](@ref), drop the observations at which a factor return is not finite. Under `x_src = ExcessSource()`, also drop the observations of a gap of a vector benchmark. A regression on such an observation has no regressor for any asset. Each fixed observation weight in the tree of `re` loses the same observations.
  4. Read the asset returns with [`benchmark_relative_returns`](@ref) under `x_src`, and call them `X`. `X` is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
  5. Read the active mask of `rd.pnl` with [`panel_moment_masks`](@ref).
- 6. Call `regression(re, X, rd.F)` on the kept observations, with the keyword `active_mask` when the panel carries a mask, and return its result. The regression fits each asset on its cells that are finite and active, as [`asset_fit_rows`](@ref) states, so a cell that the mask turns off is a gap of that asset alone.
+ 6. Call `regression(re, X, rd.F)` on the kept observations, and return its result. When the panel carries a mask and [`reads_active_mask`](@ref) of `re` is `true`, the call takes the keyword `active_mask`. Such a regression fits each asset on its cells that are finite and active, as [`asset_fit_rows`](@ref) states, so a cell that the mask turns off is a gap of that asset alone. A regression that does not read the mask gets `X` alone, as before.
 
 # Arguments
 
@@ -2073,13 +2073,16 @@ function regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult
     re, rd = shared_series_fit(re, rd, x_src, true)
     X = benchmark_relative_returns(rd, x_src)
     amsk = first(panel_moment_masks(rd.pnl))
-    # The keyword goes only with a mask, so an estimator of a caller whose method takes no
-    # keyword still fits returns data with no mask.
-    return if isnothing(amsk)
+    # The keyword goes only to an estimator that reads the mask, as a mask-aware variance does,
+    # so an estimator of a caller whose method takes no keyword fits every returns data.
+    return if isnothing(amsk) || !reads_active_mask(re)
         regression(re, X, rd.F)
     else
         regression(re, X, rd.F; active_mask = amsk)
     end
+end
+function reads_active_mask(::AbstractTimeSeriesRegressionEstimator)
+    return false
 end
 """
     assert_finite_factor_rows(F::MatNum) -> Nothing

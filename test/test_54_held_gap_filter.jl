@@ -284,6 +284,13 @@ end
           want
 end
 
+# A regression of a caller whose method takes no `active_mask` keyword. The struct lives at
+# top level because `@testset` cannot hold a `struct`.
+struct NoMaskRegression <: PO.AbstractTimeSeriesRegressionEstimator end
+function PO.regression(::NoMaskRegression, X::PO.MatNum, F::PO.MatNum)
+    return Regression(; M = transpose(F \ X))
+end
+
 @testset "factor_risk_contribution filters the gaps of the returns it measures" begin
     rngf = StableRNG(56781234)
     F = randn(rngf, T, 2) ./ 100
@@ -343,7 +350,12 @@ end
         @test frc ≈ factor_risk_contribution(cvar, wh, Xz; re = rr)
         @test sum(frc) ≈ expected_risk(cvar, wh, Xz)
         @test PO.refit_factor_regression(res, rdp).M ≈ rr.M
+        @test PO.reads_active_mask(res)
     end
+    # A regression that does not read the mask gets the returns alone, as before the mask
+    # reached the fit, so a method with no keyword fits a panel with a mask.
+    @test !PO.reads_active_mask(NoMaskRegression())
+    @test regression(NoMaskRegression(), rdp).M ≈ transpose(F \ X)
 end
 
 @testset "investable_reduction: the value-level door reduces, names and passes through" begin

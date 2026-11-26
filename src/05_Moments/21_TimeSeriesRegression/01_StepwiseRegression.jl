@@ -893,6 +893,9 @@ function regression(re::StepwiseRegression, X::MatNum, F::MatNum;
             for i in axes(rr, 1)]
     return Regression(; b = view(rr, :, 1), M = view(rr, :, 2:cols), edof = edof)
 end
+function reads_active_mask(::StepwiseRegression)
+    return true
+end
 """
     stepwise_asset_fit!(rr::MatNum, re::StepwiseRegression, tgt::AbstractRegressionTarget,
                         x::VecNum, F::MatNum, i::Integer, rows::Nothing = nothing)
