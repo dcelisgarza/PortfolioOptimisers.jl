@@ -312,6 +312,20 @@ end
     @test PO.finaliser_budget([1.0, 0.1], 1) == 1.1
     @test PO.finaliser_budget([0.5, 0.25], nothing) == 0.75
     @test_throws ArgumentError fin(; gbgt = 0.5)
+    # A mixed-integer slot keeps a short: the net budget stands alone, and the long part is
+    # free.
+    algm = ErrorWeightFinaliser(; alg = L1Norm(), dev = AbsoluteWeightDeviation())
+    finm(; kw...) = PO.opt_weight_bounds(JuMPWeightFinaliser(; slv = hslv, alg = algm,
+                                                             kw...), wbs, ws0)
+    for kw in ((; card = 3), (; card = 3, sbgt = 0.2))
+        w = finm(; kw...)
+        @test held(w) <= 3
+        @test isapprox(sum(w), 1; atol = tol)
+        @test 0.2 - tol <= short(w) <= 0.2 + tol
+    end
+    w = finm(; st = Threshold(; val = 0.45))
+    @test isapprox(w[3], -0.45; atol = tol)
+    @test isapprox(sum(w), 1; atol = tol)
 end
 
 @testset "Names, views and the Investable Mask" begin
@@ -326,18 +340,21 @@ end
     cl = ConcentrationLimitEstimator(; t = 0.2, c = 0.7, s = 1.0,
                                      set = AssetSetsMatrixEstimator(; val = "nx_group"))
     A = prior(EmpiricalPrior(), rd).sigma
-    for wf in (JuMPWeightFinaliser(; slv = hslv, tn = Turnover(; w = wt, val = 0.03),
-                                   lcse = LinearConstraintEstimator(;
-                                                                    val = ["g1 >= 0.35",
-                                                                           "a4 <= 0.05"],
-                                                                    key = nothing),
-                                   gcarde = LinearConstraintEstimator(; val = "g2 <= 5"),
-                                   conc = cl),
-               JuMPWeightFinaliser(; slv = cslv, alg = GramProjection(; slv = cslv, A = A),
-                                   tn = TurnoverEstimator(; w = wt, val = Dict("a1" => 0.01),
-                                                          dval = 0.2)),
-               JuMPWeightFinaliser(; slv = cslv, alg = PO.DiagonalProjection(wt), lt = nothing,
-                                   l2c = 0.5))
+    # With no group row, the heads hold 0.383 to 0.389 in `g1` and up to 0.18 in `a10`. The
+    # turnover ceiling lets `g1` reach 0.398, so both rows bind. The row of `a4` drops at the
+    # mask.
+    lg = [LinearConstraintEstimator(; val = "g1 >= 0.395", key = "nx_group"),
+          LinearConstraintEstimator(; val = ["a4 <= 0.05", "a10 <= 0.13"])]
+    for wf in
+        (JuMPWeightFinaliser(; slv = hslv, tn = Turnover(; w = wt, val = 0.03), lcse = lg,
+                             gcarde = LinearConstraintEstimator(; val = "g2 <= 5",
+                                                                key = "nx_group"),
+                             conc = cl),
+         JuMPWeightFinaliser(; slv = cslv, alg = GramProjection(; slv = cslv, A = A),
+                             tn = TurnoverEstimator(; w = wt, val = Dict("a1" => 0.01),
+                                                    dval = 0.2)),
+         JuMPWeightFinaliser(; slv = cslv, alg = PO.DiagonalProjection(wt), lt = nothing,
+                             l2c = 0.5))
         for h in (hrp(; wf, sets, wb = WeightBounds(; ub = 0.3)),
                   EqualWeighted(; wf, sets, wb = WeightBounds(; ub = 0.3)),
                   InverseVolatility(; wf, sets, wb = WeightBounds(; ub = 0.3)))
@@ -347,11 +364,40 @@ end
             @test isapprox(sum(res.w), 1; atol = tol)
             if isa(wf.tn, Turnover)
                 @test all(abs.(res.w[keep] .- wt[keep]) .<= 0.03 + tol)
-                @test sum(res.w[1:5]) >= 0.35 - tol
+                @test sum(res.w[1:5]) >= 0.395 - tol
+                @test res.w[10] <= 0.13 + tol
             elseif isa(wf.tn, TurnoverEstimator)
                 @test abs(res.w[1] - wt[1]) <= 0.01 + tol
             end
         end
+    end
+    # Every head views a name-keyed row and a cardinality at the mask. Without the block,
+    # six of the ten heads hold less than 0.45 in `g1`.
+    lgm = LinearConstraintEstimator(; val = "g1 >= 0.45", key = "nx_group")
+    wfm = JuMPWeightFinaliser(; slv = hslv, card = 5, lcse = lgm)
+    wfam = JuMPWeightFinaliser(; slv = hslv, card = 5, lcse = lgm,
+                               alg = ErrorWeightFinaliser(;
+                                                          dev = AbsoluteWeightDeviation()))
+    wbm = WeightBounds(; ub = 0.3)
+    for h in (hrp(; wb = wbm, wf = wfm, sets),
+              HierarchicalEqualRiskContribution(; opt = hopt(; wb = wbm, wf = wfm, sets)),
+              SchurComplementHierarchicalRiskParity(; opt = hopt(; wb = wbm, wf = wfm, sets)),
+              InverseVolatility(; wb = wbm, wf = wfm, sets),
+              EqualWeighted(; wb = wbm, wf = wfm, sets),
+              RandomWeighted(; wb = wbm, wf = wfm, sets, seed = 3, rng = StableRNG(1)),
+              BestConstantRebalancedPortfolio(; wb = wbm, wf = wfam, sets),
+              NestedClustered(; wb = wbm, wf = wfm, sets, opti = InverseVolatility(),
+                              opto = InverseVolatility()),
+              Stacking(; wb = wbm, wf = wfm, sets, opti = [InverseVolatility(), EqualWeighted()],
+                       opto = InverseVolatility()),
+              SubsetResampling(; wb = wbm, wf = wfam, sets, opt = InverseVolatility(),
+                               subset_size = 6, n_subsets = 4, rng = StableRNG(7)))
+        res = optimise(h, rdn)
+        @test success(res)
+        @test iszero(res.w[4])
+        @test held(res.w) <= 5
+        @test sum(res.w[1:5]) >= 0.45 - tol
+        @test isapprox(sum(res.w), 1; atol = tol)
     end
     wf = JuMPWeightFinaliser(; slv = cslv, alg = GramProjection(; slv = cslv, A = A),
                              tn = Turnover(; w = wt, val = 0.1))
@@ -515,13 +561,33 @@ end
         v = rt isa IndependentVariableTracking ? sd(res.w - wb0) : sd(res.w) - sd(wb0)
         @test v <= 0.0002 + 1e-7
     end
-    # The finaliser has no sets, so the rows of a tracked variance are values.
+    # The finaliser has no sets, so it resolves the rows of a tracked variance over the sets
+    # of the head, with the `strict` of the head. A head with no sets refuses them.
     wf = JuMPWeightFinaliser(; slv = cslv, alg)
     @test isnothing(PO.risk_contribution_constraints(Variance(), wf, pr))
-    @test_throws r"keyed by name" PO.risk_contribution_constraints(Variance(;
-                                                                            rc = LinearConstraintEstimator(;
-                                                                                                           val = "a1 <= 0.1")),
-                                                                   wf, pr)
+    trk(rc) = RiskTrackingError(; tr = WeightsTracking(; w = wb0), r = Variance(; rc = rc),
+                                err = 1e-3)
+    rce = LinearConstraintEstimator(; val = "a1 <= 0.05")
+    rcv = linear_constraints(rce, sets)
+    ivw(tr; kwargs...) = InverseVolatility(;
+                                           wf = JuMPWeightFinaliser(; slv = cslv, alg, tr),
+                                           kwargs...)
+    wv = optimise(ivw(trk(rcv)), rd).w
+    for tr in (trk(rce), [trk(rce)])
+        res = optimise(ivw(tr; sets), rd)
+        @test success(res)
+        @test isapprox(res.w, wv; atol = 1e-10)
+    end
+    rr = PO.resolve_tracked_risk_rows([trk(rce)], sets, true, Float64)[1].r.rc
+    @test rr.A_ineq == rcv.A_ineq && rr.B_ineq == rcv.B_ineq
+    same = [trk(rcv)]
+    @test PO.resolve_tracked_risk_rows(same, sets, true, Float64) === same
+    zz = LinearConstraintEstimator(; val = "zz <= 0.05")
+    @test_throws r"`zz` not in asset universe" optimise(ivw(trk(zz); sets, strict = true),
+                                                        rd)
+    @test_throws IsNothingError ivw(trk(rce))
+    @test_throws IsNothingError JuMPOptimiser(; slv = cslv, tr = trk(rce))
+    @test_throws IsNothingError ProgrammeAllocationSet(; slv = cslv, tr = trk(rce))
     # A tracked risk has one bound, so the owner refuses a frontier.
     @test_throws ArgumentError PO.set_risk_upper_bound!(JuMP.Model(), wf, nothing,
                                                         Frontier(; N = 3), :r)

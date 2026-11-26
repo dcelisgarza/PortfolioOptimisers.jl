@@ -12,4 +12,5 @@ set_finaliser_block!
 set_finaliser_bounds!
 finaliser_budget
 holds_block_slot
+resolve_tracked_risk_rows
 ```

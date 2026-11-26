@@ -339,11 +339,13 @@ end
     name_keyed(cl::ConcentrationLimitEstimator)
     name_keyed(x::AbstractVector)
     name_keyed(cbe::ConstraintBlock)
+    name_keyed(tr::RiskTrackingError)
+    name_keyed(r::Variance)
     name_keyed(wf::JuMPWeightFinaliser)
 
 Tells whether a constraint slot holds an estimator that resolves its names over `sets`.
 
-The owner of such a slot must carry `sets`. The estimators are every [`AbstractWeightBoundsEstimator`](@ref), [`LinearConstraintEstimator`](@ref), [`ExposureConstraintEstimator`](@ref), [`ThresholdEstimator`](@ref), [`AssetSetsMatrixEstimator`](@ref) and [`TurnoverEstimator`](@ref). A [`ScoreWeightBounds`](@ref) is the exception: it is keyed by name only when its `val` or its static bounds name assets. A [`ConcentrationLimitEstimator`](@ref) is keyed by name only when its `set` is. A vector is keyed by name when one of its entries is, a [`ConstraintBlock`](@ref) when one of its slots is, and a [`JuMPWeightFinaliser`](@ref) when its block is.
+The owner of such a slot must carry `sets`. The estimators are every [`AbstractWeightBoundsEstimator`](@ref), [`LinearConstraintEstimator`](@ref), [`ExposureConstraintEstimator`](@ref), [`ThresholdEstimator`](@ref), [`AssetSetsMatrixEstimator`](@ref) and [`TurnoverEstimator`](@ref). A [`ScoreWeightBounds`](@ref) is the exception: it is keyed by name only when its `val` or its static bounds name assets. A [`ConcentrationLimitEstimator`](@ref) is keyed by name only when its `set` is. A vector is keyed by name when one of its entries is, a [`ConstraintBlock`](@ref) when one of its slots is, and a [`JuMPWeightFinaliser`](@ref) when its block is. The tracking slot `tr` of a block is keyed by name when a [`RiskTrackingError`](@ref) tracks a [`Variance`](@ref) whose risk contribution rows `rc` are.
 
 # Returns
 
@@ -368,10 +370,16 @@ end
 function name_keyed(x::AbstractVector)
     return any(name_keyed, x)
 end
+function name_keyed(tr::RiskTrackingError)
+    return name_keyed(tr.r)
+end
+function name_keyed(r::Variance)
+    return name_keyed(r.rc)
+end
 function name_keyed(cbe::ConstraintBlock)
     return any(name_keyed,
                (cbe.wb, cbe.lt, cbe.st, cbe.lcse, cbe.gcarde, cbe.sgcarde, cbe.smtx,
-                cbe.sgmtx, cbe.slt, cbe.sst, cbe.sglt, cbe.sgst, cbe.conc, cbe.tn))
+                cbe.sgmtx, cbe.slt, cbe.sst, cbe.sglt, cbe.sgst, cbe.conc, cbe.tn, cbe.tr))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

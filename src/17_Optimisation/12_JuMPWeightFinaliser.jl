@@ -251,17 +251,13 @@ end
 
 Gives the risk contribution rows of a [`Variance`](@ref) that a tracking error of a weight finaliser tracks.
 
-The finaliser holds no sets, so it resolves no names. The rows are values.
+The finaliser holds no sets. [`set_finaliser_block!`](@ref) resolved the names of the rows over the sets of the head with [`resolve_tracked_risk_rows`](@ref), so the rows are values.
 
 # Arguments
 
   - `r`: The variance.
   - `wf`: The weight finaliser.
   - `pr`: The prior result of the head.
-
-# Validation
-
-  - `r.rc` holds no estimator that is keyed by name ([`name_keyed`](@ref)). An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -273,9 +269,52 @@ The finaliser holds no sets, so it resolves no names. The rows are values.
   - [`JuMPWeightFinaliser`](@ref)
 """
 function risk_contribution_constraints(r::Variance, ::JuMPWeightFinaliser, ::Any)
-    @argcheck(!name_keyed(r.rc),
-              ArgumentError("the risk contribution rows of a variance that a `JuMPWeightFinaliser` tracks are keyed by name, and the finaliser holds no sets: state them as a `LinearConstraint`."))
     return r.rc
+end
+"""
+    resolve_tracked_risk_rows(tr, sets, strict::Bool, datatype::DataType)
+
+Resolves the risk contribution rows of each [`Variance`](@ref) that a tracking error of a [`JuMPWeightFinaliser`](@ref) tracks, over the sets of the head.
+
+A JuMP optimiser resolves these rows with its own sets, in [`risk_contribution_constraints`](@ref). A finaliser holds no sets, so [`set_finaliser_block!`](@ref) resolves the rows here, with the sets of the head on the reduced universe, before the block builder reads them. The walk follows [`bind_data_benchmark`](@ref): a vector maps over its entries, a [`RiskTrackingError`](@ref) resolves its risk measure, and any other value comes back unchanged.
+
+# Arguments
+
+  - `tr`: The tracking slot of the block, a vector of them, or a risk measure inside one.
+  - $(arg_dict[:sets]) It is `nothing` when the head holds none. The constructor of the head then refused a row keyed by name ([`name_keyed`](@ref)).
+  - $(arg_dict[:strict])
+  - `datatype`: The element type of the rows.
+
+# Returns
+
+  - `tr`: The slot with the rows of each tracked variance as a [`LinearConstraint`](@ref), or the same object when nothing changes.
+
+# Related
+
+  - [`set_finaliser_block!`](@ref)
+  - [`linear_constraints`](@ref)
+"""
+function resolve_tracked_risk_rows(tr::Any, ::Any, ::Bool, ::DataType)
+    return tr
+end
+function resolve_tracked_risk_rows(v::AbstractVector, sets, strict::Bool,
+                                   datatype::DataType)
+    out = [resolve_tracked_risk_rows(x, sets, strict, datatype) for x in v]
+    return all(splat(===), zip(out, v)) ? v : out
+end
+function resolve_tracked_risk_rows(tr::RiskTrackingError, sets, strict::Bool,
+                                   datatype::DataType)
+    r = resolve_tracked_risk_rows(tr.r, sets, strict, datatype)
+    return r === tr.r ? tr : rebuild_struct(tr, (; r = r))
+end
+function resolve_tracked_risk_rows(r::Variance, sets, strict::Bool, datatype::DataType)
+    if !name_keyed(r.rc)
+        return r
+    end
+    return rebuild_struct(r,
+                          (;
+                           rc = linear_constraints(r.rc, sets; datatype = datatype,
+                                                   strict = strict)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -467,7 +506,7 @@ Resolves the block of a [`JuMPWeightFinaliser`](@ref), and adds its rows and its
 # Algorithm
 
  1. Refuse a gross budget that the net budget and the bounds do not admit, with [`assert_gross_budget_admissible`](@ref).
- 2. Expand a scalar or an absent bound to one bound for each asset. Put the bounds and the sets of the call into the block, and resolve both stages of it, giving `cbr`. A head already resolved the names on its full universe, with [`investable_finaliser`](@ref), and a resolved slot comes back unchanged.
+ 2. Expand a scalar or an absent bound to one bound for each asset. Put the bounds and the sets of the call into the block, and resolve both stages of it, giving `cbr`. A head already resolved the names on its full universe, with [`investable_finaliser`](@ref), and a resolved slot comes back unchanged. Bind a data benchmark of the tracking slot to `rd`, and resolve the risk contribution rows of each tracked variance over `sets`, with [`resolve_tracked_risk_rows`](@ref).
  3. When the bounds admit a short weight and the block states no `sbgt`, write the row of the net budget here, and give the block builder no net budget. The builder would pin the long part at the net budget, which forbids a short.
  4. Add both phases of the block with the block builder [`set_block_constraints!`](@ref), with the finaliser as the owner. The builder gets the fees only beside a tracking error, so a fixed fee makes no other programme mixed-integer.
  5. Add the custom objective terms of the block with [`set_block_objective_terms!`](@ref).
@@ -505,7 +544,8 @@ function set_finaliser_block!(model::JuMP.Model, wf::JuMPWeightFinaliser, wb::We
     cbe = resolve_constraint_block_names(rebuild_struct(wf.cbe, (; wb = wb, sets = sets)),
                                          strict, typeof(bgt))
     cbr = resolve_constraint_block(cbe, pr, rd; slv = wf.slv, strict = strict)
-    tr = bind_data_benchmark(cbe.tr, rd)
+    tr = resolve_tracked_risk_rows(bind_data_benchmark(cbe.tr, rd), sets, strict,
+                                   typeof(bgt))
     # A net budget with no short budget pins the long part of a long-short book at that
     # budget, and so forbids a short. The bounds admit one, so the row of the net budget
     # stands alone, as on the bare projection of an Allocation Set.
