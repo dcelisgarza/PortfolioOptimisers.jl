@@ -200,3 +200,15 @@ vector of one concrete type. A vector of mixed measures pays one dynamic call fo
 allocated 736 bytes at each bind before, and it allocates nothing now. A form that binds each element
 and compares the answers lost on the same measurement, because the returns data is boxed once for
 each element.
+
+A vector whose element type is abstract, such as a `Vector{RiskMeasure}`, keeps that element type
+in the bind. The type decides the branch, so Julia infers the type of the rebuild of a composite
+that holds the vector. A ratio whose side is a mixed vector allocated 144 bytes at each bind
+without this rule, because its rebuild had an abstract type, and it allocates nothing with it. A
+vector whose element type is concrete or a `Union` takes the element types of the bound values,
+because a bound value can leave that type.
+
+The frame walk of a head follows the same rule. A composite measure walks its fields with
+`composite_frames`, which asks `holds_reader` of each field first. So a composite with no reader
+builds no path. A `MeanReturnRiskRatio` with no reader took 977 ns and 960 bytes at each walk
+before, and it takes 0 bytes now.

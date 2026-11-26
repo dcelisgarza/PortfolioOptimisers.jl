@@ -1,5 +1,5 @@
 ```@meta
-Description = "Ratio Risk Measure, private API of PortfolioOptimisers.jl: RkRatioRM, reader_frames, holds_reader."
+Description = "Ratio Risk Measure, private API of PortfolioOptimisers.jl: RkRatioRM, reader_frames."
 ```
 
 # Ratio Risk Measure: private API
@@ -7,5 +7,4 @@ Description = "Ratio Risk Measure, private API of PortfolioOptimisers.jl: RkRati
 ```@docs
 RkRatioRM
 PortfolioOptimisers.reader_frames(::RkRatioRM, ::AbstractString, ::Bool)
-PortfolioOptimisers.holds_reader
 ```

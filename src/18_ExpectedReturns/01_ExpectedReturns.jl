@@ -880,7 +880,7 @@ deferred_slots(r::ExpectedReturnRiskRatio) = (; rt = r.rt, rk = r.rk)
 
 Return the frames of the readers in a risk measure that holds a return term, for the frame walk of a head.
 
-The return term `rt` can hold an uncertainty set with a prior of its own, as [`ArithmeticReturn`](@ref) states. The risk side `rk` of an [`ExpectedReturnRiskRatio`](@ref) can hold a risk measure with a reader. Each of those readers belongs to the group of the head that holds the measure. So the method reads every field of `r` with [`field_frames`](@ref). A field that holds no reader adds no frame.
+The return term `rt` can hold an uncertainty set with a prior of its own, as [`ArithmeticReturn`](@ref) states. The risk side `rk` of an [`ExpectedReturnRiskRatio`](@ref) can hold a risk measure with a reader. Each of those readers belongs to the group of the head that holds the measure. So the method reads every field of `r` with [`composite_frames`](@ref). A field that holds no reader adds no frame, and a measure with no reader builds no path.
 
 # Arguments
 
@@ -895,13 +895,13 @@ The return term `rt` can hold an uncertainty set with a prior of its own, as [`A
 # Related
 
   - [`reader_frames`](@ref)
-  - [`field_frames`](@ref)
+  - [`composite_frames`](@ref)
   - [`ExpectedReturn`](@ref)
   - [`ExpectedReturnRiskRatio`](@ref)
 """
 function reader_frames(r::Union{ExpectedReturn, ExpectedReturnRiskRatio},
                        path::AbstractString, refit::Bool)
-    return field_frames(r, path, refit)
+    return composite_frames(r, path, refit)
 end
 """
     expected_risk(r::ExpectedReturnRiskRatio, w::VecNum, pr::AbstractPriorResult,

@@ -354,12 +354,7 @@ end
 
 Return the frames of the readers inside the two sides of a ratio measure, for the frame walk of a head.
 
-A side can hold a risk measure with a reader, such as an [`UncertaintySetVariance`](@ref) with a prior of its own. Each of those readers belongs to the group of the head that holds the ratio. A ratio with no reader builds no path, because [`holds_reader`](@ref) answers first.
-
-# Algorithm
-
- 1. When neither `r.r1` nor `r.r2` holds a reader, by [`holds_reader`](@ref), return the empty [`ReturnsFrames`](@ref).
- 2. Otherwise walk the fields of `r` with [`field_frames`](@ref).
+A side can hold a risk measure with a reader, such as an [`UncertaintySetVariance`](@ref) with a prior of its own. Each of those readers belongs to the group of the head that holds the ratio. The method walks the fields of `r` with [`composite_frames`](@ref), so a ratio with no reader builds no path.
 
 # Arguments
 
@@ -374,45 +369,11 @@ A side can hold a risk measure with a reader, such as an [`UncertaintySetVarianc
 # Related
 
   - [`reader_frames`](@ref)
-  - [`field_frames`](@ref)
-  - [`holds_reader`](@ref)
+  - [`composite_frames`](@ref)
   - [`RkRatioRM`](@ref)
 """
 function reader_frames(r::RkRatioRM, path::AbstractString, refit::Bool)
-    return if holds_reader(r.r1, refit) || holds_reader(r.r2, refit)
-        field_frames(r, path, refit)
-    else
-        ReturnsFrames()
-    end
-end
-"""
-    holds_reader(x, refit::Bool) -> Bool
-    holds_reader(v::AbstractVector, refit::Bool) -> Bool
-
-Return whether `x` adds a frame to the group of the head that holds it.
-
-The function asks [`reader_frames`](@ref) at the empty path and drops the paths of the answer, so it needs no list of the types that hold a reader. A vector answers for its elements and builds no path for them.
-
-# Arguments
-
-  - $(arg_dict[:frame_x])
-  - $(arg_dict[:frame_refit])
-
-# Returns
-
-  - `flag::Bool`: Whether `x` states the Excess Frame or holds a raw reader.
-
-# Related
-
-  - [`reader_frames`](@ref)
-  - [`ReturnsFrames`](@ref)
-"""
-function holds_reader(x, refit::Bool)::Bool
-    fr = reader_frames(x, "", refit)
-    return fr.excess || !isempty(fr.raw)
-end
-function holds_reader(v::AbstractVector, refit::Bool)::Bool
-    return any(x -> holds_reader(x, refit), v)
+    return composite_frames(r, path, refit)
 end
 # Precomputed-returns contract for the ratio composites: decompose onto the series, mirroring
 # the `(w, X, fees)` decomposition of their `expected_risk` methods. Each component routes

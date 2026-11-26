@@ -263,6 +263,16 @@ end
             bytes(vm, rdv)
             @test PO.bind_data_benchmark(vm, rdv) === vm
             @test iszero(bytes(vm, rdv))
+            # A ratio whose side is a mixed vector infers the type of its bind, so it comes back
+            # with no allocation, and a data benchmark on that side keeps the type of the ratio.
+            nm = NonOptimisationRiskRatio(; r1 = vm, r2 = Variance())
+            @test (@inferred PO.bind_data_benchmark(nm, rdv)) === nm
+            bytes(nm, rdv)
+            @test iszero(bytes(nm, rdv))
+            nd = NonOptimisationRiskRatio(; r1 = [Variance(), td, Range()], r2 = Variance())
+            bd = @inferred PO.bind_data_benchmark(nd, rdv)
+            @test typeof(bd) == typeof(nd)
+            @test bd.r1[2].tr.B == rdv.B
         end
         @testset "The previous weights" begin
             tn = TurnoverRiskMeasure(; w = wb)
@@ -331,6 +341,15 @@ end
             end
             @test PO.holds_reader([sd, usv], false)
             @test !PO.holds_reader([sd, Variance()], false)
+            @test !PO.holds_reader([0.5, 0.5], false)
+            # A composite with no reader builds no path, so its walk costs what the walk of a
+            # single measure costs.
+            frb(r) = @allocated PO.reader_frames(r, "r", false)
+            frb(Variance())
+            for r in (RiskRatio(), MeanReturnRiskRatio())
+                frb(r)
+                @test frb(r) == frb(Variance())
+            end
             # The head names the reader that its warning missed.
             pex = EmpiricalPrior(; x_src = ExcessSource())
             @test_logs (:warn, r"r\.r1\.ucs\.pe") HierarchicalRiskParity(;

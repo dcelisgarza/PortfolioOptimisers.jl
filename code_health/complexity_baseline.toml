@@ -5,7 +5,7 @@
 julia = "1.13.4"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "c529d7baa5"
+commit = "fdcff95e16"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 6, cog_sum = 4, arg_sum = 16, macros = [] }
@@ -297,7 +297,7 @@ commit = "c529d7baa5"
 "src/12_Turnover.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 18, cog_sum = 11, arg_sum = 9, macros = ["@propagatable"] }
 "src/13_Fees.jl" = { cyc = 4, cog = 5, arg = 4, cyc_sum = 98, cog_sum = 35, arg_sum = 170, macros = ["@propagatable"] }
 "src/14_NetReturnsDrawdowns.jl" = { cyc = 6, cog = 8, arg = 5, cyc_sum = 127, cog_sum = 80, arg_sum = 210, macros = [] }
-"src/15_Tracking.jl" = { cyc = 3, cog = 4, arg = 3, cyc_sum = 44, cog_sum = 26, arg_sum = 48, macros = ["@propagatable"] }
+"src/15_Tracking.jl" = { cyc = 4, cog = 5, arg = 3, cyc_sum = 45, cog_sum = 27, arg_sum = 48, macros = ["@propagatable"] }
 "src/16_RiskMeasures/01_Base_RiskMeasures.jl" = { cyc = 6, cog = 12, arg = 6, cyc_sum = 136, cog_sum = 76, arg_sum = 179, macros = [] }
 "src/16_RiskMeasures/02_Variance.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 57, cog_sum = 21, arg_sum = 103, macros = ["@propagatable"] }
 "src/16_RiskMeasures/03_MomentRiskMeasures.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 59, cog_sum = 32, arg_sum = 95, macros = ["@propagatable"] }
@@ -321,15 +321,15 @@ commit = "c529d7baa5"
 "src/16_RiskMeasures/16_TrackingRiskMeasure.jl" = { cyc = 2, cog = 3, arg = 7, cyc_sum = 40, cog_sum = 28, arg_sum = 70, macros = ["@propagatable"] }
 "src/16_RiskMeasures/17_VarianceSkewKurtosis.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 36, cog_sum = 10, arg_sum = 50, macros = ["@propagatable"] }
 "src/16_RiskMeasures/18_GenericValueatRiskRange.jl" = { cyc = 2, cog = 1, arg = 3, cyc_sum = 17, cog_sum = 3, arg_sum = 25, macros = ["@propagatable"] }
-"src/16_RiskMeasures/19_RatioRiskMeasure.jl" = { cyc = 3, cog = 3, arg = 5, cyc_sum = 21, cog_sum = 14, arg_sum = 16, macros = ["@propagatable"] }
+"src/16_RiskMeasures/19_RatioRiskMeasure.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 16, cog_sum = 9, arg_sum = 16, macros = ["@propagatable"] }
 "src/16_RiskMeasures/20_EqualRiskMeasure.jl" = { cyc = 1, cog = 1, arg = 1, cyc_sum = 4, cog_sum = 1, arg_sum = 3, macros = [] }
 "src/16_RiskMeasures/21_MedianAbsoluteDeviationRisk.jl" = { cyc = 3, cog = 3, arg = 4, cyc_sum = 24, cog_sum = 6, arg_sum = 48, macros = ["@propagatable"] }
-"src/16_RiskMeasures/22_NonOptimisationRiskMeasures.jl" = { cyc = 3, cog = 3, arg = 5, cyc_sum = 33, cog_sum = 14, arg_sum = 53, macros = ["@propagatable"] }
+"src/16_RiskMeasures/22_NonOptimisationRiskMeasures.jl" = { cyc = 3, cog = 3, arg = 5, cyc_sum = 36, cog_sum = 16, arg_sum = 55, macros = ["@propagatable"] }
 "src/16_RiskMeasures/23_AdjustRiskContributions.jl" = { cyc = 3, cog = 3, arg = 4, cyc_sum = 70, cog_sum = 36, arg_sum = 106, macros = [] }
 "src/16_RiskMeasures/24_ExpectedRisk.jl" = { cyc = 3, cog = 4, arg = 10, cyc_sum = 104, cog_sum = 57, arg_sum = 408, macros = [] }
 "src/16_RiskMeasures/25_RiskMeasureTools.jl" = { cyc = 2, cog = 2, arg = 3, cyc_sum = 29, cog_sum = 9, arg_sum = 39, macros = [] }
 "src/16_RiskMeasures/26_WorstCaseDistribution.jl" = { cyc = 2, cog = 3, arg = 7, cyc_sum = 53, cog_sum = 30, arg_sum = 250, macros = [] }
-"src/17_Optimisation/01_Base_Optimisation/01_OptimisationTypes.jl" = { cyc = 4, cog = 3, arg = 3, cyc_sum = 24, cog_sum = 12, arg_sum = 26, macros = [] }
+"src/17_Optimisation/01_Base_Optimisation/01_OptimisationTypes.jl" = { cyc = 4, cog = 3, arg = 3, cyc_sum = 31, cog_sum = 19, arg_sum = 30, macros = [] }
 "src/17_Optimisation/01_Base_Optimisation/02_PipeRouting.jl" = { cyc = 4, cog = 7, arg = 3, cyc_sum = 18, cog_sum = 17, arg_sum = 11, macros = [] }
 "src/17_Optimisation/01_Base_Optimisation/03_TimeDependent.jl" = { cyc = 5, cog = 6, arg = 7, cyc_sum = 122, cog_sum = 85, arg_sum = 72, macros = [] }
 "src/17_Optimisation/01_Base_Optimisation/04_WeightFinalisers.jl" = { cyc = 5, cog = 6, arg = 4, cyc_sum = 25, cog_sum = 14, arg_sum = 46, macros = [] }
