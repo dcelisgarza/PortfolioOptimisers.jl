@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.4"
 julia_syntax = "1.0.2"
-commit = "d3a7fe37e9"
+commit = "c529d7baa5"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { code = 35, doc = 0, comment = 5, blank = 4, total = 44 }
@@ -435,6 +435,7 @@ commit = "d3a7fe37e9"
 "src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl" = { code = 347, doc = 569, comment = 16, blank = 272, total = 1204 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/13_SparsePortfolioAlgorithms.jl" = { code = 100, doc = 236, comment = 1, blank = 88, total = 425 }
 "src/17_Optimisation/11_ProjectionWeightFinalisers.jl" = { code = 91, doc = 222, comment = 11, blank = 111, total = 435 }
+"src/17_Optimisation/12_JuMPWeightFinaliser.jl" = { code = 206, doc = 335, comment = 5, blank = 152, total = 698 }
 "src/18_ExpectedReturns/01_ExpectedReturns.jl" = { code = 236, doc = 692, comment = 43, blank = 242, total = 1213 }
 "src/18_ExpectedReturns/02_BrinsonAttribution.jl" = { code = 37, doc = 62, comment = 2, blank = 34, total = 135 }
 "src/18_ExpectedReturns/03_PerformanceSummary.jl" = { code = 363, doc = 683, comment = 16, blank = 281, total = 1343 }

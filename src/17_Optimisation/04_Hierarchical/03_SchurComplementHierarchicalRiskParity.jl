@@ -1282,13 +1282,17 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     # A fit again after a refusal of the distance reader passes its mask as `rmsk`.
-    imsk = distance_reader_entry_mask(sh.opt.cle, pr, rd, sh.opt.strict; rmsk = rmsk)
+    imsk = distance_reader_entry_mask((sh.opt.cle, finaliser_readers(sh.opt.wf)...), pr, rd,
+                                      sh.opt.strict; rmsk = rmsk)
     # A split factor is a quotient of two risks, so the weights, their bounds and the fee
     # take the type of the returns. A `Float32` sample stays in `Float32`.
     T = eltype(pr.X)
     fees = investable_fees_view(fees_constraints(sh.opt.fees, sh.opt.sets;
                                                  strict = sh.opt.strict, datatype = T),
                                 imsk, pr.X)
+    # The block of the weight finaliser resolves its names on the same universe, and follows
+    # the mask as the fee does.
+    wf = investable_finaliser(sh.opt.wf, sh.opt.sets, sh.opt.strict, imsk, pr.X)
     # The prior fits on the coverage universe and returns a result on the full asset
     # universe, where an asset it could not estimate carries `NaN`. Reduce once, here: the
     # augmented matrix the Schur complement builds is finite, and the leaf permutation
@@ -1303,11 +1307,13 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
     clr = distance_reader_call(clusterise, sh.opt.cle, pr; rd = rd, iv = rd.iv,
                                ivpa = rd.ivpa)
-    if clr isa DistanceReaderRefusalError
+    rwf = distance_reader_call(fit_finaliser_readers, wf, pr, rd, sh.opt.strict)
+    if clr isa DistanceReaderRefusalError || rwf isa DistanceReaderRefusalError
+        err = clr isa DistanceReaderRefusalError ? clr : rwf
         return _optimise(rebuild_struct(sh0,
                                         (; opt = rebuild_struct(sh0.opt, (; pe = pr0)))),
                          rd0;
-                         rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
+                         rmsk = distance_reader_refusal_mask(err, imsk, rd0,
                                                              sh0.opt.strict), kwargs...)
     end
     assert_clustering_universe(clr, size(X, 2))
@@ -1319,7 +1325,8 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     wb = weight_bounds_constraints(wb; N = size(X, 2), datatype = T)
     w, gamma, r = schur_complement_weights(pr, items, wb, sh.params)
     assert_schur_weights(w, gamma)
-    retcode, w = finalise_weight_bounds(sh.opt.wf, wb, w)
+    retcode, w = finalise_weight_bounds(rwf, wb, w, pr, rd, sh.opt.sets, fees,
+                                        sh.opt.strict)
     return SchurComplementHierarchicalRiskParityResult(; pr = pr, wb = wb, clr = clr,
                                                        fees = fees, r = r, gamma = gamma,
                                                        retcode = retcode, w = w,
@@ -1375,13 +1382,17 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     # A fit again after a refusal of the distance reader passes its mask as `rmsk`.
-    imsk = distance_reader_entry_mask(sh.opt.cle, pr, rd, sh.opt.strict; rmsk = rmsk)
+    imsk = distance_reader_entry_mask((sh.opt.cle, finaliser_readers(sh.opt.wf)...), pr, rd,
+                                      sh.opt.strict; rmsk = rmsk)
     # A split factor is a quotient of two risks, so the weights, their bounds and the fee
     # take the type of the returns. A `Float32` sample stays in `Float32`.
     T = eltype(pr.X)
     fees = investable_fees_view(fees_constraints(sh.opt.fees, sh.opt.sets;
                                                  strict = sh.opt.strict, datatype = T),
                                 imsk, pr.X)
+    # The block of the weight finaliser resolves its names on the same universe, and follows
+    # the mask as the fee does.
+    wf = investable_finaliser(sh.opt.wf, sh.opt.sets, sh.opt.strict, imsk, pr.X)
     # The prior fits on the coverage universe and returns a result on the full asset
     # universe, where an asset it could not estimate carries `NaN`. Reduce once, here: the
     # augmented matrix the Schur complement builds is finite, and the leaf permutation
@@ -1396,11 +1407,13 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
     clr = distance_reader_call(clusterise, sh.opt.cle, pr; rd = rd, iv = rd.iv,
                                ivpa = rd.ivpa)
-    if clr isa DistanceReaderRefusalError
+    rwf = distance_reader_call(fit_finaliser_readers, wf, pr, rd, sh.opt.strict)
+    if clr isa DistanceReaderRefusalError || rwf isa DistanceReaderRefusalError
+        err = clr isa DistanceReaderRefusalError ? clr : rwf
         return _optimise(rebuild_struct(sh0,
                                         (; opt = rebuild_struct(sh0.opt, (; pe = pr0)))),
                          rd0;
-                         rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
+                         rmsk = distance_reader_refusal_mask(err, imsk, rd0,
                                                              sh0.opt.strict), kwargs...)
     end
     assert_clustering_universe(clr, size(X, 2))
@@ -1423,7 +1436,8 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
         gammas[i] = gamma
         rs[i] = ri
     end
-    retcode, w = finalise_weight_bounds(sh.opt.wf, wb, w / sum(w))
+    retcode, w = finalise_weight_bounds(rwf, wb, w / sum(w), pr, rd, sh.opt.sets, fees,
+                                        sh.opt.strict)
     return SchurComplementHierarchicalRiskParityResult(; pr = pr, wb = wb, clr = clr,
                                                        fees = fees, r = [rs...],
                                                        gamma = [gammas...],

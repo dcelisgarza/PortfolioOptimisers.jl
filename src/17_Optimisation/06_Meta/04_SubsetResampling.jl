@@ -334,6 +334,7 @@ $(val_dict[:count_fraction_grid])
 
   - `fees`: Recursively updated through [`factory`](@ref).
   - `opt`: Recursively updated through [`factory`](@ref).
+  - `wf`: Recursively updated through [`factory`](@ref).
   - `fb`: Recursively updated through [`factory`](@ref).
   - `cache`: Carried unchanged through [`factory`](@ref).
 
@@ -343,7 +344,7 @@ $(val_dict[:count_fraction_grid])
 
   - The method reads the returns matrix `X` as its third argument. When `pe` is a prior result, the method uses `pe.X` in place of `X`.
   - `pe`, `wb`, `sets` and `cache` recurse through [`port_opt_view`](@ref) with the index alone.
-  - `fees` and `opt` recurse with the index and `X`.
+  - `fees`, `wf` and `opt` recurse with the index and `X`.
   - `fb` recurses through [`view_child`](@ref) with the index and `X`.
 
 ## Observation weight parameters
@@ -353,6 +354,7 @@ $(val_dict[:count_fraction_grid])
   - `pe`: Recursively indexed through [`obs_weights_view`](@ref).
   - `fees`: Recursively indexed through [`obs_weights_view`](@ref).
   - `opt`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `wf`: Recursively indexed through [`obs_weights_view`](@ref).
   - `fb`: Recursively indexed through [`obs_weights_view`](@ref).
   - `cache`: Removed by [`obs_weights_view`](@ref), because a state has no slice on the observation axis.
 
@@ -396,7 +398,7 @@ $(val_dict[:count_fraction_grid])
     """
     $(field_dict[:wf])
     """
-    wf
+    @fprop @oprop wf
     """
     $(field_dict[:ex])
     """
@@ -445,9 +447,10 @@ $(val_dict[:count_fraction_grid])
         assert_no_nearest_bind_optimiser_schedule(opt, :opt, :SubsetResampling)
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :SubsetResampling)
         assert_internal_optimiser(opt)
-        if name_keyed(wb)
+        if name_keyed(wb) || name_keyed(wf)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
+        assert_data_benchmark_prior(wf, pe, :wf, :SubsetResampling)
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
@@ -528,6 +531,7 @@ function needs_previous_weights(opt::SubsetResampling)
     return (any(f -> needs_previous_weights(getfield(opt, f)),
                 time_dependent_fields(opt)) ||
             needs_previous_weights(opt.fees) ||
+            needs_previous_weights(opt.wf) ||
             needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.fb))
 end
@@ -617,10 +621,11 @@ function port_opt_view(sr::SubsetResampling, i, X::MatNum, args...)::SubsetResam
     sets = port_opt_view(sr.sets, i)
     opt = port_opt_view(sr.opt, i, X)
     return SubsetResampling(; pe = pe, wb = wb, fees = fees, sets = sets, opt = opt,
-                            wf = sr.wf, ex = sr.ex, subset_size = sr.subset_size,
-                            n_subsets = sr.n_subsets, max_comb = sr.max_comb, rng = sr.rng,
-                            seed = sr.seed, fb = view_child(sr.fb, i, X),
-                            strict = sr.strict, cache = port_opt_view(sr.cache, i))
+                            wf = port_opt_view(sr.wf, i, X), ex = sr.ex,
+                            subset_size = sr.subset_size, n_subsets = sr.n_subsets,
+                            max_comb = sr.max_comb, rng = sr.rng, seed = sr.seed,
+                            fb = view_child(sr.fb, i, X), strict = sr.strict,
+                            cache = port_opt_view(sr.cache, i))
 end
 function non_investable_universe(sr::SubsetResampling, ni::VecStr)::SubsetResampling
     return rebuild_struct(sr, (; sets = non_investable_sets(sr.sets, ni)))
@@ -671,7 +676,8 @@ end
 """
     subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
                                 wb::WeightBounds, wf::WeightFinaliser,
-                                ress::VecOpt, w::VecNum_VecVecNum)
+                                ress::VecOpt, w::VecNum_VecVecNum, ctx::FinaliserContext =
+                                     (nothing, nothing, nothing, nothing, false))
 
 Average the subset weights over all the assets, and finalise the average under the weight bounds.
 
@@ -696,6 +702,7 @@ On an efficient frontier, the method runs the steps once for each point.
   - `wf::WeightFinaliser`: Weight finaliser that repairs a bounds violation.
   - `ress::VecOpt`: Subset optimisation results, in the column order of `asset_idx`.
   - `w::VecNum_VecVecNum`: Weights of the first subset. The method reads only the type of `w`. A vector of vectors selects the efficient-frontier method.
+  - `ctx`: The context of the head, `(pr, rd, sets, fees, strict)`, which [`finalise_weight_bounds`](@ref) takes.
 
 # Returns
 
@@ -710,19 +717,23 @@ On an efficient frontier, the method runs the steps once for each point.
 """
 function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
                                      wb::WeightBounds, wf::WeightFinaliser, ress::VecOpt,
-                                     ::VecNum)
+                                     ::VecNum,
+                                     ctx::FinaliserContext = (nothing, nothing, nothing,
+                                                              nothing, false))
     w = zeros(eltype(ress[1].w), N)
     for i in 1:n_subsets
         idx = view(asset_idx, :, i)
         w[idx] .+= ress[i].w
     end
     w /= n_subsets
-    retcode, w = finalise_weight_bounds(wf, wb, w)
+    retcode, w = finalise_weight_bounds(wf, wb, w, ctx...)
     return subset_resampling_retcode(ress, retcode), w
 end
 function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
                                      wb::WeightBounds, wf::WeightFinaliser, ress::VecOpt,
-                                     ws::VecVecNum)
+                                     ws::VecVecNum,
+                                     ctx::FinaliserContext = (nothing, nothing, nothing,
+                                                              nothing, false))
     M = length(ws)
     w = [zeros(eltype(ress[1].w[i]), N) for i in 1:M]
     for i in 1:n_subsets
@@ -734,7 +745,7 @@ function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::
     for j in 1:M
         w[j] /= n_subsets
     end
-    retcode_w = [finalise_weight_bounds(wf, wb, wi) for wi in w]
+    retcode_w = [finalise_weight_bounds(wf, wb, wi, ctx...) for wi in w]
     return map(x -> subset_resampling_retcode(ress, x[1]), retcode_w),
            map(x -> x[2], retcode_w)
 end
@@ -783,7 +794,8 @@ Run the subset resampling optimisation, and return the averaged portfolio.
   - [`optimise`](@ref)
 """
 function _optimise(sr::SubsetResampling, rd::ReturnsResult; branchorder::Symbol = :optimal,
-                   str_names::Bool = false, save::Bool = true, kwargs...)
+                   str_names::Bool = false, save::Bool = true,
+                   rmsk::Option{BitVector} = nothing, kwargs...)
     sr = reset_time_dependent_estimator(sr)
     pr = prior(sr.pe, rd)
     # A weight and a fee take the element type of the returns.
@@ -793,9 +805,15 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; branchorder::Symbol 
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
     # the complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
-    imsk = investable_mask(pr)
+    # A distance reader of the weight finaliser drops an asset as the reader of a clustering
+    # does, see `distance_reader_entry_mask`.
+    imsk = distance_reader_entry_mask(finaliser_readers(sr.wf), pr, rd, sr.strict;
+                                      rmsk = rmsk)
     fees = investable_fees_view(fees_constraints(sr.fees, sr.sets; datatype = Tf,
                                                  strict = sr.strict), imsk, pr.X)
+    # The block of the weight finaliser resolves its names on the same universe, and follows
+    # the mask as the fee does.
+    wf = investable_finaliser(sr.wf, sr.sets, sr.strict, imsk, pr.X)
     # The prior fits on the coverage universe and returns a result on the full asset
     # universe, where an asset it could not estimate carries `NaN`. Reduce once, here,
     # before the sample: `N` is then the count of investable assets, so every subset is
@@ -804,7 +822,15 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; branchorder::Symbol 
     # The reduced `rd` takes a name of its own: a variable that is reassigned and then
     # captured by the fold's closure is boxed, which FLoops reports as a correctness and
     # performance problem on every call.
+    sr0, pr0 = sr, pr
     _, pr, sr, rdr = investable_reduction(pr, sr, rd, imsk)
+    rwf = distance_reader_call(fit_finaliser_readers, wf, pr, rdr, sr.strict)
+    if rwf isa DistanceReaderRefusalError
+        return _optimise(rebuild_struct(sr0, (; pe = pr0)), rd; branchorder = branchorder,
+                         str_names = str_names, save = save,
+                         rmsk = distance_reader_refusal_mask(rwf, imsk, rd, sr0.strict),
+                         kwargs...)
+    end
     X = pr.X
     N = size(X, 2)
     (; subset_size, n_subsets, max_comb, rng, seed) = sr
@@ -823,8 +849,8 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; branchorder::Symbol 
     end
     wb = weight_bounds_constraints(sr.wb, sr.sets; rd = rdr, N = N, strict = sr.strict,
                                    datatype = Tf)
-    retcode, w = subset_resampling_finaliser(N, n_subsets, asset_idx, wb, sr.wf, ress,
-                                             ress[1].w)
+    retcode, w = subset_resampling_finaliser(N, n_subsets, asset_idx, wb, rwf, ress,
+                                             ress[1].w, (pr, rdr, sr.sets, fees, sr.strict))
     return SubsetResamplingResult(; pr = pr, wb = wb, fees = fees, ress = ress,
                                   idx = asset_idx, retcode = retcode, w = w, imsk = imsk,
                                   fb = nothing)

@@ -8,7 +8,7 @@ jet = "0.13.3"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "666cfa9753"
+commit = "ecd76fd3d9"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -417,8 +417,8 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/16_TrackingRiskMeasureConstraints.jl" = { raw = 2, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/17_VarianceSkewKurtosisConstraints.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/18_GenericValueatRiskRangeConstraints.jl" = { raw = 0, reviewed = 0 }
-"src/17_Optimisation/06_Meta/01_Base_MetaOptimisation.jl" = { raw = 4, reviewed = 4 }
-"src/17_Optimisation/06_Meta/02_NestedClustered.jl" = { raw = 0, reviewed = 0 }
+"src/17_Optimisation/06_Meta/01_Base_MetaOptimisation.jl" = { raw = 5, reviewed = 5 }
+"src/17_Optimisation/06_Meta/02_NestedClustered.jl" = { raw = 1, reviewed = 1 }
 "src/17_Optimisation/06_Meta/03_Stacking.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/06_Meta/04_SubsetResampling.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/07_FiniteAllocation/01_Base_FiniteAllocation.jl" = { raw = 0, reviewed = 0 }
@@ -440,6 +440,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl" = { raw = 2, reviewed = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/13_SparsePortfolioAlgorithms.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/11_ProjectionWeightFinalisers.jl" = { raw = 0, reviewed = 0 }
+"src/17_Optimisation/12_JuMPWeightFinaliser.jl" = { raw = 0, reviewed = 0 }
 "src/18_ExpectedReturns/01_ExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/18_ExpectedReturns/02_BrinsonAttribution.jl" = { raw = 1, reviewed = 1 }
 "src/18_ExpectedReturns/03_PerformanceSummary.jl" = { raw = 0, reviewed = 0 }
@@ -895,6 +896,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/13_SparsePortfolioAlgorithms.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/11_ProjectionWeightFinalisers.jl" = { raw = 0, reviewed = 0 }
+"src/17_Optimisation/12_JuMPWeightFinaliser.jl" = { raw = 0, reviewed = 0 }
 "src/18_ExpectedReturns/01_ExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/18_ExpectedReturns/02_BrinsonAttribution.jl" = { raw = 0, reviewed = 0 }
 "src/18_ExpectedReturns/03_PerformanceSummary.jl" = { raw = 0, reviewed = 0 }
@@ -1350,6 +1352,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/13_SparsePortfolioAlgorithms.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/11_ProjectionWeightFinalisers.jl" = { raw = 0, reviewed = 0 }
+"src/17_Optimisation/12_JuMPWeightFinaliser.jl" = { raw = 0, reviewed = 0 }
 "src/18_ExpectedReturns/01_ExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/18_ExpectedReturns/02_BrinsonAttribution.jl" = { raw = 0, reviewed = 0 }
 "src/18_ExpectedReturns/03_PerformanceSummary.jl" = { raw = 0, reviewed = 0 }

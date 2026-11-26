@@ -230,6 +230,7 @@ end
     and the forward census reads it too.
     =#
     kept_forwards = Dict{Tuple{Symbol, Symbol}, String}(#
+                                                        (:set_clustering_weight_finaliser_alg!, :set_projection_objective!) => "public: the verb that a deviation of a `JuMPWeightFinaliser` implements; its method for a Projection Geometry is the objective of the projection programme, which the programme of an Allocation Set also writes (#2257)",
                                                         (:performance_summary, :summarise_input) => "(interface) the shared driver of the keyword methods of the exported verb: it takes their keyword bundle, and no one method can hold its body (rule 3, the review of #2072)",
                                                         (:performance_summary, :candidate_summary) => "(interface) the shared driver of the keyword methods of the exported verb that take candidates: it takes their keyword bundle, and no one method can hold its body (rule 3, the review of #2072)",
                                                         (:set_compact_show!, :set_default!) => "public: (a) a configuration verb that a user calls (#2071)",

@@ -1,5 +1,5 @@
 ```@meta
-Description = "JuMP optimisation types, private API of PortfolioOptimisers.jl: BaseJuMPOptimisationEstimator, JuMPOptimisationEstimator, RiskJuMPOptimisationEstimator, …"
+Description = "JuMP optimisation types, private API of PortfolioOptimisers.jl: BaseJuMPOptimisationEstimator, JuMPOptimisationEstimator, ProgrammeBlockOwner, …"
 ```
 
 # JuMP optimisation types: private API
@@ -7,6 +7,7 @@ Description = "JuMP optimisation types, private API of PortfolioOptimisers.jl: B
 ```@docs
 BaseJuMPOptimisationEstimator
 JuMPOptimisationEstimator
+ProgrammeBlockOwner
 RiskJuMPOptimisationEstimator
 ObjectiveFunction
 JuMPReturnsEstimator

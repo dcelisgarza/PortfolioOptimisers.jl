@@ -391,13 +391,15 @@ function weights_meet_bounds(wb::WeightBounds, w::VecNum, s::Number)::Bool
                                                             wb.ub)))
     return lb_ok && ub_ok && abs(sum(w) - s) <= tol * max(one(s), abs(s))
 end
-function opt_weight_bounds(::EuclideanWeightFinaliser, wb::WeightBounds, w::VecNum)
+function opt_weight_bounds(::EuclideanWeightFinaliser, wb::WeightBounds, w::VecNum,
+                           ::Any...)
     return weights_break_bounds(wb, w) ? euclidean_weight_projection(w, wb) : w
 end
-function opt_weight_bounds(::EntropicWeightFinaliser, wb::WeightBounds, w::VecNum)
+function opt_weight_bounds(::EntropicWeightFinaliser, wb::WeightBounds, w::VecNum, ::Any...)
     return weights_break_bounds(wb, w) ? entropic_weight_projection(w, wb) : w
 end
-function opt_weight_bounds(wf::IterativeWeightFinaliser, wb::WeightBounds, w::VecNum)
+function opt_weight_bounds(wf::IterativeWeightFinaliser, wb::WeightBounds, w::VecNum,
+                           ::Any...)
     if !weights_break_bounds(wb, w)
         return w
     end

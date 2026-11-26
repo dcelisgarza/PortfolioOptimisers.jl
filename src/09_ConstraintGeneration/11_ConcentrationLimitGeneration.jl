@@ -243,7 +243,7 @@ conc = [ConcentrationLimitEstimator(;
 lcse = LinearConstraintEstimator(; val = \"G1 <= 0.35\")
 ```
 
-The clustering and the naive optimisers have no slot for the rule, as they have none for a cardinality or a threshold. [`concentration_margins`](@ref) checks the weights of any optimiser against the rule.
+The clustering and the naive optimisers take the rule through the block of a [`JuMPWeightFinaliser`](@ref). [`concentration_margins`](@ref) checks the weights of any optimiser against the rule.
 
 # Fields
 

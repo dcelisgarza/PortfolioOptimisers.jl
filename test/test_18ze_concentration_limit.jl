@@ -299,7 +299,10 @@
         @test isnothing(concentration_limit_constraints(nothing))
         @test PortfolioOptimisers.name_keyed(cle)
         @test !PortfolioOptimisers.name_keyed(ConcentrationLimitEstimator())
-        @test_throws IsNothingError ConstraintBlock(; conc = cle)
+        # The owner of a block checks the sets, because a weight finaliser takes the sets of its
+        # head.
+        @test ConstraintBlock(; conc = cle).conc === cle
+        @test_throws IsNothingError JuMPOptimiser(; slv = hslv, conc = cle)
         # The check of a book states that the rule needs `sets`, also in a vector.
         @test_throws IsNothingError concentration_margins(cle, fill(0.5, 2))
         @test_throws IsNothingError concentration_margins([cle], fill(0.5, 2))

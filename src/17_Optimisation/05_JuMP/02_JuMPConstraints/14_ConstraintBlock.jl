@@ -25,7 +25,7 @@ Holds the feasible set of the weights of a programme, and the terms that the pro
 
 The block is the Constraint Block of the glossary. It holds the slots that a JuMP optimiser and a programme Allocation Set share: the weight bounds, the leverage caps, the linear, cardinality, threshold and phylogeny constraints, the turnover and tracking constraints, the norm ceilings, the custom constraints and the four regularisation penalties. A slot never writes the objective. The owner of the block holds the net budget, the fees, the return term and the scalariser.
 
-[`JuMPOptimiser`](@ref) and [`ProgrammeAllocationSet`](@ref) each hold a block in their field `cbe`. The keyword constructor of each owner takes each slot of the block as a flat keyword, and `opt.wb` reads the slot of the block. So build a block directly only to give one feasible set to more than one owner.
+[`JuMPOptimiser`](@ref), [`ProgrammeAllocationSet`](@ref) and [`JuMPWeightFinaliser`](@ref) each hold a block in their field `cbe`. The keyword constructor of each owner takes each slot of the block as a flat keyword, and `opt.wb` reads the slot of the block. So build a block directly only to give one feasible set to more than one owner.
 
 # Fields
 
@@ -80,7 +80,7 @@ Keywords correspond to the struct's fields. A slot typed [`TD_Option`](@ref) can
   - If `card`, `l2c`, `linfc`, `l1` or `linf` is a number: it is finite and `> 0`.
   - `lp` holds no norm-ceiling rule, and `lpc` holds no ambiguity-radius rule, see [`assert_penalty_coefficient_role`](@ref) and [`assert_norm_ceiling_role`](@ref).
   - The shapes of `scard`, `smtx`, `slt` and `sst` agree, see [`assert_subgroup_mip_fields`](@ref). The shapes of `sgcarde`, `sgmtx`, `sglt` and `sgst` agree, see [`assert_subgrouped_mip_fields`](@ref).
-  - If a slot holds an estimator keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`.
+  - A slot keyed by name ([`name_keyed`](@ref)) needs the `sets` of its owner, and the constructor of the owner checks it. The owner is a [`JuMPOptimiser`](@ref), a [`ProgrammeAllocationSet`](@ref), or the optimiser that holds a [`JuMPWeightFinaliser`](@ref).
   - If a slot holds a [`TimeDependent`](@ref): the constructor runs again once for each entry of the schedule, see [`assert_time_dependent_substitution`](@ref).
 
 The checks that read a field of the owner as well, such as [`assert_gross_budget_admissible`](@ref), run in the constructor of the owner.
@@ -292,12 +292,6 @@ julia> (opt.wb.ub, opt.card, opt.cbe.card)
         assert_norm_ceiling_role(lpc)
         assert_subgroup_mip_fields(scard, smtx, slt, sst)
         assert_subgrouped_mip_fields(sgcarde, sgmtx, sglt, sgst)
-        if any(name_keyed,
-               (wb, lt, st, lcse, gcarde, sgcarde, smtx, sgmtx, slt, sst, sglt, sgst, conc,
-                tn))
-            @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when estimator-type fields are provided"))
-        end
         assert_time_dependent_substitution(ConstraintBlock,
                                            (; wb, sbgt, gbgt, lt, st, lcse, cte, gcarde,
                                             sgcarde, smtx, sgmtx, slt, sst, sglt, sgst,
@@ -371,7 +365,7 @@ end
 
 Returns the [`ConstraintBlock`](@ref) that the keyword constructor of an owner holds, from the block that the caller gives and the slots that the caller names as flat keywords.
 
-The keyword constructors of [`JuMPOptimiser`](@ref) and [`ProgrammeAllocationSet`](@ref) call it. A flat keyword replaces that slot of a given block, and a slot that the caller does not name keeps its value. So the default of a flat keyword never overwrites a slot of a given block. [`rebuild_struct`](@ref) and `Accessors.set` pass the block and a new slot in one call, and they rely on this rule.
+The keyword constructors of [`JuMPOptimiser`](@ref), [`ProgrammeAllocationSet`](@ref) and [`JuMPWeightFinaliser`](@ref) call it. A flat keyword replaces that slot of a given block, and a slot that the caller does not name keeps its value. So the default of a flat keyword never overwrites a slot of a given block. [`rebuild_struct`](@ref) and `Accessors.set` pass the block and a new slot in one call, and they rely on this rule.
 
 # Algorithm
 
@@ -1226,7 +1220,7 @@ end
 
 Add a [`ResolvedConstraintBlock`](@ref) to a model, in its own namespace and in two phases. This is the block builder.
 
-Every programme that holds a block adds it through these two functions: a JuMP head in [`assemble_jump_model!`](@ref) for its own block and for each later block, such as the set in the model of a leader, and the projection of a [`ProgrammeAllocationSet`](@ref) in [`set_allocation_set_constraints!`](@ref). So the order of the Model Assembly is written once. A JuMP head runs its own steps between the two phases: the fees, the risk step, the return terms and [`mark_risk_minimised!`](@ref), then the bounds builder [`set_allocation_risk_return_bounds!`](@ref) of each later block. The projection minimises no risk, so it runs the bounds builder of its set alone between the two phases, and sets no mark.
+Every programme that holds a block adds it through these two functions: a JuMP head in [`assemble_jump_model!`](@ref) for its own block and for each later block, such as the set in the model of a leader, the projection of a [`ProgrammeAllocationSet`](@ref) in [`set_allocation_set_constraints!`](@ref), and the programme of a [`JuMPWeightFinaliser`](@ref). So the order of the Model Assembly is written once. A JuMP head runs its own steps between the two phases: the risk step, the return terms and [`mark_risk_minimised!`](@ref), then the bounds builder [`set_allocation_risk_return_bounds!`](@ref) of each later block. The projection minimises no risk, so it runs the bounds builder of its set alone between the two phases, and sets no mark.
 
 Phase 1, `set_block_constraints!`, adds the rows that come before the risk step of the owner. Phase 2, `set_block_post_risk_constraints!`, adds the rows that read the marks of the objective of the owner, `risk_minimised` and `variance_flag`: the semidefinite phylogeny reads them. The integer phylogeny and the custom constraints come after them too.
 
@@ -1243,8 +1237,9 @@ Phase 1:
  3. Add the linear rows `lcsr`, then the centrality rows `ctr`, with [`set_linear_weight_constraints!`](@ref).
  4. Add the MIP kinds with [`set_mip_constraints!`](@ref), the exact cost budget of a [`BudgetCosts`](@ref) whose `xbgt` is `true` with [`set_cost_budget_mip_constraints!`](@ref), then the sub-group MIP kinds with [`set_smip_constraints!`](@ref), then the concentration rules with [`set_concentration_constraints!`](@ref).
  5. Add the turnover ceilings with [`set_turnover_constraints!`](@ref).
- 6. Add the tracking errors `tr` with [`set_tracking_error_constraints!`](@ref), on the prior of the block.
- 7. Add the norm ceilings `l2c`, `lpc` and `linfc`, then the penalties `l1`, `l2`, `lp` and `linf`.
+ 6. Add the fees that are not fixed with [`set_non_fixed_fees!`](@ref). The fixed fees joined with the MIP kinds. So the net returns, which the first reader registers for the whole model, hold every fee.
+ 7. Add the tracking errors `tr` with [`set_tracking_error_constraints!`](@ref), on the prior of the block.
+ 8. Add the norm ceilings `l2c`, `lpc` and `linfc`, then the penalties `l1`, `l2`, `lp` and `linf`.
 
 Phase 2:
 
@@ -1255,7 +1250,7 @@ Phase 2:
 
   - $(arg_dict[:model])
   - `cbr`: The Result of the block.
-  - `owner`: The owner of the block: a JuMP head, or a [`ProgrammeAllocationSet`](@ref). The tracking errors and the custom constraints dispatch on it.
+  - `owner`: The owner of the block: a JuMP head, a [`ProgrammeAllocationSet`](@ref) or a [`JuMPWeightFinaliser`](@ref). The tracking errors and the custom constraints dispatch on it.
   - `bgt`: The net budget of the owner of the block, or `nothing`.
   - `fees`: The fees of the owner of the block, or `nothing`.
   - `tr`: The tracking errors of the owner, bound to its rows, or `nothing`.
@@ -1296,6 +1291,8 @@ function set_block_constraints!(model::JuMP.Model, cbr::ResolvedConstraintBlock,
                           ss; prefix = prefix)
     set_concentration_constraints!(model, cbr.conc, wb, ss; prefix = prefix)
     set_turnover_constraints!(model, cbr.tn; prefix = prefix)
+    # Before the first reader of the net returns, which registers them once for the model.
+    set_non_fixed_fees!(model, fees)
     set_tracking_error_constraints!(model, cbr.pr, tr, owner, plr, fees, b1;
                                     prefix = prefix, kwargs...)
     set_weight_norm_2_constraints!(model, cbr.l2c; prefix = prefix)

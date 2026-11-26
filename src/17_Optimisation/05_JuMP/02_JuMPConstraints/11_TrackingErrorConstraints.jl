@@ -206,7 +206,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          tr::RiskTrackingError{<:Any, <:Any, <:Any,
                                                                <:IndependentVariableTracking},
                                          opt::Union{JuMPOptimisationEstimator,
-                                                    AbstractProgrammeAllocationSet},
+                                                    ProgrammeBlockOwner},
                                          pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees},
                                          args...; prefix::Symbol = Symbol(""), kwargs...)
     r = tr.r
@@ -230,7 +230,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          tr::RiskTrackingError{<:Any, <:Any, <:Any,
                                                                <:DependentVariableTracking},
                                          opt::Union{JuMPOptimisationEstimator,
-                                                    AbstractProgrammeAllocationSet},
+                                                    ProgrammeBlockOwner},
                                          pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees},
                                          args...; prefix::Symbol = Symbol(""), kwargs...)
     ri = tr.r

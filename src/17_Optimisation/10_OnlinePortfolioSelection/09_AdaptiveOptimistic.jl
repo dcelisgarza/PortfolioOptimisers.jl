@@ -73,6 +73,9 @@ PortfolioOptimisers.DiagonalProjection
         return new{typeof(h)}(h)
     end
 end
+function port_opt_view(proj::DiagonalProjection, i, args...)::DiagonalProjection
+    return DiagonalProjection(nothing_scalar_array_view(proj.h, i))
+end
 """
     project(proj::DiagonalProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
 

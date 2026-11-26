@@ -12,9 +12,7 @@ WeightDeviation
 weight_deviation
 deviation_error_term
 IterativeWeightFinaliser
-JuMPWeightFinaliser
 JuMPWeightFinaliserFormulation
 WeightFinaliser
-set_clustering_weight_finaliser_alg!
 opt_weight_bounds
 ```

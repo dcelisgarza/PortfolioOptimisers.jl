@@ -653,10 +653,14 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     # A fit again after a refusal of the distance reader passes its mask as `rmsk`.
-    imsk = distance_reader_entry_mask(hec.opt.cle, pr, rd, hec.opt.strict; rmsk = rmsk)
+    imsk = distance_reader_entry_mask((hec.opt.cle, finaliser_readers(hec.opt.wf)...), pr,
+                                      rd, hec.opt.strict; rmsk = rmsk)
     fees = investable_fees_view(fees_constraints(hec.opt.fees, hec.opt.sets;
                                                  strict = hec.opt.strict, datatype = T),
                                 imsk, pr.X)
+    # The block of the weight finaliser resolves its names on the same universe, and follows
+    # the mask as the fee does.
+    wf = investable_finaliser(hec.opt.wf, hec.opt.sets, hec.opt.strict, imsk, pr.X)
     # A forced exit is charged once, against the full-universe weight vector the fit
     # rebuilds, so only the result charges it. No sub-problem below holds that vector —
     # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
@@ -675,11 +679,13 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
     clr = distance_reader_call(clusterise, hec.opt.cle, pr; rd = rd, iv = rd.iv,
                                ivpa = rd.ivpa, branchorder = branchorder)
-    if clr isa DistanceReaderRefusalError
+    rwf = distance_reader_call(fit_finaliser_readers, wf, pr, rd, hec.opt.strict)
+    if clr isa DistanceReaderRefusalError || rwf isa DistanceReaderRefusalError
+        err = clr isa DistanceReaderRefusalError ? clr : rwf
         return _optimise(rebuild_struct(hec0,
                                         (; opt = rebuild_struct(hec0.opt, (; pe = pr0)))),
                          rd0; branchorder = branchorder,
-                         rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
+                         rmsk = distance_reader_refusal_mask(err, imsk, rd0,
                                                              hec0.opt.strict), kwargs...)
     end
     assert_clustering_universe(clr, N)
@@ -714,7 +720,8 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     end
     wb = weight_bounds_constraints(hec.opt.wb, hec.opt.sets; rd = rd, N = N,
                                    strict = hec.opt.strict, datatype = T)
-    retcode, w = finalise_weight_bounds(hec.opt.wf, wb, w / sum(w))
+    retcode, w = finalise_weight_bounds(rwf, wb, w / sum(w), pr, rd, hec.opt.sets, fees,
+                                        hec.opt.strict)
     return HierarchicalEqualRiskContributionResult(;
                                                    hr = HierarchicalResult(; pr = pr,
                                                                            clr = clr,

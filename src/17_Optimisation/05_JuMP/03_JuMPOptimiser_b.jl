@@ -427,10 +427,10 @@ owner is its [`ProgrammeAllocationSet`](@ref), see [`later_constraint_blocks`](@
     in that phase. A dependent [`Variance`](@ref) tracking error then takes the semidefinite
     formulation, as it does under a phylogeny of the head, and it solves.
  1. Phase 1 of each block, [`set_block_constraints!`](@ref), adds the weight bounds, the
-    budgets and every row before the risk step. The block of the head takes the net budget
+    budgets, the fees and every row before the risk step. The block of the head takes the net budget
     `opt.bgt`, the fees and the tracking errors of the head. A block of a set takes no net
     budget and no fees, and its own tracking errors.
- 2. The head adds its fees, its risk measures and its return terms, and marks the objective
+ 2. The head adds its risk measures and its return terms, and marks the objective
     with [`mark_risk_minimised!`](@ref). The risk measures get the phylogeny `plr` of the
     block of the head. A variance also reads the mark `sdp_phylogeny` that phase 1 of any
     block sets, [`mark_sdp_phylogeny!`](@ref).
@@ -514,7 +514,6 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
         set_block_constraints!(model, cbri, set, nothing, nothing;
                                tr = allocation_set_tracking(set.tr, cbri), prefix = prefix)
     end
-    set_non_fixed_fees!(model, fees)
     set_risk_and_scalarise!(model, r, optimiser, opt, pr, cbr.plr, fees, b1; rd = rd)
     set_return_constraints!(model, ret, obj, pr; rd = rd)
     # After the return constraints, so a `MaximumRatio` has chosen its form, and before

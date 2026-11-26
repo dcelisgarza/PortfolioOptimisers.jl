@@ -31,6 +31,7 @@ The answer is `true` when one of three parts needs them. The first is a [`TimeDe
 function needs_previous_weights(opt::NaiveOptimisationEstimator)
     return any(f -> needs_previous_weights(getfield(opt, f)), time_dependent_fields(opt)) ||
            needs_previous_weights(opt.fees) ||
+           needs_previous_weights(opt.wf) ||
            needs_previous_weights(opt.fb)
 end
 """
@@ -307,6 +308,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `fees`: Recursively updated through [`factory`](@ref).
+  - `wf`: Recursively updated through [`factory`](@ref).
   - `fb`: Recursively updated through [`factory`](@ref).
   - `cache`: Carried unchanged through [`factory`](@ref).
 
@@ -318,6 +320,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
   - `wb`: Recursively viewed through [`port_opt_view`](@ref).
   - `fees`: Recursively viewed through [`port_opt_view`](@ref).
   - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `wf`: Recursively viewed through [`port_opt_view`](@ref).
   - `fb`: Recursively viewed through [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
   - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
@@ -327,6 +330,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 
   - `pe`: Recursively indexed through [`obs_weights_view`](@ref).
   - `fees`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `wf`: Recursively indexed through [`obs_weights_view`](@ref).
   - `fb`: Recursively indexed through [`obs_weights_view`](@ref).
   - `cache`: Removed by [`obs_weights_view`](@ref), because a state has no slice on the observation axis.
 
@@ -407,7 +411,7 @@ InverseVolatility
     """
     $(field_dict[:wf])
     """
-    wf
+    @fprop @vprop @oprop wf
     """
     $(field_dict[:fb])
     """
@@ -430,14 +434,15 @@ InverseVolatility
                                fb::TDO_Option{<:OptE_Opt}, sq::Bool, strict::Bool,
                                cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :InverseVolatility)
-        if name_keyed(wb)
+        if name_keyed(wb) || name_keyed(wf)
             @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when wb is keyed by name"))
+                      IsNothingError("sets cannot be nothing when wb, or a slot of wf, is keyed by name"))
         end
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when fees is a FeesEstimator"))
         end
+        assert_data_benchmark_prior(wf, pe, :wf, :InverseVolatility)
         assert_time_dependent_substitution(InverseVolatility,
                                            (; pe, wb, fees, sets, wf, fb, sq, strict),
                                            merge(naive_optimiser_td_defaults(),
@@ -539,30 +544,42 @@ Run the inverse volatility portfolio optimisation.
   - [`optimise`](@ref)
   - [`_optimise`](@ref)
 """
-function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult(); kwargs...)
+function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
+                   rmsk::Option{BitVector} = nothing, kwargs...)
     iv = reset_time_dependent_estimator(iv)
     pr = prior(iv.pe, rd)
     # A weight, a bound and a fee take the element type of the returns.
     Tf = eltype(pr.X)
-    # Resolve the fee on the caller's own universe, before `investable_reduction` below
-    # narrows `sets`, for the reason the hierarchical heads do; `investable_fees_view` then
-    # places it on the axes the mask leaves.
+    # A distance reader of the weight finaliser drops an asset as the reader of a clustering
+    # does, see `distance_reader_entry_mask`.
+    imsk = distance_reader_entry_mask(finaliser_readers(iv.wf), pr, rd, iv.strict;
+                                      rmsk = rmsk)
+    # Resolve the fee and the names of the weight finaliser on the caller's own universe,
+    # before `investable_reduction` below narrows `sets`, for the reason the hierarchical
+    # heads do. Each then goes on the axes the mask leaves.
     fees = investable_fees_view(fees_constraints(iv.fees, iv.sets; strict = iv.strict,
-                                                 datatype = Tf), investable_mask(pr),
-                                size(pr.X, 2))
+                                                 datatype = Tf), imsk, size(pr.X, 2))
+    wf = investable_finaliser(iv.wf, iv.sets, iv.strict, imsk, pr.X)
     # The prior fits on the coverage universe and returns a result on the full asset
     # universe, where an asset it could not estimate carries `NaN`. Reduce once, here: the
     # diagonal below then holds a finite variance at every position, and the bounds are
     # stated over the investable assets alone. `NaiveOptimisationResult` expands the
     # weights back.
-    imsk, pr, iv, rd = investable_reduction(pr, iv, rd)
+    iv0, pr0, rd0 = iv, pr, rd
+    _, pr, iv, rd = investable_reduction(pr, iv, rd, imsk)
+    rwf = distance_reader_call(fit_finaliser_readers, wf, pr, rd, iv.strict)
+    if rwf isa DistanceReaderRefusalError
+        return _optimise(rebuild_struct(iv0, (; pe = pr0)), rd0;
+                         rmsk = distance_reader_refusal_mask(rwf, imsk, rd0, iv0.strict),
+                         kwargs...)
+    end
     X = pr.X
     w = LinearAlgebra.diag(pr.sigma)
     w = inv.(!iv.sq ? sqrt.(w) : w)
     w /= sum(w)
     wb = weight_bounds_constraints(iv.wb, iv.sets; rd = rd, N = size(X, 2),
                                    strict = iv.strict, datatype = Tf)
-    retcode, w = finalise_weight_bounds(iv.wf, wb, w)
+    retcode, w = finalise_weight_bounds(rwf, wb, w, pr, rd, iv.sets, fees, iv.strict)
     return NaiveOptimisationResult(; pr = pr, wb = wb, fees = fees, retcode = retcode,
                                    w = w, imsk = imsk, fb = nothing)
 end
@@ -619,6 +636,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `fees`: Recursively updated through [`factory`](@ref).
+  - `wf`: Recursively updated through [`factory`](@ref).
   - `fb`: Recursively updated through [`factory`](@ref).
   - `cache`: Carried unchanged through [`factory`](@ref).
 
@@ -629,6 +647,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
   - `wb`: Recursively viewed through [`port_opt_view`](@ref).
   - `fees`: Recursively viewed through [`port_opt_view`](@ref).
   - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `wf`: Recursively viewed through [`port_opt_view`](@ref).
   - `fb`: Recursively viewed through [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
   - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
@@ -674,7 +693,7 @@ EqualWeighted
     """
     $(field_dict[:wf])
     """
-    wf
+    @fprop @vprop wf
     """
     $(field_dict[:fb])
     """
@@ -692,14 +711,15 @@ EqualWeighted
                            fb::TDO_Option{<:OptE_Opt}, strict::Bool,
                            cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :EqualWeighted)
-        if name_keyed(wb)
+        if name_keyed(wb) || name_keyed(wf)
             @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when wb is keyed by name"))
+                      IsNothingError("sets cannot be nothing when wb, or a slot of wf, is keyed by name"))
         end
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when fees is a FeesEstimator"))
         end
+        assert_prior_free_finaliser(wf, :EqualWeighted)
         assert_time_dependent_substitution(EqualWeighted,
                                            (; wb, fees, sets, wf, fb, strict),
                                            naive_optimiser_td_defaults())
@@ -766,14 +786,16 @@ function _optimise(ew::EqualWeighted, rd::ReturnsResult; kwargs...)
     # This head fits no prior, so it derives the Coverage Universe of its own window and
     # reduces once, here: the weight bounds and the sets are stated over the full universe
     # and are viewed by the same index. `NaiveOptimisationResult` expands the weights back.
+    ew0, X0 = ew, rd.X
     cmsk, ew, rd = coverage_reduction(ew, rd)
+    wf = investable_finaliser(ew0.wf, ew0.sets, ew0.strict, cmsk, X0)
     fees = investable_fees_view(fees, cmsk, Nf)
     N = size(rd.X, 2)
     # The weight takes the type of the data, not the `Float64` of `inv(N)`.
     w = fill(one(Tf) / N, N)
     wb = weight_bounds_constraints(ew.wb, ew.sets; rd = rd, N = N, strict = ew.strict,
                                    datatype = Tf)
-    retcode, w = finalise_weight_bounds(ew.wf, wb, w)
+    retcode, w = finalise_weight_bounds(wf, wb, w, nothing, rd, ew.sets, fees, ew.strict)
     return NaiveOptimisationResult(; pr = rd, wb = wb, fees = fees, retcode = retcode,
                                    w = w, imsk = cmsk, fb = nothing)
 end
@@ -838,6 +860,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `fees`: Recursively updated through [`factory`](@ref).
+  - `wf`: Recursively updated through [`factory`](@ref).
   - `fb`: Recursively updated through [`factory`](@ref).
   - `cache`: Carried unchanged through [`factory`](@ref).
 
@@ -849,6 +872,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
   - `wb`: Recursively viewed through [`port_opt_view`](@ref).
   - `fees`: Recursively viewed through [`port_opt_view`](@ref).
   - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `wf`: Recursively viewed through [`port_opt_view`](@ref).
   - `fb`: Recursively viewed through [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
   - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
@@ -907,7 +931,7 @@ RandomWeighted
     """
     $(field_dict[:wf])
     """
-    wf
+    @fprop @vprop wf
     """
     $(field_dict[:fb])
     """
@@ -927,14 +951,15 @@ RandomWeighted
                             strict::Bool, cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :RandomWeighted)
         assert_nonempty_gt0_finite_val(alpha, :alpha)
-        if name_keyed(wb)
+        if name_keyed(wb) || name_keyed(wf)
             @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when wb is keyed by name"))
+                      IsNothingError("sets cannot be nothing when wb, or a slot of wf, is keyed by name"))
         end
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when fees is a FeesEstimator"))
         end
+        assert_prior_free_finaliser(wf, :RandomWeighted)
         assert_time_dependent_substitution(RandomWeighted,
                                            (; alpha, rng, seed, wb, fees, sets, wf, fb,
                                             strict), (; wf = IterativeWeightFinaliser()))
@@ -1026,7 +1051,9 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; kwargs...)
     # reduces once, here: the concentrations, the weight bounds and the sets are stated over
     # the full universe and are viewed by the same index. `NaiveOptimisationResult` expands
     # the weights back.
+    rw0, X0 = rw, rd.X
     cmsk, rw, rd = coverage_reduction(rw, rd)
+    wf = investable_finaliser(rw0.wf, rw0.sets, rw0.strict, cmsk, X0)
     fees = investable_fees_view(fees, cmsk, Nf)
     N = size(rd.X, 2)
     dist = if isa(rw.alpha, Number)
@@ -1038,7 +1065,7 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; kwargs...)
     w = rand(rng, dist)
     wb = weight_bounds_constraints(rw.wb, rw.sets; rd = rd, N = N, strict = rw.strict,
                                    datatype = Tf)
-    retcode, w = finalise_weight_bounds(rw.wf, wb, w)
+    retcode, w = finalise_weight_bounds(wf, wb, w, nothing, rd, rw.sets, fees, rw.strict)
     return NaiveOptimisationResult(; pr = rd, wb = wb, fees = fees, retcode = retcode,
                                    w = w, imsk = cmsk, fb = nothing)
 end
@@ -1113,6 +1140,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `fees`: Recursively updated through [`factory`](@ref).
+  - `wf`: Recursively updated through [`factory`](@ref).
   - `fb`: Recursively updated through [`factory`](@ref).
   - `cache`: Carried unchanged through [`factory`](@ref).
 
@@ -1123,6 +1151,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
   - `wb`: Recursively viewed through [`port_opt_view`](@ref).
   - `fees`: Recursively viewed through [`port_opt_view`](@ref).
   - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `wf`: Recursively viewed through [`port_opt_view`](@ref).
   - `fb`: Recursively viewed through [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
   - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
@@ -1177,7 +1206,7 @@ BestConstantRebalancedPortfolio
     """
     $(field_dict[:wf])
     """
-    wf
+    @fprop @vprop wf
     """
     $(field_dict[:fb])
     """
@@ -1206,9 +1235,9 @@ BestConstantRebalancedPortfolio
                                              tol::Number, strict::Bool,
                                              cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :BestConstantRebalancedPortfolio)
-        if name_keyed(wb)
+        if name_keyed(wb) || name_keyed(wf)
             @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when wb is keyed by name"))
+                      IsNothingError("sets cannot be nothing when wb, or a slot of wf, is keyed by name"))
         end
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets),
@@ -1216,6 +1245,7 @@ BestConstantRebalancedPortfolio
         end
         @argcheck(iters > 0, DomainError(iters, "`iters` must be positive"))
         @argcheck(tol > zero(tol), DomainError(tol, "`tol` must be positive"))
+        assert_prior_free_finaliser(wf, :BestConstantRebalancedPortfolio)
         assert_time_dependent_substitution(BestConstantRebalancedPortfolio,
                                            (; wb, fees, sets, wf, fb, iters, tol, strict),
                                            naive_optimiser_td_defaults())
@@ -1391,14 +1421,17 @@ function _optimise(bcrp::BestConstantRebalancedPortfolio, rd::ReturnsResult; kwa
     fees = fees_constraints(bcrp.fees, bcrp.sets; strict = bcrp.strict, datatype = Tf)
     # This head fits no prior, so it derives the Coverage Universe of its own window and
     # reduces once, here, as `EqualWeighted` does. `NaiveOptimisationResult` expands back.
+    bcrp0, X0 = bcrp, rd.X
     cmsk, bcrp, rd = coverage_reduction(bcrp, rd)
+    wf = investable_finaliser(bcrp0.wf, bcrp0.sets, bcrp0.strict, cmsk, X0)
     fees = investable_fees_view(fees, cmsk, Nf)
     X = one(eltype(rd.X)) .+ rd.X
     N = size(X, 2)
     fp = cover_fixed_point(X, bcrp.iters, bcrp.tol)
     wb = weight_bounds_constraints(bcrp.wb, bcrp.sets; rd = rd, N = N, strict = bcrp.strict,
                                    datatype = Tf)
-    retcode, w = finalise_weight_bounds(bcrp.wf, wb, fp.w)
+    retcode, w = finalise_weight_bounds(wf, wb, fp.w, nothing, rd, bcrp.sets, fees,
+                                        bcrp.strict)
     if isa(retcode, OptimisationSuccess)
         retcode = OptimisationSuccess(;
                                       res = (; converged = fp.converged,

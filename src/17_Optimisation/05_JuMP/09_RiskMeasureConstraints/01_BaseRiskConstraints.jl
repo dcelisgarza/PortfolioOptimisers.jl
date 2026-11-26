@@ -14,9 +14,9 @@ Groups the JuMP optimisers that do not use factor risk contribution.
 """
 const NonFRCJuMPOpt = Union{MeanRisk, NearOptimalCentering, RiskBudgeting}
 """
-    const RiskConstraintOwner = Union{RiskJuMPOptimisationEstimator, AbstractProgrammeAllocationSet}
+    const RiskConstraintOwner = Union{RiskJuMPOptimisationEstimator, ProgrammeBlockOwner}
 
-Groups the owners of the risk constraints that a builder writes. An owner is a JuMP optimiser, whose programme the constraint joins, or a programme Allocation Set, whose projection the constraint joins.
+Groups the owners of the risk constraints that a builder writes. An owner is a JuMP optimiser, whose programme the constraint joins, or a [`ProgrammeBlockOwner`](@ref), whose projection the constraint joins.
 
 Every `set_risk_constraints!` and `set_risk!` method takes the owner in its `opt` slot. A builder reads the owner through three methods and no others. [`risk_constraint_solver`](@ref) gives the solver that resolves a Deferred Quantity. [`risk_contribution_constraints`](@ref) gives the risk contribution rows of a [`Variance`](@ref). [`set_risk_upper_bound!`](@ref) writes the bound on the risk expression. A [`RiskBoundOwner`](@ref) honours the bound. A [`FactorRiskContribution`](@ref) ignores a number bound with a warning, and refuses a frontier or a per-asset vector.
 
@@ -27,10 +27,9 @@ Every `set_risk_constraints!` and `set_risk!` method takes the owner in its `opt
   - [`AbstractProgrammeAllocationSet`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
-const RiskConstraintOwner = Union{RiskJuMPOptimisationEstimator,
-                                  AbstractProgrammeAllocationSet}
+const RiskConstraintOwner = Union{RiskJuMPOptimisationEstimator, ProgrammeBlockOwner}
 """
-    const RiskBoundOwner = Union{NonFRCJuMPOpt, AbstractProgrammeAllocationSet}
+    const RiskBoundOwner = Union{NonFRCJuMPOpt, ProgrammeBlockOwner}
 
 Groups the owners that honour the `settings.ub` of a risk measure.
 
@@ -42,7 +41,7 @@ The group holds every JuMP optimiser except [`FactorRiskContribution`](@ref), an
   - [`NonFRCJuMPOpt`](@ref)
   - [`set_risk_upper_bound!`](@ref)
 """
-const RiskBoundOwner = Union{NonFRCJuMPOpt, AbstractProgrammeAllocationSet}
+const RiskBoundOwner = Union{NonFRCJuMPOpt, ProgrammeBlockOwner}
 """
     risk_constraint_solver(opt::JuMPOptimisationEstimator)
 
@@ -302,8 +301,7 @@ This route calls no [`factory`](@ref), so a measure that states no solver of its
   - [`assert_declared_calibration_resolver`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
-                               opt::Union{JuMPOptimisationEstimator,
-                                          AbstractProgrammeAllocationSet},
+                               opt::Union{JuMPOptimisationEstimator, ProgrammeBlockOwner},
                                pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC},
                                fees::Option{<:Fees}, b1::Option{<:MatNum} = nothing;
                                kwargs...)
@@ -334,8 +332,7 @@ function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, rs::VecRM,
-                               opt::Union{JuMPOptimisationEstimator,
-                                          AbstractProgrammeAllocationSet},
+                               opt::Union{JuMPOptimisationEstimator, ProgrammeBlockOwner},
                                pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC},
                                fees::Option{<:Fees}, b1::Option{<:MatNum} = nothing;
                                kwargs...)
@@ -382,7 +379,7 @@ The two methods of [`set_risk_constraints!`](@ref) both call this function, so a
 """
 function set_resolved_risk_constraints!(model::JuMP.Model, i::Integer, r::RiskMeasure,
                                         opt::Union{JuMPOptimisationEstimator,
-                                                   AbstractProgrammeAllocationSet},
+                                                   ProgrammeBlockOwner},
                                         pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC},
                                         fees::Option{<:Fees}, b1::Option{<:MatNum};
                                         kwargs...)
@@ -564,7 +561,7 @@ function set_risk_upper_bound!(model::JuMP.Model, ::JuMPOptimisationEstimator, r
     state_set!(model, ub.prefix, :tracked_risk_bound, (r_expr, ub))
     return nothing
 end
-function set_risk_upper_bound!(model::JuMP.Model, ::AbstractProgrammeAllocationSet, r_expr,
+function set_risk_upper_bound!(model::JuMP.Model, ::ProgrammeBlockOwner, r_expr,
                                ub::TrackedRiskBound, key, flag::Bool = true)
     state_set!(model, ub.prefix, :tracked_risk_bound, (r_expr, ub))
     return nothing
@@ -578,7 +575,7 @@ function set_risk_upper_bound!(::JuMP.Model, opt::FactorRiskContribution, r_expr
                                ub::Front_NumVec, key, flag::Bool = true)
     return throw(ArgumentError("`$(nameof(typeof(opt)))` solves its model once and does not sweep a frontier, so it cannot honour the bound `settings.ub = $ub` ($key), a frontier or a per-asset vector. Remove `ub`, or use `MeanRisk` or `NearOptimalCentering`, which sweep a frontier."))
 end
-function set_risk_upper_bound!(::JuMP.Model, set::AbstractProgrammeAllocationSet, r_expr,
+function set_risk_upper_bound!(::JuMP.Model, set::ProgrammeBlockOwner, r_expr,
                                ub::Front_NumVec, key, flag::Bool = true)
     return throw(ArgumentError("the ceiling of a risk measure on a `$(nameof(typeof(set)))` is one number, its `settings.ub`; got `$ub` ($key), a frontier or a per-asset vector, which a one-step projection cannot bound."))
 end
