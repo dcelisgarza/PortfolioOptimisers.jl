@@ -1,5 +1,5 @@
 ```@meta
-Description = "S covariance, public API of PortfolioOptimisers.jl: AbstractSAlgorithm, DetS, SCovariance, s_starts, s_refine, StatsAPI.fit."
+Description = "S covariance, public API of PortfolioOptimisers.jl: AbstractSAlgorithm, DetS, FastS, RobustStartS, SCovariance, s_starts, s_refine, StatsAPI.fit."
 ```
 
 # S covariance
@@ -7,6 +7,8 @@ Description = "S covariance, public API of PortfolioOptimisers.jl: AbstractSAlgo
 ```@docs
 AbstractSAlgorithm
 DetS
+FastS
+RobustStartS
 SCovariance
 PortfolioOptimisers.s_starts
 PortfolioOptimisers.s_refine
