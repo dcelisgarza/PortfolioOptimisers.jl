@@ -235,6 +235,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :cvg_active_mask => "`active_mask`: The active mask of `X`, of the shape of `X`, or `nothing`. When it is not `nothing`, it takes the place of the active mask of `pnl`.",#
                  # The price gap fill.
                  :strict_span => "`strict`: If `true`, a window with a gap from a `PricesResult` that states no Listing Span raises an `ArgumentError`. If `false`, it issues a warning.",#
+                 # The price jumps.
+                 :jump_factor => "`factor`: Largest move of a price that is not a Price Jump, as a ratio of two prices. It is greater than one. A move is a jump when the ratio of the later price to the earlier one is more than `factor` or less than `1 / factor`.",#
                  # The benchmark weights of a Factor Exposure.
                  :strict_bw => "`strict`: If `true`, a benchmark weight that is not finite on an active cell raises an `ArgumentError`. If `false`, it reads as zero, and a warning names the cells.",#
                  # The source of the returns of a factor regression.
