@@ -192,7 +192,8 @@ Returns the rho function at the squared distance `t`, see [`BisquareRho`](@ref) 
   - [`m_scale`](@ref)
 """
 function srho(::BisquareRho, t::Number, c2::Number)
-    return t >= c2 ? one(t) : 1 - (1 - t / c2)^3
+    r = t / c2
+    return r >= 1 ? one(r) : 1 - (1 - r)^3
 end
 function srho(::RockeRho, t::Number, g::Number)
     u = t - 1
@@ -226,7 +227,8 @@ Returns the weight of an observation at the squared distance `t`, see [`Bisquare
   - [`s_isteps`](@ref)
 """
 function srho_weight(::BisquareRho, t::Number, c2::Number)
-    return t >= c2 ? zero(t) : (1 - t / c2)^2
+    r = t / c2
+    return r >= 1 ? zero(r) : (1 - r)^2
 end
 function srho_weight(::RockeRho, t::Number, g::Number)
     return abs(t - 1) > g ? zero(t) : 1 - abs2((t - 1) / g)
@@ -285,8 +287,12 @@ The fixed-point step ``s \\leftarrow s \\, \\overline{\\rho(t/s)} / b`` converge
   - [`s_isteps`](@ref)
 """
 function m_scale(rho::AbstractSRho, t::VecNum, k::Number, b::Number, s::Number)
-    for _ in 1:S_MAX_ITER
-        sn = s * Statistics.mean(x -> srho(rho, x / s, k), t) / b
+    # The step takes the scale as its argument, so no closure captures the loop variable. The
+    # first step gives `s` the type of the step, so the loop is type stable.
+    mstep = r -> r * Statistics.mean(x -> srho(rho, x / r, k), t) / b
+    s = mstep(s)
+    for _ in 2:S_MAX_ITER
+        sn = mstep(s)
         done = abs(sn - s) <= 4 * eps(typeof(sn)) * sn
         s = sn
         if done

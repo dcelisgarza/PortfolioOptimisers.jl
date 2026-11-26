@@ -645,7 +645,7 @@ end
 
 Does I-steps of an S estimate from the location `mu` and the scatter `S`.
 
-An I-step is a step of the fixed-point equations of [lopuhaa1989](@cite), which state that an S estimate is an M-estimate with the weights of its own rho function. The step does not increase the M-scale. It stops when the relative change of the shape and the change of the location in the metric of the shape are both below `sqrt(eps)`, or after `maxsteps` steps.
+An I-step is a step of the fixed-point equations of [lopuhaa1989](@cite), which state that an S estimate is an M-estimate with the weights of its own rho function. The step does not increase the M-scale. It stops when the relative change of the shape and the change of the location in the metric of the scatter are both below `sqrt(eps)`, or after `maxsteps` steps.
 
 # Algorithm
 
@@ -688,7 +688,7 @@ function s_isteps(rho::AbstractSRho, X::MatNum, mu::VecNum, S::MatNum, fixed::Bo
     tol = sqrt(eps(real(eltype(V))))
     for _ in 1:maxsteps
         mun, Vn = weighted_shape(X, srho_weight.(Ref(rho), t ./ s, k), mu, fixed)
-        done = shape_converged(mu, V, mun, Vn, tol)
+        done = shape_converged(mu, V, mun, Vn, s, tol)
         mu, V = mun, Vn
         t = squared_distances(X, mu, V)
         s = m_scale(rho, t, k, b, s)
@@ -699,16 +699,17 @@ function s_isteps(rho::AbstractSRho, X::MatNum, mu::VecNum, S::MatNum, fixed::Bo
     return mu, V, s, false
 end
 """
-    shape_converged(mu::VecNum, V::MatNum, mun::VecNum, Vn::MatNum, tol::Number) -> Bool
+    shape_converged(mu::VecNum, V::MatNum, mun::VecNum, Vn::MatNum, s::Number, tol::Number) -> Bool
 
 Returns whether a step of a fixed point moved the location and the shape by less than `tol`.
 
-The relative change of the shape is in the Frobenius norm, and the change of the location is its distance in the metric of the old shape.
+The relative change of the shape is in the Frobenius norm. The change of the location is its distance in the metric of the old scatter ``s \\mathbf{V}``, so the test does not change when the data are multiplied by a constant.
 
 # Arguments
 
   - `mu`, `V`: The old location and shape.
   - `mun`, `Vn`: The new location and shape.
+  - `s`: The scale of the shape, so that ``s \\mathbf{V}`` is the scatter.
   - `tol`: The tolerance.
 
 # Returns
@@ -720,9 +721,10 @@ The relative change of the shape is in the Frobenius norm, and the change of the
   - [`s_isteps`](@ref)
   - [`bisquare_mstep`](@ref)
 """
-function shape_converged(mu::VecNum, V::MatNum, mun::VecNum, Vn::MatNum, tol::Number)
+function shape_converged(mu::VecNum, V::MatNum, mun::VecNum, Vn::MatNum, s::Number,
+                         tol::Number)
     return LinearAlgebra.norm(Vn - V) <= tol * LinearAlgebra.norm(V) &&
-           only(squared_distances(transpose(mun), mu, V)) <= abs2(tol)
+           only(squared_distances(transpose(mun), mu, V)) <= abs2(tol) * s
 end
 """
     weighted_shape(X::MatNum, w::VecNum, mu::VecNum, fixed::Bool) -> Tuple{VecNum, MatNum}

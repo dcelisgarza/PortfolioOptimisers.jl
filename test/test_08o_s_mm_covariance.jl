@@ -9,7 +9,7 @@ The reference values come from R 4.5.3 with `rrcov` 1.7-7: `CovSest` with `metho
 `smm2255`. The other tests check the resistance to outliers, the efficiency on clean data, the
 fixed centre, the determinism of the search, the tuning constants and the refusals.
 =#
-using Test, PortfolioOptimisers, Statistics, LinearAlgebra, StableRNGs, Random
+using Test, PortfolioOptimisers, Statistics, StatsBase, LinearAlgebra, StableRNGs, Random
 
 const POS = PortfolioOptimisers
 const StatsAPI = PortfolioOptimisers.StatsAPI
@@ -109,6 +109,41 @@ end
         @test StatsAPI.fit(MMCovariance(; s = sm), X).mu ≈ med
         @test StatsAPI.fit(MMCovariance(), X; mean = med).mu ≈ med
         @test StatsAPI.fit(SCovariance(), X; mean = med).sigma ≈ StatsAPI.fit(sm, X).sigma
+    end
+    @testset "Element type, scale, composition and online" begin
+        # Each branch of the rho function takes the type of `t / c2`, and no closure of the
+        # M-scale captures its loop variable.
+        @test (@inferred POS.srho(BisquareRho(), 1.0f0, 2.0)) isa Float64
+        @test (@inferred POS.srho(BisquareRho(), 3.0f0, 2.0)) isa Float64
+        @test (@inferred POS.srho_weight(BisquareRho(), 3.0f0, 2.0)) isa Float64
+        @test (@inferred POS.m_scale(BisquareRho(), Float32[1, 2, 3], 2.0, 0.5, 1.0f0)) isa
+              Float64
+        X32 = Float32.(X)
+        for ce in (SCovariance(), MMCovariance())
+            @test (@inferred StatsAPI.fit(ce, X)).sigma isa Matrix{Float64}
+            # The steps stop at the tolerance of the type of the data.
+            @test cov(ce, X32) ≈ cov(ce, X) rtol = 10 * sqrt(eps(Float32))
+            # The stop rule of the location reads the metric of the scatter, so it does not
+            # change with the units of the data. The S fit stops within its tolerance.
+            @test cov(ce, 1e-2 .* X) ≈ 1e-4 .* cov(ce, X) rtol = 1e-7
+            # One asset.
+            r = StatsAPI.fit(ce, X[:, 1:1])
+            @test size(r.sigma) == (1, 1)
+            @test r.sigma[1, 1] > 0
+            on = partial_fit!(POS.update_online_estimator(Online(ce)), X[1:60, :])
+            on = partial_fit!(on, X[61:end, :])
+            @test cov(on) ≈ cov(ce, X)
+            @test !POS.supports_partial_fit(ce)
+        end
+        @test cov(MMCovariance(), 1e-2 .* X) ≈ 1e-4 .* cov(MMCovariance(), X) rtol = 1e-12
+        w = eweights(1:100, 0.05)
+        sm = SCovariance(; me = MedianExpectedReturns())
+        @test POS.factory(sm, w).me.w === w
+        @test POS.factory(MMCovariance(; s = sm), w).s.me.w === w
+        @test POS.port_opt_view(MMCovariance(; s = sm), 1:2) isa MMCovariance
+        # The `q` of the MM estimator defaults to the `q` of its S estimate.
+        @test MMCovariance(; s = SCovariance(; q = 0.999)).q == 0.999
+        @test MMCovariance(; s = SCovariance(; q = 0.999), q = 0.99).q == 0.99
     end
     @testset "MCD with the bisquare M-step" begin
         ce = MCDCovariance(; rw = BisquareReweighting())
@@ -219,6 +254,9 @@ end
         @test_throws DomainError SCovariance(; bdp = 0)
         @test_throws DomainError SCovariance(; q = 1)
         @test_throws DomainError MMCovariance(; q = 0)
+        # An `Online` wrapper reads the `cache` of the MM estimator, never the one of `s`.
+        @test_throws ArgumentError MMCovariance(;
+                                                s = POS.update_online_estimator(Online(SCovariance())))
         @test_throws DomainError BisquareReweighting(; eff = 1)
         @test_throws ArgumentError MCDCovariance(; shr = MCDShrinkage(), ssc = nothing,
                                                  rw = BisquareReweighting())
