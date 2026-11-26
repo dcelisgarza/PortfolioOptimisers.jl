@@ -691,6 +691,7 @@ function allocation_set_ready(set::ProgrammeAllocationSet, X::Option{<:ReturnsRe
 end
 """
     project(proj::AbstractProjectionGeometry, set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
+    project(proj::AbstractProjectionGeometry, set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector, imsk::BitVector)
     project(proj::GramProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
 
 Projects the raw step `q` onto the Allocation Set in the geometry's divergence, as a JuMP programme.
@@ -702,6 +703,8 @@ Under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) and [`LogBarrier
 A solved programme returns its weights. A programme that does not solve, or whose constraints cannot be built on the step's rows ([`allocation_set_ready`](@ref)), is a Held Step. Then [`record_held_step!`](@ref) writes the record to the current [`ProjectionStep`](@ref), and the function returns a copy of `w`, the book the fund already holds.
 
 A set that reads the rows fits its prior on the rows of the step, as a batch head does. The programme then runs on the prior's Investable Mask, also as a batch head does. It solves over the assets the prior prices, and gives a zero weight to every other asset. Under a time-varying panel, an asset without a listing for part of the window is outside the universe of a plain prior until the window no longer holds that part. So the programme gives it a zero, which is the one zero in the recursion's allocation that the rule's step did not make. A batch head gives the same zero. The asset comes back at the first step at which the prior prices it, and the rule's geometry decides whether the raw step then gives it weight, as for a zero in the Start Allocation. A set that reads no rows fits no prior and solves over the full universe.
+
+A rule whose loss or forecaster cannot price every asset passes its own Investable Mask as `imsk`. The programme then solves on the intersection of that mask with the mask of the set, and gives a zero weight to every asset that either of them leaves out.
 
 The programme is a bare head of the shared entry [`resolve_block_entry`](@ref): it holds no block of its own, and it passes the block of its set. So the mask of the step follows the rules of the entry of a JuMP head. An asset that a [`FeatureDistance`](@ref) of a reader of the set cannot read, an asset with a gap in the rows that a plain graph reader of the set reads, and an asset that a distance reader of the set refuses each take a zero weight at the step, with a warning. Under the `strict` flag of the step, the programme refuses them.
 
@@ -752,6 +755,7 @@ Where:
   - `set`: The set, resolved.
   - `q`: The raw step.
   - `w`: The Price-Adjusted Allocation the step trades from.
+  - `imsk`: The Investable Mask of the loss or of the forecaster of the rule.
 
 # Validation
 
@@ -778,6 +782,16 @@ function project(proj::AbstractProjectionGeometry, set::ProgrammeAllocationSet,
         return copy(w)
     end
     return project(proj, resolve_projection_entry(set, w, X), q, w, X)
+end
+function project(proj::AbstractProjectionGeometry, set::ProgrammeAllocationSet,
+                 q::AbstractVector, w::AbstractVector, imsk::BitVector)
+    X = projection_step_rows()
+    reason = allocation_set_ready(set, X)
+    if !isnothing(reason)
+        record_held_step!(reason, nothing)
+        return copy(w)
+    end
+    return project(proj, resolve_projection_entry(set, w, X, imsk), q, w, X)
 end
 function project(proj::GramProjection, set::BoundedAllocationSet, q::AbstractVector,
                  w::AbstractVector)
@@ -866,8 +880,8 @@ function project(proj::AbstractProjectionGeometry, e::Tuple, q::AbstractVector,
 end
 """
     resolve_projection_entry(set::BoundedAllocationSet, w::AbstractVector, X)
-    resolve_projection_entry(set::ProgrammeAllocationSet, w::AbstractVector, X::ReturnsResult)
-    resolve_projection_entry(set::ProgrammeAllocationSet, w::AbstractVector, X::Nothing)
+    resolve_projection_entry(set::ProgrammeAllocationSet, w::AbstractVector, X::ReturnsResult, imsk::Option{BitVector} = nothing)
+    resolve_projection_entry(set::ProgrammeAllocationSet, w::AbstractVector, X::Nothing, imsk::Option{BitVector} = nothing)
 
 Resolves the Allocation Set of a projection programme for one step, through the shared entry of a bare head.
 
@@ -877,9 +891,9 @@ The projection programme holds no block of its own, so it is a bare head of [`re
 
  1. On a bounded set, return no mask, the set and no block Result. Stop.
  2. Give the set the Price-Adjusted Allocation `w` with `factory(set, w)`, so a turnover ceiling, a tracking error, a risk ceiling, a custom constraint and a custom objective term that read the previous weights read the book of the step.
- 3. With no rows, resolve the block with [`resolve_constraint_block`](@ref) on no prior, check the bounds with [`assert_feasible_bounds`](@ref), and return no mask, the set and the block Result. Stop.
+ 3. With no rows, refuse a mask with [`programme_investable_reduction`](@ref), resolve the block with [`resolve_constraint_block`](@ref) on no prior, check the bounds with [`assert_feasible_bounds`](@ref), and return no mask, the set and the block Result. Stop.
  4. Fit the prior of the set on `X` with [`fit_allocation_set_block`](@ref).
- 5. Resolve the block through [`resolve_block_entry`](@ref), from the mask of the prior, [`investable_mask`](@ref), under the `strict` flag of the step, [`projection_step_strict`](@ref).
+ 5. Resolve the block through [`resolve_block_entry`](@ref), from the intersection of `imsk` with the mask of the prior, [`investable_mask`](@ref), under the `strict` flag of the step, [`projection_step_strict`](@ref).
  6. Check the bounds of the step against the budget of one with [`assert_feasible_bounds`](@ref). A bound that reads the rows resolves only at stage 2 ([`bounds_read_rows`](@ref)).
  7. View the set at the mask with [`programme_investable_reduction`](@ref), for the builders. Return the mask, the viewed set and the block Result.
 
@@ -888,10 +902,13 @@ The projection programme holds no block of its own, so it is a bare head of [`re
   - `set`: The set, resolved once per fold.
   - `w`: The Price-Adjusted Allocation the step trades from.
   - `X`: The rows the head holds through the period, a [`ReturnsResult`](@ref), or `nothing`.
+  - `imsk`: The Investable Mask of the loss or of the forecaster of the rule, or `nothing` when it prices every asset.
 
 # Validation
 
   - The rules of [`allocation_set_prior`](@ref), [`resolve_block_entry`](@ref) and [`assert_feasible_bounds`](@ref).
+  - The prior of the set prices at least one asset of `imsk`, through [`allocation_set_priced_mask`](@ref). Raises an [`IsEmptyError`](@ref), or an [`IsNonFiniteError`](@ref) under the `strict` flag of the step.
+  - `imsk` is `nothing` when `X` is `nothing`. Raises an `IsNothingError`.
   - Under the `strict` flag of the step, no reader of the set drops an asset. Raises an [`IsNonFiniteError`](@ref).
 
 # Returns
@@ -908,9 +925,11 @@ function resolve_projection_entry(set::BoundedAllocationSet, ::AbstractVector, :
     return nothing, set, nothing
 end
 function resolve_projection_entry(set::ProgrammeAllocationSet, w::AbstractVector,
-                                  X::ReturnsResult)::Tuple
+                                  X::ReturnsResult,
+                                  imsk::Option{BitVector} = nothing)::Tuple
     b = fit_allocation_set_block((factory(set, w), X))
-    imsk, _, cbrs = resolve_block_entry(no_head_block, (), investable_mask(b[3]), (b,), X,
+    imsk = investable_intersection(imsk, investable_mask(b[3]))
+    imsk, _, cbrs = resolve_block_entry(no_head_block, (), imsk, (b,), X,
                                         projection_step_strict())
     # The entry returns after its last fit again, so the one block is resolved.
     cbr = only(cbrs)::ResolvedConstraintBlock
@@ -918,15 +937,198 @@ function resolve_projection_entry(set::ProgrammeAllocationSet, w::AbstractVector
     setr, _, _ = programme_investable_reduction(imsk, b[1], X, nothing)
     return imsk, setr, cbr
 end
-function resolve_projection_entry(set::ProgrammeAllocationSet, w::AbstractVector,
-                                  ::Nothing)::Tuple
+function resolve_projection_entry(set::ProgrammeAllocationSet, w::AbstractVector, ::Nothing,
+                                  imsk::Option{BitVector} = nothing)::Tuple
     # With no rows the set fits no prior, so it has no mask and runs no reader: stage 2
-    # alone resolves the block. `allocation_set_prior` refuses a set that reads the rows.
-    setw = factory(set, w)
+    # alone resolves the block. `allocation_set_prior` refuses a set that reads the rows,
+    # and the reduction refuses a mask.
+    setw, _, _ = programme_investable_reduction(imsk, factory(set, w), nothing, nothing)
     cbr = resolve_constraint_block(setw.cbe, allocation_set_prior(setw, nothing), nothing;
                                    slv = setw.slv, strict = projection_step_strict())
     assert_feasible_bounds(cbr.wb)
     return nothing, setw, cbr
+end
+"""
+    project(proj::AbstractProjectionGeometry, set::AbstractAllocationSet, q::AbstractVector, w::AbstractVector, imsk::Nothing)
+    project(proj::AbstractProjectionGeometry, set::AbstractAllocationSet, q::AbstractVector, w::AbstractVector, imsk::BitVector)
+
+Projects the raw step `q` onto the Allocation Set at the Investable Mask of the step, and gives a zero weight to every asset outside it.
+
+A rule passes the mask when a reader of the step cannot price every asset: the loss of a first-order rule, or the forecaster of a rule that reads a forecast. The projection then leaves such an asset out, as a batch optimiser leaves out an asset that its prior cannot price, and its answer holds a zero there. A `nothing` mask is the projection over every asset.
+
+The method serves every set that [`port_opt_view`](@ref) views at the assets of the mask. A [`ProgrammeAllocationSet`](@ref) has a method of its own, which intersects the mask with the mask of the prior of the set.
+
+# Algorithm
+
+With a mask:
+
+ 1. Reduce the geometry and `q` to the mask with [`investable_geometry_view`](@ref), and view the set at it.
+ 2. When the bounds of the set at the mask do not reach the budget, by [`feasible_bounds`](@ref), record a Held Step with [`record_held_step!`](@ref), and return a copy of `w`. Stop.
+ 3. Project onto the reduced set, from `w` cut to the mask and not renormalised. When the answer does not meet the budget, it is the Held Step of that projection, and the method returns a copy of `w`.
+ 4. Return the answer with a zero at every asset outside the mask, with [`expand_investable_weights`](@ref).
+
+# Arguments
+
+  - `proj`: The geometry, over the full universe.
+  - `set`: The set, resolved over the full universe.
+  - `q`: The raw step over the full universe. The method does not read an entry outside the mask.
+  - `w`: The Price-Adjusted Allocation the step trades from, over the full universe. A Held Step returns it, so it trades nothing, also at an asset outside the mask.
+  - `imsk`: The Investable Mask of the step, or `nothing`.
+
+# Returns
+
+  - `w'::Vector`: The projected allocation over the full universe, or a copy of `w` on a Held Step.
+
+# Related
+
+  - [`investable_mask`](@ref)
+  - [`investable_book`](@ref)
+  - [`programme_investable_reduction`](@ref)
+"""
+function project(proj::AbstractProjectionGeometry, set::AbstractAllocationSet,
+                 q::AbstractVector, w::AbstractVector, ::Nothing)
+    return project(proj, set, q, w)
+end
+function project(proj::AbstractProjectionGeometry, set::AbstractAllocationSet,
+                 q::AbstractVector, w::AbstractVector, imsk::BitVector)
+    projr, qr = investable_geometry_view(imsk, proj, q)
+    setr = port_opt_view(set, findall(imsk))
+    if !feasible_bounds(setr)
+        record_held_step!("no allocation summing to one lies between the bounds of the $(count(imsk)) assets that the step can price, and the step trades nothing",
+                          nothing)
+        return copy(w)
+    end
+    wn = project(projr, setr, qr, w[imsk])
+    return if isapprox(sum(wn), one(eltype(wn)))
+        expand_investable_weights(imsk, wn)
+    else
+        copy(w)
+    end
+end
+"""
+    investable_mask(v::VecNum) -> Option{BitVector}
+
+Derives the Investable Mask of a gradient or of a forecast, which holds `NaN` at an asset that its reader cannot price.
+
+A prior result holds `NaN` in `mu` and on the diagonal of `sigma` at such an asset. A vector with `NaN` at every asset states no universe, so it has no mask, and the projection refuses the raw step that reads it.
+
+# Algorithm
+
+ 1. When no entry is `NaN`, or every entry is, return `nothing`.
+ 2. Otherwise, return the mask of the entries that are not `NaN`.
+
+# Related
+
+  - [`loss_gradient`](@ref)
+  - [`forecast_relative`](@ref)
+  - [`project`](@ref)
+"""
+function investable_mask(v::VecNum)::Option{BitVector}
+    if !any(isnan, v) || all(isnan, v)
+        return nothing
+    end
+    return .!isnan.(v)
+end
+"""
+    investable_book(w::AbstractVector, imsk::Nothing)
+    investable_book(w::AbstractVector, imsk::BitVector)
+
+Reduces an allocation to the Investable Mask of a step, over the full universe: the entries on the mask renormalised to sum to one with [`renormalised_view`](@ref), and a zero outside it.
+
+A step whose reader cannot price every asset starts from this allocation, so it is the step of the same rule over the assets that the reader prices. A `nothing` mask returns `w`.
+
+# Related
+
+  - [`renormalised_view`](@ref)
+  - [`expand_investable_weights`](@ref)
+  - [`project`](@ref)
+"""
+function investable_book(w::AbstractVector, ::Nothing)
+    return w
+end
+function investable_book(w::AbstractVector, imsk::BitVector)
+    return expand_investable_weights(imsk, renormalised_view(w, imsk))
+end
+"""
+    investable_intersection(a::Nothing, b::Option{BitVector})
+    investable_intersection(a::BitVector, b::Nothing)
+    investable_intersection(a::BitVector, b::BitVector)
+
+Intersects the Investable Masks of two readers of one step. A `nothing` mask keeps every asset. Two masks that share no asset give `a`, and the reader of `b` decides what it does on it. The hint of an optimistic step is zero there, and the entry of a programme set refuses the mask with [`allocation_set_priced_mask`](@ref).
+
+# Related
+
+  - [`investable_mask`](@ref)
+  - [`resolve_projection_entry`](@ref)
+"""
+function investable_intersection(::Nothing, b::Option{BitVector})
+    return b
+end
+function investable_intersection(a::BitVector, ::Nothing)
+    return a
+end
+function investable_intersection(a::BitVector, b::BitVector)
+    keep = a .& b
+    return any(keep) ? keep : a
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Splits the gradient of a loss into a finite gradient, which holds a zero at every asset that the loss cannot price, and its Investable Mask.
+
+The averages of a Gradient Transform, the gradient mass of an [`AdaptiveSubgradient`](@ref) and the hint of a Gradient Predictor read the finite gradient, so such an asset adds nothing to them. The projection of the step reads the mask. A gradient that prices every asset passes unchanged, with no mask.
+
+# Returns
+
+  - `(g, imsk)::Tuple`: The finite gradient, and the mask from [`investable_mask`](@ref) or `nothing`.
+
+# Related
+
+  - [`loss_gradient`](@ref)
+  - [`investable_mask`](@ref)
+  - [`project`](@ref)
+"""
+function investable_gradient(g::AbstractVector)
+    imsk = investable_mask(g)
+    return isnothing(imsk) ? g : ifelse.(imsk, g, zero(eltype(g))), imsk
+end
+"""
+    parked_iterate(u::AbstractVector, v::AbstractVector, imsk::Nothing)
+    parked_iterate(u::AbstractVector, v::AbstractVector, imsk::BitVector)
+
+Returns the iterate of a [`MirrorDescent`](@ref) rule after a step at the Investable Mask `imsk`.
+
+The book of such a step holds a zero at every asset outside the mask. The iterate keeps its own weight there, and the step moves the rest of its mass alone. So an asset that the loss prices again comes back at the weight of the iterate, where a multiplicative step from a zero would hold the zero for ever. A `nothing` mask returns `v`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+u^{+}_i &= \\begin{cases} v_i \\sum_{j \\in \\mathcal{I}} u_j \\big/ \\sum_{j \\in \\mathcal{I}} v_j & \\text{if } i \\in \\mathcal{I}\\,, \\\\ u_i & \\text{otherwise}\\,. \\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``u_i``: Entry of the iterate before the step, the argument `u`, for asset ``i``.
+  - ``v_i``: Entry of the projected step, the argument `v`, for asset ``i``.
+  - ``u^{+}_i``: Entry of the iterate after the step for asset ``i``.
+  - ``\\mathcal{I}``: Assets of the mask.
+
+When the iterate has no mass on the mask, the function returns `v` on the mask and a zero outside it, with [`investable_book`](@ref).
+
+# Related
+
+  - [`MirrorDescentState`](@ref)
+  - [`investable_book`](@ref)
+"""
+function parked_iterate(::AbstractVector, v::AbstractVector, ::Nothing)
+    return v
+end
+function parked_iterate(u::AbstractVector, v::AbstractVector, imsk::BitVector)
+    s = sum(view(u, imsk))
+    b = investable_book(v, imsk)
+    return iszero(s) ? b : ifelse.(imsk, s .* b, u)
 end
 """
     programme_investable_reduction(imsk::Nothing, set::AbstractAllocationSet, X::Option{<:ReturnsResult}, pr)

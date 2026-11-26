@@ -196,7 +196,9 @@ Steps each asset at its own rate, set by the gradient mass that the asset has ac
 
 This is the diagonal adaptive subgradient method of Algorithm 1 of [duchi2011](@cite), with its composite mirror descent update. The rule projects in the norm of its gradient mass, through a [`DiagonalProjection`](@ref) that it builds at every step, so it holds no `proj` slot.
 
-At `delta = 0` an asset with no gradient so far has no gradient mass, and the diagonal of the norm has a zero entry there. This happens to an asset whose every price relative so far is zero, and under a [`RiskLoss`](@ref) to an asset that the window does not price. [duchi2011](@citet) take the pseudo-inverse of ``H_t`` in the raw step there, and so does the rule. The gradient of such an asset is zero, so its raw step is its weight. The projection in the seminorm of ``H_t`` fixes the weights of the other assets, and [`DiagonalProjection`](@ref) gives the asset its limit as ``\\delta \\to 0^{+}``. So the rule at `delta = 0` is the limit of the rule at a positive `delta`, and its answer is a minimiser of the projection of [duchi2011](@citet), on which the bound below holds.
+At `delta = 0` an asset with no gradient so far has no gradient mass, and the diagonal of the norm has a zero entry there. This happens to an asset whose every price relative so far is zero. [duchi2011](@citet) take the pseudo-inverse of ``H_t`` in the raw step there, and so does the rule. The gradient of such an asset is zero, so its raw step is its weight. The projection in the seminorm of ``H_t`` fixes the weights of the other assets, and [`DiagonalProjection`](@ref) gives the asset its limit as ``\\delta \\to 0^{+}``. So the rule at `delta = 0` is the limit of the rule at a positive `delta`, and its answer is a minimiser of the projection of [duchi2011](@citet), on which the bound below holds.
+
+An objective can price a part of the universe alone, as a [`RiskLoss`](@ref) does under a time-varying panel. The step then runs on the priced assets, and the book holds a zero at every other one. Such an asset adds nothing to its gradient mass. When the objective prices it again, the step starts from that zero, and can buy it.
 
 # Mathematical definition
 
@@ -234,11 +236,11 @@ The full-matrix variant, Algorithm 2 of [duchi2011](@cite), uses ``H_t = \\delta
 [`online_update!`](@ref) runs these steps at the period's row `x`. The Gradient Point `point` is the book `w` when it is `nothing`, the default.
 
  1. Form the Price-Adjusted Allocation `wh` of the book `w` after the row.
- 2. Resolve `obj` against `wh` with [`factory`](@ref), so that a benchmark or a turnover reference of a [`RiskLoss`](@ref) that is not fixed takes `wh`. Take the gradient `g` of that objective at `point`, from `x` and the head's `rows`, with [`loss_gradient`](@ref).
+ 2. Resolve `obj` against `wh` with [`factory`](@ref), so that a benchmark or a turnover reference of a [`RiskLoss`](@ref) that is not fixed takes `wh`. Take the gradient `g` of that objective at `point`, from `x` and the head's `rows`, with [`loss_gradient`](@ref), and its Investable Mask `imsk`, with [`investable_gradient`](@ref).
  3. Add `g` to the gradient mass `st.s` in place, as the root of the sum of squares of each asset.
  4. Form the diagonal `h = delta .+ st.s`.
- 5. Form the raw step `q = w .- eta .* g ./ h`, with the pseudo-inverse at a zero entry of `h`: there `g` is zero, and the entry of `q` is the entry of `w`.
- 6. Project `q` onto the set from `wh` in the geometry `DiagonalProjection(h)`, which gives the new allocation.
+ 5. Reduce `w` to the mask with [`investable_book`](@ref), which gives `b`. Form the raw step `q = b .- eta .* g ./ h`, with the pseudo-inverse at a zero entry of `h`: there `g` is zero, and the entry of `q` is the entry of `b`.
+ 6. Project `q` onto the set from `wh` at the mask in the geometry `DiagonalProjection(h)`, which gives the new allocation.
  7. Return the state, with the period count raised by one, and the new allocation.
 
 A [`RiskLoss`](@ref) gives a zero gradient while the head holds fewer than two rows. At `delta = 0` the first such step has `h = 0`. On a set with no Objective Penalty it is then the Euclidean projection of `w`, the zero step of every first-order rule.
@@ -325,13 +327,14 @@ function online_update!(alg::AdaptiveSubgradient, st::AdaptiveSubgradientState,
                         set::AbstractAllocationSet,
                         point::Option{<:AbstractVector} = nothing)
     wh = price_adjusted_allocation(w, x)
-    g = loss_gradient(factory(alg.obj, wh), something(point, w), x, rows)
+    g, imsk = investable_gradient(loss_gradient(factory(alg.obj, wh), something(point, w),
+                                                x, rows))
     st.s .= hypot.(st.s, g)
     h = alg.delta .+ st.s
     # The pseudo-inverse of `H`: an entry of `h` is zero only where every gradient so far is
     # zero, so dividing that zero by one takes no step there.
-    q = w .- alg.eta .* g ./ ifelse.(iszero.(h), one.(h), h)
-    wn = project(DiagonalProjection(h), set, q, wh)
+    q = investable_book(w, imsk) .- alg.eta .* g ./ ifelse.(iszero.(h), one.(h), h)
+    wn = project(DiagonalProjection(h), set, q, wh, imsk)
     return AdaptiveSubgradientState(st.n + 1, st.s), wn
 end
 """
@@ -557,7 +560,7 @@ Returns the state of the predictor after the period and the hint of the period, 
 
   - Under [`LastGradient`](@ref) the hint is a copy of `g`. At `at_played = false` it is the gradient of `obj` at the secondary iterate `v`, on the mixed relative `xm` that `g` reads.
   - Under [`MeanGradient`](@ref) the method updates the running mean `m`, and the hint is a copy of it.
-  - Under [`ForecastGradient`](@ref) the method folds or fits the forecaster on the traded relative `x` through [`forecast_relative`](@ref), and the hint is the log-wealth gradient of the forecast at `v`. It reads no objective, because a forecast is a price relative.
+  - Under [`ForecastGradient`](@ref) the method folds or fits the forecaster on the traded relative `x` through [`forecast_relative`](@ref), and the hint is the log-wealth gradient of the forecast at `v`, reduced to the assets that the forecaster prices. It is `NaN` at every other asset. It reads no objective, because a forecast is a price relative.
 
 A forecaster folds the path that traded, not the mixed one, so the mix does not pull its statistic toward one. The rule applies no mix to the forecast.
 
@@ -589,7 +592,10 @@ function predict_gradient!(pred::ForecastGradient, ps, ::AbstractOnlineObjective
                            ::AbstractVector, v::AbstractVector, x::AbstractVector,
                            ::AbstractVector, rows, ::Integer)
     ps, xhat = forecast_relative(pred.me, ps, x, rows)
-    return ps, -xhat ./ LinearAlgebra.dot(v, xhat)
+    imsk = investable_mask(xhat)
+    gross = LinearAlgebra.dot(investable_weights_view(imsk, investable_book(v, imsk)),
+                              investable_weights_view(imsk, xhat))
+    return ps, -xhat ./ gross
 end
 """
     predictor_state_view(ps::Nothing, i)
@@ -837,7 +843,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Takes one half-step of the optimistic step of a [`MirrorDescent`](@ref) rule. This is the mirror step of the rule from `u` on the scaled gradient `s`, projected onto the set in the rule's geometry from the Price-Adjusted Allocation `w`.
+Takes one half-step of the optimistic step of a [`MirrorDescent`](@ref) rule. This is the mirror step of the rule from `u` on the scaled gradient `s`, projected onto the set in the rule's geometry from the Price-Adjusted Allocation `w`. With an Investable Mask `imsk`, the step starts from `u` reduced to the mask, and the projection gives a zero weight outside it.
 
 # Related
 
@@ -847,8 +853,9 @@ Takes one half-step of the optimistic step of a [`MirrorDescent`](@ref) rule. Th
   - [`project`](@ref)
 """
 function half_step(alg::MirrorDescent, set::AbstractAllocationSet, u::AbstractVector,
-                   s::AbstractVector, w::AbstractVector)
-    return project(alg.proj, set, mirror_step(alg.proj, u, s), w)
+                   s::AbstractVector, w::AbstractVector, imsk::Option{BitVector} = nothing)
+    return project(alg.proj, set, mirror_step(alg.proj, investable_book(u, imsk), s), w,
+                   imsk)
 end
 # The gradient is read at `point`: the unmixed played iterate when it is `nothing`, on the
 # head and under `OwnPoint`, and the mixture's played blend under `BlendPoint`; the hint is
@@ -861,11 +868,15 @@ function online_update!(alg::MirrorDescent, st::OptimisticMirrorDescentState,
                         point::Option{<:AbstractVector} = nothing)
     t = st.n + 1
     wh = price_adjusted_allocation(w, x)
+    obj = factory(alg.obj, wh)
     if restart(alg.eta, t)
         # The period count survives the restart: the schedule's stages are cumulative. The
-        # start re-enters the set from the book the fund holds, as it entered at the seed.
-        u0 = reprojection(alg.proj, set, st.w0, wh)
-        return OptimisticMirrorDescentState(t, copy(u0), copy(u0), st.w0,
+        # start re-enters the set from the book the fund holds, as it entered at the seed,
+        # on the assets that the loss prices.
+        imsk = investable_mask(loss_gradient(obj, st.u, x, rows))
+        u0 = reprojection(alg.proj, set, investable_book(st.w0, imsk), wh, imsk)
+        return OptimisticMirrorDescentState(t, copy(parked_iterate(st.w0, u0, imsk)),
+                                            copy(u0), st.w0,
                                             schedule_state_seed(alg.eta, st.w0),
                                             zero(st.res), zero(st.m),
                                             predictor_state_seed(alg.predictor, st.w0)),
@@ -878,20 +889,24 @@ function online_update!(alg::MirrorDescent, st::OptimisticMirrorDescentState,
     eta = learning_rate(alg.eta, t, st)
     alpha = mixing_share(alg.eta, t, alg.alpha)
     xm = mixed_relatives(x, alpha)
-    obj = factory(alg.obj, wh)
-    g = loss_gradient(obj, something(point, st.u), xm, rows)
-    v = half_step(alg, set, st.v, eta .* g, wh)
+    g, imsk = investable_gradient(loss_gradient(obj, something(point, st.u), xm, rows))
+    v = half_step(alg, set, st.v, eta .* g, wh, imsk)
     ps, m = predict_gradient!(alg.predictor, st.ps, obj, g, v, x, xm, rows, t)
+    m, pmsk = investable_gradient(m)
+    # The second half-step runs on the assets that the loss and the hint both price. When
+    # they share none it runs on those of the loss, where the hint is zero.
+    kmsk = investable_intersection(imsk, pmsk)
     r = hint_residual(alg.proj, g .- st.m)
     res = [st.res[1] + r, st.res[1]]
     s = statistic_after_step(alg.eta, st.s, w, x)
     # The played iterate is formed at the rate of the next period, which the schedule
     # answers from the state `nst` after the row: the paper's `f_{t+1}` at `η_{t+1}`.
     nst = OptimisticMirrorDescentState(t, v, v, st.w0, s, res, m, ps)
-    u = half_step(alg, set, v, learning_rate(alg.eta, t + 1, nst) .* m, wh)
-    played = played_allocation(u, alpha)
-    return OptimisticMirrorDescentState(t, v, u, st.w0, s, res, m, ps),
-           iszero(alpha) ? played : reprojection(alg.proj, set, played, wh)
+    u = half_step(alg, set, v, learning_rate(alg.eta, t + 1, nst) .* m, wh, kmsk)
+    played = played_allocation(u, alpha, kmsk)
+    return OptimisticMirrorDescentState(t, parked_iterate(st.v, v, imsk), u, st.w0, s, res,
+                                        m, ps),
+           iszero(alpha) ? played : reprojection(alg.proj, set, played, wh, kmsk)
 end
 export AdaptiveSubgradient, LastGradient, MeanGradient, ForecastGradient, HintResidualRate
 public predictor_state_seed, predict_gradient!, predictor_state_view, copy_predictor_state

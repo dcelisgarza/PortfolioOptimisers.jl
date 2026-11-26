@@ -883,6 +883,7 @@ In order to implement a new set kind, subtype `AbstractAllocationSet` with its c
 
   - `resolve_allocation_set(set::AbstractAllocationSet, N::Integer, strict::Bool, datatype::DataType) -> AbstractAllocationSet`: The set with every estimator resolved to a value over the `N` assets, which the projection then reads. The library implements the method on `nothing`, the empty slot, which resolves to the bare simplex, a default [`BoundedAllocationSet`](@ref).
   - `project(proj::AbstractProjectionGeometry, set::AbstractAllocationSet, q::AbstractVector, w::AbstractVector) -> AbstractVector`: The projection onto the resolved set, for every geometry the set admits.
+  - `port_opt_view(set::AbstractAllocationSet, i, args...) -> AbstractAllocationSet`: The set over the assets `i`. A step whose loss or forecaster cannot price every asset projects onto the view at the assets that it prices.
   - `rows_needed(set::AbstractAllocationSet) -> Union{Nothing, Integer}`: The number of rows the set's constraints read at a step, `0` for a set that reads none.
 
 ## Arguments

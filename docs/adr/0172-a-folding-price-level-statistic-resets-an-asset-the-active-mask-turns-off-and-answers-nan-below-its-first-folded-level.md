@@ -137,3 +137,9 @@ and `forecast_relative` calls `partial_fit!` directly.
 - ADR 0170's paragraph naming this as its follow-up is rewritten: the family now takes the
   Coverage Universe reading of that ADR rather than the cash reading.
 - Issue #1238.
+
+## Amendment (2026-11-25): the step removes a leg with no folded level
+
+Issue #2339. *In the head, `flat_where_undefined` holds that leg* is superseded. `mean(me)` still
+answers `NaN` there. `forecast_relative` keeps the `NaN`, and the step removes the leg and gives it
+a zero weight. ADR 0170, amendment of 2026-11-25.

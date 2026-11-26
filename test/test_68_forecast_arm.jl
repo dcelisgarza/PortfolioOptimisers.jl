@@ -160,10 +160,10 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         @test gf.cache.n == 6 && gf.cache.nu == [6, 3]
         @test vec(mean(gf))[2] ≈ vec(mean(emag, Rg[4:6, 2:2]))[1]
         @test vec(mean(gf))[1] ≈ vec(mean(emag, Rg[:, 1:1]))[1]
-        # Below the warm-up the asset carries no forecast, so the step holds its leg.
+        # Below the warm-up the asset carries no forecast, so the step removes its leg.
         cold3 = po.partial_fit!(emag, Rg[1:3, :]; active_mask = amskg[1:3, :])
         @test cold3.cache.nu == [3, 0] && isnan(vec(mean(cold3))[2])
-        @test po.flat_where_undefined(1 .+ vec(mean(cold3)))[2] == 1
+        @test isnan(po.forecast_where_defined(1 .+ vec(mean(cold3)))[2])
         # The Asset Panel arm of the batch verb is that fold, so the two arms agree.
         @test isequal(vec(mean(emag, Rg, pnlg)), vec(mean(gf)))
         # With no mask a gap is a delisting, because nothing states otherwise.

@@ -277,3 +277,13 @@ not over returns.
   whose kernel-scaled step is not normalised.
 - A factor forecast is recorded as fog on the map, should one ever be wanted; nothing on the
   ledger asks for it.
+
+## Amendment (2026-11-25): a forecast is `NaN` at an asset that the forecaster cannot price
+
+Issue #2339. *A forecast is flat where the forecaster answers a non-finite entry* held for that
+entry alone, so the step of a rule could move the whole book to an asset with no forecast. The
+forecast is now flat only where no entry is finite. Otherwise a non-finite entry is `NaN`, the step
+runs on the other assets, and the allocation holds a zero at that one. The five forecast-reading
+rules take one `online_update!`, on `ForecastReadingRule`, and each gives its raw step through
+`forecast_step`. `scale_relative` still reads a non-finite entry as one. ADR 0170, amendment of
+2026-11-25.

@@ -958,12 +958,12 @@ end
             @test maxerr(w_book, walk(trl(wh2; fixed = true))) < 1e-14
             @test maxerr(w_book, walk(trl(wq; fixed = true))) > 1e-3
         end
-        # The same two rows on a panel whose fourth asset is inactive (#1772). The book keeps
-        # the asset at its weight of the uniform start and reads its gap as a relative of
-        # one, so `wh` has four legs, and the loss views the benchmark on the three priced
-        # ones. Measured: 0.0 against the benchmark at `wh`, 0.33, 0.52 and 0.67 against the
-        # caller's. The adaptive subgradient steps there since #1777, because a zero entry of
-        # its gradient mass is the limit of a positive one.
+        # The same two rows on a panel whose fourth asset is inactive (#1772). The first step
+        # reads one row, so the book of the second keeps the asset at its weight of the
+        # uniform start and reads its gap as a relative of one. So `wh` has four legs, and
+        # the loss views the benchmark on the three priced ones.
+        # Measured: 0.0 against the benchmark at `wh`, and 0.0022, 0.0021 and 0.0085 against the
+        # caller's. The default rates put the whole book on the third asset.
         Rn2 = copy(R[1:2, :])
         am2 = trues(2, N)
         am2[:, 4] .= false
@@ -972,15 +972,15 @@ end
                              pnl = AssetPanel(; amsk = am2, emsk = copy(am2)))
         xg = [X[2, 1:3]; 1]
         whm = xg ./ sum(xg)
-        for mk in (o -> GradientProjection(; eta = 50, obj = o),
-                   o -> AdaptiveSubgradient(; obj = o),
-                   o -> GradientProjection(; eta = 50, obj = o,
+        for mk in (o -> GradientProjection(; eta = 5, obj = o),
+                   o -> AdaptiveSubgradient(; delta = 0.1, obj = o),
+                   o -> GradientProjection(; eta = 5, obj = o,
                                            predictor = LastGradient(; at_played = false)))
             walk(o) = optimise(OPS(; alg = mk(o)), rdn2).w
             w_book = walk(trl(wq; fixed = false))
             @test iszero(w_book[4])
             @test maxerr(w_book, walk(trl(whm; fixed = true))) < 1e-14
-            @test maxerr(w_book, walk(trl(wq; fixed = true))) > 0.1
+            @test maxerr(w_book, walk(trl(wq; fixed = true))) > 1e-3
         end
     end
 
@@ -1055,7 +1055,8 @@ end
         @test maxerr(w100, wmv) < 0.06
 
         # `loss_gradient` on a panel whose window does not cover D: the gradient is
-        # 2 Σ u on the three priced assets, u sliced and not renormalised, and zero at D.
+        # 2 Σ v on the three priced assets, v their slice of u renormalised, and `NaN` at D,
+        # the mark of an asset that the loss cannot price (#2339).
         Rn = copy(R[1:10, :])
         am = trues(10, N)
         am[:, 4] .= false
@@ -1063,18 +1064,18 @@ end
         rdn = ReturnsResult(; nx = nx, X = Rn, ts = ts[1:10],
                             pnl = AssetPanel(; amsk = am, emsk = copy(am)))
         u = [0.3, 0.3, 0.2, 0.2]
+        v = u[1:3] ./ sum(u[1:3])
         g = po.loss_gradient(RiskLoss(; window = 10), u, X[11, :], rdn)
-        @test g[4] == 0
-        @test isapprox(g[1:3], 2 .* cov(R[1:10, 1:3]) * u[1:3]; atol = 1e-15)
+        @test isnan(g[4])
+        @test isapprox(g[1:3], 2 .* cov(R[1:10, 1:3]) * v; atol = 1e-15)
         # Issue #1660: the measure is viewed on the mask with the prior, so a benchmark of
         # four legs is cut to the three priced ones and is not renormalised.
         tr4 = TrackingRiskMeasure(; tr = WeightsTracking(; w = [0.4, 0.3, 0.2, 0.1]))
         tr3 = TrackingRiskMeasure(; tr = WeightsTracking(; w = [0.4, 0.3, 0.2]))
         gt = po.loss_gradient(RiskLoss(; r = tr4, window = 10), u, X[11, :], rdn)
-        @test gt[4] == 0
+        @test isnan(gt[4])
         @test isapprox(gt[1:3],
-                       po.loss_gradient(RiskLoss(; r = tr3, window = 10), u[1:3],
-                                        X[11, 1:3],
+                       po.loss_gradient(RiskLoss(; r = tr3, window = 10), v, X[11, 1:3],
                                         ReturnsResult(; nx = nx[1:3], X = R[1:10, 1:3]));
                        atol = 1e-12)
 

@@ -481,13 +481,36 @@ function simplex_bounds(wb::WeightBounds)::Bool
     return all(iszero, wb.lb) && all(isone, wb.ub)
 end
 """
+    feasible_bounds(wb::WeightBounds)
+    feasible_bounds(set::BoundedAllocationSet)
+    feasible_bounds(set::AbstractAllocationSet)
+
+Checks whether an allocation on the budget lies between the resolved bounds, `sum(wb.lb) <= 1 <= sum(wb.ub)`.
+
+A [`BoundedAllocationSet`](@ref) answers for its own bounds. Any other set answers `true`, because its projection settles what it does on an infeasible set.
+
+# Related
+
+  - [`project`](@ref)
+  - [`assert_feasible_bounds`](@ref)
+"""
+function feasible_bounds(wb::WeightBounds)::Bool
+    return sum(wb.lb) <= one(eltype(wb.lb)) <= sum(wb.ub)
+end
+function feasible_bounds(set::BoundedAllocationSet)::Bool
+    return feasible_bounds(set.wb)
+end
+function feasible_bounds(::AbstractAllocationSet)::Bool
+    return true
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Refuses a resolved bound that no allocation on the budget satisfies.
 
 # Validation
 
-  - `sum(wb.lb) <= 1 <= sum(wb.ub)`. An `ArgumentError` is thrown otherwise.
+  - `sum(wb.lb) <= 1 <= sum(wb.ub)`, through [`feasible_bounds`](@ref). An `ArgumentError` is thrown otherwise.
 
 # Related
 
@@ -495,7 +518,7 @@ Refuses a resolved bound that no allocation on the budget satisfies.
   - [`BoundedAllocationSet`](@ref)
 """
 function assert_feasible_bounds(wb::WeightBounds)::Nothing
-    @argcheck(sum(wb.lb) <= one(eltype(wb.lb)) <= sum(wb.ub),
+    @argcheck(feasible_bounds(wb),
               ArgumentError("no allocation summing to one lies between the resolved bounds: `Σ lb = $(sum(wb.lb))` and `Σ ub = $(sum(wb.ub))`, and the budget is one."))
     return nothing
 end
