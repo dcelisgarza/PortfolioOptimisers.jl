@@ -233,6 +233,43 @@ end
                              (s.mu, 2 .* s.sigma), (zeros(3), Matrix(1.0I, 3, 3))], false,
                             POS.s_tuning(BisquareRho(), 0.5, 100, 3)...)
         @test length(runs) == 2
+        # The refinement keeps the `n_best` starts with the smallest M-scales, in that order.
+        kb = POS.s_tuning(BisquareRho(), 0.5, 100, 3)
+        starts = [(s.mu, s.sigma), (vec(mean(X; dims = 1)), cov(X)), (s.mu, 2 .* s.sigma),
+                  (zeros(3), Matrix(1.0I, 3, 3))]
+        refined = [POS.s_isteps(BisquareRho(), X, mu, S, false, kb..., 2)
+                   for (mu, S) in starts]
+        order = sortperm([r[3] for r in refined])[1:2]
+        @test all(runs[j][1] == refined[i][1] && runs[j][2] == refined[i][2]
+                  for (j, i) in enumerate(order))
+        # A given seed draws from a copy of the generator, so the field does not change.
+        # With `seed = nothing`, the search draws from the generator itself.
+        a = FastS(; rng = StableRNG(5), seed = 1)
+        r0 = copy(a.rng)
+        StatsAPI.fit(SCovariance(; alg = a), X)
+        @test a.rng == r0
+        a = FastS(; rng = StableRNG(5))
+        @test cov(SCovariance(; alg = a), X) ≈ s.sigma rtol = 1e-6
+        @test a.rng != StableRNG(5)
+        # Many assets: the width of the Rocke rho is below one, and the M-scale of the fit
+        # solves its equation, which the fixed-point step does not do from about 20 assets.
+        Y, _, bad = s_outlier_sample(StableRNG(30), 500, 30, 25, 6)
+        rk = StatsAPI.fit(SCovariance(; rho = RockeRho()), Y)
+        gy, by = POS.s_tuning(RockeRho(), 0.5, 500, 30)
+        @test gy < 1
+        sy = POS.m_scale(RockeRho(), rk.d2, gy, by, median(rk.d2))
+        @test mean(t -> POS.srho(RockeRho(), t / sy, gy), rk.d2) ≈ by atol = 1e-12
+        @test POS.m_scale(RockeRho(), rk.d2, gy, by, 10 * sy) ≈ sy rtol = 1e-12
+        @test all(rk.outlier[bad])
+        @test (@inferred POS.srho(RockeRho(), 1.0f0, gy)) isa Float64
+        @test (@inferred POS.srho_weight(RockeRho(), 1.0f0, gy)) isa Float64
+        @test (@inferred POS.m_scale(RockeRho(), Float32[1, 2, 3], 0.5, 0.4, 1.0f0)) isa
+              Float64
+        # A width of zero gives no observation a weight, so the fit refuses it.
+        @test_throws DomainError POS.s_tuning(RockeRho(; arp = 0.5), 0.5, 100, 3)
+        @test_throws DomainError StatsAPI.fit(SCovariance(; rho = RockeRho(; arp = 0.45)),
+                                              X)
+        @test POS.s_tuning(RockeRho(; arp = 0.39), 0.5, 100, 3)[1] > 0
         # The start estimator of `RobustStartS` takes the views and the weights.
         T = [2.0 0.1 0.0; 0.1 1.0 0.0; 0.0 0.0 0.5]
         ce = SCovariance(;
