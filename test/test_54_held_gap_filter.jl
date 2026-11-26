@@ -317,7 +317,7 @@ end
     wp = [0.4, 0.1, 0.0, 0.2, 0.3]
     Xoz = map(x -> isfinite(x) ? x : 0.0, Xo)
     g(v; kw...) = factor_risk_contribution(cvar, v, prf; kw...)
-    @test @test_logs((:warn, r"Assets \[\"2\", \"4\"\] carry"), g(wp)) ≈
+    @test @test_logs((:warn, r"Assets \[2, 4\] carry"), g(wp)) ≈
           factor_risk_contribution(cvar, wp[keep], Xoz[:, keep];
                                    re = PO.port_opt_view(re, keep))
     @test_throws ArgumentError g(wp; strict = true)
@@ -326,6 +326,24 @@ end
                         fpr = prior(EmpiricalPrior(), F))
     @test @test_logs((:warn, r"Assets \[2, 4\] carry"),
                      factor_risk_contribution(cvar, wp, pro)) ≈ f(wp, Xoz)
+    # A regression estimator fits each asset on the rows where its return is finite, so the
+    # default `StepwiseRegression` fits the loadings of `rd` with its gap and raises no
+    # `BoundsError` (#2370). The loadings of asset 2 are those of its own history.
+    sw = StepwiseRegression()
+    @test regression(sw, Xg, F).M[2, :] ≈
+          regression(sw, Xg[31:end, 2:2], F[31:end, :]).M[1, :]
+    # The active mask of an Asset Panel states the same universe as the gap.
+    amsk = trues(size(X))
+    amsk[1:30, 2] .= false
+    rdp = ReturnsResult(; nx = nx, X = X, nf = ["f1", "f2"], F = F,
+                        pnl = AssetPanel(; amsk = amsk, emsk = copy(amsk)))
+    for res in (sw, DimensionReductionRegression())
+        rr = regression(res, Xg, F)
+        frc = factor_risk_contribution(cvar, wh, rdg; re = res, rd = rdg)
+        @test frc ≈ factor_risk_contribution(cvar, wh, Xz; re = rr)
+        @test sum(frc) ≈ expected_risk(cvar, wh, Xz)
+        @test PO.refit_factor_regression(res, rdp).M ≈ rr.M
+    end
 end
 
 @testset "investable_reduction: the value-level door reduces, names and passes through" begin

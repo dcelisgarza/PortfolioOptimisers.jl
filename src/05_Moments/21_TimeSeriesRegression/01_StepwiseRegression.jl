@@ -322,15 +322,18 @@ end
 
 Adds the factor of smallest p-value when a p-value search selected none.
 
-Both [`PValue`](@ref) methods of `_regression` call it last, so a p-value search never returns an empty factor set. It does nothing when `included` already holds a factor. It warns each time that it adds a factor, because that factor failed the threshold in the search.
+Both [`PValue`](@ref) methods of `_regression` call it last, so a p-value search returns an empty factor set only when no factor has a p-value. It does nothing when `included` already holds a factor. It warns each time that it adds a factor, because that factor failed the threshold in the search.
+
+A p-value that is `NaN` never wins, because `best_pval > NaN` is `false`. When every p-value is `NaN`, for example on a response with no variance, no factor has a p-value, and the function adds none. [`stepwise_factor_set`](@ref) then warns, and the asset gets an intercept-only model. The function never pushes the index `0`, which names no factor.
 
 # Algorithm
 
  1. Return at once when `included` is not empty.
  2. For each factor `i` of `F`, fit `tgt` to an intercept column and column `i`, and read the p-value of column `i`. Call it `test_pval`.
  3. Keep the smallest `test_pval` of step 2 as `best_pval`, and its factor as `new_factor`.
- 4. Warn, and name `new_factor` and `best_pval`.
- 5. Push `new_factor` onto `included`.
+ 4. Return when step 3 kept no factor, because every p-value is `NaN`.
+ 5. Warn, and name `new_factor` and `best_pval`.
+ 6. Push `new_factor` onto `included`.
 
 # Arguments
 
@@ -370,6 +373,9 @@ function add_best_factor_after_pval_failure!(tgt::AbstractRegressionTarget,
             new_factor = i
         end
     end
+    if iszero(new_factor)
+        return nothing
+    end
     @warn("No factor with p-value lower than threshold. Best we can do is factor $new_factor, with p-value $best_pval.",
           maxlog = log_limit(:warn), _id = @log_id())
     push!(included, new_factor)
@@ -401,7 +407,7 @@ A candidate is admissible only when each factor coefficient of the candidate mod
 
 # Returns
 
-  - `included::Vector{Int}`: Indices of the selected factors, in the order in which the loop added them, so the vector is not sorted. It holds at least one index.
+  - `included::Vector{Int}`: Indices of the selected factors, in the order in which the loop added them, so the vector is not sorted. It holds at least one index, unless no factor has a p-value, as [`add_best_factor_after_pval_failure!`](@ref) states.
 
 # Related
 
@@ -581,7 +587,7 @@ Shrinks a factor set from full, and removes the factor of largest p-value while 
 
 # Returns
 
-  - `included::VecInt`: Indices of the selected factors, in ascending order. It holds at least one index. It is the `1:size(F, 2)` range itself when the full model already passes the threshold, and a `Vector{Int}` otherwise.
+  - `included::VecInt`: Indices of the selected factors, in ascending order. It holds at least one index, unless no factor has a p-value, as [`add_best_factor_after_pval_failure!`](@ref) states. It is the `1:size(F, 2)` range itself when the full model already passes the threshold, and a `Vector{Int}` otherwise.
 
 # Related
 
@@ -823,18 +829,22 @@ function stepwise_factor_set(re::StepwiseRegression, x::VecNum, F::MatNum, i::In
     return included
 end
 """
-    regression(re::StepwiseRegression, X::MatNum, F::MatNum)
+    regression(re::StepwiseRegression, X::MatNum, F::MatNum;
+               active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing)
 
 Runs one stepwise search per asset and assembles the loadings matrix from the fits.
 
 Each asset has its own search. The search of one asset reads only the column of that asset and `F`, so one asset cannot change the factor set of another. An asset whose entry of `re.included` holds a factor set takes that set, and no search runs for it.
 
+An asset fits on the observations where its return is finite and `active_mask` is `true`, as [`asset_fit_rows`](@ref) states. So an asset that lists late gets the loadings of its own history, and a gap changes no other asset.
+
 # Algorithm
 
  1. Allocate `rr`, a dense `assets × (factors + 1)` buffer of zeros. A factor that an asset does not select keeps its zero.
  2. Name the first column of each design, the column of ones, to the target with `factory(re.tgt, InterceptColumn(1))`, and call the result `tgt`.
- 3. For each asset `i`, fit it with [`stepwise_asset_fit!`](@ref), which writes row `i` of `rr` and returns the residual count of the asset. Collect the counts in `edof`, whose element type is the type of the counts.
- 4. Build a [`Regression`](@ref) from the first column of `rr`, its remaining columns, and `edof`.
+ 3. Find the observations of the fit of each asset with [`asset_fit_rows`](@ref), in one pass over `X` and `active_mask`.
+ 4. For each asset `i`, fit it on its observations with [`stepwise_asset_fit!`](@ref), which writes row `i` of `rr` and returns the residual count of the asset. Collect the counts in `edof`, whose element type is the type of the counts.
+ 5. Build a [`Regression`](@ref) from the first column of `rr`, its remaining columns, and `edof`.
 
 # Arguments
 
@@ -842,18 +852,24 @@ Each asset has its own search. The search of one asset reads only the column of 
   - $(arg_dict[:X])
   - $(arg_dict[:F])
 
+# Keyword Arguments
+
+  - `active_mask`: The active mask of `X`, of the shape of `X`, or `nothing`. A cell that it turns off is a gap of its asset.
+
 # Validation
 
+  - The rules of [`assert_finite_factor_rows`](@ref) for `F`.
   - The rules of [`assert_stepwise_included`](@ref) for `re.included`, `X` and `F`.
+  - The rules of [`asset_fit_rows`](@ref): `active_mask` has the size of `X`, and every asset carries at least one finite and active return.
 
 # Returns
 
   - `reg::Regression`: Regression result that holds:
 
       + `b`: Intercept of each asset, a view of the first column of `rr`.
-      + `M`: Coefficient of each asset and factor, a view of the remaining columns of `rr`. A factor that the asset does not use has an exact zero. A whole row is zero when the asset uses no factor. An empty entry of `re.included` gives such a row with no warning. A search that selects no factor gives it too, and [`stepwise_factor_set`](@ref) warns. Only [`BackwardElimination`](@ref) under a [`MinMaxValStepwiseRegressionCriterion`](@ref) can select no factor.
+      + `M`: Coefficient of each asset and factor, a view of the remaining columns of `rr`. A factor that the asset does not use has an exact zero. A whole row is zero when the asset uses no factor. An empty entry of `re.included` gives such a row with no warning. A search that selects no factor gives it too, and [`stepwise_factor_set`](@ref) warns. [`BackwardElimination`](@ref) under a [`MinMaxValStepwiseRegressionCriterion`](@ref) can select no factor, and a [`PValue`](@ref) search selects none when no factor has a p-value.
       + `L`: Not set. The regression runs in the original factor basis, so `reg.L` returns `reg.M` through the `swap(L, M)` property rule of the result, and `size(reg.L, 2)` is the number of columns of `F`.
-      + `edof`: Degrees of freedom of the residuals of each asset, which [`residual_count`](@ref) reads off the fit of the asset. Under an unpenalised target it is the number of observations less the intercept and the factors that the search selected for that asset, an integer. Under a penalised target it is the real count that [`ElasticNetFit`](@ref) states. The count reads the selected factors alone, and not the search that selected them.
+      + `edof`: Degrees of freedom of the residuals of each asset, which [`residual_count`](@ref) reads off the fit of the asset. Under an unpenalised target it is the number of observations of the fit of the asset less the intercept and the factors that the search selected for that asset, an integer. Under a penalised target it is the real count that [`ElasticNetFit`](@ref) states. The count reads the selected factors alone, and not the search that selected them.
 
 # Related
 
@@ -865,27 +881,35 @@ Each asset has its own search. The search of one asset reads only the column of 
 
   - $(ref_dict[:cajas2025]) Section 4.1, Equations 4.2-4.3. $(ref_dict[:no_original_source])
 """
-function regression(re::StepwiseRegression, X::MatNum, F::MatNum)
+function regression(re::StepwiseRegression, X::MatNum, F::MatNum;
+                    active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing)
     assert_finite_factor_rows(F)
     assert_stepwise_included(re.included, X, F)
+    rows = asset_fit_rows(X, active_mask)
     cols = size(F, 2) + 1
     rr = zeros(promote_type(eltype(F), eltype(X)), size(X, 2), cols)
     tgt = factory(re.tgt, InterceptColumn(1))
-    edof = [stepwise_asset_fit!(rr, re, tgt, view(X, :, i), F, i) for i in axes(rr, 1)]
+    edof = [stepwise_asset_fit!(rr, re, tgt, view(X, :, i), F, i, rows[i])
+            for i in axes(rr, 1)]
     return Regression(; b = view(rr, :, 1), M = view(rr, :, 2:cols), edof = edof)
 end
 """
     stepwise_asset_fit!(rr::MatNum, re::StepwiseRegression, tgt::AbstractRegressionTarget,
-                        x::VecNum, F::MatNum, i::Integer)
+                        x::VecNum, F::MatNum, i::Integer, rows::Nothing = nothing)
+    stepwise_asset_fit!(rr::MatNum, re::StepwiseRegression, tgt::AbstractRegressionTarget,
+                        x::VecNum, F::MatNum, i::Integer, rows::VecInt)
 
 Fits one asset of a [`StepwiseRegression`](@ref), writes its coefficients into row `i` of `rr`, and returns its residual count.
 
+The asset fits on `rows`, the observations where its return is finite and active, which [`asset_fit_rows`](@ref) gives. With `nothing`, every return is finite, and the fit reads the whole column. With a vector, the method cuts `x`, `F` and the observation weights of `re` to those rows with [`shared_series_estimator`](@ref), names the intercept column of the cut target again, and fits the cut data. So the search and the fit of the asset read the same observations, and the residual count is the count of its own history.
+
 # Algorithm
 
- 1. Take the factor set of asset `i` with [`stepwise_factor_set`](@ref), and call it `included`.
- 2. Fit `tgt` to a column of ones and the columns `included` of `F`, and read its coefficients. Call them `params`. Fit the intercept column alone when `included` is empty.
- 3. Write `params[1]` into `rr[i, 1]`, and the remaining coefficients into the columns of `rr` that `included` names, in the order of `included`. A selected factor whose coefficient the penalty of a penalised target set to zero writes that zero.
- 4. Return [`residual_count`](@ref) of the fit and its design. This is the number of degrees of freedom that the fit leaves in the residuals of the asset.
+ 1. When `rows` is a vector, cut `re`, `x` and `F` to `rows`, take `tgt` again from the cut `re`, and do the steps below on the cut data.
+ 2. Take the factor set of asset `i` with [`stepwise_factor_set`](@ref), and call it `included`.
+ 3. Fit `tgt` to a column of ones and the columns `included` of `F`, and read its coefficients. Call them `params`. Fit the intercept column alone when `included` is empty.
+ 4. Write `params[1]` into `rr[i, 1]`, and the remaining coefficients into the columns of `rr` that `included` names, in the order of `included`. A selected factor whose coefficient the penalty of a penalised target set to zero writes that zero.
+ 5. Return [`residual_count`](@ref) of the fit and its design. This is the number of degrees of freedom that the fit leaves in the residuals of the asset.
 
 # Arguments
 
@@ -895,6 +919,7 @@ Fits one asset of a [`StepwiseRegression`](@ref), writes its coefficients into r
   - `x`: Returns of asset `i`, `observations × 1`.
   - $(arg_dict[:F])
   - `i`: Index of the asset.
+  - `rows`: The observations where the return of the asset is finite, or `nothing` when every return is finite.
 
 # Returns
 
@@ -904,11 +929,19 @@ Fits one asset of a [`StepwiseRegression`](@ref), writes its coefficients into r
 
   - [`regression`](@ref)
   - [`stepwise_factor_set`](@ref)
+  - [`asset_fit_rows`](@ref)
+  - [`shared_series_estimator`](@ref)
   - [`residual_count`](@ref)
 """
+function stepwise_asset_fit!(rr::MatNum, re::StepwiseRegression, ::AbstractRegressionTarget,
+                             x::VecNum, F::MatNum, i::Integer, rows::VecInt)
+    re = shared_series_estimator(re, rows, length(x))
+    return stepwise_asset_fit!(rr, re, factory(re.tgt, InterceptColumn(1)), view(x, rows),
+                               view(F, rows, :), i)
+end
 function stepwise_asset_fit!(rr::MatNum, re::StepwiseRegression,
                              tgt::AbstractRegressionTarget, x::VecNum, F::MatNum,
-                             i::Integer)
+                             i::Integer, ::Nothing = nothing)
     ovec = range(one(eltype(F)), one(eltype(F)); length = length(x))
     included = stepwise_factor_set(re, x, F, i)
     x1 = !isempty(included) ? [ovec view(F, :, included)] : reshape(ovec, :, 1)

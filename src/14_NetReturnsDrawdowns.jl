@@ -458,7 +458,7 @@ function held_gap_pairs(W::MatNum, X::MatNum)
 end
 """
     filter_held_gaps(w::Union{VecNum, VecVecNum, MatNum}, X::MatNum, strict::Bool;
-                     nx::Option{<:VecStr} = nothing)
+                     nx::Option{<:Union{VecStr, VecInt}} = nothing)
 
 Return the window with every non-finite entry replaced by zero, and name the Held Gaps.
 
@@ -481,7 +481,7 @@ A fold hands this verb the window **viewed at the Investable Mask**, so a column
   - `w`: Portfolio weights, a population of them, or a weight path (observations × assets).
   - `X`: Asset returns, `observations × assets`.
   - `strict`: Whether a non-finite return at a held pair raises rather than warns.
-  - `nx`: Optional asset names of the columns of `X`. When given, the message names the held assets by them; otherwise it reports their column indices.
+  - `nx`: Optional labels of the columns of `X`, the asset names or the positions of the assets in the universe of the caller. When given, the message names the held assets by them; otherwise it reports their column indices.
 
 # Validation
 
@@ -501,7 +501,7 @@ A fold hands this verb the window **viewed at the Investable Mask**, so a column
   - [`performance_summary`](@ref)
 """
 function filter_held_gaps(w::Union{VecNum, VecVecNum, MatNum}, X::MatNum, strict::Bool;
-                          nx::Option{<:VecStr} = nothing)
+                          nx::Option{<:Union{VecStr, VecInt}} = nothing)
     if all(isfinite, X)
         return X
     end
@@ -512,16 +512,16 @@ function filter_held_gaps(w::Union{VecNum, VecVecNum, MatNum}, X::MatNum, strict
     return map(x -> isfinite(x) ? x : zero(x), X)
 end
 """
-    held_gap_msg(held::AbstractVector{<:Tuple{Integer, Integer}}, nx::Option{<:VecStr} = nothing)
+    held_gap_msg(held::AbstractVector{<:Tuple{Integer, Integer}}, nx::Option{<:Union{VecStr, VecInt}} = nothing)
 
 Write the message a Held Gap raises.
 
-The message names the assets, the count of pairs and the first observation, so a caller can find the delisting that made them, and it states the consequence: the pair contributes zero and the missing weight sits in cash. The assets are named by `nx` when it is given, because the window a fold filters is viewed at the Investable Mask and a column index of it is a reduced one; with no names the column indices are reported.
+The message names the assets, the count of pairs and the first observation, so a caller can find the delisting that made them, and it states the consequence: the pair contributes zero and the missing weight sits in cash. The assets are named by `nx` when it is given, because the window a fold filters is viewed at the Investable Mask and a column index of it is a reduced one; with no names the column indices are reported. A caller with no names and a mask gives the positions of the columns in its own universe as `nx`, integers, so the message reads `[2, 4]` with a mask and with none.
 
 # Arguments
 
   - `held`: The `(observation, asset)` pairs [`held_gap_pairs`](@ref) found.
-  - `nx`: Optional asset names of the window's columns.
+  - `nx`: Optional labels of the columns of the window, the asset names or the positions of the assets in the universe of the caller.
 
 # Returns
 
@@ -534,7 +534,7 @@ The message names the assets, the count of pairs and the first observation, so a
   - [`strict_diagnostic`](@ref)
 """
 function held_gap_msg(held::AbstractVector{<:Tuple{Integer, Integer}},
-                      nx::Option{<:VecStr} = nothing)
+                      nx::Option{<:Union{VecStr, VecInt}} = nothing)
     cols = unique(last.(held))
     assets = isnothing(nx) ? cols : nx[cols]
     return "a portfolio cannot earn a return an asset did not have. Assets $(assets) carry a non-finite return at $(length(held)) held (observation, asset) pair(s), the first at observation $(first(held)[1]). Those pairs contribute zero, so the weight of a missing asset sits in cash on that observation and the series understates the portfolio by whatever it would have earned. Pass `strict = true` to refuse instead, zero the weights over the observations the asset is inactive, or pass a weight history."

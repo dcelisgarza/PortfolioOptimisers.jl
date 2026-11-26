@@ -1480,6 +1480,13 @@
                                      ys_gm(f(res_gm, rd_gm))), ys_gm(f(res_gm, rdz_gm)))
             @test_throws ArgumentError f(res_gm, rd_gm; strict = true)
         end
+        # The default `StepwiseRegression` fits each asset on the rows where its return is
+        # finite, so both arities plot the loadings of the gapped returns (#2370).
+        rr_gm = regression(StepwiseRegression(), Xg_gm, F_gm)
+        @test isequal(ys_gm(plot_factor_risk_contribution(r_gm, res_gm, rd_gm; N = 3)),
+                      ys_gm(plot_factor_risk_contribution(r_gm, res_gm, rdz_gm; re = rr_gm,
+                                                          N = 3)))
+        @test is_plot(plot_factor_risk_contribution(r_gm, wh_gm, rd_gm; rd = rd_gm, N = 3))
         # A result with no prior leaves the refusal to the measure.
         res0_gm = PortfolioOptimisers.rebuild_struct(res_gm, (; pr = nothing))
         @test_throws PortfolioOptimisers.IsNothingError plot_measures([res0_gm]; axes_gm...)

@@ -372,7 +372,7 @@ function resolve_factor_risk_inputs(r::BaseRM_VecBaseRM, X::Union{MatNum, Return
 end
 function resolve_factor_risk_inputs(r::BaseRM_VecBaseRM, pr::AbstractPriorResult, w::VecNum,
                                     imsk::Option{<:BitVector}, strict::Bool)
-    nx = isnothing(imsk) ? nothing : string.(findall(imsk))
+    nx = isnothing(imsk) ? nothing : findall(imsk)
     X = filter_held_gaps(w, original_returns(pr), strict; nx = nx)
     return first(resolve_risk_inputs(r, pr)), X
 end
@@ -491,11 +491,14 @@ Fit the factor loadings of a regression reader on the returns that its source na
 
 [`resolve_factor_regression`](@ref) and [`factor_space_regression`](@ref) call it when the source of `re` takes no loadings of a prior. The source `x_src = returns_source(re)` picks the matrix, as [`benchmark_relative_returns`](@ref) states: `rd.X` under `nothing` and [`DataSource`](@ref), and `rd.X - rd.B` under [`ExcessSource`](@ref).
 
+A gap of one asset is not a Shared Series gap, so it drops no observation of the other assets. The regression fits each asset on the observations where its return is finite, as [`asset_fit_rows`](@ref) states. An asset that lists late gets the loadings of its own history. The active mask of the Asset Panel of `rd` states the universe too, so a cell that the mask turns off is out of the fit of its asset. The regression reads the mask and the finiteness in one pass, and it copies no returns.
+
+The function is [`regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult)`](@ref) with a refusal that names the three sources of the loadings, `re`, `pr` and `rd`.
+
 # Algorithm
 
  1. Check that `rd.X` and `rd.F` are present.
- 2. Drop the observations of a Shared Series gap with [`shared_series_fit`](@ref) under `x_src`: a gap of the factor returns, and a gap of a vector benchmark under `ExcessSource()`. Each fixed observation weight in the tree of `re` loses the same observations.
- 3. Read the asset returns with [`benchmark_relative_returns`](@ref) under `x_src`, giving `X`. Fit and return `regression(re, X, rd.F)`.
+ 2. Fit and return `regression(re, rd)`. It drops the observations of a Shared Series gap under `x_src`, reads the asset returns that `x_src` names, and fits each asset on its cells that are finite and active.
 
 # Arguments
 
@@ -507,6 +510,7 @@ Fit the factor loadings of a regression reader on the returns that its source na
 
   - `!isnothing(rd.X)` and `!isnothing(rd.F)`. Throws an [`IsNothingError`](@ref) that names the three arguments `re`, `pr` and `rd` that can supply loadings.
   - The rules of [`benchmark_relative_returns`](@ref).
+  - The rule of [`asset_fit_rows`](@ref): every asset carries at least one finite and active return.
 
 # Returns
 
@@ -516,16 +520,16 @@ Fit the factor loadings of a regression reader on the returns that its source na
 
   - [`resolve_factor_regression`](@ref)
   - [`factor_space_regression`](@ref)
+  - [`regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult)`](@ref)
   - [`shared_series_fit`](@ref)
+  - [`asset_fit_rows`](@ref)
 """
 function refit_factor_regression(re::AbstractTimeSeriesRegressionEstimator,
                                  rd::ReturnsResult,
                                  pr::Option{<:AbstractPriorResult} = nothing)
-    x_src = returns_source(re)
     @argcheck(!isnothing(rd.X) && !isnothing(rd.F),
               IsNothingError("a factor decomposition needs loadings, and none of the three arguments `re`, `pr` and `rd` holds any. `re` is an estimator (`$(nameof(typeof(re)))`), so it must fit them from `rd.X` and `rd.F`; the prior carries no factor block to read them from instead.\nSupply the data as `rd`, or pass a precomputed `Regression` as `re`, or pass a prior fitted through a factor model (e.g. `FactorPrior`), which carries its own loadings in `rr`.\nGot\nisnothing(rd.X) => $(isnothing(rd.X))\nisnothing(rd.F) => $(isnothing(rd.F))\nisnothing(pr) => $(isnothing(pr))"))
-    re, rd = shared_series_fit(re, rd, x_src, true)
-    return regression(re, benchmark_relative_returns(rd, x_src), rd.F)
+    return regression(re, rd)
 end
 # The prior route of the value-level `expected_risk`. A non-investable asset carries `NaN`
 # in `mu`, on the diagonal of `sigma` and down its column of `pr.X`, so the figure is `NaN`
@@ -1486,7 +1490,7 @@ The function splits the Euler decomposition of the risk between the factor expos
 
 A prior result reduces to the Investable Mask at the entry, through [`investable_reduction`](@ref), and the function reduces `rd` with it, so the regression fits the loadings over the investable assets alone. A held non-investable asset warns and its weight is dropped, or it raises under `strict`. The result has one entry for each factor and not one for each asset, so nothing expands.
 
-The gaps of a [`ReturnsResult`](@ref) become zero once before the finite difference, as in [`expected_risk`](@ref), and a bare matrix keeps them. The gaps of the original returns of a prior become zero in the same way. A [`CrossSectionalFactorPrior`](@ref) keeps in `original_X` the gap of an asset that lists inside the window. The regression that fits the loadings reads `rd` as the caller gives it.
+The gaps of a [`ReturnsResult`](@ref) become zero once before the finite difference, as in [`expected_risk`](@ref), and a bare matrix keeps them. The gaps of the original returns of a prior become zero in the same way. A [`CrossSectionalFactorPrior`](@ref) keeps in `original_X` the gap of an asset that lists inside the window. The regression that fits the loadings reads the gaps of `rd` and does not set them to zero, because a zero is not a return and biases the loadings to zero. It fits each asset on the observations where its return is finite and its active mask is `true`, as [`refit_factor_regression`](@ref) states. So an asset that lists late gets the loadings of its own history, and its Held Gaps contribute zero to the risk that the function measures.
 
 The gradient is taken on [`original_returns`](@ref), the returns that the caller supplied, and not on `pr.X`. The two differ under a factor prior, where `pr.X` is the reconstruction `F * transpose(M) .+ transpose(b)`. That matrix has the rank of `F` and no residual, so on it the off-factor part of a measure that reads the series reports the share of the intercept and not the idiosyncratic risk, and it can be negative. So under a factor prior the entries sum to the risk on the returns of the caller, and not to `expected_risk(r, w, pr)`. A measure whose kernel reads a moment and not the series, such as [`Variance`](@ref), [`StandardDeviation`](@ref) or [`DistributionValueatRisk`](@ref), gives the same answer on both matrices.
 

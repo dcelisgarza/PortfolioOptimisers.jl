@@ -39,6 +39,10 @@ To add a time-series regression estimator, subtype `AbstractTimeSeriesRegression
 
   - `reg::Regression`: The regression result, which carries the loadings matrix and the optional intercept.
 
+### Gaps and the active mask
+
+[`regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult)`](@ref) passes the keyword `active_mask`, of the shape of `X`, when the Asset Panel of `rd` carries an active mask, and no keyword otherwise. So a method with no keyword fits returns data with no mask. To fit a panel with a mask, take the keyword, and read [`asset_fit_rows`](@ref) for the rows of each asset, as [`StepwiseRegression`](@ref) and [`DimensionReductionRegression`](@ref) do.
+
 # Examples
 
 The example below defines a minimal regression estimator.
@@ -2039,7 +2043,8 @@ The method calls `regression(re, X, rd.F)` on the observations that it keeps. A 
  2. Read the source of `re` with [`returns_source`](@ref), and call it `x_src`. A regression that reads the returns data itself states its source in its `x_src` field.
  3. With [`shared_series_fit`](@ref), drop the observations at which a factor return is not finite. Under `x_src = ExcessSource()`, also drop the observations of a gap of a vector benchmark. A regression on such an observation has no regressor for any asset. Each fixed observation weight in the tree of `re` loses the same observations.
  4. Read the asset returns with [`benchmark_relative_returns`](@ref) under `x_src`, and call them `X`. `X` is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
- 5. Call `regression(re, X, rd.F)` on the kept observations, and return its result.
+ 5. Read the active mask of `rd.pnl` with [`panel_moment_masks`](@ref).
+ 6. Call `regression(re, X, rd.F)` on the kept observations, with the keyword `active_mask` when the panel carries a mask, and return its result. The regression fits each asset on its cells that are finite and active, as [`asset_fit_rows`](@ref) states, so a cell that the mask turns off is a gap of that asset alone.
 
 # Arguments
 
@@ -2066,7 +2071,15 @@ function regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult
     @argcheck(!isnothing(rd.F), IsNothingError)
     x_src = returns_source(re)
     re, rd = shared_series_fit(re, rd, x_src, true)
-    return regression(re, benchmark_relative_returns(rd, x_src), rd.F)
+    X = benchmark_relative_returns(rd, x_src)
+    amsk = first(panel_moment_masks(rd.pnl))
+    # The keyword goes only with a mask, so an estimator of a caller whose method takes no
+    # keyword still fits returns data with no mask.
+    return if isnothing(amsk)
+        regression(re, X, rd.F)
+    else
+        regression(re, X, rd.F; active_mask = amsk)
+    end
 end
 """
     assert_finite_factor_rows(F::MatNum) -> Nothing
@@ -2098,6 +2111,66 @@ function assert_finite_factor_rows(F::MatNum)::Nothing
     end
     rows = findall(t -> !all(isfinite, view(F, t, :)), axes(F, 1))
     return throw(IsNonFiniteError("a factor return is a regressor of every asset, and the factor returns are not finite at observation(s) $(first(rows, 5)) of $(size(F, 1)), so no asset has a regressor there. Fit through a ReturnsResult, which drops those observations, or drop them from X and F before the call."))
+end
+"""
+    asset_fit_rows(X::MatNum, active_mask::Option{<:AbstractMatrix{<:Bool}})
+        -> Vector{Option{Vector{Int}}}
+    asset_fit_rows(x::VecNum, a::Option{<:AbstractVector{<:Bool}}, i::Integer)
+        -> Option{Vector{Int}}
+
+Return the observations on which a time-series regression fits each asset: the rows where the return of the asset is finite and its active mask is `true`.
+
+A time-series regression fits each asset on its own, against factor returns that are finite at every row, as [`assert_finite_factor_rows`](@ref) checks. So a gap in the return of one asset removes that observation from the fit of that asset alone. An asset that lists late, or delists early, gets the loadings of its own history, and no other asset changes.
+
+A cell is in the fit when its return is finite and the active mask admits it, which is the rule of the Coverage Universe applied to each cell. The function reads both in one pass and copies nothing. An interior gap leaves an asset active with a missing return, so the finiteness is read under a mask too. With no mask, the rule is finiteness alone. The function does not read the estimation mask, as [`coverage_mask`](@ref) does not.
+
+When every cell of an asset is in the fit, its entry is `nothing`, and the fit takes the path of a complete column, with no copy and no cut of the observation weights.
+
+# Arguments
+
+  - $(arg_dict[:X])
+  - `active_mask`: The active mask of `X`, of the shape of `X`, or `nothing`.
+  - `x`: Returns of asset `i`, `observations × 1`.
+  - `a`: The column of the active mask of asset `i`, or `nothing`.
+  - `i`: Index of the asset, which names it in the message.
+
+# Validation
+
+  - `active_mask`, when it is not `nothing`, has the size of `X`. Otherwise, the function throws a `DimensionMismatch`.
+  - Each asset has at least one cell in the fit. Otherwise, the function throws an [`IsNonFiniteError`](@ref) that names the asset.
+
+# Returns
+
+  - `rows::Vector{Option{Vector{Int}}}`: For each asset, its observations in the fit, or `nothing` when every observation is in it. The vector method returns the entry of one asset.
+
+# Related
+
+  - [`assert_finite_factor_rows`](@ref)
+  - [`coverage_mask`](@ref)
+  - [`shared_series_estimator`](@ref)
+  - [`regression`](@ref)
+"""
+function asset_fit_rows(X::MatNum, active_mask::Option{<:AbstractMatrix{<:Bool}})
+    @argcheck(isnothing(active_mask) || size(active_mask) == size(X),
+              DimensionMismatch("the active mask names one cell of the sample at each entry, so it must have the size of X, got $(size(active_mask)) for the active mask against $(size(X)) for X"))
+    rows = Vector{Option{Vector{Int}}}(undef, size(X, 2))
+    for i in axes(X, 2)
+        a = isnothing(active_mask) ? nothing : view(active_mask, :, i)
+        rows[i] = asset_fit_rows(view(X, :, i), a, i)
+    end
+    return rows
+end
+function asset_fit_rows(x::VecNum, a::Option{<:AbstractVector{<:Bool}},
+                        i::Integer)::Option{Vector{Int}}
+    # The method is compiled for the type of `a`, so the test of `nothing` folds away.
+    live = t -> (isnothing(a) || a[t]) && isfinite(x[t])
+    if all(live, eachindex(x))
+        return nothing
+    end
+    rows = findall(live, eachindex(x))
+    @argcheck(!isempty(rows),
+              IsNonFiniteError("asset $i carries no finite and active return in the $(length(x)) observations of the sample, so a regression has no observation to fit its loadings on. Remove the asset from the sample, or fit over a window in which it is listed."))
+    return rows
 end
 """
     pin_regression_choice(re::AbstractTimeSeriesRegressionEstimator, X::MatNum, F::MatNum,
@@ -2133,6 +2206,9 @@ end
 export regression, Regression, LinearModel, GeneralisedLinearModel, BenchmarkWeightMetric,
        RegressionWeightMetric, InverseIdiosyncraticVarianceMetric
 public AbstractTimeSeriesRegressionEstimator, AbstractCrossSectionalRegressionEstimator
+# The `# Interfaces` section of AbstractTimeSeriesRegressionEstimator tells an estimator that
+# takes the `active_mask` keyword to call `asset_fit_rows` for the rows of each asset (#2370).
+public asset_fit_rows
 # The `# Interfaces`-marked type of #1145 (ADR 0154): AbstractOrthogonalityMetric names the two
 # verbs an extension must implement, whose concrete methods live under
 # src/11_UncertaintySets/09_OrthogonalUncertaintySets.jl -- the same split #1137 already used.

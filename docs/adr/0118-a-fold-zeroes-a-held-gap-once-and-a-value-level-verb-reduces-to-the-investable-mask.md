@@ -470,3 +470,40 @@ finite wrong number, with no message.
   `investable_reduction` one time, before they bind the measures. So one message covers all the
   axes, and a measure binds to the reduced prior. Before, a default measure on a prior with a
   non-investable asset bound to the full `sigma` and then met the reduced weights.
+
+## Amendment (2026-11-26)
+
+([#2370](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/2370)). The amendment above
+filters the returns that `factor_risk_contribution` measures, and it left the regression that fits
+the loadings to read `rd` with its gaps. With the default `StepwiseRegression`, a gapped column
+gave a `NaN` p-value at every factor. The search then pushed the index `0` and raised a bare
+`BoundsError`. `plot_factor_risk_contribution` raised the same error.
+
+- A time-series regression fits each asset on the rows where its return is finite.
+  `asset_fit_rows` gives the rows. `StepwiseRegression` and `DimensionReductionRegression` cut the
+  observation weights of the fit to those rows with `shared_series_estimator`. A complete column
+  takes the old path, with no copy. A late listing gets the loadings of its own history, and no
+  other asset changes. An asset with no finite return raises an `IsNonFiniteError` that names it.
+- `DimensionReductionRegression` reduces `F` over every observation, so every asset keeps one
+  basis. The intercept of a gapped asset reads the factor mean over its own rows.
+- The two estimators take an `active_mask` keyword. `asset_fit_rows` reads the mask and the
+  finiteness of each column in one pass, so a cell that the mask turns off is a gap of its asset,
+  and no returns are copied. `regression(re, rd)` passes the active mask of `rd.pnl` when the panel
+  carries one, and no keyword otherwise, so an estimator of a caller with no keyword still fits
+  returns data with no mask. `refit_factor_regression` is `regression(re, rd)` with its own
+  refusal, so the two routes do not repeat the fit. `asset_fit_rows` is `public`, because the
+  `# Interfaces` section of `AbstractTimeSeriesRegressionEstimator` tells an implementer to call
+  it.
+- The attribution does not set the gaps of `rd` to zero before the regression. A zero is not a
+  return, and it biases the loadings to zero. The returns that the attribution measures still
+  take the Held Gap rule of the amendment above.
+- A p-value search never pushes the index `0`. When no factor has a p-value, the search selects
+  no factor, and the asset gets an intercept-only model with a warning.
+- The message of a Held Gap of a prior under a mask names the positions of the caller as
+  integers, `[2, 4]`, as the message with no mask does. `filter_held_gaps` and `held_gap_msg` take
+  `nx` as names or as positions.
+- The refused option was a refusal of a gapped sample by the regression, as a plain moment
+  estimator refuses one. A regression fits each asset alone, against factor returns that are
+  finite at every row, so a row of one asset is not a row of another. A refusal discards the
+  history of a late listing that a fit can use. `FactorPrior` keeps the Coverage Universe, because
+  its lift reads the residual of each asset over the whole window.
