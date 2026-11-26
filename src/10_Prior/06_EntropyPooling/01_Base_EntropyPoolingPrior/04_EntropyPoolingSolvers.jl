@@ -275,6 +275,50 @@ function ep_prior_probabilities(w::ScenarioProbabilities, T::Integer, Ti::Intege
     return w
 end
 """
+    ep_view_prior(imsk, pr::AbstractPriorResult, w::VecNum) -> AbstractPriorResult
+
+Make the prior result that the views of an entropy pooling fit read.
+
+A posterior puts no mass on an observation whose prior probability is zero, so the returns of that observation change no view. But each view row has one coefficient for each observation, and the size of a coefficient sets the scale of its row. One extreme return at a zero prior probability, such as a crash that the caller removed, then makes the rest of the row smaller than the tolerance of the solver, or overflows the exponential of a tail view. The fit returns the prior, or misses the view, with no error.
+
+So the views read the mean row of the support at each observation of zero prior probability. The moments of `pr` do not change. Only the views read the result. The refit reads the returns as they are.
+
+# Algorithm
+
+ 1. View `pr` at the Investable Mask with [`investable_prior`](@ref).
+ 2. Return that view when every entry of `w` is positive.
+ 3. Copy its returns. Replace each row whose entry of `w` is zero with the mean of the other rows under `w`.
+ 4. Return the view with the new returns, through [`forward_prior`](@ref).
+
+# Arguments
+
+  - `imsk`: The Investable Mask, or `nothing` when every asset is investable.
+  - $(arg_dict[:pr])
+  - `w`: Prior probabilities of the fit, one for each observation. They are the same at every stage, so every stage states its rows over the same returns.
+
+# Returns
+
+  - `vpr::AbstractPriorResult`: The prior over the investable assets that the views read.
+
+# Related
+
+  - [`investable_prior`](@ref)
+  - [`forward_prior`](@ref)
+  - [`entropy_pooling`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+  - [`MeucciEntropyPoolingPrior`](@ref)
+"""
+function ep_view_prior(imsk, pr::AbstractPriorResult, w::VecNum)
+    vpr = investable_prior(imsk, pr)
+    sup = w .> zero(eltype(w))
+    if all(sup)
+        return vpr
+    end
+    X = copy(vpr.X)
+    X[.!sup, :] .= transpose(w[sup]) * X[sup, :] ./ sum(w[sup])
+    return forward_prior(vpr; X = X)
+end
+"""
     entropy_pooling(w::VecNum, epc::AbstractDict, opt::OptimEntropyPooling)
 
 Solve the dual of the entropy pooling problem with Optim.jl.
@@ -282,6 +326,8 @@ Solve the dual of the entropy pooling problem with Optim.jl.
 `entropy_pooling` finds the posterior probabilities that minimise the Kullback-Leibler divergence from the prior probabilities, subject to the moment and view constraints. It uses [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/). [`MeucciEntropyPoolingPrior`](@ref) and [`EntropyPoolingPrior`](@ref) call this method when the optimiser is an [`OptimEntropyPooling`](@ref).
 
 The two optimisation algorithms minimise the same objective and return the same posterior. They differ only in the arithmetic of the evaluation.
+
+The posterior gives a zero probability to each observation whose prior probability is zero, whatever value that observation holds.
 
 The dual problem has one variable for each row, not one for each observation. It cannot hold an auxiliary variable, so it expresses no tail view. It also has no slack variable. The method relaxes the fixed equality rows of the `:feq` key with the box ``[-s_{c2},\\, s_{c2}]`` on their dual variables. This box is the dual of a penalty of weight ``s_{c2}`` on the norm of the slack of the primal problem.
 
@@ -422,9 +468,12 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     last_x = similar(x0)
     grad = similar(x0)
     y = similar(w)
+    #! A posterior puts no mass where the prior puts none. An extreme scenario off the support
+    #! can overflow the exponential, and `0 * Inf` is `NaN`, so its exponent is zero.
+    tilt(q, z) = q * exp(ifelse(iszero(q), zero(z), z))
     function update!(x)
         copy!(last_x, x)
-        y .= w .* exp.(-transpose(A) * x .- one(eltype(w)))
+        y .= tilt.(w, .-(transpose(A) * x) .- one(eltype(w)))
         grad .= B - A * y
         return nothing
     end
@@ -469,7 +518,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     @argcheck(Optim.converged(result),
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     x = Optim.minimizer(result)
-    return scenario_probabilities(w, w .* exp.(-transpose(A) * x .- one(eltype(w))))
+    return scenario_probabilities(w, tilt.(w, .-(transpose(A) * x) .- one(eltype(w))))
 end
 function entropy_pooling(w::VecNum, epc::AbstractDict,
                          opt::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any,
@@ -512,6 +561,10 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
         push!(wbs, repeat([lo hi], s))
     end
     A, B, wb = reduce(vcat, first.(blocks)), reduce(vcat, last.(blocks)), reduce(vcat, wbs)
+    #! A zero prior probability gives a `log_p` of `-Inf` and a `y` of zero. The objective
+    #! reads `log_r`, the logarithm of the ratio of the posterior to the prior, which is
+    #! finite there. The difference `log(y) - log_p` is `NaN` there, and the solve then
+    #! stopped at its start and reported success.
     log_p = log.(w)
     #! `wb` bounds a `:feq` dual variable by `sc2`, and the constructor admits any
     #! `sc2 >= 0`. An unclamped start of `factor` therefore sits outside the box whenever
@@ -521,12 +574,12 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     x0 = clamp.(fill(factor, size(A, 1)), view(wb, :, 1) / 2, view(wb, :, 2) / 2)
     last_x = similar(x0)
     grad = similar(x0)
-    log_x = similar(log_p)
+    log_r = similar(log_p)
     y = similar(log_p)
     function update!(x)
         copy!(last_x, x)
-        log_x .= log_p .- (one(eltype(log_p)) .+ transpose(A) * x)
-        y .= exp.(log_x)
+        log_r .= .-(one(eltype(log_p)) .+ transpose(A) * x)
+        y .= exp.(log_p .+ log_r)
         grad .= B - A * y
         return nothing
     end
@@ -540,7 +593,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     end
     function f(x)
         common_op(x)
-        return opt.sc1 * (LinearAlgebra.dot(x, grad) - LinearAlgebra.dot(y, log_x - log_p))
+        return opt.sc1 * (LinearAlgebra.dot(x, grad) - LinearAlgebra.dot(y, log_r))
     end
     function g!(G, x)
         common_op(x)

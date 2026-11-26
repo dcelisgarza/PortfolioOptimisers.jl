@@ -958,7 +958,7 @@ The posterior moments are the sample statistics under the weights ``\\boldsymbol
 
  1. Fit the wrapped prior estimator with [`ep_wrapped_prior`](@ref). The result is `pr` and the prior probabilities `w0` on its rows. The fit sets the observation axis. `T` is `size(pr.X, 1)`, which is smaller than `size(X, 1)` when a nested prior drops rows. The probabilities are `pe.w` when the caller gives one, `pr.w` when the fit returns one, and the uniform `1/T` otherwise. [`prior_probability_factory`](@ref) puts the `pe.w` of the caller on the rows that each weighted field of the wrapped estimator reads, and the fit of `pr` uses it. Before that fit, [`scenario_count`](@ref) reads `T` with only the steps that drop rows, so most wrapped priors need no fit for it. When the fit under `pe.w` returns its own `pr.w`, a nested prior solved its views from `pe.w`. Then `w0` is `pr.w`, the posterior of the nested prior.
  2. Pin each choice of `pe.pe` under a [`PinnedChoice`](@ref) at this fit with [`pin_prior_choice`](@ref), so every refit reads the choice that the views read. Every refit goes through [`scenario_prior`](@ref), which holds the model of this fit, with its regression and its residual block. So the refit reads the scenarios that the views read.
- 3. Get the Investable Mask of the fit and the universe of the views with [`investable_views`](@ref). Every view row uses only the investable columns, and the mask is the same at each stage.
+ 3. Get the Investable Mask of the fit and the universe of the views with [`investable_views`](@ref). Every view row uses only the investable columns, and the mask is the same at each stage. Make the prior that the views read with [`ep_view_prior`](@ref), at this fit and at each refit that a later stage reads.
  4. Make the empty constraint dictionary `epc`, the matrix `fixed` of the pinned moments, and the Departure Ledger. Resolve the `cvar_views` against that fit one time, through [`ep_cvar_views_setup`](@ref) into `cvv`. Every stage searches the same targets, so a `prior(...)` reference gives one number for the whole chain.
  5. Stage one, the mean and the value at risk. Write the `mu_views` and `var_views` rows into `epc`. When `epc` holds a row or `cvv` holds a search, solve from `w0` through [`ep_cvar_views_solve!`](@ref) into `w1`, and refit `pr` under `w1`.
  6. Stage two, the variance and the covariance. Write the `sigma_views` and `cov_views` rows into `epc`. Pin the mean of every asset that those rows read with [`fix_mu!`](@ref), so the stage cannot move a moment that an earlier stage set. Under the same test, solve into `w1`, and refit `pr` under `w1`.
@@ -1026,7 +1026,7 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
     # move between stages. ADR 0115 and ADR 0125.
     imsk, vsets, ni = investable_views(pr, pe.sets)
     led = String[]
-    vpr = investable_prior(imsk, pr)
+    vpr = ep_view_prior(imsk, pr, w0)
     fixed = falses(size(vpr.X, 2), 2)
     epc = Dict{Symbol, Tuple{MatNum, VecNum}}()
     # mu and VaR
@@ -1047,7 +1047,7 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
         w1 = LinearAlgebra.normalize!(ep_cvar_views_solve!(cvv, epc, w0, pe.opt), 1)
         pr = scenario_prior(pe.pe, w1, pr0, X, F, pnl; strict = strict, kwargs...,
                             cache_reg = true)
-        vpr = investable_prior(imsk, pr)
+        vpr = ep_view_prior(imsk, pr, w0)
     end
     if !isnothing(pe.sigma_views) || !isnothing(pe.cov_views)
         # sigma
@@ -1070,7 +1070,7 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
             w1 = LinearAlgebra.normalize!(ep_cvar_views_solve!(cvv, epc, ws, pe.opt), 1)
             pr = scenario_prior(pe.pe, w1, pr0, X, F, pnl; strict = strict, kwargs...,
                                 cache_reg = true)
-            vpr = investable_prior(imsk, pr)
+            vpr = ep_view_prior(imsk, pr, w0)
         end
     end
     if !isnothing(pe.rho_views) || !isnothing(pe.sk_views) || !isnothing(pe.kt_views)
@@ -1159,7 +1159,7 @@ The posterior moments are the sample statistics under the weights ``\\boldsymbol
 
  1. Fit the wrapped prior estimator with [`ep_wrapped_prior`](@ref). The result is `pr` and the prior probabilities `w0` on its rows. The fit sets the observation axis. `T` is `size(pr.X, 1)`, which is smaller than `size(X, 1)` when a nested prior drops rows. The probabilities are `pe.w` when the caller gives one, `pr.w` when the fit returns one, and the uniform `1/T` otherwise. [`prior_probability_factory`](@ref) puts the `pe.w` of the caller on the rows that each weighted field of the wrapped estimator reads, and the fit of `pr` uses it. Before that fit, [`scenario_count`](@ref) reads `T` with only the steps that drop rows, so most wrapped priors need no fit for it. When the fit under `pe.w` returns its own `pr.w`, a nested prior solved its views from `pe.w`. Then `w0` is `pr.w`, the posterior of the nested prior.
  2. Pin each choice of `pe.pe` under a [`PinnedChoice`](@ref) at this fit with [`pin_prior_choice`](@ref), so every refit reads the choice that the views read. Every refit goes through [`scenario_prior`](@ref), which holds the model of this fit, with its regression and its residual block. So the refit reads the scenarios that the views read.
- 3. Get the Investable Mask of the fit and the universe of the views with [`investable_views`](@ref). Every view row uses only the investable columns.
+ 3. Get the Investable Mask of the fit and the universe of the views with [`investable_views`](@ref). Every view row uses only the investable columns. Make the prior that the views read with [`ep_view_prior`](@ref).
  4. Make the empty constraint dictionary `epc` and the Departure Ledger. Resolve the `cvar_views` against that fit one time, through [`ep_cvar_views_setup`](@ref) into `cvv`.
  5. Write the `mu_views` and `var_views` rows into `epc`.
  6. Write the `sigma_views` and `cov_views` rows into `epc`. This route pins no moment, so it does not call [`fix_mu!`](@ref) or [`fix_sigma!`](@ref).
@@ -1220,7 +1220,7 @@ function ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatN
     # investable columns, because `0 * NaN` is `NaN`. ADR 0115 and ADR 0125.
     imsk, vsets, ni = investable_views(pr, pe.sets)
     led = String[]
-    vpr = investable_prior(imsk, pr)
+    vpr = ep_view_prior(imsk, pr, w0)
     epc = Dict{Symbol, Tuple{MatNum, VecNum}}()
     # mu and VaR
     # Every `prior(...)` reference resolves against the fit above.

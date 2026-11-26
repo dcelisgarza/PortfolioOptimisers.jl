@@ -1990,8 +1990,8 @@ end
                                        rd)
     @test occursin(", $(hi2))", e.value.msg)
     # A value at risk row is the mass of the losses at or above its target. When only the
-    # scenario at zero prior probability reaches the target, the support gives that mass
-    # nothing, and the row is refused.
+    # scenario at zero prior probability reaches the target, the view is past the largest
+    # loss that the views read, and the fit names that loss.
     imn = argmin(view(X, :, 1))
     w0 = ones(size(X, 1))
     w0[imn] = 0
@@ -2000,6 +2000,13 @@ end
     vv = ValueatRiskView(; alpha = 0.05, views = lce("AAPL == $(-(lo + lo2) / 2)"))
     e = @test_throws DomainError prior(EntropyPoolingPrior(; sets = sets, w = w0,
                                                            var_views = vv), rd)
+    @test occursin("the maximum viable for asset 1 is $(-lo2).", e.value.msg)
+    # `ep_var_views!` over the returns as they are finds a loss at the target, and refuses the
+    # row because the support gives it no mass.
+    epc = Dict{Symbol, Tuple{PortfolioOptimisers.MatNum, PortfolioOptimisers.VecNum}}()
+    e = @test_throws DomainError PortfolioOptimisers.ep_var_views!(vv, epc,
+                                                                   prior(EmpiricalPrior(),
+                                                                         rd), sets, w0)
     @test occursin("The value at risk view `", e.value.msg)
     # With every scenario in the support, the same view holds.
     @test prior(EntropyPoolingPrior(; sets = sets, var_views = vv), rd) isa LowOrderPrior
@@ -3198,4 +3205,109 @@ different posterior. A loop with one kind of collection alone gave no difference
         end
         @test n_diff == 0
     end
+end
+
+@testset "A dual solve meets its views when a prior probability is zero" begin
+    #=
+    `LogEntropyPooling` read `log(0) - log(0)`, which is `NaN`, so its objective was `NaN` at
+    every point. The solve stopped at its start, reported success, and missed the view.
+    `ExpEntropyPooling` read `0 * exp(z)`, which is `NaN` when a scenario off the support is
+    so far out that the exponential overflows. The reference is the solve on the support
+    alone, which holds no zero.
+    =#
+    rng = StableRNG(1)
+    X = 0.01 .* randn(rng, 100, 1)
+    v = vcat(zeros(20), ones(80))
+    q = StatsBase.pweights(v ./ sum(v))
+    sup = 21:100
+    mk(A, b) = Dict{Symbol,
+                    Tuple{<:PortfolioOptimisers.MatNum, <:PortfolioOptimisers.VecNum}}(:eq =>
+                                                                                           (A,
+                                                                                            b))
+    for alg in (ExpEntropyPooling(), LogEntropyPooling()), tgt in (0.002, -0.002),
+        out in (0.0, 50.0, -50.0)
+
+        opt = OptimEntropyPooling(; alg = alg)
+        Xo = copy(X)
+        Xo[1:2, 1] .+= out
+        A = permutedims(Xo)
+        p = PortfolioOptimisers.entropy_pooling(q, mk(A, [tgt]), opt)
+        r = PortfolioOptimisers.entropy_pooling(StatsBase.pweights(q[sup]),
+                                                mk(A[:, sup], [tgt]), opt)
+        @test isa(p, StatsBase.ProbabilityWeights)
+        @test all(iszero, p[1:20])
+        @test isapprox(dot(p, view(Xo, :, 1)), tgt; rtol = 1e-5)
+        @test isapprox(sum(p), 1; rtol = 1e-6)
+        @test isapprox(p[sup], collect(r); rtol = 1e-5)
+    end
+end
+
+@testset "A return of zero prior probability does not move a view" begin
+    #=
+    The coefficient of an observation sets the scale of its view row, also when its prior
+    probability is zero. A crash that `w` removes made the rest of the row smaller than the
+    tolerance of the solver, so a kurtosis view missed its target by a third and an entropic
+    view gave the prior back. A larger crash made the row of a tail view `NaN`. The reference
+    is the fit with an ordinary return at the same observation.
+    =#
+    rng = StableRNG(7)
+    X0 = 0.01 .* randn(rng, 200, 2)
+    v = vcat(zeros(5), ones(195))
+    q = StatsBase.pweights(v ./ sum(v))
+    nx = ["A", "B"]
+    zsets = UniverseSets(; dict = Dict("nx" => nx))
+    lce(s) = LinearConstraintEstimator(; val = s)
+    evar(p, X) = PortfolioOptimisers.ep_evar(-X[:, 1], collect(p), 0.05).evar
+    function kt(p, X)
+        y = X[:, 1] .- dot(p, view(X, :, 1))
+        return dot(p, y .^ 4) / dot(p, y .^ 2)^2
+    end
+    e0 = evar(q, X0)
+    jopt = JuMPEntropyPooling(; slv = slv)
+    function ev(alg, s)
+        return (; opt = jopt,
+                evar_views = EntropicValueatRiskView(; alpha = 0.05, alg = alg,
+                                                     views = lce(s)))
+    end
+    cases = ((EntropyPoolingPrior, (; mu_views = lce("A == 0.002")),
+              (p, X) -> dot(p, view(X, :, 1)), 0.002),
+             (EntropyPoolingPrior, (; kt_views = lce("A == 3.5")), kt, 3.5),
+             (EntropyPoolingPrior,
+              (; alg = H0_EntropyPooling(), kt_views = lce("A == 3.5"), opt = jopt),
+              nothing, nothing),
+             (MeucciEntropyPoolingPrior, (; kt_views = lce("A == 3.5")), kt, 3.5),
+             (MeucciEntropyPoolingPrior,
+              (; alg = H0_EntropyPooling(), kt_views = lce("A == 3.5")), nothing, nothing),
+             (EntropyPoolingPrior, ev(nothing, "A >= $(1.1 * e0)"), evar, 1.1 * e0),
+             (EntropyPoolingPrior, ev(GridTailView(), "A >= $(1.1 * e0)"), nothing,
+              nothing),
+             (EntropyPoolingPrior, ev(SequentialTailView(), "A <= $(0.9 * e0)"), evar,
+              0.9 * e0))
+    for (pe, kw, f, tgt) in cases
+        fit(X) = prior(pe(; sets = zsets, w = q, kw...), ReturnsResult(; nx = nx, X = X))
+        ref = fit(X0)
+        for out in (0.1, 1.0, 50.0)
+            X = copy(X0)
+            X[1, 1] -= out
+            pr = fit(X)
+            # The refit and the result read the returns as they are.
+            @test pr.X == X
+            @test all(iszero, pr.w[1:5])
+            @test isapprox(pr.w, ref.w; rtol = 1e-6)
+            if !isnothing(f)
+                @test isapprox(f(pr.w, X), tgt; rtol = 1e-5)
+            end
+        end
+    end
+    # A prior with no zero probability is the view at the mask, with no copy.
+    pr0 = prior(EmpiricalPrior(), ReturnsResult(; nx = nx, X = X0))
+    @test PortfolioOptimisers.ep_view_prior(nothing, pr0, fill(inv(200), 200)) === pr0
+    # The row is the mean of the support under `w`, and no other field moves.
+    qz = [0.0; 2.0; ones(198)]
+    vpr = PortfolioOptimisers.ep_view_prior(nothing, pr0, qz)
+    @test isapprox(vpr.X[1, :], vec(transpose(qz) * X0) ./ sum(qz))
+    @test vpr.X[2:end, :] == X0[2:end, :]
+    @test vpr.mu === pr0.mu
+    @test size(PortfolioOptimisers.ep_view_prior(BitVector([true, false]), pr0, qz).X) ==
+          (200, 1)
 end

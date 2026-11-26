@@ -118,7 +118,9 @@
     holds one of them.
     `AbstractSearchReduction` joined with its `# Interfaces` section on 2026-11-15 (issue
     #2002): `EachValue` and `PerCandidate` subtype it, and the slot `r_sca` of a search holds
-    one of them.
+    one of them. `AbstractPositionReading` and `AbstractConcentrationAlgorithm` joined with
+    their `# Interfaces` sections on 2026-11-23 (issue #2018): the readings and the forms of
+    a `ConcentrationLimit` subtype them.
     They are held to their own list for the same reason — public is API too.
     =#
     #! format: off
@@ -137,6 +139,7 @@
         :AbstractChoiceRule,
         :AbstractCollateralAlgorithm,
         :AbstractCompactRadiusAlgorithm,
+        :AbstractConcentrationAlgorithm,
         :AbstractConfidenceUpdate,
         :AbstractConstraintEstimator,
         :AbstractConstraintResult,
@@ -218,6 +221,7 @@
         :AbstractPipelineEstimator,
         :AbstractPipelineResult,
         :AbstractPosdefEstimator,
+        :AbstractPositionReading,
         :AbstractPreorderBy,
         :AbstractPreprocessingEstimator,
         :AbstractPreprocessingResult,

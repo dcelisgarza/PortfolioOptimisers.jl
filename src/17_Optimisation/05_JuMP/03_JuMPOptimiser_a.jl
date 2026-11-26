@@ -342,11 +342,11 @@ $(DocStringExtensions.FIELDS)
         slots...,
     ) -> JuMPOptimiser
 
-Keywords correspond to the struct's fields and to the slots of [`ConstraintBlock`](@ref). `slots...` takes each keyword of the block with its type and its default: `wb`, `sbgt`, `gbgt`, `lt`, `st`, `lcse`, `cte`, `gcarde`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn`, `sets`, `tr`, `ple`, `ccnt`, `cobj`, `ss`, `card`, `scard`, `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp`, `linf` and `xbgt`. The constructor builds the block in `cbe` from these flat keywords, with the defaults of the block. When the caller gives `cbe`, a flat keyword replaces that slot of the given block, and a slot that the caller does not name keeps its value, see [`constraint_block`](@ref). So the default of a flat keyword never overwrites a slot of a given block. A name that is neither a field nor a slot raises a `MethodError`.
+Keywords correspond to the struct's fields and to the slots of [`ConstraintBlock`](@ref). `slots...` takes each keyword of the block with its type and its default: `wb`, `sbgt`, `gbgt`, `lt`, `st`, `lcse`, `cte`, `gcarde`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `conc`, `tn`, `sets`, `tr`, `ple`, `ccnt`, `cobj`, `ss`, `card`, `scard`, `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp`, `linf` and `xbgt`. The constructor builds the block in `cbe` from these flat keywords, with the defaults of the block. When the caller gives `cbe`, a flat keyword replaces that slot of the given block, and a slot that the caller does not name keeps its value, see [`constraint_block`](@ref). So the default of a flat keyword never overwrites a slot of a given block. A name that is neither a field nor a slot raises a `MethodError`.
 
 A field or a slot typed [`TD_Option`](@ref) or [`TD`](@ref) can hold a [`TimeDependent`](@ref) schedule in place of a static value. A cross-validation fold loop resolves the schedule at each fold, and an `optimise` call outside a fold loop reads the static default of the field. So the prior estimator, the returns model, the scalariser, the asset sets and the constraints can change from fold to fold. The execution settings `slv`, `sc`, `so` and `strict` are static.
 
-`lcse`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn` and `ple` take a vector that mixes the members of their element type, such as `[Turnover(…), TurnoverEstimator(…)]`. Such a literal infers an element type that the positional constructor refuses, so the keyword constructor of the block narrows it through [`narrow_mixed_vector`](@ref), and the caller writes no [`concrete_typed_array`](@ref).
+`lcse`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `conc`, `tn` and `ple` take a vector that mixes the members of their element type, such as `[Turnover(…), TurnoverEstimator(…)]`. Such a literal infers an element type that the positional constructor refuses, so the keyword constructor of the block narrows it through [`narrow_mixed_vector`](@ref), and the caller writes no [`concrete_typed_array`](@ref).
 
 The positional constructor takes the fields in the order of the struct: `pe`, `slv`, `cbe`, `bgt`, `fees`, `ret`, `sca`, `sc`, `so`, `strict` and `cache`. Before the block, it took one argument for each slot.
 
@@ -471,8 +471,8 @@ end
 # set it, so `opt.wb` and the search key `"opt.wb"` keep their meaning (ADR 0237).
 @forward_properties JuMPOptimiser begin
     forward(cbe, wb, sbgt, gbgt, lt, st, lcse, cte, gcarde, sgcarde, smtx, sgmtx, slt, sst,
-            sglt, sgst, tn, sets, tr, ple, ccnt, cobj, ss, card, scard, l2c, lpc, linfc, l1,
-            l2, lp, linf, xbgt; settable)
+            sglt, sgst, conc, tn, sets, tr, ple, ccnt, cobj, ss, card, scard, l2c, lpc,
+            linfc, l1, l2, lp, linf, xbgt; settable)
 end
 function time_dependent_candidate_fields(opt::JuMPOptimiser)::Tuple
     return (typed_time_dependent_fields(opt)..., typed_time_dependent_fields(opt.cbe)...)
