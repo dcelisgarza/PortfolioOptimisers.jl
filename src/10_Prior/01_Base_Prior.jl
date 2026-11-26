@@ -2220,7 +2220,8 @@ function kept_row_positions(rows::VecInt, pos::VecInt)
     return rows[pos]
 end
 export prior, LowOrderPrior, HighOrderPrior
-public forward_prior, AbstractPriorEstimator, AbstractPriorResult, reconstruct_prior
+public forward_prior, AbstractPriorEstimator, AbstractPriorResult, reconstruct_prior,
+       investable_mask
 # The `# Interfaces`-marked types of #1146 (ADR 0154): the five families
 # `AbstractPriorEstimator`'s own section tells an author to subtype now carry the contract
 # themselves. Their verb, `prior`, is already exported. `AbstractHighOrderPriorEstimator`

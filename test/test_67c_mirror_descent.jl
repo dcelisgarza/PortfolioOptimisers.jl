@@ -959,18 +959,19 @@ end
             @test maxerr(w_book, walk(trl(wq; fixed = true))) > 1e-3
         end
         # The same two rows on a panel whose fourth asset is inactive (#1772). The first step
-        # reads one row, so the book of the second keeps the asset at its weight of the
-        # uniform start and reads its gap as a relative of one. So `wh` has four legs, and
-        # the loss views the benchmark on the three priced ones.
-        # Measured: 0.0 against the benchmark at `wh`, and 0.0022, 0.0021 and 0.0085 against the
-        # caller's. The default rates put the whole book on the third asset.
+        # reads one row, so it holds on the three active assets, and the book of the second
+        # holds a zero at the asset (#2346). The loss views the benchmark `wh` on the three
+        # priced ones.
+        # Measured: 9e-14, 9e-14 and 1.4e-12 against the benchmark at `wh`, rounding on the
+        # gradient of the norm of a small difference. The default rates put the whole book on
+        # the third asset.
         Rn2 = copy(R[1:2, :])
         am2 = trues(2, N)
         am2[:, 4] .= false
         Rn2[.!am2] .= NaN
         rdn2 = ReturnsResult(; nx = nx, X = Rn2, ts = ts[1:2],
                              pnl = AssetPanel(; amsk = am2, emsk = copy(am2)))
-        xg = [X[2, 1:3]; 1]
+        xg = [X[2, 1:3]; 0]
         whm = xg ./ sum(xg)
         for mk in (o -> GradientProjection(; eta = 5, obj = o),
                    o -> AdaptiveSubgradient(; delta = 0.1, obj = o),
@@ -979,7 +980,7 @@ end
             walk(o) = optimise(OPS(; alg = mk(o)), rdn2).w
             w_book = walk(trl(wq; fixed = false))
             @test iszero(w_book[4])
-            @test maxerr(w_book, walk(trl(whm; fixed = true))) < 1e-14
+            @test maxerr(w_book, walk(trl(whm; fixed = true))) < 1e-11
             @test maxerr(w_book, walk(trl(wq; fixed = true))) > 1e-3
         end
     end
@@ -1276,11 +1277,12 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates
                                                        fill(1 / N, N)), fill(1 / N, N),
                                     X[1, :], nothing, simplex, nothing)
         @test w0 == optimise(OPS(; alg = GradientProjection()), rows(rd, 1:1)).w
-        st1, w1 = po.online_update!(BuyAndHold(), nothing, fill(1 / N, N), X[1, :], nothing,
-                                    simplex, [0.2, 0.3, 0.5])
-        st2, w2 = po.online_update!(BuyAndHold(), nothing, fill(1 / N, N), X[1, :], nothing,
-                                    simplex)
-        @test w1 == w2 && isnothing(st1)
+        ub = fill(1 / N, N)
+        sb = po.rule_state_seed(BuyAndHold(), ub)
+        st1, w1 = po.online_update!(BuyAndHold(), sb, ub, X[1, :], nothing, simplex,
+                                    [0.2, 0.3, 0.5])
+        st2, w2 = po.online_update!(BuyAndHold(), sb, ub, X[1, :], nothing, simplex)
+        @test w1 == w2 == st1.u == st2.u
     end
 
     @testset "Ader and Sword" begin
@@ -1373,7 +1375,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates
         @test sw.gamma == 1 / 3 && isa(sw.proj, EuclideanProjection)
         @test_throws DomainError SwitchingWeighting(; gamma = -0.1)
         @test_throws DomainError SwitchingWeighting(; gamma = 1.1)
-        @test po.rows_needed(sw) == 0 && isnothing(po.rule_state_seed(sw, fill(1 / N, N)))
+        @test po.rows_needed(sw) == 0 && po.rule_state_seed(sw, fill(1 / N, N)).n == 0
         @test_throws DomainError SwitchingPortfolio(; N = 0)
         sp = SwitchingPortfolio(; N = N, gamma = 0.25)
         @test length(sp.experts) == N && sp.alg.gamma == 0.25
@@ -1403,7 +1405,8 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates
                      libpath(ConstantRebalancedPortfolio())) < 1e-14
         # Over one expert there is nothing to switch to.
         one_set = resolve(BoundedAllocationSet(), 1)
-        @test po.online_update!(sw, nothing, [1.0], [1.1], nothing, one_set)[2] == [1.0]
+        @test po.online_update!(sw, po.rule_state_seed(sw, [1.0]), [1.0], [1.1], nothing,
+                                one_set)[2] == [1.0]
         # A cap on the Expert Set clips the share after the mix.
         spc = SwitchingPortfolio(; N = N,
                                  eset = BoundedAllocationSet(; wb = WeightBounds(0.2, 0.5)))
@@ -1440,7 +1443,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates
         # Without a set nothing is projected, and the default method drops the set.
         @test po.rule_state_seed(mix, u).h[1] == [1, 0, 0]
         @test po.rule_state_seed(mix, u, nothing).h[1] == [1, 0, 0]
-        @test isnothing(po.rule_state_seed(BuyAndHold(), u, capr))
+        @test isnothing(po.rule_state_seed(ConstantRebalancedPortfolio(), u, capr))
         # A rule whose state reads only `w` takes the set as an ignored slot (#2102).
         @test po.rule_state_seed(MirrorDescent(), u, capr).u ==
               po.rule_state_seed(MirrorDescent(), u).u
@@ -1457,8 +1460,9 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates
         s3, w3 = po.online_update!(md, po.rule_state_seed(md, u), u, x, nothing, capr,
                                    po.rule_state_seed(md, u).u)
         @test w1 == w2 == w3 && s1.u == s2.u == s3.u
-        @test po.online_update!(BuyAndHold(), nothing, u, x, nothing, capr, u)[2] ==
-              po.online_update!(BuyAndHold(), nothing, u, x, nothing, capr)[2]
+        sb = po.rule_state_seed(BuyAndHold(), u)
+        @test po.online_update!(BuyAndHold(), sb, u, x, nothing, capr, u)[2] ==
+              po.online_update!(BuyAndHold(), sb, u, x, nothing, capr)[2]
         # The oracle: a mixture whose experts already hold the projected allocations. The
         # head seeds on its set, so the expert weighting reads the same returns from the
         # first row, and the two mixtures agree row for row.
@@ -1495,14 +1499,16 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates
             xk = 1 .+ 0.05 .* randn(StableRNG(K + 1), K)
             q = wk .* xk ./ dot(wk, xk)
             eq6 = (1 - g * K / (K - 1)) .* q .+ g / (K - 1)
-            wn = po.online_update!(SwitchingWeighting(; gamma = g), nothing, wk, xk,
-                                   nothing, resolve(BoundedAllocationSet(), K))[2]
+            swg = SwitchingWeighting(; gamma = g)
+            wn = po.online_update!(swg, po.rule_state_seed(swg, wk), wk, xk, nothing,
+                                   resolve(BoundedAllocationSet(), K))[2]
             @test maxerr(wn, eq6) < 1e-15
         end
         # At γ = (K - 1) / K every entry is 1 / K.
-        @test po.online_update!(SwitchingWeighting(; gamma = 2 / 3), nothing,
-                                [0.7, 0.2, 0.1], X[1, :], nothing, simplex)[2] ≈
-              fill(1 / 3, 3)
+        sw23 = SwitchingWeighting(; gamma = 2 / 3)
+        w23 = [0.7, 0.2, 0.1]
+        @test po.online_update!(sw23, po.rule_state_seed(sw23, w23), w23, X[1, :], nothing,
+                                simplex)[2] ≈ fill(1 / 3, 3)
 
         # The switching portfolio is the Bayesian mixture over the paths of the hidden
         # process: the prior of a path is (1/N) ∏ (1 - γ or γ/(N - 1)), and the wealth of

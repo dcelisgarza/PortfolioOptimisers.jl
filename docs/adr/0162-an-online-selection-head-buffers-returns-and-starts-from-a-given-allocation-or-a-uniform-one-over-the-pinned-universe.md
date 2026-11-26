@@ -177,3 +177,19 @@ zero.
   `FollowTheLeadingHistory` implement it, and the head's seed calls it inside the start's
   projection step. One private helper, `project_start`, projects the head's start and every
   expert's, so the exception for a set that reads rows is written once.
+
+## Amendment (2026-11-25): the parked legs of the uniform start leave the step
+
+Issue #2346. *The uniform start is over the pinned universe* holds: the start is `1/N` over every pinned
+name. Its stated cost is gone. An update reads the allocation on the assets active at the row,
+renormalised, so a parked leg enters no gross return `⟨w, x⟩`. The fund of every rule is now the
+recursion over the listed names alone, where the fund of an exponentiated gradient was within 1 % of it.
+
+A leg that lists later gets the weight that the rule gives it:
+
+- A rule that multiplies its own allocation gives it the weight that its iterate kept: a `MirrorDescent`,
+  a `BuyAndHold`, an `ExpectationMaximisation`, an `AggregatingAlgorithm` and a `SwitchingWeighting`.
+- A `ConstantRebalancedPortfolio` gives it its target.
+- A rule whose step adds to its allocation, or does not read it, steps from the zero.
+
+[ADR 0170](0170-an-online-selection-head-keeps-a-non-finite-return-and-the-active-mask-in-its-rows-buffer-and-every-statistic-over-the-rows-reduces-to-its-coverage-universe.md) holds the decision.

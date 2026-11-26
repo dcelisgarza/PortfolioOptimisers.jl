@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Moves each weight to the other entries with probability ``\\gamma`` after the wealth step, the switching weighting (SP).
 
-It is the switching rule of [singer1997](@citet). As the weighting of an [`ExpertMixture`](@ref) it acts on the expert-return vector. There the wealth step is the buy-and-hold weighting, and the share is the switch from one expert to another. Over the single-asset constant rebalanced portfolios it is the switching portfolio of [singer1997](@cite), [`SwitchingPortfolio`](@ref). On the head over the assets it gives the same numbers, because the blend of the unit experts is the weight vector itself. The rule keeps no state and reads no rows. The package does not build the second version in [singer1997](@cite), whose rate falls the longer the process holds one asset.
+It is the switching rule of [singer1997](@citet). As the weighting of an [`ExpertMixture`](@ref) it acts on the expert-return vector. There the wealth step is the buy-and-hold weighting, and the share is the switch from one expert to another. Over the single-asset constant rebalanced portfolios it is the switching portfolio of [singer1997](@cite), [`SwitchingPortfolio`](@ref). On the head over the assets it gives the same numbers, because the blend of the unit experts is the weight vector itself, while every asset is active. The rule reads no rows. Its state is its iterate, an [`AllocationIterateState`](@ref), which is the allocation itself while every entry is active. The package does not build the second version in [singer1997](@cite), whose rate falls the longer the process holds one asset.
 
 # Mathematical definition
 
@@ -29,10 +29,12 @@ The first line is Equation 4 of [singer1997](@cite), written in weights. The sec
 
 # Algorithm
 
- 1. Compute `q`, the Price-Adjusted Allocation of `w` over `x`.
- 2. Set `K` to the length of `q`.
+ 1. Compute `wh`, the Price-Adjusted Allocation of `w` over `x`, and `q`, the one of the iterate `st.u`, with [`price_adjusted_iterate`](@ref). `q` is `wh` while every asset is active. `st` is the state of the rule: what the rule keeps from one update to the next, here an [`AllocationIterateState`](@ref).
+ 2. Set `K` to the number of active entries of `q`.
  3. When `K` is one, set `p` to `q`, because one entry has no other entry to switch to. Otherwise, set `p` to the fixed share of `q` at the rate `gamma`.
- 4. Project `p` onto the Allocation Set with `alg.proj`, from `q`. Return `st` unchanged, and the projection. `st` is the state of the rule: what the rule keeps from one update to the next. This rule keeps nothing.
+ 4. Project `p` onto the Allocation Set with `alg.proj`, from `wh`. Return the state with the period count raised by one and the projection as its iterate, and the projection.
+
+At a row with an inactive asset, the steps run on the active assets alone, and the new allocation holds a zero at every other asset, see [`online_update!`](@ref). The iterate keeps the weight of an inactive asset, through [`parked_iterate`](@ref).
 
 # Fields
 
@@ -89,18 +91,25 @@ function SwitchingWeighting(; gamma::Real = 1 / 3,
                             proj::EuclideanProjection = EuclideanProjection())::SwitchingWeighting
     return SwitchingWeighting(gamma, proj)
 end
-function online_update!(alg::SwitchingWeighting, st, w::AbstractVector, x::AbstractVector,
-                        ::Any, set::AbstractAllocationSet,
-                        ::Option{<:AbstractVector} = nothing)
-    q = price_adjusted_allocation(w, x)
-    K = length(q)
+function rule_state_seed(::SwitchingWeighting, w::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
+    return AllocationIterateState(0, w)
+end
+function online_update!(alg::SwitchingWeighting, st::AllocationIterateState,
+                        w::AbstractVector, x::AbstractVector, ::Any,
+                        set::AbstractAllocationSet, ::Option{<:AbstractVector} = nothing)
+    imsk = investable_mask(x)
+    wh = price_adjusted_allocation(w, x)
+    q = price_adjusted_iterate(st, w, wh, x, imsk)
+    K = length(investable_weights_view(imsk, q))
     # Over one expert there is nothing to switch to, and the share's denominator is zero.
     p = if K == 1
         q
     else
         (1 - alg.gamma) .* q .+ (alg.gamma / (K - 1)) .* (sum(q) .- q)
     end
-    return st, project(alg.proj, set, p, q)
+    wn = project(alg.proj, set, p, wh, imsk)
+    return AllocationIterateState(st.n + 1, parked_iterate(st.u, wn, imsk)), wn
 end
 """
     SwitchingPortfolio(; N::Integer, gamma::Real = 1/3, eset::Option{<:BoundedAllocationSet} = nothing, proj::EuclideanProjection = EuclideanProjection())

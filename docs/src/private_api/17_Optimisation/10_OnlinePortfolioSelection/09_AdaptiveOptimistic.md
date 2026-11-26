@@ -9,6 +9,7 @@ PortfolioOptimisers.DiagonalProjection
 PortfolioOptimisers.AdaptiveSubgradientState
 PortfolioOptimisers.OptimisticMirrorDescentState
 PortfolioOptimisers.hint_residual
+PortfolioOptimisers.rate_step!
 PortfolioOptimisers.half_step
 ```
 

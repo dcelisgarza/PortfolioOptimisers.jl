@@ -374,7 +374,7 @@ end
         W = libpath(AggregatingAlgorithm(; eta = 0.5))
         Wb = libpath(BuyAndHold())
         @test all(abs.(W[end, :] .- 1 / N) .< abs.(Wb[end, :] .- 1 / N) .+ 1e-12)
-        @test isnothing(po.rule_state_seed(AggregatingAlgorithm(), w0))
+        @test po.rule_state_seed(AggregatingAlgorithm(), w0).u == w0
         @test po.rows_needed(AggregatingAlgorithm()) == 0
         @test_throws DomainError AggregatingAlgorithm(; eta = 0)
         @test_throws TypeError AggregatingAlgorithm(; proj = EuclideanProjection())

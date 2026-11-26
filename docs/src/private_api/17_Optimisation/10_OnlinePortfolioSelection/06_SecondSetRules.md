@@ -1,5 +1,5 @@
 ```@meta
-Description = "Second set rules, private API of PortfolioOptimisers.jl: nonneg_quadratic_root, ConfidenceWeightedMeanReversionState, lagged_window_correlation, …"
+Description = "Second set rules, private API of PortfolioOptimisers.jl: nonneg_quadratic_root, ConfidenceWeightedMeanReversionState, investable_belief, …"
 ```
 
 # Second set rules: private API
@@ -7,6 +7,7 @@ Description = "Second set rules, private API of PortfolioOptimisers.jl: nonneg_q
 ```@docs
 PortfolioOptimisers.nonneg_quadratic_root
 PortfolioOptimisers.ConfidenceWeightedMeanReversionState
+PortfolioOptimisers.investable_belief
 PortfolioOptimisers.lagged_window_correlation
 PortfolioOptimisers.anticorrelation_claims
 PortfolioOptimisers.wealth_transfer

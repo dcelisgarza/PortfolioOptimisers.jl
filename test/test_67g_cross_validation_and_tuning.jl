@@ -421,15 +421,19 @@ Eight groups:
     end
 
     @testset "9. A fallback that needs rows steps with the head (#1633)" begin
-        # A and B leave the panel at row 30, and the head holds only them, so every fold
-        # from there reads out a failure and the fallback answers.
+        # A and B leave the panel at row 30, and the head holds only them. The bounds of C and D
+        # do not reach the budget, so the step holds that book (#2346). Every fold from there
+        # reads out a failure and the fallback answers.
         amsk = trues(T, N)
         amsk[30:end, 1:2] .= false
         Rg = copy(R)
         Rg[30:end, 1:2] .= NaN
         rdg = ReturnsResult(; nx = nx, X = Rg, ts = ts,
                             pnl = AssetPanel(; amsk = amsk, emsk = amsk))
-        mk(fb) = OPS(; alg = BuyAndHold(), w0 = [0.5, 0.5, 0.0, 0.0], fb = fb)
+        caps = BoundedAllocationSet(;
+                                    wb = WeightBounds(; lb = 0.0,
+                                                      ub = [1.0, 1.0, 0.4, 0.4]))
+        mk(fb) = OPS(; alg = BuyAndHold(), set = caps, w0 = [0.5, 0.5, 0.0, 0.0], fb = fb)
         cv = OnlineIndexWalkForward(20, 5)
         o = cross_val_predict(mk(EqualWeighted()), rdg, cv)
         b = cross_val_predict(mk(EqualWeighted()), rdg,

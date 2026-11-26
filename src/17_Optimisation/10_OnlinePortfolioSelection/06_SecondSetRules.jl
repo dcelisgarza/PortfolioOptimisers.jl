@@ -350,7 +350,7 @@ $(DocStringExtensions.FIELDS)
     """
     n
     """
-    The diagonal of ``\\Sigma_t``, the belief covariance over the weights, with one entry per asset. The update writes it in place. The seed is ``1 / N^2`` per asset, and every step rescales it to the trace ``1 / N`` of the seed.
+    The diagonal of ``\\Sigma_t``, the belief covariance over the weights, with one entry per asset. A row with no inactive asset writes it in place. The seed is ``1 / N^2`` per asset, and every step rescales it to the trace ``1 / N`` of the seed.
     """
     sigma
 end
@@ -424,6 +424,8 @@ Where:
  6. Write `inv.(inv.(sigma) .+ gain .* x .^ 2)` into `sigma`.
  7. Divide `sigma` by `length(sigma) * sum(sigma)`, so its sum is ``1 / N``.
  8. Project `q` onto the Allocation Set with `alg.proj`, from the Price-Adjusted Allocation. Return the state of the rule with its period count raised by one, and the projection.
+
+At a row with an inactive asset, the steps run on the active assets alone, and the new allocation holds a zero at every other asset, see [`online_update!`](@ref). The belief is then cut to the active assets with [`investable_belief`](@ref), and an inactive asset keeps its variance.
 
 # Fields
 
@@ -512,18 +514,40 @@ function online_update!(alg::ConfidenceWeightedMeanReversion,
                         st::ConfidenceWeightedMeanReversionState, w::AbstractVector,
                         x::AbstractVector, ::Any, set::AbstractAllocationSet,
                         ::Option{<:AbstractVector} = nothing)
-    sigma = st.sigma
-    M = LinearAlgebra.dot(w, x)
-    V = LinearAlgebra.dot(sigma, x .^ 2)
-    W = LinearAlgebra.dot(sigma, x)
+    imsk = investable_mask(x)
+    wr, xr = renormalised_view(w, imsk), investable_weights_view(imsk, x)
+    sigma = investable_belief(st.sigma, imsk)
+    M = LinearAlgebra.dot(wr, xr)
+    V = LinearAlgebra.dot(sigma, xr .^ 2)
+    W = LinearAlgebra.dot(sigma, xr)
     xbar = W / sum(sigma)
     lam = confidence_step(alg.formulation, V, alg.phi, xbar, W, M, alg.eps)
-    q = w .- lam .* sigma .* (x .- xbar)
+    q = wr .- lam .* sigma .* (xr .- xbar)
     gain = confidence_gain(alg.formulation, lam, alg.phi, V)
-    sigma .= inv.(inv.(sigma) .+ gain .* x .^ 2)
+    sigma .= inv.(inv.(sigma) .+ gain .* xr .^ 2)
     sigma ./= length(sigma) * sum(sigma)
-    wn = project(alg.proj, set, q, price_adjusted_allocation(w, x))
-    return ConfidenceWeightedMeanReversionState(st.n + 1, sigma), wn
+    wn = project(alg.proj, set, expand_investable_weights(imsk, q),
+                 price_adjusted_allocation(w, x), imsk)
+    # An inactive asset keeps its variance, and the others keep their share of the trace.
+    v = parked_iterate(st.sigma, expand_investable_weights(imsk, sigma), imsk)
+    return ConfidenceWeightedMeanReversionState(st.n + 1, v), wn
+end
+"""
+    investable_belief(sigma::AbstractVector, imsk::Nothing)
+    investable_belief(sigma::AbstractVector, imsk::BitVector)
+
+Reduces the belief variances of a [`ConfidenceWeightedMeanReversion`](@ref) rule to the Investable Mask of the row, with the trace `1 / n` of a belief over its `n` assets. A `nothing` mask returns `sigma`, which the step writes in place.
+
+# Related
+
+  - [`ConfidenceWeightedMeanReversionState`](@ref)
+  - [`renormalised_view`](@ref)
+"""
+function investable_belief(sigma::AbstractVector, ::Nothing)
+    return sigma
+end
+function investable_belief(sigma::AbstractVector, imsk::BitVector)
+    return renormalised_view(sigma, imsk) ./ count(imsk)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -532,7 +556,7 @@ Moves wealth from an asset that grew more to one whose log returns follow its ow
 
 This is the anti-correlation rule (Anticor) of [borodin2004](@citet). The asset that receives the wealth is expected to repeat the earlier growth of the asset that gives it. The headline algorithm of [borodin2004](@cite), ANTI₁, is the uniform buy-and-hold mixture of this rule over the windows 2 to 30, which is an [`ExpertMixture`](@ref) over those experts under its default weighting.
 
-The rule recomputes the correlation from the rows the head holds at every period and carries nothing, so it reads the last ``2 \\ell`` rows. Until the head holds ``2 \\ell`` rows, the rule returns the wealth held, which is buy-and-hold. A gap in a row reads as a flat period, the leg held in cash, as [`price_relative`](@ref) reads it. The rule takes the logarithm of a price relative as `log1p` of the return. The correlation removes the mean of each window, and `1 + r` loses the precision of a small return. The raw step is in the simplex, so on the default Allocation Set the Euclidean projection returns it unchanged. On a stated set, the projection repairs it.
+The rule recomputes the correlation from the rows the head holds at every period and carries nothing, so it reads the last ``2 \\ell`` rows. Until the head holds ``2 \\ell`` rows, the rule returns the wealth held, which is buy-and-hold. The windows read the active assets of the row. A gap of such an asset in an earlier row reads as a flat period, the leg held in cash, as [`price_relative`](@ref) reads it. The rule takes the logarithm of a price relative as `log1p` of the return. The correlation removes the mean of each window, and `1 + r` loses the precision of a small return. The raw step is in the simplex, so on the default Allocation Set the Euclidean projection returns it unchanged. On a stated set, the projection repairs it.
 
 # Mathematical definition
 
@@ -583,6 +607,8 @@ The negative autocorrelation of an asset raises every claim that the asset takes
  5. Compute `cor` and `mu2` with [`lagged_window_correlation`](@ref) over the first `wn` rows and the last `wn` rows of `L`.
  6. Compute the claims with [`anticorrelation_claims`](@ref), and `q` with [`wealth_transfer`](@ref) from `wh`.
  7. Project `q` onto the Allocation Set with `alg.proj`, from `wh`. Return `st` unchanged, and the projection. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing.
+
+At a row with an inactive asset, the steps run on the active assets alone, and the new allocation holds a zero at every other asset, see [`online_update!`](@ref).
 
 # Fields
 
@@ -751,21 +777,24 @@ function online_update!(alg::AntiCorrelation, st, w::AbstractVector, x::Abstract
     wn = alg.window
     # The transfers move the wealth held at the end of the period, the paper's `b̂_t`.
     wh = price_adjusted_allocation(w, x)
+    imsk = investable_mask(x)
+    b = renormalised_view(wh, imsk)
     q = if isnothing(rows) || size(rows.X, 1) < 2 * wn
-        wh
+        b
     else
         T = size(rows.X, 1)
         # The windows are a kernel over price relatives, so a gap reads as one: the leg
         # sat in cash, as the step reads it (see [`price_relative`](@ref)). The logarithm
         # of that relative is `log1p` of the return, which keeps the precision of a small
         # return that the correlation then cancels.
-        Rw = view(head_frame_returns(rows), (T - 2 * wn + 1):T, :)
+        R = investable_weights_view(imsk, head_frame_returns(rows))
+        Rw = view(R, (T - 2 * wn + 1):T, :)
         L = log1p.(ifelse.(isfinite.(Rw), Rw, zero(eltype(Rw))))
         cor, mu2 = lagged_window_correlation(view(L, 1:wn, :),
                                              view(L, (wn + 1):(2 * wn), :))
-        wealth_transfer(wh, anticorrelation_claims(cor, mu2))
+        wealth_transfer(b, anticorrelation_claims(cor, mu2))
     end
-    return st, project(alg.proj, set, q, wh)
+    return st, project(alg.proj, set, expand_investable_weights(imsk, q), wh, imsk)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -789,6 +818,10 @@ $(DocStringExtensions.FIELDS)
     """
     n
     """
+    The iterate, over the full pinned universe. At a row with an inactive asset, it keeps the weight of that asset, where the book holds a zero, see [`parked_iterate`](@ref).
+    """
+    u
+    """
     Start Allocation ``\\boldsymbol{w}_1``, which the online form pulls towards.
     """
     w1
@@ -801,10 +834,11 @@ function merge_states(::ExpectationMaximisationState, ::ExpectationMaximisationS
     return throw(ArgumentError("an `ExpectationMaximisationState` is not merged on its own: it sits beside an allocation that is order-dependent, so the head's state refuses the merge, and the state of the rule follows it."))
 end
 function Base.copy(x::ExpectationMaximisationState)
-    return ExpectationMaximisationState(x.n, copy(x.w1), copy_column(x.s))
+    return ExpectationMaximisationState(x.n, copy(x.u), copy(x.w1), copy_column(x.s))
 end
 function port_opt_view(x::ExpectationMaximisationState, i, args...)
-    return ExpectationMaximisationState(x.n, renormalised_view(x.w1, i),
+    return ExpectationMaximisationState(x.n, renormalised_view(x.u, i),
+                                        renormalised_view(x.w1, i),
                                         schedule_state_view(x.s, i))
 end
 """
@@ -855,13 +889,15 @@ The step sums to one without a normalisation, because ``\\langle \\boldsymbol{w}
 # Algorithm
 
  1. Set the period `t = st.n + 1`. `st` is the state of the rule: what the rule keeps from one update to the next, here an [`ExpectationMaximisationState`](@ref).
- 2. When `restart(alg.eta, t)` holds, return a state with the period count `t`, the Start Allocation `st.w1` and the statistic of the schedule at its seed, and a copy of `st.w1`.
+ 2. When `restart(alg.eta, t)` holds, re-enter the Start Allocation `st.w1` onto the set from the Price-Adjusted Allocation with [`reprojection`](@ref). Return a state with the period count `t`, that allocation as the iterate and the statistic of the schedule at its seed, and the allocation. Stop.
  3. Read the rate `eta_t` of the period with [`learning_rate`](@ref).
- 4. Compute `g = x ./ dot(w, x)` and the plain step `q = w .* (1 - eta_t .+ eta_t .* g)`.
+ 4. Compute `g = x ./ dot(u, x)` and the plain step `q = u .* (1 - eta_t .+ eta_t .* g)`, from the iterate `u = st.u`.
  5. Build the new state `stn`, with the period count `t` and the statistic that `schedule_update!` returns for the row.
  6. Compute `ratio`, the smaller of the rate of the next period over `eta_t` and [`correction_ratio_cap`](@ref). [`learning_rate`](@ref) reads the rate of the next period from `stn`.
  7. When `ratio` is not one, set `q = ratio .* q .+ (1 - ratio) .* st.w1`.
- 8. Project `q` onto the Allocation Set with `alg.proj`, from the Price-Adjusted Allocation. Return `stn` and the projection.
+ 8. Project `q` onto the Allocation Set with `alg.proj`, from the Price-Adjusted Allocation. Return `stn` with the projection as its iterate, and the projection.
+
+At a row with an inactive asset, the steps run on the active assets alone, and the new allocation holds a zero at every other asset, see [`online_update!`](@ref). The iterate keeps the weight of an inactive asset, through [`parked_iterate`](@ref).
 
 # Fields
 
@@ -928,7 +964,7 @@ function ExpectationMaximisation(; eta::Union{Real, AbstractLearningRateSchedule
 end
 function rule_state_seed(alg::ExpectationMaximisation, w::AbstractVector,
                          ::Option{<:AbstractAllocationSet} = nothing)
-    return ExpectationMaximisationState(0, copy(w), schedule_state_seed(alg.eta, w))
+    return ExpectationMaximisationState(0, w, copy(w), schedule_state_seed(alg.eta, w))
 end
 """
     correction_ratio_cap(eta::Real, t::Integer)
@@ -960,21 +996,28 @@ function online_update!(alg::ExpectationMaximisation, st::ExpectationMaximisatio
                         w::AbstractVector, x::AbstractVector, ::Any,
                         set::AbstractAllocationSet, ::Option{<:AbstractVector} = nothing)
     t = st.n + 1
+    imsk = investable_mask(x)
+    wh = price_adjusted_allocation(w, x)
     if restart(alg.eta, t)
-        # The period count survives the restart: the schedule's stages are cumulative.
-        return ExpectationMaximisationState(t, st.w1, schedule_state_seed(alg.eta, st.w1)),
-               copy(st.w1)
+        # The period count survives the restart: the schedule's stages are cumulative. The
+        # start re-enters the set from the book the fund holds, on the active assets.
+        b = reprojection(alg.proj, set, investable_book(st.w1, imsk), wh, imsk)
+        return ExpectationMaximisationState(t, parked_iterate(st.w1, b, imsk), st.w1,
+                                            schedule_state_seed(alg.eta, st.w1)), copy(b)
     end
     eta_t = learning_rate(alg.eta, t, st)
-    g = x ./ LinearAlgebra.dot(w, x)
-    q = w .* (one(eta_t) - eta_t .+ eta_t .* g)
-    stn = ExpectationMaximisationState(t, st.w1, schedule_update!(alg.eta, st.s, w, x))
+    ur, xr = renormalised_view(st.u, imsk), investable_weights_view(imsk, x)
+    g = xr ./ LinearAlgebra.dot(ur, xr)
+    q = ur .* (one(eta_t) - eta_t .+ eta_t .* g)
+    stn = ExpectationMaximisationState(t, st.u, st.w1,
+                                       schedule_update!(alg.eta, st.s, w, x))
     ratio = min(learning_rate(alg.eta, t + 1, stn) / eta_t,
                 correction_ratio_cap(alg.eta, t))
     if !isone(ratio)
-        q .= ratio .* q .+ (one(ratio) - ratio) .* st.w1
+        q .= ratio .* q .+ (one(ratio) - ratio) .* renormalised_view(st.w1, imsk)
     end
-    return stn, project(alg.proj, set, q, price_adjusted_allocation(w, x))
+    wn = project(alg.proj, set, expand_investable_weights(imsk, q), wh, imsk)
+    return ExpectationMaximisationState(t, parked_iterate(st.u, wn, imsk), st.w1, stn.s), wn
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1005,8 +1048,10 @@ The weight of an asset, or of an expert, is its start weight times its wealth ra
 
 # Algorithm
 
- 1. Compute `q = w .* x .^ alg.eta`.
- 2. Project `q` onto the Allocation Set with `alg.proj`, from the Price-Adjusted Allocation. On the default set the entropic projection divides `q` by its sum. Return `st` unchanged, and the projection. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing.
+ 1. Compute `q = st.u .* x .^ alg.eta`, from the iterate `st.u`. `st` is the state of the rule: what the rule keeps from one update to the next, here an [`AllocationIterateState`](@ref).
+ 2. Project `q` onto the Allocation Set with `alg.proj`, from the Price-Adjusted Allocation. On the default set the entropic projection divides `q` by its sum. Return the state with the period count raised by one and the projection as its iterate, and the projection.
+
+At a row with an inactive asset, the steps run on the active assets alone, and the new allocation holds a zero at every other asset, see [`online_update!`](@ref). The iterate keeps the weight of an inactive asset, through [`parked_iterate`](@ref).
 
 # Fields
 
@@ -1062,11 +1107,17 @@ function AggregatingAlgorithm(; eta::Real = 1,
                               proj::EntropicProjection = EntropicProjection())::AggregatingAlgorithm
     return AggregatingAlgorithm(eta, proj)
 end
-function online_update!(alg::AggregatingAlgorithm, st, w::AbstractVector, x::AbstractVector,
-                        ::Any, set::AbstractAllocationSet,
-                        ::Option{<:AbstractVector} = nothing)
-    q = w .* x .^ alg.eta
-    return st, project(alg.proj, set, q, price_adjusted_allocation(w, x))
+function rule_state_seed(::AggregatingAlgorithm, w::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
+    return AllocationIterateState(0, w)
+end
+function online_update!(alg::AggregatingAlgorithm, st::AllocationIterateState,
+                        w::AbstractVector, x::AbstractVector, ::Any,
+                        set::AbstractAllocationSet, ::Option{<:AbstractVector} = nothing)
+    imsk = investable_mask(x)
+    q = investable_book(st.u, imsk) .* x .^ alg.eta
+    wn = project(alg.proj, set, q, price_adjusted_allocation(w, x), imsk)
+    return AllocationIterateState(st.n + 1, parked_iterate(st.u, wn, imsk)), wn
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1139,6 +1190,8 @@ Where:
  3. Set `q` to `exp.(st.G[top] .- st.G[first(order)])` on `top` and to zero elsewhere, and divide `q` by its sum. The shift by the largest log wealth keeps the exponential finite.
  4. Project `q` onto the Allocation Set with `alg.proj`, from the Price-Adjusted Allocation. Return the state of the rule with its period count raised by one, and the projection.
 
+At a row with an inactive asset, the steps run on the active assets alone, and the new allocation holds a zero at every other asset, see [`online_update!`](@ref). An inactive asset keeps its wealth. When fewer than `alg.k` assets are active, `top` holds them all.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -1202,15 +1255,18 @@ end
 function online_update!(alg::TopK, st::CumulativeWealthState, w::AbstractVector,
                         x::AbstractVector, ::Any, set::AbstractAllocationSet,
                         ::Option{<:AbstractVector} = nothing)
-    st.G .+= log.(x)
-    order = sortperm(st.G; rev = true, alg = Base.Sort.DEFAULT_STABLE)
-    top = view(order, 1:(alg.k))
+    imsk = investable_mask(x)
+    st.G .+= log.(cash_relative(x))
+    G = investable_weights_view(imsk, st.G)
+    order = sortperm(G; rev = true, alg = Base.Sort.DEFAULT_STABLE)
+    top = view(order, 1:min(alg.k, length(G)))
     # The paper weights the top k by their wealth. The shift by the largest log wealth, which
     # the normalisation undoes, keeps a long run from overflowing the exponential.
-    q = zeros(eltype(st.G), length(w))
-    q[top] .= exp.(st.G[top] .- st.G[first(order)])
+    q = zeros(eltype(G), length(G))
+    q[top] .= exp.(G[top] .- G[first(order)])
     q ./= sum(q)
-    wn = project(alg.proj, set, q, price_adjusted_allocation(w, x))
+    wn = project(alg.proj, set, expand_investable_weights(imsk, q),
+                 price_adjusted_allocation(w, x), imsk)
     return CumulativeWealthState(st.n + 1, st.G, st.p0), wn
 end
 """
@@ -1242,6 +1298,8 @@ Where:
  1. Add `log.(x)` to `st.G`, and set the period `n = st.n + 1`. `st` is the state of the rule: what the rule keeps from one update to the next, here a [`CumulativeWealthState`](@ref).
  2. Compute `q = st.p0 .* exp.((st.G .- maximum(st.G)) ./ sqrt(n + 1))`. The shift by the largest log wealth, which the normalisation removes, keeps the exponential finite.
  3. Project `q` onto the Allocation Set with `alg.proj`, from the Price-Adjusted Allocation. On the default set the entropic projection divides `q` by its sum. Return the state of the rule with the period count `n`, and the projection.
+
+At a row with an inactive asset, the steps run on the active assets alone, and the new allocation holds a zero at every other asset, see [`online_update!`](@ref). An inactive asset keeps its wealth and its share of the prior.
 
 # Fields
 
@@ -1295,12 +1353,16 @@ end
 function online_update!(alg::WeakAggregatingAlgorithm, st::CumulativeWealthState,
                         w::AbstractVector, x::AbstractVector, ::Any,
                         set::AbstractAllocationSet, ::Option{<:AbstractVector} = nothing)
-    st.G .+= log.(x)
+    imsk = investable_mask(x)
+    st.G .+= log.(cash_relative(x))
     n = st.n + 1
+    G = investable_weights_view(imsk, st.G)
     # The exponent is shifted by its maximum, which the normalisation undoes, so a long run
     # never overflows the exponential.
-    q = st.p0 .* exp.((st.G .- maximum(st.G)) ./ sqrt((n + 1) * one(eltype(st.G))))
-    wn = project(alg.proj, set, q, price_adjusted_allocation(w, x))
+    q = renormalised_view(st.p0, imsk) .*
+        exp.((G .- maximum(G)) ./ sqrt((n + 1) * one(eltype(G))))
+    wn = project(alg.proj, set, expand_investable_weights(imsk, q),
+                 price_adjusted_allocation(w, x), imsk)
     return CumulativeWealthState(n, st.G, st.p0), wn
 end
 """

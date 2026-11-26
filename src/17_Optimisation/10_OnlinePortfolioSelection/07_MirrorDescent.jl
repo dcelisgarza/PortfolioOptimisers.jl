@@ -239,7 +239,9 @@ Each term of ``C_{1, t}`` is non-negative, because the largest price relative is
 
  1. Before the first row, seed the statistic `s = [0, log(N)]`.
  2. Read the rate of period `t` from `s`: `eta_max` while `s[1]` is not positive, and ``\\eta_t`` otherwise.
- 3. After the rule's step of period `t`, add `maximum(x ./ dot(w, x)) - 1` to `s[1]`, with `w` the allocation the rule played in period `t` and `x` its price relative.
+ 3. After the rule's step of period `t`, add `maximum(x ./ dot(w, x)) - 1` to `s[1]`, with `w` the allocation the rule played in period `t` and `x` its price relative. Set `s[2]` to the log of the length of `x`.
+
+At a row with an inactive asset, `w` and `x` are cut to the active assets, so `s[2]` is the log of their number.
 
 # Fields
 
@@ -295,7 +297,11 @@ function schedule_state_seed(::SelfConfidentRate, w::AbstractVector)
 end
 function schedule_update!(::SelfConfidentRate, s::AbstractVector, w::AbstractVector,
                           x::AbstractVector)
-    s[1] += maximum(Base.Fix2(/, LinearAlgebra.dot(w, x)), x) - one(eltype(s))
+    imsk = investable_mask(x)
+    xr = investable_weights_view(imsk, x)
+    gross = LinearAlgebra.dot(renormalised_view(w, imsk), xr)
+    s[1] += maximum(Base.Fix2(/, gross), xr) - one(eltype(s))
+    s[2] = log(length(xr))
     return s
 end
 function learning_rate(sched::SelfConfidentRate, ::Integer, st)
@@ -386,7 +392,7 @@ The rate of the update at period ``t`` reads ``\\boldsymbol{x}_t``. It is ``\\et
  1. Before the first row, seed the state: every column of `B` is the Start Allocation, and `L` is zero, with `window` rows, or one row under the whole history.
  2. The schedule answers `true` to [`reads_period_row`](@ref), so the rule writes the state before it reads the rate. At period `n`, find the row `row` of `L` with [`ring_row`](@ref).
  3. For the expert `b` at each rate `eta`, compute its period return `r = dot(b, x)`. Write `log(r)` into `L[row, k]`: overwrite it under a window, and add it to the running sum under the whole history.
- 4. Step `b` to `b .* exp.(eta .* x ./ r)`, and divide it by its sum.
+ 4. Step `b` to `b .* exp.(eta .* x ./ r)`, and divide it by its sum, with [`rate_step!`](@ref). At a row with an inactive asset, the expert steps on the active assets alone and keeps its weight at the others.
  5. Sum each column of `L`, and take the rate of the column with the largest sum. The sum is in logs, so the comparison never overflows.
 
 # Fields
@@ -477,15 +483,13 @@ end
 function schedule_update!(sched::WindowedBestRate, s::WindowedBestRateState,
                           ::AbstractVector, x::AbstractVector)
     n = s.n + 1
+    imsk = investable_mask(x)
     row = ring_row(sched.window, n)
     # A ring row is overwritten; the one row of the whole history accumulates.
     keep = isnothing(sched.window)
     for (k, eta) in enumerate(sched.etas)
-        b = view(s.B, :, k)
-        r = LinearAlgebra.dot(b, x)
+        r = rate_step!(view(s.B, :, k), eta, x, imsk)
         s.L[row, k] = ifelse(keep, s.L[row, k], zero(r)) + log(r)
-        b .*= exp.(eta .* x ./ r)
-        b ./= sum(b)
     end
     return WindowedBestRateState(n, s.B, s.L)
 end
@@ -1241,12 +1245,12 @@ For [`LogWealth`](@ref) the gradient reads the price relative `x` alone. For a [
 
 # Algorithm
 
-The [`LogWealth`](@ref) method returns `-x ./ dot(u, x)`. The [`RiskLoss`](@ref) method runs these steps.
+The [`LogWealth`](@ref) method returns `-x ./ dot(u, x)`, with `u` and the `x` of the product cut to the active assets and `u` renormalised. So it is `NaN` at an inactive asset. The [`RiskLoss`](@ref) method runs these steps.
 
  1. When `rows` is `nothing`, or holds fewer than two rows, return the zero vector.
  2. View the last `min(window, n)` of the `n` rows of `rows`. The head can hold more rows than the loss reads, because another part of the head can need more.
  3. Fit the prior `pr` of the loss on that view, as a batch prior is fitted, on its returns and its Asset Panel. The prior reads its own source, so under `x_src = ExcessSource()` it reads `X - B`. The prior answers `NaN` at an asset outside its Coverage Universe.
- 4. Read the Investable Mask of `pr`.
+ 4. Read the Investable Mask of `pr`, and intersect it with the active assets of `x`.
  5. Compute the gradient of the measure on that mask with [`investable_risk_gradient`](@ref), against the rows of the view. It is `NaN` at every other leg.
 
 # Related
@@ -1256,9 +1260,11 @@ The [`LogWealth`](@ref) method returns `-x ./ dot(u, x)`. The [`RiskLoss`](@ref)
   - [`risk_gradient`](@ref)
 """
 function loss_gradient(::LogWealth, u::AbstractVector, x::AbstractVector, ::Any)
-    return -x ./ LinearAlgebra.dot(u, x)
+    imsk = investable_mask(x)
+    return -x ./
+           LinearAlgebra.dot(renormalised_view(u, imsk), investable_weights_view(imsk, x))
 end
-function loss_gradient(obj::RiskLoss, u::AbstractVector, ::AbstractVector,
+function loss_gradient(obj::RiskLoss, u::AbstractVector, x::AbstractVector,
                        rows::Option{<:ReturnsResult})
     if isnothing(rows) || size(rows.X, 1) < 2
         return zeros(eltype(u), length(u))
@@ -1266,7 +1272,8 @@ function loss_gradient(obj::RiskLoss, u::AbstractVector, ::AbstractVector,
     n = size(rows.X, 1)
     window = port_opt_view(rows, (n - min(obj.window, n) + 1):n, :)
     pr = prior(obj.pe, window)
-    return investable_risk_gradient(obj, u, pr, investable_mask(pr), window)
+    imsk = investable_intersection(investable_mask(pr), investable_mask(x))
+    return investable_risk_gradient(obj, u, pr, imsk, window)
 end
 """
     investable_risk_gradient(obj::RiskLoss, u::AbstractVector, pr::AbstractPriorResult, imsk::Nothing, rd::ReturnsResult)
@@ -1711,8 +1718,9 @@ function mixed_relatives(x::AbstractVector, alpha::Real)
     if iszero(alpha)
         return x
     end
-    N = length(x)
-    return (1 - alpha / N) .* x .+ (alpha / N) * maximum(x)
+    xr = investable_weights_view(investable_mask(x), x)
+    N = length(xr)
+    return (1 - alpha / N) .* x .+ (alpha / N) * maximum(xr)
 end
 function rows_needed(alg::MirrorDescent)
     return rows_needed(alg.obj)
@@ -1729,7 +1737,7 @@ function online_update!(alg::MirrorDescent, st::MirrorDescentState, w::AbstractV
         # The period count survives the restart: the schedule's stages are cumulative. The
         # start re-enters the set from the book the fund holds, as it entered at the seed,
         # on the assets that the loss prices.
-        imsk = investable_mask(loss_gradient(obj, st.u, x, rows))
+        _, imsk = investable_gradient(loss_gradient(obj, st.u, x, rows), x)
         u0 = reprojection(alg.proj, set, investable_book(st.w0, imsk), wh, imsk)
         return MirrorDescentState(t, parked_iterate(st.w0, u0, imsk), st.w0,
                                   schedule_state_seed(alg.eta, st.w0),
@@ -1742,7 +1750,7 @@ function online_update!(alg::MirrorDescent, st::MirrorDescentState, w::AbstractV
     eta = learning_rate(alg.eta, t, st)
     alpha = mixing_share(alg.eta, t, alg.alpha)
     xm = mixed_relatives(x, alpha)
-    g, imsk = investable_gradient(loss_gradient(obj, something(point, st.u), xm, rows))
+    g, imsk = investable_gradient(loss_gradient(obj, something(point, st.u), xm, rows), x)
     gs, gt = transform_gradient!(alg.grad, st.gs, g)::Tuple
     q = mirror_step(alg.proj, investable_book(st.u, imsk), eta .* gt)
     u = project(alg.proj, set, q, wh, imsk)
@@ -1750,46 +1758,6 @@ function online_update!(alg::MirrorDescent, st::MirrorDescentState, w::AbstractV
     played = played_allocation(u, alpha, imsk)
     return MirrorDescentState(t, parked_iterate(st.u, u, imsk), st.w0, s, gs),
            iszero(alpha) ? played : reprojection(alg.proj, set, played, wh, imsk)
-end
-"""
-    reprojection(proj::AbstractProjectionGeometry, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector, imsk::Option{BitVector} = nothing)
-    reprojection(proj::AbstractProjectionGeometry, set::AbstractAllocationSet, q::AbstractVector, w::AbstractVector, imsk::Option{BitVector} = nothing)
-
-Projects onto the head's Allocation Set an allocation that a [`MirrorDescent`](@ref) rule plays without a step to it.
-
-There are two such allocations. One is the uniform mix of the iterate under `alpha`. The other is the Start Allocation that a restart of a Learning-Rate Schedule returns to. Either can lie outside the set. The mix does when the set excludes the uniform allocation. The start does when a turnover ceiling or a MIP kind excludes it from the book the fund now holds. So the head projects them again, in the rule's own geometry, as an [`ExpertMixture`](@ref) projects its blend with [`blend_projection`](@ref).
-
-On a [`BoundedAllocationSet`](@ref), the function returns an allocation inside the bounds unchanged, so the default set costs nothing. On every other set the projection is a programme, and a rule with a positive `alpha` solves two programmes per period. With an Investable Mask, the function projects `q` at the mask on every set.
-
-# Arguments
-
-  - `proj`: The rule's geometry.
-  - `set`: The set, resolved.
-  - `q`: The allocation to play.
-  - `w`: The Price-Adjusted Allocation the step trades from.
-  - `imsk`: The Investable Mask of the step, or `nothing`.
-
-# Returns
-
-  - `w'::AbstractVector`: `q` itself on a bounded set it lies in, its projection at the mask otherwise.
-
-# Related
-
-  - [`project`](@ref)
-  - [`blend_projection`](@ref)
-  - [`played_allocation`](@ref)
-"""
-function reprojection(proj::AbstractProjectionGeometry, set::BoundedAllocationSet,
-                      q::AbstractVector, w::AbstractVector,
-                      imsk::Option{BitVector} = nothing)
-    wb = set.wb
-    inside = isnothing(imsk) && all(wb.lb .<= q .<= wb.ub)
-    return inside ? q : project(proj, set, q, w, imsk)
-end
-function reprojection(proj::AbstractProjectionGeometry, set::AbstractAllocationSet,
-                      q::AbstractVector, w::AbstractVector,
-                      imsk::Option{BitVector} = nothing)
-    return project(proj, set, q, w, imsk)
 end
 """
     ExponentiatedGradient(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(), grad::Option{<:AbstractGradientTransform} = nothing, predictor::Option{<:AbstractGradientPredictor} = nothing)

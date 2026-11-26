@@ -328,7 +328,7 @@ function online_update!(alg::AdaptiveSubgradient, st::AdaptiveSubgradientState,
                         point::Option{<:AbstractVector} = nothing)
     wh = price_adjusted_allocation(w, x)
     g, imsk = investable_gradient(loss_gradient(factory(alg.obj, wh), something(point, w),
-                                                x, rows))
+                                                x, rows), x)
     st.s .= hypot.(st.s, g)
     h = alg.delta .+ st.s
     # The pseudo-inverse of `H`: an entry of `h` is zero only where every gradient so far is
@@ -592,7 +592,7 @@ function predict_gradient!(pred::ForecastGradient, ps, ::AbstractOnlineObjective
                            ::AbstractVector, v::AbstractVector, x::AbstractVector,
                            ::AbstractVector, rows, ::Integer)
     ps, xhat = forecast_relative(pred.me, ps, x, rows)
-    imsk = investable_mask(xhat)
+    imsk = investable_intersection(investable_mask(x), investable_mask(xhat))
     gross = LinearAlgebra.dot(investable_weights_view(imsk, investable_book(v, imsk)),
                               investable_weights_view(imsk, xhat))
     return ps, -xhat ./ gross
@@ -826,6 +826,31 @@ function hint_residual(::Union{EntropicProjection, TsallisProjection, LogBarrier
                        d::AbstractVector)
     return abs2(maximum(abs, d))
 end
+"""
+    rate_step!(b::AbstractVector, eta::Real, x::AbstractVector, imsk::Nothing)
+    rate_step!(b::AbstractVector, eta::Real, x::AbstractVector, imsk::BitVector)
+
+Takes the exponentiated-gradient step of one expert of a [`WindowedBestRate`](@ref) in place, and returns the gross return of the expert in the period.
+
+With an Investable Mask, the step runs on the assets of the mask, and the expert keeps its weight at every other asset, as the iterate of a [`MirrorDescent`](@ref) does, see [`parked_iterate`](@ref).
+
+# Related
+
+  - [`WindowedBestRate`](@ref)
+  - [`schedule_update!`](@ref)
+"""
+function rate_step!(b::AbstractVector, eta::Real, x::AbstractVector, ::Nothing)
+    r = LinearAlgebra.dot(b, x)
+    b .*= exp.(eta .* x ./ r)
+    b ./= sum(b)
+    return r
+end
+function rate_step!(b::AbstractVector, eta::Real, x::AbstractVector, imsk::BitVector)
+    v = renormalised_view(b, imsk)
+    r = rate_step!(v, eta, view(x, imsk), nothing)
+    b .= parked_iterate(b, expand_investable_weights(imsk, v), imsk)
+    return r
+end
 # A rule with a predictor takes the optimistic step: its rows and its state are the ones of
 # that step, and the update dispatches on the state.
 function rows_needed(alg::MirrorDescent{<:Any, <:Any, <:Any, <:Any, <:Any,
@@ -873,7 +898,7 @@ function online_update!(alg::MirrorDescent, st::OptimisticMirrorDescentState,
         # The period count survives the restart: the schedule's stages are cumulative. The
         # start re-enters the set from the book the fund holds, as it entered at the seed,
         # on the assets that the loss prices.
-        imsk = investable_mask(loss_gradient(obj, st.u, x, rows))
+        _, imsk = investable_gradient(loss_gradient(obj, st.u, x, rows), x)
         u0 = reprojection(alg.proj, set, investable_book(st.w0, imsk), wh, imsk)
         return OptimisticMirrorDescentState(t, copy(parked_iterate(st.w0, u0, imsk)),
                                             copy(u0), st.w0,
@@ -889,10 +914,10 @@ function online_update!(alg::MirrorDescent, st::OptimisticMirrorDescentState,
     eta = learning_rate(alg.eta, t, st)
     alpha = mixing_share(alg.eta, t, alg.alpha)
     xm = mixed_relatives(x, alpha)
-    g, imsk = investable_gradient(loss_gradient(obj, something(point, st.u), xm, rows))
+    g, imsk = investable_gradient(loss_gradient(obj, something(point, st.u), xm, rows), x)
     v = half_step(alg, set, st.v, eta .* g, wh, imsk)
     ps, m = predict_gradient!(alg.predictor, st.ps, obj, g, v, x, xm, rows, t)
-    m, pmsk = investable_gradient(m)
+    m, pmsk = investable_gradient(m, x)
     # The second half-step runs on the assets that the loss and the hint both price. When
     # they share none it runs on those of the loss, where the hint is zero.
     kmsk = investable_intersection(imsk, pmsk)

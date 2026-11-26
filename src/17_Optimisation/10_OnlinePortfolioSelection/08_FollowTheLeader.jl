@@ -15,7 +15,7 @@ In order to implement a new selector, subtype `AbstractSampleSelector` with the 
 ## Arguments
 
   - `sel`: The selector.
-  - `X`: The price relatives `1 .+ r` of every row that the head holds, `observations × assets`, in time order. A gap reads as one, through [`price_relative`](@ref). So a window that spans a listing compares as a window in which that asset sat in cash, which is the number that the step reads there.
+  - `X`: The price relatives `1 .+ r` of every row that the head holds, `observations × assets`, in time order. It holds the columns of the assets that are active at the last row. A gap reads as one, through [`price_relative`](@ref). So a window that spans a listing compares as a window in which that asset sat in cash.
 
 ## Returns
 
@@ -855,7 +855,7 @@ The solver-free default runs Cover's fixed point, which stops on a certificate, 
 
 **The rule projects the damped mix alone.** It uses the Euclidean geometry on `proj`, with the Price-Adjusted Allocation as the reference. On a static convex set the projection returns the mix unchanged. A turnover ceiling or a MIP kind needs the repair on a day when the mix leaves the set. The rule skips the projection by type on a [`BoundedAllocationSet`](@ref), and at `gamma = 0`. An empty sample, or a sample too small for the estimator, gives the uniform portfolio projected onto the set, as in [gyorfischafer2003,gyorfi2006,gyorfi2008,li2011corn](@cite). A JuMP head fits a covariance, so it needs two rows. A re-solve that fails after the fallback chain of the held estimator is a Held Step. The rule then plays the Price-Adjusted Allocation, so the fund trades nothing that period.
 
-**Under a time-varying panel the re-solve is the batch path.** The estimator reads the head's rows viewed at the sample, with the returns as they are, `NaN` where no return exists, and the active mask. So the estimator reduces to its own universe, as it does on any `ReturnsResult`, and writes a zero at every asset outside it. That universe is the Coverage Universe of the sample for the solver-free leader and for a head with no prior, and the Investable Mask of its prior for a JuMP head. An asset that is not listed for a part of the sample stays outside the universe of a plain estimator until the sample clears that span. A [`Prefix`](@ref) sample never clears it, and a [`LastRows`](@ref) sample clears it when its window has passed the listing. A prior that reads the mask admits the asset after its own warm-up. The selector reads a gap as a price relative of one, as if the asset sat in cash, so it compares a window that spans a listing and does not drop it. The damped mix and the projection read a zero from the leader at such an asset as they read any other zero.
+**Under a time-varying panel the re-solve is the batch path on the active assets.** The sample marks every asset that is inactive at the last row as inactive at each of its rows, see [`investable_sample`](@ref), and the leader holds a zero there. So the leader of a sample of past rows holds no asset that departed after them. The estimator reads the head's rows viewed at the sample, with the returns as they are, `NaN` where no return exists, and the active mask. So the estimator reduces to its own universe, as it does on any `ReturnsResult`, and writes a zero at every asset outside it. That universe is the Coverage Universe of the sample for the solver-free leader and for a head with no prior, and the Investable Mask of its prior for a JuMP head. An asset that is not listed for a part of the sample stays outside the universe of a plain estimator until the sample clears that span. A [`Prefix`](@ref) sample never clears it, and a [`LastRows`](@ref) sample clears it when its window has passed the listing. A prior that reads the mask admits the asset after its own warm-up. The selector reads a gap as a price relative of one, as if the asset sat in cash, so it compares a window that spans a listing and does not drop it. The damped mix and the projection read a zero from the leader at such an asset as they read any other zero.
 
 # Mathematical definition
 
@@ -897,8 +897,8 @@ Where:
 The steps of the Online Update:
 
  1. Compute `wh`, the Price-Adjusted Allocation of `w` over `x`.
- 2. Select `idx`, the rows of the sample, with `select_rows` on `alg.sel` and the price relatives of `rows` in the head's frame, which [`head_frame_returns`](@ref) gives. The leader in step 3 reads the raw rows, and its prior states its own source.
- 3. When `idx` holds fewer rows than `leader_min_rows(alg.opt)`, set `wstar` to the uniform portfolio projected onto `set` with `alg.proj`, from `wh`. Otherwise set `wstar` to the result of `leader_allocation` on `alg.opt`, the view of `rows` at `idx`, `wh`, `set` and `rows`.
+ 2. Select `idx`, the rows of the sample, with `select_rows` on `alg.sel` and the price relatives of the active assets of `rows` in the head's frame, which [`head_frame_returns`](@ref) gives. The leader in step 3 reads the raw rows, and its prior states its own source.
+ 3. When `idx` holds fewer rows than `leader_min_rows(alg.opt)`, set `wstar` to the uniform portfolio projected onto `set` with `alg.proj`, from `wh`. When the bounds of the set at the active assets do not reach the budget, record a Held Step, with `wstar` as `nothing`. Otherwise set `wstar` to the result of `leader_allocation` on `alg.opt`, the sample that [`investable_sample`](@ref) gives, `wh`, `set` and `rows`.
  4. When `wstar` is `nothing`, the step is a Held Step. Return `st` and a copy of `wh`. `st` is the state of the rule: what the rule keeps from one update to the next, or `nothing` for a rule that keeps nothing. This rule returns it unchanged.
  5. When `alg.gamma` is zero, return `st` and `wstar`.
  6. Set `mix` to `(1 - alg.gamma) .* wstar .+ alg.gamma .* w`. Return `st` and the result of `blend_projection` of `mix` onto `set` with `alg.proj`, from `wh`.
@@ -1368,12 +1368,17 @@ end
 function online_update!(alg::FollowTheLeader, st, w::AbstractVector, x::AbstractVector,
                         rows::ReturnsResult, set::AbstractAllocationSet,
                         ::Option{<:AbstractVector} = nothing)
+    imsk = investable_mask(x)
     wh = price_adjusted_allocation(w, x)
-    idx = select_rows(alg.sel, price_relative.(head_frame_returns(rows)))
+    R = investable_weights_view(imsk, head_frame_returns(rows))
+    idx = select_rows(alg.sel, price_relative.(R))
     wstar = if length(idx) < leader_min_rows(alg.opt)
-        project(alg.proj, set, fill(one(eltype(w)) / length(w), length(w)), wh)
+        u = fill(one(eltype(w)) / length(w), length(w))
+        project(alg.proj, set, investable_book(u, imsk), wh, imsk)
+    elseif !isnothing(imsk) && !feasible_bounds(port_opt_view(set, findall(imsk)))
+        record_held_step!(infeasible_mask_msg(imsk), nothing)
     else
-        leader_allocation(alg.opt, port_opt_view(rows, idx, :), wh, set, rows)
+        leader_allocation(alg.opt, investable_sample(rows, idx, imsk), wh, set, rows)
     end
     if isnothing(wstar)
         return st, copy(wh)
@@ -1381,8 +1386,8 @@ function online_update!(alg::FollowTheLeader, st, w::AbstractVector, x::Abstract
     if iszero(alg.gamma)
         return st, wstar
     end
-    mix = (one(alg.gamma) - alg.gamma) .* wstar .+ alg.gamma .* w
-    return st, blend_projection(alg.proj, set, mix, wh)
+    mix = (one(alg.gamma) - alg.gamma) .* wstar .+ alg.gamma .* investable_book(w, imsk)
+    return st, blend_projection(alg.proj, set, mix, wh, imsk)
 end
 """
     ShortTermLossControlPortfolio(; window::Integer = 5, gamma::Real = 0.025, slv::Slv_VecSlv, pe::AbstractPriorEstimator = EmpiricalPrior(; ce = RankOneCovariance()), proj::EuclideanProjection = EuclideanProjection(), sc::Number = 1, so::Number = 1)
@@ -1744,7 +1749,7 @@ The steps of the Online Update:
  5. Set `p` to `(1 - 1 / (t + 1)) .* phat`, followed by the share `1 / (t + 1)` of the new copy.
  6. Under `alg.prune`, keep the copies that `expert_alive` finds alive at `t + 1`, with their entries of `p`.
  7. Project `p` onto the Expert Set with the entropic projection. On the bare simplex over the copies this divides `p` by its sum.
- 8. Set `q` to the sum of `p[k] .* h` over the copies. Return the new state of the rule, and the result of `blend_projection` of `q` onto `set` with `alg.proj`, from the Price-Adjusted Allocation.
+ 8. Set `q` to the sum of `p[k] .* h` over the copies, with each `h` on the active assets of the row, renormalised with [`investable_book`](@ref), as `r` reads it. Return the new state of the rule, and the result of `blend_projection` of `q` onto `set` with `alg.proj`, from the Price-Adjusted Allocation.
 
 # Fields
 
@@ -1918,7 +1923,9 @@ function online_update!(alg::FollowTheLeadingHistory, st::FollowTheLeadingHistor
                         set::AbstractAllocationSet, ::Option{<:AbstractVector} = nothing)
     t = st.n + 1
     K = length(st.h)
-    r = map(h -> LinearAlgebra.dot(h, x), st.h)
+    imsk = investable_mask(x)
+    xc = cash_relative(x)
+    r = map(h -> LinearAlgebra.dot(investable_book(h, imsk), xc), st.h)
     q = st.p .* r .^ alg.alpha
     phat = q ./ sum(q)
     for k in 1:K
@@ -1944,9 +1951,9 @@ function online_update!(alg::FollowTheLeadingHistory, st::FollowTheLeadingHistor
                 resolve_allocation_set(alg.eset, length(p), false, eltype(w)), p, p)
     q = zeros(eltype(w), length(w))
     for (k, h) in enumerate(st.h)
-        q .+= p[k] .* h
+        q .+= p[k] .* investable_book(h, imsk)
     end
-    wn = blend_projection(alg.proj, set, q, price_adjusted_allocation(w, x))
+    wn = blend_projection(alg.proj, set, q, price_adjusted_allocation(w, x), imsk)
     return FollowTheLeadingHistoryState(t, st.st, st.h, p, st.born), wn
 end
 export Prefix, LastRows, HistogramMatch, KernelMatch, NearestNeighbourMatch,

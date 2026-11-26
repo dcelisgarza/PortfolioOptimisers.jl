@@ -9,6 +9,7 @@ PortfolioOptimisers.online_selection_seed
 PortfolioOptimisers.fold_online_selection
 PortfolioOptimisers.online_selection_pin
 PortfolioOptimisers.online_selection_row!
+PortfolioOptimisers.row_relatives
 PortfolioOptimisers.row_timestamp
 PortfolioOptimisers.report_held_steps
 PortfolioOptimisers.report_row_gaps
@@ -16,6 +17,7 @@ PortfolioOptimisers.buffer_returns_result
 PortfolioOptimisers.buffer_column_view
 PortfolioOptimisers.buffer_panel
 PortfolioOptimisers.online_selection_result
+PortfolioOptimisers.online_selection_failure
 PortfolioOptimisers.batch_from_state(::OnlinePortfolioSelection)
 PortfolioOptimisers.held_timestamps(opt::OnlinePortfolioSelection)
 PortfolioOptimisers.update_online_estimator(opt::Union{OnlinePortfolioSelection, PreviousWeights})

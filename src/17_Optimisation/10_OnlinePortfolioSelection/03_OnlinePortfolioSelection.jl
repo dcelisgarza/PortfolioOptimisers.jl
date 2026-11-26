@@ -9,7 +9,7 @@ The head is a naive optimiser. It fits no moment and solves no programme of its 
 
 **The online verbs run the same recursion.** `partial_fit!(opt, rd)` folds each row into the state as the Block Step. A fold of `k` rows is `k` single-row updates, so a walk-forward with `test_size = k` holds the Next-Period Allocation of the end of the block for `k` periods. `optimise(opt)` with no data is the **Recursion Result**. It wraps the allocation of the state in a Result and runs no batch path. So `optimise(opt)` after a fold of rows `1:t` equals `optimise(opt, rd[1:t])` exactly, at every `test_size`. The held path of a walk-forward differs from the batch pass in two ways. The target set at the start of a block drifts over the block, and the Block Step sets the cadence of the trades.
 
-**The Start Allocation** is `w0`, `nothing` by default. When it is absent, the recursion starts at `1/N` over the whole pinned universe, and the unlisted names are included. If `k` of `N` assets are unlisted at the first row, the recursion puts `k/N` of its weight on legs that see `x = 1`, as cash does, until the rule moves that weight. `optimise(opt)` with no data renormalises over the listed legs, so the fund holds the listed legs alone. But the fund is not always the recursion that starts over the listed names alone, because the parked legs enter the gross return `⟨w, x⟩` that a rule reads. Buy-and-hold scales each leg by its own price relative, so its fund is the same. The exponentiated-gradient step divides by the gross return, so its fund is different. A [`ProgrammeAllocationSet`](@ref) does not remove the difference. Its projection gives a zero weight to a parked leg that the prior of the set cannot price, as to every asset outside the Investable Mask of the step. But the gradient of that step already read the parked leg in the gross return, so the weights of the listed legs keep the difference, also for an asset that never lists. A caller who wants the recursion to be the fund from row one gives `w0` over the listed assets, with zeros elsewhere. The rule's step then decides what a zero does. The exponentiated-gradient step keeps a zero at zero, so that asset never gets weight. A Euclidean step that moves no weight onto the asset keeps the zero exact too, because [`project_simplex`](@ref) only renormalises a raw step that is on the simplex up to rounding. Buy-and-hold is such a step. A Euclidean step that moves weight onto the asset, as the passive-aggressive step does, gives it weight, and a gap at that asset is then a Held Gap.
+**The Start Allocation** is `w0`, `nothing` by default. When it is absent, the recursion starts at `1/N` over the whole pinned universe, and the unlisted names are included. The fund holds the listed legs alone, and an update reads the start on the assets active at the row, renormalised. So the fund is the recursion that starts over the listed names alone, under every rule. A rule that multiplies its own allocation keeps the weight of an unlisted leg on its iterate, and gives the leg that weight when it lists. A caller gives a weight of zero to such a leg through `w0`. The rule's step then decides what a zero does. The exponentiated-gradient step keeps a zero at zero, so that asset never gets weight. A Euclidean step that moves no weight onto the asset keeps the zero exact too, because [`project_simplex`](@ref) on the simplex, and [`bounded_quadratic_projection`](@ref) under other bounds, only renormalise a raw step that is in the set up to rounding. Buy-and-hold is such a step. A Euclidean step that moves weight onto the asset, as the passive-aggressive step does, gives it weight, and a gap at that asset is then a Held Gap.
 
 A given `w0` is over the pinned names, and the head pins and views it with them. The first step projects it once onto the Allocation Set in the rule's geometry, as it projects the uniform start, so a start outside the set becomes feasible and is never refused. A set that reads the head's rows has no constraints before the first row, so it holds the start as given until the first update. The start reaches the first Online Update as `w`. A rule that steps from `w` continues from it. A rule whose next allocation is not a step from `w` replaces it at that update. The constant rebalanced portfolio returns its own `w`, an expert mixture returns the mix of its experts, and the Newton step solves its Gram. Such a rule can still carry `w0` forward. The gradient of the Newton step reads `w`, and an expert that steps from `w` starts at `w0`. Under every rule, the fund holds `w0` for exactly one period.
 
@@ -17,9 +17,9 @@ A given `w0` is over the pinned names, and the head pins and views it with them.
 
 **Under `x_src = ExcessSource()` the head selects in the Excess Frame.** The rule's step reads the price relative of the return in excess of the benchmark, `x = 1 + r - b`. Here `b` is the benchmark return of the row, one value that every asset shares for a vector benchmark, and one value per asset for a matrix benchmark. Every reader of the rows inside a rule reads the same frame through [`head_frame_returns`](@ref): the refit and the fold of a forecaster, the scale of a [`ForecastReversion`](@ref), the window of an [`AntiCorrelation`](@ref) and the row selector of a [`FollowTheLeader`](@ref). The rows buffer keeps the raw returns and the benchmark, so the prior of a Risk Loss, the prior and each graph or exposure slot of a programme set, and a leader read the raw rows and state their own source. The source of the step, the readers of a Risk Loss and the readers of a programme set form one group. When one of them states `ExcessSource()` and another states no source and reads the raw rows, the head warns once, see [`warn_raw_readers`](@ref). A leader and the fallback are heads with their own groups. A gap in the benchmark is a gap in the frame, which the step reads as one and the head reports as a Held Gap. `predict(res, rd)` reports the raw wealth of the fund, because the fund holds the assets. Returns data with no benchmark is refused with an `ArgumentError`.
 
-**A non-finite return is kept, and read in two ways.** The rule's step reads `x = 1` there, as if the leg held cash. At an asset that the panel marks inactive, or at one to which the recursion gives no weight, this is silent. At an active asset with a non-zero weight it is a Held Gap, which warns by default and refuses under `strict`. The rows buffer keeps the cell as `NaN`, with the row's active mask beside it. Every statistic over the rows reads them as the batch verb reads a Returns Result, and reduces to its own Coverage Universe. Such a statistic is the mean of a forecaster, the prior of a Risk Loss or of a programme set, or the re-solve of a leader. A plain estimator drops an asset with a gap anywhere in its window. A mask-aware estimator answers the asset from the rows it has. A kernel over price relatives reads the gap as one.
+**An inactive asset leaves the step, and a Held Gap reads as cash.** At an asset that the panel marks inactive at a row, the step of every rule leaves the asset out, and the new allocation holds a zero there, as a batch head does with an asset outside its Coverage Universe. The return of an inactive asset is not read, also when it is finite. A non-finite return at an active asset with a non-zero weight is a Held Gap, which warns by default and refuses under `strict`. The step reads `x = 1` there, as if the leg held cash. At an asset to which the recursion gives no weight, the gap is silent. The rows buffer keeps the cell as `NaN`, with the row's active mask beside it. Every statistic over the rows reads them as the batch verb reads a Returns Result, and reduces to its own Coverage Universe. Such a statistic is the mean of a forecaster, the prior of a Risk Loss or of a programme set, or the re-solve of a leader. A plain estimator drops an asset with a gap anywhere in its window. A mask-aware estimator answers the asset from the rows it has. A kernel over the rows reads the active assets of the last row, and reads a gap in an earlier row as one. A row at which no asset is active states no universe. The step then reads `x = 1` at every asset, and `optimise(opt)` with no data gives an [`OptimisationFailure`](@ref), which the fallback answers.
 
-A reader of a statistic that cannot price a leg removes it from the step, and the new allocation holds a zero there, as a batch head does with an asset that its prior cannot price. The readers are the loss of a first-order rule, the forecaster of a rule, the held estimator of a leader and the prior of a programme set. Each admits the leg again when it can price it. The iterate of a [`MirrorDescent`](@ref) keeps the weight of a leg that its loss cannot price, so the leg comes back at that weight. A kernel over price relatives prices a gap as cash, so it forces no zero, and under it a relisted asset comes back at the recursion's own weight. Under a time-varying panel, the Investable Mask of the Recursion Result is the active mask of the last folded row. `optimise(opt)` with no data slices the full allocation to that mask and renormalises it, and the Result expands it back with a zero at every non-investable asset.
+A reader of a statistic that cannot price an active leg removes it from the step too, and the new allocation holds a zero there. The readers are the loss of a first-order rule, the forecaster of a rule, the held estimator of a leader and the prior of a programme set. Each admits the leg again when it can price it. A rule that multiplies its own allocation keeps the weight of a removed leg on its iterate, and the leg comes back at that weight, see [`parked_iterate`](@ref). Any other rule steps from a zero. Under a time-varying panel, the Investable Mask of the Recursion Result is the active mask of the last folded row. `optimise(opt)` with no data slices the full allocation to that mask and renormalises it, and the Result expands it back with a zero at every non-investable asset.
 
 **The Allocation Set on `set` is the one the Constrained Update projects onto.** [`project`](@ref) projects the raw step of every rule onto it, in the rule's own Projection Geometry. The default [`BoundedAllocationSet`](@ref) is the simplex, and every projection onto it is closed form, so the default configuration solves nothing. A [`ProgrammeAllocationSet`](@ref) admits the full constraint vocabulary, and its projection is a programme. When a programme fails, the step is a **Held Step**. The projection returns the Price-Adjusted Allocation it was given, so the fund trades nothing that period, and the state of the rule still absorbs the row. The head warns once, with the row's timestamp. The retcode of the Recursion Result is an [`OptimisationSuccess`](@ref) that carries the [`HeldStep`](@ref) record of the last folded row, so a fallback chain never runs on a hold. The constructor refuses a negative lower bound under an entropic, Tsallis or log-barrier rule.
 
@@ -52,7 +52,7 @@ Where:
   - $(math_dict[:T])
   - $(math_dict[:N])
 
-The wealth ``S_T`` is the wealth of Equation 1.1 of [cover1991](@cite), earned in the protocol of Section 2 of [lihoi2014](@cite). The Next-Period Allocation after ``T`` rows is ``\\boldsymbol{w}_{T+1}``. Both projections are one call of [`project`](@ref), so a [`ProgrammeAllocationSet`](@ref) adds its Objective Penalty to both objectives.
+The wealth ``S_T`` is the wealth of Equation 1.1 of [cover1991](@cite), earned in the protocol of Section 2 of [lihoi2014](@cite). At an asset that is inactive in period ``t``, the step reads no ``x_{tj}``, and ``w_{t+1, j} = 0``. The Next-Period Allocation after ``T`` rows is ``\\boldsymbol{w}_{T+1}``. Both projections are one call of [`project`](@ref), so a [`ProgrammeAllocationSet`](@ref) adds its Objective Penalty to both objectives.
 
 Under `x_src = ExcessSource()`, ``r_{tj}`` is the return of asset ``j`` in excess of the benchmark, ``r_{tj} - b_{tj}``, where ``b_{tj}`` is the benchmark return of period ``t`` for asset ``j``. A vector benchmark gives every asset the same ``b_{tj}``.
 
@@ -646,7 +646,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Takes one row of the recursion, inside a [`ProjectionStep`](@ref) that gives every projection of the row the rows it reads and a log for its holds.
 
-The row's returns `r` are in the head's frame, in excess of the benchmark under `x_src = ExcessSource()`. The row's Returns Result `rd` is raw. The row reads a gap in two ways, and each reader gets the reading that the rest of the library gives it. The Online Update and every kernel over the price relatives read one at a gap, as if the leg held cash, which is the reading of a Held Gap. So the recursion stays over the full pinned universe and never carries a forced zero. Every statistic over the rows reads them as a batch verb reads a Returns Result, with `NaN` where there was no return and the active mask beside it. Such a statistic is the mean of a forecaster, the prior of a Risk Loss or of a programme set, or the re-solve of a leader. It reduces to its own Coverage Universe. So a window over an unlisted span never meets a constant column, and returns that never happened never dilute the statistic of a relisted asset.
+The row's returns `r` are in the head's frame, in excess of the benchmark under `x_src = ExcessSource()`. The row's Returns Result `rd` is raw. The Online Update leaves out an asset that the row's active mask turns off, through the mark of [`row_relatives`](@ref). At a gap of an active asset it reads one, as if the leg held cash, which is the reading of a Held Gap. So the recursion stays over the full pinned universe, with a zero at an inactive asset. Every statistic over the rows reads them as a batch verb reads a Returns Result, with `NaN` where there was no return and the active mask beside it. Such a statistic is the mean of a forecaster, the prior of a Risk Loss or of a programme set, or the re-solve of a leader. It reduces to its own Coverage Universe. So a window over an unlisted span never meets a constant column, and returns that never happened never dilute the statistic of a relisted asset.
 
 A row with a held projection warns once, with the row's timestamp and each hold, and returns the first [`HeldStep`](@ref) record. A row whose projections all solved returns `nothing`.
 
@@ -654,7 +654,7 @@ A row with a held projection warns once, with the row's timestamp and each hold,
 
  1. Name the Held Gaps of the returns `r` at the row's index `i` through [`report_row_gaps`](@ref).
  2. Fold the row's Returns Result `rd` into the rows buffer `X` through [`partial_fit!`](@ref), when the tree keeps one. The buffer keeps the raw returns of `rd` verbatim with its active mask, and every other field of `rd` beside it.
- 3. Form the price relative `x` through [`price_relative`](@ref), which is one at a gap.
+ 3. Form the price relative `x` through [`row_relatives`](@ref), which is one at a gap of an active asset and `NaN` at an inactive asset.
  4. Read the buffer out as `rows`, a [`ReturnsResult`](@ref) of the rows that the head holds, through [`buffer_returns_result`](@ref).
  5. Take the Online Update through [`online_update!`](@ref), inside a projection step over `rows`, the timestamp `ts`, the head's `strict` and the source `x_src` of its step, which [`with_projection_step`](@ref) opens. This gives the new state `st` of the rule, the allocation `w` and the log of holds `held`.
  6. Warn on a hold through [`report_held_steps`](@ref), which gives the row's hold record.
@@ -678,7 +678,7 @@ A row with a held projection warns once, with the row's timestamp and each hold,
   - [`fold_online_selection`](@ref)
   - [`report_row_gaps`](@ref)
   - [`buffer_returns_result`](@ref)
-  - [`price_relative`](@ref)
+  - [`row_relatives`](@ref)
   - [`online_update!`](@ref)
   - [`with_projection_step`](@ref)
   - [`HeldStep`](@ref)
@@ -691,11 +691,32 @@ function online_selection_row!(opt::OnlinePortfolioSelection, st, w::AbstractVec
     if !isnothing(X)
         X = partial_fit!(X, row.rd; own_returns = true)
     end
-    x = price_relative.(r)
+    x = row_relatives(r, amsk)
     rows = buffer_returns_result(X)
     (st, w), held = with_projection_step(() -> online_update!(opt.alg, st, w, x, rows, set),
                                          rows, ts; strict = opt.strict, x_src = opt.x_src)
     return st, w, X, report_held_steps(held, ts)
+end
+"""
+    row_relatives(r::AbstractVector, amsk::Nothing)
+    row_relatives(r::AbstractVector, amsk::AbstractVector{<:Bool})
+
+Returns the price relatives of a row, which the Online Update reads, with `NaN` at every asset that the active mask of the row turns off.
+
+The `NaN` is the mark of an asset that a step cannot price, and [`investable_mask`](@ref) reads it. So a step leaves an inactive asset out, as a batch optimiser does with an asset outside its Coverage Universe. A gap at an active asset is a Held Gap, and [`price_relative`](@ref) reads it as one. A row with no active asset states no universe, so it holds no mark.
+
+# Related
+
+  - [`online_selection_row!`](@ref)
+  - [`price_relative`](@ref)
+  - [`cash_relative`](@ref)
+"""
+function row_relatives(r::AbstractVector, ::Nothing)
+    return price_relative.(r)
+end
+function row_relatives(r::AbstractVector, amsk::AbstractVector{<:Bool})
+    x = price_relative.(r)
+    return any(amsk) ? ifelse.(amsk, x, oftype.(x, NaN)) : x
 end
 """
     buffer_returns_result(X::Nothing)
@@ -819,7 +840,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Names the Held Gaps of one row of returns, and writes nothing.
 
-The function passes over a non-finite cell that the row's active mask marks inactive, because an inactive asset has no return by definition. It also passes over a non-finite cell at which the recursion's weight is zero. Every other non-finite cell is a Held Gap, and [`strict_diagnostic`](@ref) reports them all in one [`held_gap_msg`](@ref). The report is a warning by default and a refusal under `strict`. The function does not fill the row. The buffer keeps the cell as it is, and the Online Update reads it as one through [`price_relative`](@ref).
+The function passes over a non-finite cell that the row's active mask marks inactive, because an inactive asset has no return by definition. It also passes over a non-finite cell at which the recursion's weight is zero. Every other non-finite cell is a Held Gap, and [`strict_diagnostic`](@ref) reports them all in one [`held_gap_msg`](@ref). The report is a warning by default and a refusal under `strict`. The function does not fill the row. The buffer keeps the cell as it is, and the Online Update reads it as one through [`row_relatives`](@ref).
 
 # Arguments
 
@@ -936,7 +957,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns the Recursion Result, the allocation of the state as a [`NaiveOptimisationResult`](@ref) over the assets active at the last folded row.
 
-This function reads the state and writes nothing, so every call on one state returns the same Result. Its retcode is an [`OptimisationSuccess`](@ref). Its `res` is the [`HeldStep`](@ref) record of the last folded row when that row was held, and `nothing` otherwise. A reduced allocation with no mass is the one failure from which a rule cannot recover. It happens when every held asset is inactive at the last row. This function then returns an [`OptimisationFailure`](@ref) with `NaN` weights, so that a fallback chain continues.
+This function reads the state and writes nothing, so every call on one state returns the same Result. Its retcode is an [`OptimisationSuccess`](@ref). Its `res` is the [`HeldStep`](@ref) record of the last folded row when that row was held, and `nothing` otherwise. Two cases have no allocation to read out, and a rule cannot recover from either. The first is a reduced allocation with no mass, or with a mass that is a rounding by [`below_rounding`](@ref). It happens when every held asset is inactive at the last row. The second is a set whose bounds at the active assets admit no allocation on the budget, by [`feasible_bounds`](@ref). A step at such a row is held, so the book keeps the departed assets, and no renormalisation of it lies in the set. In both cases this function returns an [`OptimisationFailure`](@ref) with `NaN` weights, so that a fallback chain continues.
 
 # Mathematical definition
 
@@ -953,16 +974,17 @@ Where:
   - ``\\mathcal{I}``: Investable Mask of the Result, the assets active at the last folded row, or every asset under a static panel.
   - $(math_dict[:T])
 
-The Result expands ``\\bar{\\boldsymbol{w}}`` back over the pinned universe with a zero at every asset outside ``\\mathcal{I}``. The weights are defined when the denominator is positive and every ``w_{T+1,i}`` is finite.
+The Result expands ``\\bar{\\boldsymbol{w}}`` back over the pinned universe with a zero at every asset outside ``\\mathcal{I}``. The weights are defined when the denominator is positive and above the rounding of the budget, and every ``w_{T+1,i}`` is finite.
 
 # Algorithm
 
  1. Read the active mask `imsk` of the last folded row, and form `idx`, the indices of the active assets, or every index when `imsk` is `nothing`.
  2. View the head's set at `idx`, giving `set`, and slice the allocation to `w`.
  3. Resolve the head's fee against the full set, and view it at the Investable Mask through [`investable_fees_view`](@ref), giving `fees`.
- 4. Sum `w` to `s`. When no asset is active, `s` is not positive, or an entry of `w` is not finite, return an [`OptimisationFailure`](@ref) with `NaN` weights and no bounds.
+ 4. Sum `w` to `s`. When no asset is active, `s` is not positive or is a rounding of the allocation of the state by [`below_rounding`](@ref), or an entry of `w` is not finite, return an [`OptimisationFailure`](@ref) with `NaN` weights and no bounds, through [`online_selection_failure`](@ref).
  5. Resolve the weight bounds of `set` over the active assets, giving `wb`. The resolution reads the rows that the head holds, viewed at the active assets, so a bound that reads the returns, such as a [`ScoreWeightBounds`](@ref), scores the rows of the last step.
- 6. Return `w ./ s` with `wb`, `fees` and an [`OptimisationSuccess`](@ref) whose `res` is the hold record of the state.
+ 6. When `wb` admits no allocation on the budget, by [`feasible_bounds`](@ref), return an [`OptimisationFailure`](@ref) in the same way.
+ 7. Return `w ./ s` with `wb`, `fees` and an [`OptimisationSuccess`](@ref) whose `res` is the hold record of the state.
 
 # Arguments
 
@@ -991,21 +1013,49 @@ function online_selection_result(opt::OnlinePortfolioSelection,
                                                  strict = opt.strict, datatype = eltype(w)),
                                 imsk, N)
     s = sum(w)
-    if iszero(Nr) || !(s > zero(s)) || !all(isfinite, w)
+    if iszero(Nr) || !(s > zero(s)) || below_rounding(s, state.w) || !all(isfinite, w)
         # No asset is active at the last row, or the recursion's mass sits on none of
         # them: there is no allocation to read out, and no universe to bound.
-        return NaiveOptimisationResult(; pr = nothing, wb = nothing,
-                                       retcode = OptimisationFailure(;
-                                                                     res = "the recursion's allocation has no mass on the assets active at the last folded row, so no Next-Period Allocation can be read out."),
-                                       w = fill(convert(eltype(w), NaN), Nr), imsk = imsk,
-                                       fb = nothing, fees = fees)
+        return online_selection_failure("the recursion's allocation has no mass on the assets active at the last folded row, so no Next-Period Allocation can be read out.",
+                                        w, imsk, fees)
     end
     # A head that keeps no rows has `nothing` here, and its view is `nothing`.
     rows = port_opt_view(buffer_returns_result(state.X), idx)
     wb = weight_bounds_constraints(set.wb, set.sets; rd = rows, N = Nr, strict = opt.strict,
                                    datatype = eltype(w))
+    if !feasible_bounds(wb)
+        # The step at such a row is held, and no renormalisation of its book lies in the set.
+        return online_selection_failure("no allocation summing to one lies between the bounds of the assets active at the last folded row, so no Next-Period Allocation can be read out.",
+                                        w, imsk, fees)
+    end
     retcode, w = OptimisationSuccess(; res = state.hold), w ./ s
     return NaiveOptimisationResult(; pr = nothing, wb = wb, retcode = retcode, w = w,
+                                   imsk = imsk, fb = nothing, fees = fees)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the Recursion Result that has no allocation to read out: an [`OptimisationFailure`](@ref) with the reason `msg`, `NaN` weights over the active assets and no bounds, so that a fallback chain continues.
+
+# Arguments
+
+  - `msg`: The reason of the failure.
+  - `w`: The allocation of the state, sliced to the active assets.
+  - `imsk`: The active mask of the last folded row, or `nothing`.
+  - `fees`: The fees, viewed at the active assets.
+
+# Returns
+
+  - `res::NaiveOptimisationResult`: The failed Recursion Result, `pr = nothing`.
+
+# Related
+
+  - [`online_selection_result`](@ref)
+"""
+function online_selection_failure(msg::AbstractString, w::AbstractVector, imsk, fees)
+    return NaiveOptimisationResult(; pr = nothing, wb = nothing,
+                                   retcode = OptimisationFailure(; res = msg),
+                                   w = fill(convert(eltype(w), NaN), length(w)),
                                    imsk = imsk, fb = nothing, fees = fees)
 end
 """

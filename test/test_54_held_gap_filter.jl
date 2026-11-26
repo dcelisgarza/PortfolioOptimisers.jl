@@ -1274,11 +1274,10 @@ end
     end
 end
 
-@testset "An asset that never lists parks its share of the uniform start as cash (#2127)" begin
-    # The asset `e` has no row. The uniform start gives it 1/8, the held first row reads it as
-    # cash, and the gradient of the second row reads that cash in the gross return. So the
-    # listed weights differ from the fit without `e` (ADR 0162). A start with a zero at `e`
-    # is the fit without `e`, bit for bit.
+@testset "An asset that never lists takes no part in the step (#2127, #2346)" begin
+    # The asset `e` has no row. The uniform start gives it 1/8, and the first row holds that
+    # book. The step of every later row reads the active assets alone (ADR 0170), so the fit
+    # is the one without `e`, from the uniform start and from a start with a zero at `e`.
     rng7 = StableRNG(424242)
     T7, N7 = 24, 8
     F7 = randn(rng7, T7, 2)
@@ -1308,11 +1307,14 @@ end
     wk7 = (@test_logs held match_mode = :any optimise(ops7(nothing), rdk7)).w
     w7 = (@test_logs held match_mode = :any optimise(ops7(nothing), rd7)).w
     @test iszero(w7[5])
-    @test !isapprox(w7[k7], wk7; rtol = 0, atol = 1e-6)
+    # The step reads the active assets alone, so the parked share enters no gross return
+    # (#2346). Measured: 4.9e-5, and 1.8e-7 at a solver tolerance of 1e-11. A start moved by
+    # 1e-15 moves the book over the seven assets as much.
+    @test isapprox(w7[k7], wk7; rtol = 0, atol = 2e-4)
     w07 = [i == 5 ? 0.0 : 1 / 7 for i in 1:N7]
     wz7 = (@test_logs held match_mode = :any optimise(ops7(w07), rd7)).w
     @test iszero(wz7[5])
-    @test wz7[k7] == wk7
+    @test isapprox(wz7[k7], wk7; rtol = 0, atol = 2e-4)
 end
 
 @testset "The projection resolves its set through the entry of a bare head (#2046)" begin
