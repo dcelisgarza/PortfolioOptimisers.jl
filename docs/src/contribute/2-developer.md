@@ -280,7 +280,8 @@ To create a new release, you can follow these simple steps:
 
 - Create a branch `dev-release-x.y.z` from `origin/main`. A branch with no `dev` prefix gets no push checks, and its pull request cannot merge.
 
-- Update `version` in `Project.toml`
+- Update `version` in `Project.toml`. No other pull request changes it, unless the maintainer asks to release with that pull request. Such a pull request does the next step too.
+- Run `julia docs/fold_next_release.jl <from> <to>`, for example with `0.34.5 0.35.0`. It moves each page of `docs/src/next_release/` into the migration guide. Then run `julia --project=code_health code_health/prose.jl refresh`.
 - Create a commit "Release vx.y.z", push, create a PR, wait for it to pass, merge the PR.
 - Go back to main screen and click on the latest commit (link: [https://github.com/dcelisgarza/PortfolioOptimisers.jl/commit/main](https://github.com/dcelisgarza/PortfolioOptimisers.jl/commit/main))
 - At the bottom, write `@JuliaRegistrator register`
