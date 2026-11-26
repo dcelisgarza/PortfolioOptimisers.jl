@@ -437,7 +437,7 @@ The method that Julia selects is the algorithm.
   - [`demean_returns`](@ref)
   - [`dimension_reduction_map`](@ref)
   - [`standardisation_mean`](@ref)
-  - [`_regression(::DimensionReductionRegression, ::VecNum, ::VecNum, ::VecNum, ::MatNum, ::MatNum)`](@ref)
+  - [`_regression(::DimensionReductionRegression, ::VecNum, ::VecNum, ::VecNum, ::MatNum, ::MatNum, ::Integer)`](@ref)
 
 # References
 
@@ -535,7 +535,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the fit of one asset in the reduced basis of a [`DimensionReductionRegression`](@ref), with its coefficients mapped back to the original factors.
 
-This type is an implementation detail and is not intended for direct use. [`_regression(::DimensionReductionRegression, ::VecNum, ::VecNum, ::VecNum, ::MatNum, ::MatNum)`](@ref) makes it, and [`regression(::DimensionReductionRegression, ::MatNum, ::MatNum)`](@ref) collects one for each asset into a [`Regression`](@ref).
+This type is an implementation detail and is not intended for direct use. [`_regression(::DimensionReductionRegression, ::VecNum, ::VecNum, ::VecNum, ::MatNum, ::MatNum, ::Integer)`](@ref) makes it, and [`regression(::DimensionReductionRegression, ::MatNum, ::MatNum)`](@ref) collects one for each asset into a [`Regression`](@ref).
 
 # Fields
 
@@ -558,9 +558,10 @@ $(DocStringExtensions.FIELDS)
 end
 """
     _regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum,
-               sigma::VecNum, x1::MatNum, Vp::MatNum, mu_r::VecNum = mu) -> ReducedBasisFit
+               sigma::VecNum, x1::MatNum, Vp::MatNum, i::Integer,
+               mu_r::VecNum = mu) -> ReducedBasisFit
     _regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum,
-               sigma::VecNum, x1::MatNum, Vp::MatNum, F::MatNum,
+               sigma::VecNum, x1::MatNum, Vp::MatNum, i::Integer, F::MatNum,
                rows::VecInt) -> ReducedBasisFit
 
 Fits one asset in the reduced basis and maps its coefficients back to the original factors.
@@ -598,11 +599,11 @@ Where:
 
  1. On the second method, cut `re` to `rows` with [`shared_series_estimator`](@ref), take `mu_r` as the mean of the rows `rows` of `F` under the mean estimator of the standardisation of the cut `re`, and do the steps below on `y[rows]`, `x1[rows, :]` and `mu_r`.
  2. Read the weights of `re.retgt` with [`regression_target_weights`](@ref), and call them `w`. Take the mean of `y`, weighted by `w` when it is not `nothing`, and call it `mean_y`.
- 3. Fit `re.retgt` to `x1` and `y`, with the leading column of ones named to it by `factory(re.retgt, InterceptColumn(1))`, and drop the leading coefficient. Call the rest `beta_pc`.
+ 3. Fit `re.retgt` to `x1` and `y` with [`asset_fit_coefficients`](@ref), with the leading column of ones named to it by `factory(re.retgt, InterceptColumn(1))`, and drop the leading coefficient. Call the rest `beta_pc`. A Saturated Fit, which leaves no residual, gets the intercept alone and a warning, so its `beta_pc` is zero.
  4. Map `beta_pc` through `Vp` and divide by `sigma`. Call the result `beta`, the coefficients in the original factor space.
  5. Subtract the `mu_r`-weighted sum of `beta` from `mean_y`, and call the result `beta0`.
  6. Prepend `beta0` to `beta`.
- 7. Read the residual count of the fit of step 3 with [`residual_count`](@ref), and call it `edof`.
+ 7. Take the residual count of the fit of step 3, which [`asset_fit_coefficients`](@ref) reads with [`residual_count`](@ref), and call it `edof`.
 
 # Arguments
 
@@ -612,6 +613,7 @@ Where:
   - `sigma`: Standard deviation vector of the original factors. It must be the scale that standardised them, for the same reason.
   - `x1`: Projected factor matrix with an intercept column, from [`prep_dim_red_reg`](@ref).
   - `Vp`: Projection matrix of the fitted dimension reduction model.
+  - `i`: Index of the asset, which names it in the warning of a Saturated Fit.
   - `mu_r`: Mean vector of the original factors over the observations of the fit.
   - $(arg_dict[:F])
   - `rows`: The observations where the return of the asset is finite.
@@ -635,22 +637,22 @@ Where:
   - $(ref_dict[:fekedulegn2002]) Pages 7 and 21-22, Equations 20-23 and 34-36.
 """
 function _regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum, sigma::VecNum,
-                     x1::MatNum, Vp::MatNum, mu_r::VecNum = mu)
+                     x1::MatNum, Vp::MatNum, i::Integer, mu_r::VecNum = mu)
     w = regression_target_weights(re.retgt)
     mean_y = isnothing(w) ? Statistics.mean(y) : Statistics.mean(y, w)
-    fit_result = StatsAPI.fit(factory(re.retgt, InterceptColumn(1)), x1, y)
-    beta_pc = StatsAPI.coef(fit_result)[2:end]
+    params, nu = asset_fit_coefficients(factory(re.retgt, InterceptColumn(1)), x1, y, i)
+    beta_pc = params[2:end]
     beta = Vp * beta_pc ./ sigma
     beta0 = mean_y - LinearAlgebra.dot(beta, mu_r)
     pushfirst!(beta, beta0)
-    return ReducedBasisFit(beta, residual_count(fit_result, x1))
+    return ReducedBasisFit(beta, nu)
 end
 function _regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum, sigma::VecNum,
-                     x1::MatNum, Vp::MatNum, F::MatNum, rows::VecInt)
+                     x1::MatNum, Vp::MatNum, i::Integer, F::MatNum, rows::VecInt)
     re = shared_series_estimator(re, rows, length(y))
     me = standardisation_mean(re.ve, regression_target_weights(re.retgt))
     mu_r = vec(Statistics.mean(me, view(F, rows, :); dims = 1))
-    return _regression(re, view(y, rows), mu, sigma, view(x1, rows, :), Vp, mu_r)
+    return _regression(re, view(y, rows), mu, sigma, view(x1, rows, :), Vp, i, mu_r)
 end
 """
     regression(re::DimensionReductionRegression, X::MatNum, F::MatNum;
@@ -660,7 +662,7 @@ Reduces the factors once and regresses every asset on the same reduced basis.
 
 The method fits the reduction on `F` alone. So the reduction does not depend on the assets, and the response of one asset cannot change the loadings of another.
 
-An asset fits on the observations where its return is finite and `active_mask` is `true`, as [`asset_fit_rows`](@ref) states, in the basis that every observation of `F` gives. So an asset that lists late gets the loadings of its own history in the same basis as the other assets, and a gap changes no other asset.
+An asset fits on the observations where its return is finite and `active_mask` is `true`, as [`asset_fit_rows`](@ref) states, in the basis that every observation of `F` gives. So an asset that lists late gets the loadings of its own history in the same basis as the other assets, and a gap changes no other asset. An asset with no more of those observations than the retained components plus the intercept is a Saturated Fit. It gets the model with the intercept alone and a warning, as [`asset_fit_coefficients`](@ref) states. On a sample of `T` observations a reduction retains at most `T - 1` components, so a short sample can saturate every asset.
 
 # Algorithm
 
@@ -686,14 +688,14 @@ An asset fits on the observations where its return is finite and `active_mask` i
 # Validation
 
   - The rules of [`assert_finite_factor_rows`](@ref) for `F`.
-  - The rules of [`asset_fit_rows`](@ref): `active_mask` has the size of `X`, and every asset carries at least one finite and active return.
+  - The rules of [`asset_fit_rows`](@ref): `active_mask` has the size of `X`, and every asset carries at least two finite and active returns.
 
 # Returns
 
   - `reg::Regression`: Regression result that holds:
 
       + `b`: Intercept of each asset, a view of the first column of `rr`.
-      + `M`: Coefficient of each asset and factor in the original factor space, a view of the remaining columns of `rr`. Every asset keeps every factor, so `M` has no structural zero.
+      + `M`: Coefficient of each asset and factor in the original factor space, a view of the remaining columns of `rr`. Every asset keeps every factor, so `M` has no structural zero, except the row of zeros of a Saturated Fit.
       + `L`: Coefficient of each asset and retained component, ``(\\mathbf{M} \\odot \\boldsymbol{\\sigma}^{\\intercal}) \\mathbf{V}_p^{+\\intercal}``. It reproduces the coefficients of the fits of step 4 in the reduced space, up to the sign of each component that step 7 sets. On a 200×5 sample the two agreed to `2.2e-16`. `size(L, 2)` is the number of retained components, which is the width of a risk decomposition.
       + `edof`: Degrees of freedom of the residuals of each asset, which [`residual_count`](@ref) reads off the fit of the asset. Under an unpenalised target it is the number of observations of the fit of the asset less the intercept and the retained components, the same integer for every asset with no gap. Under a penalised target it is the real count of each asset that [`ElasticNetFit`](@ref) states.
 
@@ -718,9 +720,9 @@ function regression(re::DimensionReductionRegression, X::MatNum, F::MatNum;
         x = view(X, :, i)
         r = fit_rows[i]
         return if isnothing(r)
-            _regression(re, x, mu, sigma, f1, Vp)
+            _regression(re, x, mu, sigma, f1, Vp, i)
         else
-            _regression(re, x, mu, sigma, f1, Vp, F, r)
+            _regression(re, x, mu, sigma, f1, Vp, i, F, r)
         end
     end
     for (i, fi) in pairs(fits)

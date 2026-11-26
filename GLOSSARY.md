@@ -428,6 +428,11 @@ A fit with no penalty is a projection, so it spends the rank of its design, whic
 A Penalty Strength that reads the data spends a little more, the Strength Divergence. In code a field of the target holds a rule that adds that part, and the default `nothing` leaves it out. ADR 0223 names the rule.
 *Avoid*: effective count, which names the Effective Observation Count of a weighted moment.
 
+**Saturated Fit**
+A fit of one asset in a time-series regression that leaves no residual degree of freedom, because the asset has no more observations in the fit than its model has parameters. Its coefficients interpolate the returns and are not an estimate, and its residual variance is zero. `StepwiseRegression` and `DimensionReductionRegression` refit it on the intercept alone, with a warning, so each factor of the asset gets a loading of zero. An asset needs two observations in the fit, so that the intercept alone leaves a residual, and the regression refuses an asset with fewer (#2371).
+In code `asset_fit_coefficients` reads the residual count of the fit and refits, and `asset_fit_rows` refuses an asset with fewer than two observations.
+*Avoid*: exact fit, which also names a fit with a residual of zero on more observations than parameters.
+
 **Cross-Sectional Regression**
 A regression of one observation's asset returns on the lagged Factor Exposures across the assets, one fit per observation.
 Its **solve algorithm** decides what an observation with a rank-deficient design gets. It means the same thing whether the fit is closed-form or runs an external target. The answer is the answer of least norm by default, a return of zero for each dependent factor, a refusal, or the answer of the solver unchecked. A target reaches the answer of least norm by a fit on the factors that the rank test keeps, projected onto the row space of the design (#1625).
