@@ -106,6 +106,92 @@ w_held = [0.3, 0.2, 0.1, 0.3, 0.1]
          0.5 0.0 0.5
          0.5 0.3 0.2]
     @test PO.held_gap_pairs(U, Y) == [(3, 3)]
+    # Weights of a wrong size raise the error of the product, also on a gapped window.
+    @test_throws DimensionMismatch PO.held_gap_pairs([0.5, 0.5], Y)
+    @test_throws DimensionMismatch PO.held_gap_pairs([[0.5, 0.3, 0.2], [0.5, 0.5]], Y)
+    @test_throws DimensionMismatch PO.held_gap_pairs(U[1:2, :], Y)
+end
+
+# `performance_summary` of weights or of a result reads a gap as `predict` does (#1992).
+@testset "performance_summary filters the gaps of the returns once" begin
+    figs = (:n_periods, :ann_return, :ann_volatility, :sharpe, :sharpe_stderr, :sortino,
+            :calmar, :max_drawdown, :cvar)
+    agree(a, b) = all(f -> isapprox(getproperty(a, f), getproperty(b, f); nans = true),
+                      figs)
+    # A late listing and an early delisting of two assets.
+    Xg = copy(X)
+    Xg[1:30, 2] .= NaN
+    Xg[150:end, 4] .= NaN
+    Xz = map(x -> isfinite(x) ? x : 0.0, Xg)
+    rdg = ReturnsResult(; nx = nx, X = Xg)
+    w0 = [0.5, 0.0, 0.3, 0.0, 0.2]
+    wh = [0.4, 0.1, 0.3, 0.0, 0.2]
+    fees = Fees(; l = 0.001)
+
+    # A gap at a zero weight is silent, also under `strict`, and every figure is finite.
+    for strict in (false, true)
+        ps = @test_logs min_level=Logging.Warn performance_summary(w0, rdg, fees;
+                                                                   strict = strict)
+        @test agree(ps, performance_summary(w0[[1, 3, 5]], X[:, [1, 3, 5]], fees))
+        @test all(f -> isfinite(getproperty(ps, f)), figs)
+        ps = @test_logs min_level=Logging.Warn performance_summary(w0, Xg, fees;
+                                                                   strict = strict)
+        @test agree(ps, performance_summary(w0, X, fees))
+    end
+
+    # A Held Gap is one warning that names the asset, and it contributes zero.
+    ps = @test_logs (:warn, r"Assets \[\"b\"\] carry") performance_summary(wh, rdg)
+    @test agree(ps, performance_summary(wh, Xz))
+    @test ps.n_eff == performance_summary(wh, X).n_eff
+    @test_logs (:warn, r"Assets \[2\] carry") performance_summary(wh, Xg)
+    @test_throws ArgumentError performance_summary(wh, rdg; strict = true)
+    @test_throws ArgumentError performance_summary(wh, Xg; strict = true)
+
+    # Many weight vectors are filtered once, so one warning names each held asset.
+    W = [wh, [0.4, 0.0, 0.3, 0.1, 0.2]]
+    pv = @test_logs (:warn, r"Assets \[\"b\", \"d\"\] carry") performance_summary(W, rdg)
+    for j in eachindex(W)
+        @test pv.ann_return[j] ≈ performance_summary(W[j], Xz).ann_return
+    end
+    @test_throws ArgumentError performance_summary(W, rdg; strict = true)
+
+    # A weight path judges each pair by the weights of its own observation.
+    U = repeat(wh', T)
+    U[1:30, 2] .= 0
+    pu = @test_logs min_level=Logging.Warn performance_summary(U, rdg; strict = true)
+    @test agree(pu, performance_summary(U, Xz))
+
+    # A result reads its universe and its names through its mask, and agrees with `predict`.
+    res = optimise(EqualWeighted(), rd)
+    pr_w = @test_logs (:warn, r"Assets \[\"b\", \"d\"\] carry") match_mode=:any predict(res,
+                                                                                        rdg)
+    ps = @test_logs (:warn, r"Assets \[\"b\", \"d\"\] carry") performance_summary(res, rdg)
+    @test agree(ps, performance_summary(pr_w))
+    @test_throws ArgumentError performance_summary(res, rdg; strict = true)
+    Xd = copy(Xg)
+    Xd[:, 1] .= NaN
+    resm = optimise(EqualWeighted(), ReturnsResult(; nx = nx, X = Xd[40:140, :]))
+    @test PO.result_investable_mask(resm) == BitVector([0, 1, 1, 1, 1])
+    rdd = ReturnsResult(; nx = nx, X = Xd)
+    ps = @test_logs (:warn, r"Assets \[\"b\", \"d\"\] carry") performance_summary(resm, rdd)
+    @test agree(ps, performance_summary([0.25, 0.25, 0.25, 0.25], Xz[:, 2:5]))
+
+    # A vector of results takes `strict` too.
+    pc = performance_summary([res, resm], rdd)
+    @test all(isfinite, pc.ann_return)
+    @test_throws ArgumentError performance_summary([res, resm], rdd; strict = true)
+    @test performance_summary([res, res], rd; strict = true).sharpe ==
+          fill(performance_summary(res, rd).sharpe, 2)
+
+    # A series and a prediction are scored as they are, so they take no `strict`.
+    @test_throws MethodError performance_summary(X * w0; strict = true)
+    @test_throws MethodError performance_summary(pr_w; strict = true)
+
+    # The type is inferred, and a wrong size raises the error of the product.
+    @test @inferred(performance_summary(w0, Xg)) isa PerformanceSummaryResult
+    @test @inferred(performance_summary(w0, rdg)) isa PerformanceSummaryResult
+    @test_throws DimensionMismatch performance_summary([0.5, 0.5], Xg)
+    @test_throws DimensionMismatch performance_summary([0.5, 0.5], X)
 end
 
 @testset "investable_reduction: the value-level door reduces, names and passes through" begin

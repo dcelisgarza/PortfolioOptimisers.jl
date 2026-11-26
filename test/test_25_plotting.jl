@@ -1361,6 +1361,82 @@
         @test is_plot(plot_network(ne_pv, res_pv; rd = rd_pv))
     end
 
+    @testset "A plot of a series from weights filters the gaps (#1992)" begin
+        X_gp = randn(MersenneTwister(1992), 60, 3) ./ 100
+        Xg_gp = copy(X_gp)
+        Xg_gp[1:20, 2] .= NaN
+        B_gp = vec(sum(X_gp; dims = 2)) ./ 3
+        rd_gp = ReturnsResult(; nx = ["a", "b", "c"], X = Xg_gp, nb = ["idx"], B = B_gp)
+        res_gp = optimise(EqualWeighted(), ReturnsResult(; nx = ["a", "b", "c"], X = X_gp))
+        ser_gp(p) = p.series_list[1][:y]
+        Xz_gp = map(x -> isfinite(x) ? x : 0.0, Xg_gp)
+        r_gp = ConditionalValueatRisk()
+        figs_gp = (plot_portfolio_cumulative_returns, plot_drawdowns, plot_histogram,
+                   plot_rolling_drawdowns, (w, x) -> plot_rolling_measure(r_gp, w, x),
+                   (res, rd) -> plot_rolling_measure(r_gp, res, rd))
+        w0_gp, wh_gp = [0.6, 0.0, 0.4], [0.4, 0.3, 0.3]
+        for f in figs_gp[1:5]
+            # A gap at a zero weight draws the figure of the complete returns, silently.
+            want = ser_gp(f(w0_gp, X_gp))
+            @test isequal(@test_logs(min_level = Base.CoreLogging.Warn,
+                                     ser_gp(f(w0_gp, Xg_gp))), want)
+            @test isequal(@test_logs(min_level = Base.CoreLogging.Warn,
+                                     ser_gp(f(w0_gp, rd_gp))), want)
+            # A Held Gap contributes zero, with a warning that names the asset.
+            want = ser_gp(f(wh_gp, Xz_gp))
+            got = @test_logs (:warn, r"Assets \[\"b\"\] carry") ser_gp(f(wh_gp, rd_gp))
+            @test isequal(got, want)
+            got = @test_logs (:warn, r"Assets \[2\] carry") ser_gp(f(wh_gp, Xg_gp))
+            @test isequal(got, want)
+        end
+        for f in (figs_gp[1:4]..., figs_gp[6])
+            @test isequal(@test_logs((:warn, r"Assets \[\"b\"\] carry"),
+                                     ser_gp(f(res_gp, rd_gp))),
+                          ser_gp(f(res_gp,
+                                   ReturnsResult(; nx = ["a", "b", "c"], X = Xz_gp))))
+        end
+        want = ser_gp(plot_benchmark(w0_gp, X_gp, B_gp))
+        @test all(isfinite, want)
+        @test ser_gp(plot_benchmark(w0_gp, Xg_gp, B_gp)) == want
+        @test ser_gp(plot_benchmark(w0_gp, rd_gp)) == want
+        @test @test_logs((:warn, r"Assets \[\"b\"\] carry"),
+                         ser_gp(plot_benchmark(res_gp, rd_gp))) ==
+              ser_gp(plot_benchmark(fill(1 / 3, 3), Xz_gp, B_gp))
+        # The summary plot sends `strict` to the summary.
+        @test_throws ArgumentError plot_performance_summary(wh_gp, rd_gp; strict = true)
+        @test isequal(ser_gp(plot_performance_summary(w0_gp, rd_gp; strict = true)),
+                      ser_gp(plot_performance_summary(w0_gp, X_gp)))
+        # `strict` refuses a Held Gap in each plot, and it lets a gap at a zero weight pass.
+        for f in (plot_portfolio_cumulative_returns, plot_drawdowns, plot_histogram,
+                  plot_rolling_drawdowns,
+                  (w, x; kw...) -> plot_rolling_measure(r_gp, w, x; kw...))
+            for x in (Xg_gp, rd_gp)
+                @test_throws ArgumentError f(wh_gp, x; strict = true)
+                @test isequal(ser_gp(f(w0_gp, x; strict = true)), ser_gp(f(w0_gp, X_gp)))
+            end
+            @test_throws ArgumentError f(res_gp, rd_gp; strict = true)
+        end
+        @test_throws ArgumentError plot_benchmark(wh_gp, Xg_gp, B_gp; strict = true)
+        @test_throws ArgumentError plot_benchmark(wh_gp, rd_gp; strict = true)
+        @test_throws ArgumentError plot_benchmark(res_gp, rd_gp; strict = true)
+        # The dashboard filters once, and its message names the asset, not the column of the
+        # view at the Investable Mask, where "c" is the second column.
+        Xd_gp = copy(X_gp)
+        Xd_gp[:, 1] .= NaN
+        Xd_gp[1:20, 3] .= NaN
+        resd_gp = optimise(EqualWeighted(),
+                           ReturnsResult(; nx = ["a", "b", "c"], X = Xd_gp[21:60, :]))
+        rdd_gp = ReturnsResult(; nx = ["a", "b", "c"], X = Xd_gp)
+        dash_gp(x; kw...) = plot_portfolio_dashboard(resd_gp, x; r = r_gp, kw...)
+        got = @test_logs (:warn, r"Assets \[\"c\"\] carry") dash_gp(rdd_gp)
+        Xdz_gp = map(x -> isfinite(x) ? x : 0.0, Xd_gp)
+        want = dash_gp(ReturnsResult(; nx = ["a", "b", "c"], X = Xdz_gp))
+        @test length(got.series_list) == length(want.series_list)
+        @test all(isequal(g[:y], h[:y])
+                  for (g, h) in zip(got.series_list, want.series_list))
+        @test_throws ArgumentError dash_gp(rdd_gp; strict = true)
+    end
+
     @testset "Every result arity pairs the result's two universes (#884)" begin
         # The rest of the class the `plot_network` fix above named. A result carries `w` on
         # the caller's universe, and `pr` and `fees` on the one the fit solved, so an arity

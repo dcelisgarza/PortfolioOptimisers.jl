@@ -9,8 +9,8 @@ commit = "74b5c19437"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 6, cog_sum = 4, arg_sum = 16, macros = [] }
-"ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 9, arg = 8, cyc_sum = 56, cog_sum = 65, arg_sum = 99, macros = [] }
-"ext/PortfolioOptimisersPlotsExt/02_DrawdownAndHistogramPlots.jl" = { cyc = 10, cog = 15, arg = 10, cyc_sum = 59, cog_sum = 70, arg_sum = 148, macros = [] }
+"ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 9, arg = 9, cyc_sum = 56, cog_sum = 65, arg_sum = 103, macros = [] }
+"ext/PortfolioOptimisersPlotsExt/02_DrawdownAndHistogramPlots.jl" = { cyc = 10, cog = 15, arg = 9, cyc_sum = 59, cog_sum = 70, arg_sum = 132, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/03_MeasurePlots.jl" = { cyc = 7, cog = 14, arg = 10, cyc_sum = 47, cog_sum = 65, arg_sum = 79, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/04_CompositionPlots.jl" = { cyc = 10, cog = 10, arg = 13, cyc_sum = 47, cog_sum = 33, arg_sum = 118, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/05_ClusteringPlots.jl" = { cyc = 6, cog = 6, arg = 8, cyc_sum = 25, cog_sum = 20, arg_sum = 53, macros = [] }
@@ -18,7 +18,7 @@ commit = "74b5c19437"
 "ext/PortfolioOptimisersPlotsExt/07_FactorMomentPlots.jl" = { cyc = 3, cog = 4, arg = 4, cyc_sum = 29, cog_sum = 16, arg_sum = 66, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/08_AttributionPlots.jl" = { cyc = 4, cog = 5, arg = 7, cyc_sum = 14, cog_sum = 12, arg_sum = 31, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/09_CrossValidationPlots.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 11, cog_sum = 3, arg_sum = 31, macros = [] }
-"ext/PortfolioOptimisersPlotsExt/10_FrontierPlots.jl" = { cyc = 5, cog = 9, arg = 16, cyc_sum = 18, cog_sum = 20, arg_sum = 66, macros = [] }
+"ext/PortfolioOptimisersPlotsExt/10_FrontierPlots.jl" = { cyc = 5, cog = 9, arg = 17, cyc_sum = 18, cog_sum = 20, arg_sum = 67, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/11_FactorDiagnosticsPlots.jl" = { cyc = 6, cog = 10, arg = 8, cyc_sum = 85, cog_sum = 44, arg_sum = 202, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { cyc = 5, cog = 8, arg = 8, cyc_sum = 66, cog_sum = 43, arg_sum = 189, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/13_CovarianceForecastPlots.jl" = { cyc = 4, cog = 5, arg = 8, cyc_sum = 64, cog_sum = 33, arg_sum = 130, macros = [] }
