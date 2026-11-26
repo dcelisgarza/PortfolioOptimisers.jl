@@ -1437,6 +1437,94 @@
         @test_throws ArgumentError dash_gp(rdd_gp; strict = true)
     end
 
+    @testset "A plot of a measure of weights filters the gaps (#2313)" begin
+        X_gm = randn(MersenneTwister(2313), 60, 3) ./ 100
+        F_gm = randn(MersenneTwister(2314), 60, 2) ./ 100
+        Xg_gm = copy(X_gm)
+        Xg_gm[1:20, 2] .= NaN
+        Xz_gm = map(x -> isfinite(x) ? x : 0.0, Xg_gm)
+        nx_gm = ["a", "b", "c"]
+        rd_of(X) = ReturnsResult(; nx = nx_gm, X = X, nf = ["f", "g"], F = F_gm)
+        rd_gm, rdz_gm = rd_of(Xg_gm), rd_of(Xz_gm)
+        res_gm = optimise(EqualWeighted(), rd_of(X_gm))
+        ys_gm(p) = [s[:y] for s in p.series_list]
+        r_gm = ConditionalValueatRisk()
+        re_gm = Regression(; M = randn(MersenneTwister(2315), 3, 2), b = zeros(3))
+        w0_gm, wh_gm = [0.6, 0.0, 0.4], [0.4, 0.3, 0.3]
+        axes_gm = (; x = r_gm, y = LowOrderMoment(), c = MeanReturn())
+        rc_gm(w, d; kw...) = plot_risk_contribution(r_gm, w, d; N = 3, kw...)
+        frc_gm(w, d; kw...) = plot_factor_risk_contribution(r_gm, w, d; re = re_gm, N = 3,
+                                                            kw...)
+        # A gap at a zero weight is silent, and a Held Gap gives one warning for the figure.
+        for f in (rc_gm, frc_gm, (w, d; kw...) -> plot_measures(w, d; axes_gm..., kw...),
+                  (w, d; kw...) -> plot_measures(w, d; axes_gm..., z = r_gm, kw...),
+                  (w, d; kw...) -> plot_efficient_frontier([w, w0_gm], d; axes_gm..., kw...))
+            @test isequal(@test_logs(min_level = Base.CoreLogging.Warn,
+                                     ys_gm(f(w0_gm, rd_gm; strict = true))),
+                          ys_gm(f(w0_gm, rdz_gm)))
+            @test isequal(@test_logs((:warn, r"Assets \[\"b\"\] carry"),
+                                     ys_gm(f(wh_gm, rd_gm))), ys_gm(f(wh_gm, rdz_gm)))
+            @test_throws ArgumentError f(wh_gm, rd_gm; strict = true)
+        end
+        for f in (rc_gm, frc_gm)
+            @test isequal(@test_logs((:warn, r"Assets \[2\] carry"),
+                                     ys_gm(f(wh_gm, Xg_gm))), ys_gm(f(wh_gm, Xz_gm)))
+            @test_throws ArgumentError f(wh_gm, Xg_gm; strict = true)
+        end
+        # The result arities, with one warning for each result.
+        for f in ((res, rd; kw...) -> plot_risk_contribution(r_gm, res, rd; N = 3, kw...),
+                  (res, rd; kw...) -> plot_factor_risk_contribution(r_gm, res, rd; re = re_gm,
+                                                                    N = 3, kw...),
+                  (res, rd; kw...) -> plot_measures([res], rd; axes_gm..., kw...))
+            @test isequal(@test_logs((:warn, r"Assets \[\"b\"\] carry"),
+                                     ys_gm(f(res_gm, rd_gm))), ys_gm(f(res_gm, rdz_gm)))
+            @test_throws ArgumentError f(res_gm, rd_gm; strict = true)
+        end
+        # The default `StepwiseRegression` fits each asset on the rows where its return is
+        # finite, so both arities plot the loadings of the gapped returns (#2370).
+        rr_gm = regression(StepwiseRegression(), Xg_gm, F_gm)
+        @test isequal(ys_gm(plot_factor_risk_contribution(r_gm, res_gm, rd_gm; N = 3)),
+                      ys_gm(plot_factor_risk_contribution(r_gm, res_gm, rdz_gm; re = rr_gm,
+                                                          N = 3)))
+        @test is_plot(plot_factor_risk_contribution(r_gm, wh_gm, rd_gm; rd = rd_gm, N = 3))
+        # A result with no prior leaves the refusal to the measure.
+        res0_gm = PortfolioOptimisers.rebuild_struct(res_gm, (; pr = nothing))
+        @test_throws PortfolioOptimisers.IsNothingError plot_measures([res0_gm]; axes_gm...)
+        # A result whose prior is returns data filters them too.
+        resr_gm = optimise(EqualWeighted(), rd_gm)
+        @test isequal(ys_gm(plot_measures([resr_gm]; axes_gm...)),
+                      ys_gm(plot_measures([resr_gm], rdz_gm; axes_gm...)))
+        # The bars take the names of the returns data, and a data benchmark binds to them.
+        p_gm = plot_risk_contribution(r_gm, wh_gm, rdz_gm; N = 3)
+        @test xticks(p_gm)[1][2] == nx_gm
+        rdb_gm = ReturnsResult(; nx = nx_gm, X = X_gm, nb = ["i"], B = X_gm[:, 1])
+        te_gm = TrackingRiskMeasure(; tr = DataBenchmarkTracking())
+        @test is_plot(plot_risk_contribution(te_gm, wh_gm, rdb_gm; N = 3))
+        # A gapped prior is reduced once, before the measures bind to it.
+        pr_gm = prior(EmpiricalPrior(), rd_of(X_gm))
+        mu_gm, sigma_gm, Xn_gm = collect(pr_gm.mu), collect(pr_gm.sigma), copy(X_gm)
+        mu_gm[2] = NaN
+        sigma_gm[2, :] .= NaN
+        sigma_gm[:, 2] .= NaN
+        Xn_gm[:, 2] .= NaN
+        prn_gm = LowOrderPrior(; X = Xn_gm, mu = mu_gm, sigma = sigma_gm)
+        prk_gm = LowOrderPrior(; X = X_gm[:, [1, 3]], mu = pr_gm.mu[[1, 3]],
+                               sigma = pr_gm.sigma[[1, 3], [1, 3]])
+        # The reduced prior and the prior of two assets sum in a different order, so
+        # the figures agree to the last bit only.
+        @test ys_gm(plot_measures(w0_gm, prn_gm)) ≈
+              ys_gm(plot_measures(w0_gm[[1, 3]], prk_gm))
+        @test_logs((:warn, r"Assets \[2\] are not investable"),
+                   plot_measures(wh_gm, prn_gm))
+        @test_throws ArgumentError plot_measures(wh_gm, prn_gm; strict = true)
+        @test ys_gm(plot_efficient_frontier([w0_gm, w0_gm], prn_gm)) ≈
+              ys_gm(plot_efficient_frontier([w0_gm[[1, 3]], w0_gm[[1, 3]]], prk_gm))
+        @test_logs((:warn, r"Assets \[2\] are not investable"),
+                   plot_efficient_frontier([res_gm, res_gm], prn_gm))
+        @test_throws ArgumentError plot_efficient_frontier([res_gm, res_gm], prn_gm;
+                                                           strict = true)
+    end
+
     @testset "Every result arity pairs the result's two universes (#884)" begin
         # The rest of the class the `plot_network` fix above named. A result carries `w` on
         # the caller's universe, and `pr` and `fees` on the one the fit solved, so an arity

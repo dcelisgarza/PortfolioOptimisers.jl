@@ -442,3 +442,69 @@ enough, also at a zero weight. Two calls that a caller reads as the same must gi
   a `DimensionMismatch`.
 
 A `performance_summary(ret)` of a bare series stays documented and not checked.
+
+## Amendment (2026-11-24, second)
+
+([#2313](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/2313)). The Decision above
+left the `ReturnsResult` arities of the value-level verbs unchanged, for the cost of a scan in a hot
+path. That reason holds for the bare matrix arity alone. No solve calls a value-level verb with a
+`ReturnsResult`. The old rule also made `expected_risk(r, res, rd)` differ from
+`performance_summary(res, rd)` and from `expected_risk(r, predict(res, rd))`. A tail measure gave a
+finite wrong number, with no message.
+
+- `investable_reduction(rd, w, fees, strict)` is the one entry that each of these verbs calls once:
+  `expected_risk`, `risk_contribution`, `risk_gradient` and `factor_risk_contribution`. It now sets
+  the gaps of `rd.X` to zero with `filter_held_gaps`, and it names the assets by `rd.nx`. It returns
+  `rd` itself when `rd.X` holds no gap. The filter runs before the scalariser, the population and
+  the finite differences, so each verb scans the returns one time.
+- `expected_risk(r, res, X)` of a matrix filters before the view at the Investable Mask, so the
+  message names the columns of the caller.
+- `factor_risk_contribution` of a prior filters `original_X`. A prior that rebuilds its scenarios
+  fills no gap of that matrix, and the attribution reads it.
+- The bare matrix arity of each verb stays the plain product, and its docstring names the filter.
+  The hierarchical solves and the finite differences call it at every evaluation.
+- The filter runs also for a measure that reads the weights alone. A test of the input kind would
+  put the rule in each composite measure, and it would save one scan of a report.
+- The plots `plot_risk_contribution`, `plot_factor_risk_contribution`, `plot_measures` and
+  `plot_efficient_frontier` take `strict`, and they filter a matrix too. The last two call
+  `investable_reduction` one time, before they bind the measures. So one message covers all the
+  axes, and a measure binds to the reduced prior. Before, a default measure on a prior with a
+  non-investable asset bound to the full `sigma` and then met the reduced weights.
+
+## Amendment (2026-11-26)
+
+([#2370](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/2370)). The amendment above
+filters the returns that `factor_risk_contribution` measures, and it left the regression that fits
+the loadings to read `rd` with its gaps. With the default `StepwiseRegression`, a gapped column
+gave a `NaN` p-value at every factor. The search then pushed the index `0` and raised a bare
+`BoundsError`. `plot_factor_risk_contribution` raised the same error.
+
+- A time-series regression fits each asset on the rows where its return is finite.
+  `asset_fit_rows` gives the rows. `StepwiseRegression` and `DimensionReductionRegression` cut the
+  observation weights of the fit to those rows with `shared_series_estimator`. A complete column
+  takes the old path, with no copy. A late listing gets the loadings of its own history, and no
+  other asset changes. An asset with no finite return raises an `IsNonFiniteError` that names it.
+- `DimensionReductionRegression` reduces `F` over every observation, so every asset keeps one
+  basis. The intercept of a gapped asset reads the factor mean over its own rows.
+- The two estimators take an `active_mask` keyword. `asset_fit_rows` reads the mask and the
+  finiteness of each column in one pass, so a cell that the mask turns off is a gap of its asset,
+  and no returns are copied. `regression(re, rd)` passes the active mask of `rd.pnl` when the panel
+  carries one and `reads_active_mask(re)` is `true`, as a mask-aware variance gets it. The
+  fallback is `false`, so an estimator of a caller with no keyword fits every returns data as
+  before, and a patch release adds no obligation to it. `refit_factor_regression` is `regression(re, rd)` with its own
+  refusal, so the two routes do not repeat the fit. `asset_fit_rows` is `public`, because the
+  `# Interfaces` section of `AbstractTimeSeriesRegressionEstimator` tells an implementer to call
+  it.
+- The attribution does not set the gaps of `rd` to zero before the regression. A zero is not a
+  return, and it biases the loadings to zero. The returns that the attribution measures still
+  take the Held Gap rule of the amendment above.
+- A p-value search never pushes the index `0`. When no factor has a p-value, the search selects
+  no factor, and the asset gets an intercept-only model with a warning.
+- The message of a Held Gap of a prior under a mask names the positions of the caller as
+  integers, `[2, 4]`, as the message with no mask does. `filter_held_gaps` and `held_gap_msg` take
+  `nx` as names or as positions.
+- The refused option was a refusal of a gapped sample by the regression, as a plain moment
+  estimator refuses one. A regression fits each asset alone, against factor returns that are
+  finite at every row, so a row of one asset is not a row of another. A refusal discards the
+  history of a late listing that a fit can use. `FactorPrior` keeps the Coverage Universe, because
+  its lift reads the residual of each asset over the whole window.

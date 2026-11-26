@@ -278,18 +278,18 @@ function plot_stacked_area_composition end
         w::VecNum,
         X::MatNum_Pr,
         fees::Option{<:Fees} = nothing;
-        nx::AbstractVector = 1:length(w),
+        nx::Option{<:AbstractVector} = nothing,
         delta::Number = 1e-6,
         marginal::Bool = false,
         percentage::Bool = true,
         erc::Bool = true,
         N::Option{<:Number} = nothing,
         sca::Option{<:Scalariser} = nothing,
+        strict::Bool = false,
         kwargs...
     ) -> Plot
-    plot_risk_contribution(r, w::VecNum, rd::ReturnsResult, fees = nothing; delta, marginal, percentage, erc, N, sca, kwargs...) -> Plot
-    plot_risk_contribution(r, res::OptimisationResult, rd::ReturnsResult; delta, marginal, percentage, erc, N, sca, kwargs...) -> Plot
-    plot_risk_contribution(r, res::OptimisationResult, pr::AbstractPriorResult; nx, delta, marginal, percentage, erc, N, sca, kwargs...) -> Plot
+    plot_risk_contribution(r, res::OptimisationResult, rd::ReturnsResult; nx, delta, marginal, percentage, erc, N, sca, strict, kwargs...) -> Plot
+    plot_risk_contribution(r, res::OptimisationResult, pr::AbstractPriorResult; nx, delta, marginal, percentage, erc, N, sca, strict, kwargs...) -> Plot
     plot_risk_contribution(r, pred::PredictionResult, fees = nothing; delta, marginal, percentage, erc, N, sca, kwargs...) -> Plot
 
 Plot the risk contribution of each asset as a bar chart.
@@ -299,6 +299,8 @@ The bars are [`risk_contribution`](@ref) of `w`, rescaled to shares when `percen
 The bars decompose **one** number, the scalarised aggregate of `r`, so they sum to the aggregate and not to any one element. Under [`MaxScalariser`](@ref) and [`MinScalariser`](@ref) the decomposition is exact only where the argmax is **unique**. At a near tie between two scaled measures the subgradient is a set, and the bars are one admissible answer of several.
 
 The method that takes a fold reads the target weights of the fold and the asset returns that its Held Weights record kept, and it settles the fee against the length of the fold, as [`predict`](@ref) did. Under a Weight Drift the bars are exact to **first order in the drift** only, for the reason [`risk_contribution`](@ref) states. A fold whose scheme set neither `wd` nor a `DriftedWeights` source keeps no record and so no asset returns.
+
+A gap in the returns does not change the size of the sample. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). Every arity that takes weights, or an optimisation result, reads a gap in the same way through [`filter_held_gaps`](@ref): a gap at a zero weight gives no message, and a Held Gap contributes zero with a warning, or raises an `ArgumentError` under `strict = true`.
 
 # Mathematical definition
 
@@ -320,17 +322,18 @@ Where:
 
   - `r`: Risk measure, or a vector of them that `sca` combines.
   - `w`: Portfolio weights vector.
-  - `X`: Asset returns matrix (observations × assets), or a prior result.
-  - `rd`: Returns result. The figure reads its `X` and its `nx`.
+  - `X`: Asset returns matrix (observations × assets), a prior result or a returns result.
+  - `rd`: Returns result. The figure reads its `X`, its `B` and its `nx`.
   - `pr`: Prior result. The figure reads its `X`.
   - `fees`: Transaction fees, or `nothing`.
-  - `nx`: Asset names.
+  - `nx`: Asset names. With `nothing`, they are the names of a returns result, and the positions of the assets otherwise.
   - `delta`: Finite difference step of [`risk_contribution`](@ref).
   - `marginal`: Draw the marginal contribution when `true`, and the component contribution otherwise.
   - `percentage`: Divide the contributions by their sum when `true`, so that the bars sum to one.
   - `erc`: Draw the reference line when `true`.
   - `N`: The count or the share of the bars to draw, or `nothing` for the effective number of the contributions. [`relevant_assets`](@ref) states the rule.
   - `sca`: Scalariser that combines the measures in `r`. It has no effect when `r` is one measure. Pass `res.sca` to draw the figure that the optimisation ran under.
+  - `strict`: Whether a Held Gap of the returns, or a held non-investable asset of a prior, raises an `ArgumentError`. With `false`, each gives a warning. Only the methods that take weights, or an [`OptimisationResult`](@ref), read it.
   - `res`: Optimisation result. The figure reads its weights and its fees on its investable universe.
   - `pred`: A fold, from [`predict`](@ref).
 
@@ -348,6 +351,7 @@ Where:
 # Related
 
   - [`risk_contribution`](@ref)
+  - [`filter_held_gaps`](@ref)
   - [`plot_composition`](@ref)
   - [`PredictionResult`](@ref)
   - [`HeldWeightsResult`](@ref)
@@ -371,9 +375,10 @@ function plot_risk_contribution end
         percentage::Bool = true,
         erc::Bool = true,
         sca::Option{<:Scalariser} = nothing,
+        strict::Bool = false,
         kwargs...
     ) -> Plot
-    plot_factor_risk_contribution(r, res::OptimisationResult, rd::ReturnsResult; re, delta, N, percentage, erc, sca, kwargs...) -> Plot
+    plot_factor_risk_contribution(r, res::OptimisationResult, rd::ReturnsResult; re, delta, N, percentage, erc, sca, strict, kwargs...) -> Plot
     plot_factor_risk_contribution(
         r,
         pred::PredictionResult,
@@ -389,6 +394,8 @@ The bars are [`factor_risk_contribution`](@ref) of `w`, rescaled to shares when 
 The bars take the names in `nf`, or else in `rd.nf`, only when the names count the columns of the loadings. A dimension reduction regression fits fewer columns than there are factors, so its bars are numbered.
 
 The method that takes a fold is the twin of the fold method of [`plot_risk_contribution`](@ref). It fits the loadings on a returns result that it builds from the fold, the asset returns of its Held Weights record beside the factor block the fold carried, unless the caller gives `rd`, which it views at the mask of the fold. The first order caveat of that method holds here too.
+
+A gap in the returns does not change the size of the sample. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). Every arity that takes weights, or an optimisation result, reads a gap in the same way through [`filter_held_gaps`](@ref): a gap at a zero weight gives no message, and a Held Gap contributes zero with a warning, or raises an `ArgumentError` under `strict = true`.
 
 # Mathematical definition
 
@@ -410,7 +417,7 @@ Where:
 
   - `r`: Risk measure, or a vector of them that `sca` combines.
   - `w`: Portfolio weights vector.
-  - `X`: Asset returns matrix (observations × assets), or a prior result.
+  - `X`: Asset returns matrix (observations × assets), a prior result or a returns result.
   - `fees`: Transaction fees, or `nothing`.
   - `re`: Factor regression estimator.
   - `rd`: Returns result that carries the factor returns the loadings are fitted on, and the factor names in `rd.nf`.
@@ -420,6 +427,7 @@ Where:
   - `percentage`: Divide the contributions by their sum when `true`, so that the bars sum to one.
   - `erc`: Draw the reference line when `true`.
   - `sca`: Scalariser that combines the measures in `r`. It has no effect when `r` is one measure. Pass `res.sca` to draw the figure that the optimisation ran under.
+  - `strict`: Whether a Held Gap of the returns, or a held non-investable asset of a prior, raises an `ArgumentError`. With `false`, each gives a warning. Only the methods that take weights, or an [`OptimisationResult`](@ref), read it.
   - `res`: Optimisation result. The figure reads its weights and its fees on its investable universe.
   - `pred`: A fold, from [`predict`](@ref).
 
@@ -437,6 +445,7 @@ Where:
 # Related
 
   - [`factor_risk_contribution`](@ref)
+  - [`filter_held_gaps`](@ref)
   - [`plot_composition`](@ref)
   - [`PredictionResult`](@ref)
   - [`HeldWeightsResult`](@ref)
@@ -613,12 +622,13 @@ function plot_drawdowns end
         c::BaseRM_VecBaseRM = ExpectedReturnRiskRatio(; rk=x, rt=ArithmeticReturn(), rf=0),
         slv::Option{<:Slv_VecSlv} = nothing,
         factory::Bool = true,
+        strict::Bool = false,
         kwargs...
     ) -> Plot
     plot_measures(
         res_vec::AbstractVector{<:OptimisationResult},
         pr::Option{<:Pr_RR} = nothing;
-        x, y, z, c, slv, fees, factory, kwargs...
+        x, y, z, c, slv, fees, factory, strict, kwargs...
     ) -> Plot
     plot_measures(
         pred::AbstractPredictionResult;
@@ -638,7 +648,7 @@ Each point is one portfolio. Its coordinates are [`expected_risk`](@ref) of `x`,
 
 Each axis takes one measure or a **vector** of them, and a vector becomes the one number that the axis plots. The figure names no scalariser, so a **bare vector on an axis takes [`SumScalariser`](@ref)**, each element weighted by its own `settings.scale`. A scalariser reaches an axis only through the `sca` field of a wrapper, [`ExpectedReturnRiskRatio`](@ref), [`MeanReturnRiskRatio`](@ref) or [`NonOptimisationRiskRatio`](@ref), and each axis can name its own. Those wrappers are all ratios, so the figure cannot apply a [`MaxScalariser`](@ref) to a **plain** vector of risks. Scalarise the vector with [`expected_risk`](@ref) and plot the numbers for that.
 
-[`expected_risk`](@ref) reduces a Prior Result to the Investable Mask at its own entry, so a gapped prior needs no step here. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref).
+The figure reduces the data once, before it binds and scores the measures, with the reduction that [`expected_risk`](@ref) does. A Prior Result is reduced to the Investable Mask, and the gaps of a [`ReturnsResult`](@ref) become zero through [`filter_held_gaps`](@ref). So one message names a held asset or a Held Gap for all the axes, and the result arity gives one for each result. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref).
 
 # Arguments
 
@@ -651,6 +661,7 @@ Each axis takes one measure or a **vector** of them, and a vector becomes the on
   - `c`: Measure of the colour, or a vector of them.
   - `slv`: Solver that [`factory`](@ref) binds to each measure.
   - `factory`: Bind each measure through [`factory`](@ref) before the figure scores it.
+  - `strict`: Whether a held non-investable asset of a prior, or a Held Gap of a returns result, raises an `ArgumentError`. With `false`, each gives a warning. A prediction does not read it.
   - `res_vec`: Optimisation results.
   - `pred`: A prediction, a walk-forward path or a population.
   - `plt`: A plot to draw into, or `nothing` for a new one.
@@ -658,6 +669,7 @@ Each axis takes one measure or a **vector** of them, and a vector becomes the on
 # Validation
 
   - The rules of [`expected_risk`](@ref) for each measure.
+  - Under `strict`, the rules of [`investable_reduction`](@ref).
 
 # Returns
 
@@ -666,6 +678,8 @@ Each axis takes one measure or a **vector** of them, and a vector becomes the on
 # Related
 
   - [`expected_risk`](@ref)
+  - [`filter_held_gaps`](@ref)
+  - [`investable_reduction`](@ref)
   - [`Scalariser`](@ref)
 """
 function plot_measures end
@@ -1755,18 +1769,19 @@ function plot_cv_dashboard end
         min_risk::Bool = true,
         max_score::Bool = true,
         factory::Bool = true,
+        strict::Bool = false,
         kwargs...
     ) -> Plot
     plot_efficient_frontier(res_vec::AbstractVector{<:OptimisationResult}, rd::ReturnsResult; kwargs...) -> Plot
-    plot_efficient_frontier(w::VecVecNum, pr::Pr_RR; x, y, c, slv, fees, min_risk, max_score, factory, kwargs...) -> Plot
-    plot_efficient_frontier(res::OptimisationResult, pr::Pr_RR; fees, kwargs...) -> Plot
+    plot_efficient_frontier(w::VecVecNum, pr::Pr_RR; x, y, c, slv, fees, min_risk, max_score, factory, strict, kwargs...) -> Plot
+    plot_efficient_frontier(res::OptimisationResult, pr::Pr_RR; fees, strict, kwargs...) -> Plot
     plot_efficient_frontier(res::OptimisationResult, rd::ReturnsResult; fees, kwargs...) -> Plot
 
 Plot a collection of portfolios as a line ordered by risk, coloured by a score, to trace an efficient frontier.
 
 Each point is [`expected_risk`](@ref) of `x` and `y` for one portfolio, and its colour is [`expected_risk`](@ref) of `c`. The default colour is the ratio of the arithmetic return to the risk of `x`. Under the default `Variance()` that is the return over the variance, not a Sharpe ratio. The line joins the points in ascending order of `x`. A blue star marks the portfolio of least `x`, and a red star the portfolio of largest `c`. When `factory` is `true`, [`factory`](@ref) binds each measure to the prior and to `slv` first. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads after `using StatsPlots`.
 
-A [`ReturnsResult`](@ref) in the second position is a tag and not data. Each result is scored against the prior it was fitted on, on its own investable universe, as [`plot_measures`](@ref) scores a vector of results. A prior in that position scores every portfolio against that one prior.
+A [`ReturnsResult`](@ref) in the second position is a tag and not data. Each result is scored against the prior it was fitted on, on its own investable universe, as [`plot_measures`](@ref) scores a vector of results. A prior in that position scores every portfolio against that one prior. The method that takes weights reads a [`ReturnsResult`](@ref) as data. The figure reduces the prior or the returns data once, before it binds and scores the measures, as [`plot_measures`](@ref) does, so one message names a held asset or a Held Gap for all the axes.
 
 Each axis takes one measure or a **vector** of them, and a vector becomes the one number that the axis plots. As in [`plot_measures`](@ref) the figure names no scalariser, so a **bare vector on an axis takes [`SumScalariser`](@ref)**, each element weighted by its own `settings.scale`. A scalariser reaches an axis only through the `sca` field of a ratio wrapper, so the figure cannot apply a [`MaxScalariser`](@ref) to a plain vector of risks. The order of the line and the two stars read the scalarised number, so a vector `x` orders the frontier by the aggregate and not by one measure. The axis label joins the element measures with `+`, whichever scalariser formed the number.
 
@@ -1785,10 +1800,12 @@ Each axis takes one measure or a **vector** of them, and a vector becomes the on
   - `min_risk`: Mark the portfolio of least `x` when `true`.
   - `max_score`: Mark the portfolio of largest `c` when `true`.
   - `factory`: Bind each measure through [`factory`](@ref) before the figure scores it.
+  - `strict`: Whether a held non-investable asset of a prior, or a Held Gap of a returns result, raises an `ArgumentError`. With `false`, each gives a warning. The methods that take a tag do not read it.
 
 # Validation
 
   - The rules of [`expected_risk`](@ref) for each measure.
+  - Under `strict`, the rules of [`investable_reduction`](@ref).
 
 # Returns
 
@@ -1798,6 +1815,7 @@ Each axis takes one measure or a **vector** of them, and a vector becomes the on
 
   - [`plot_measures`](@ref)
   - [`expected_risk`](@ref)
+  - [`investable_reduction`](@ref)
   - [`Scalariser`](@ref)
 """
 function plot_efficient_frontier end

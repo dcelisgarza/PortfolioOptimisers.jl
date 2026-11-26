@@ -9,7 +9,7 @@ The fee is two scalars on two clocks. [`calc_fees`](@ref) contracts the whole we
 
 The per asset returns sum to this series. `vec(sum(calc_net_asset_returns(w, X, fees); dims = 2))` reproduces `calc_net_returns(w, X, fees)`, because [`calc_asset_fees`](@ref) splits over the assets what [`calc_fees`](@ref) contracts into a scalar. The two sides add in a different order, so the identity holds to rounding and not to `==`.
 
-**This verb is the plain product, and a non-finite entry poisons its whole observation.** `0 * NaN` is `NaN`, so a zero weight does not save the row: one `NaN` in `X[t, i]` makes `val[t]` non-finite whatever `w[i]` holds. The verb takes no finiteness check, because the library calls it at many sites, and a scan here is paid at each of them on every evaluation. A gapped panel is scored through [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref), which reduces the window to the Investable Mask and filters the Held Gaps once with [`filter_held_gaps`](@ref) before it reaches this verb. [`performance_summary`](@ref) and the plots of a net return series filter them too.
+**This verb is the plain product, and a non-finite entry poisons its whole observation.** `0 * NaN` is `NaN`, so a zero weight does not save the row: one `NaN` in `X[t, i]` makes `val[t]` non-finite whatever `w[i]` holds. The verb takes no finiteness check, because the library calls it at many sites, and a scan here is paid at each of them on every evaluation. A gapped panel is scored through [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref), which reduces the window to the Investable Mask and filters the Held Gaps once with [`filter_held_gaps`](@ref) before it reaches this verb. [`performance_summary`](@ref), the plots of a figure from weights and returns, and the value-level verbs of a [`ReturnsResult`](@ref), such as [`expected_risk`](@ref), filter them too.
 
 # Mathematical definition
 
@@ -288,7 +288,7 @@ function charge_fee_axis!(A::AbstractMatrix, am, ot)
 end
 """
     investable_reduction(X::MatNum, w, fees::Option{<:Fees}, strict::Bool)
-    investable_reduction(rd::AbstractReturnsResult, w, fees::Option{<:Fees}, strict::Bool)
+    investable_reduction(rd::ReturnsResult, w, fees::Option{<:Fees}, strict::Bool)
     investable_reduction(pr::AbstractPriorResult, w, fees::Option{<:Fees}, strict::Bool,
                          imsk::Nothing)
     investable_reduction(pr::AbstractPriorResult, w, fees::Option{<:Fees}, strict::Bool,
@@ -304,11 +304,13 @@ The fee goes through the same verb as at the fit sites, [`investable_fees_view`]
 
 A held non-investable asset is a holding the prior cannot value. It takes the library's strictness policy through [`strict_diagnostic`](@ref): a warning names the assets and their weights are dropped, or an `ArgumentError` names them under `strict`.
 
-A bare returns matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask exists to derive and they pass through. The fee alone goes through `investable_fees_view` under a `nothing` mask. That is what lets one verb state the reduction once and dispatch decide whether it happens.
+A bare returns matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask exists to derive. The fee goes through `investable_fees_view` under a `nothing` mask. That is what lets one verb state the reduction once and dispatch decide whether it happens.
+
+A bare matrix passes through as it is, because the solves and the finite differences call the matrix methods at every evaluation. A [`ReturnsResult`](@ref) is data that a caller scores once, so its gaps become zero here, through [`filter_held_gaps`](@ref), as [`predict`](@ref) reads them. Without that filter, a moment measure is `NaN` and a tail measure is a finite wrong number, because `partialsort` puts a `NaN` after every real number. The filter reads every return one time, also for a measure that reads the weights alone.
 
 # Algorithm
 
- 1. Return `nothing`, `pr` and the weights unchanged, and the fee through [`investable_fees_view`](@ref) under a `nothing` mask, when `pr` is a matrix or a returns result.
+ 1. When `pr` is a matrix, return `nothing`, `pr` and the weights unchanged, and the fee through [`investable_fees_view`](@ref) under a `nothing` mask. When `pr` is a returns result, return the same with the gaps of its `X` set to zero by [`filter_held_gaps`](@ref). A returns result with no gap, or with no `X`, is returned as it is.
  2. Take the Investable Mask `imsk`. By default, [`investable_mask`](@ref) derives it once from the prior.
  3. Return the same when the mask is `nothing`, which means that every asset is investable. The method on a `Nothing` mask takes this case.
  4. Otherwise report the held non-investable assets through [`strict_diagnostic`](@ref).
@@ -319,16 +321,17 @@ A bare returns matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask
   - `pr`: Prior result, [`ReturnsResult`](@ref), or asset returns matrix.
   - `w`: Portfolio weights, a population of them, or a weight path (observations × assets).
   - `fees`: [`Fees`](@ref) the figure is charged against, or `nothing`.
-  - `strict`: Whether a held non-investable asset raises rather than warns.
+  - `strict`: Whether a held non-investable asset of a prior result, or a Held Gap of a returns result, raises rather than warns.
   - `imsk`: The Investable Mask of `pr`, or `nothing` when every asset is investable. Only a prior result takes it.
 
 # Validation
 
   - Every asset the weights hold is investable, else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`.
+  - On a returns result, the rules of [`filter_held_gaps`](@ref).
 
 # Returns
 
-  - `(imsk, pr, w, fees)`: The Investable Mask and the three reduced to it, or `nothing`, `pr` and the weights unchanged, and the fee on the axes a `nothing` mask leaves.
+  - `(imsk, pr, w, fees)`: The Investable Mask and the three reduced to it. With no mask, `nothing`, `pr` (with no gap when it is a returns result), the weights unchanged, and the fee on the axes a `nothing` mask leaves.
 
 # Related
 
@@ -337,6 +340,7 @@ A bare returns matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask
   - [`investable_weights_view`](@ref)
   - [`investable_fees_view`](@ref)
   - [`expand_investable_weights`](@ref)
+  - [`filter_held_gaps`](@ref)
   - [`port_opt_view`](@ref)
   - [`strict_diagnostic`](@ref)
 """
@@ -344,7 +348,14 @@ function investable_reduction(X::MatNum, w::Union{VecNum, VecVecNum, MatNum},
                               fees::Option{<:Fees}, ::Bool)
     return nothing, X, w, investable_fees_view(fees, nothing, X)
 end
-function investable_reduction(rd::AbstractReturnsResult,
+function investable_reduction(rd::ReturnsResult, w::Union{VecNum, VecVecNum, MatNum},
+                              fees::Option{<:Fees}, strict::Bool)
+    # Only a returns result with a gap is rebuilt: the filter returns `rd.X` itself otherwise.
+    X = filter_held_gaps(w, rd.X, strict; nx = rd.nx)
+    return nothing, X === rd.X ? rd : rebuild_struct(rd, (; X = X)), w,
+           investable_fees_view(fees, nothing, X)
+end
+function investable_reduction(rd::ReturnsResult{<:Any, Nothing},
                               w::Union{VecNum, VecVecNum, MatNum}, fees::Option{<:Fees},
                               ::Bool)
     return nothing, rd, w, investable_fees_view(fees, nothing, rd.X)
@@ -447,11 +458,11 @@ function held_gap_pairs(W::MatNum, X::MatNum)
 end
 """
     filter_held_gaps(w::Union{VecNum, VecVecNum, MatNum}, X::MatNum, strict::Bool;
-                     nx::Option{<:VecStr} = nothing)
+                     nx::Option{<:Union{VecStr, VecInt}} = nothing)
 
 Return the window with every non-finite entry replaced by zero, and name the Held Gaps.
 
-A point-in-time panel carries a `NaN` at every `(observation, asset)` pair where the asset is inactive: before it lists, and after it delists. `0 * NaN` is `NaN`, so a zero weight does not save the product `X * w`, and one delisting poisons every observation after it. This is the one place a fold cleans the window it is about to score, and it runs **once**, over the investable columns alone, before the series is formed and before a Weight Drift compounds. [`performance_summary`](@ref) of weights or of a result, and each plot that forms a net return series from them, clean their returns with it too, so a report reads a gap as a fold does.
+A point-in-time panel carries a `NaN` at every `(observation, asset)` pair where the asset is inactive: before it lists, and after it delists. `0 * NaN` is `NaN`, so a zero weight does not save the product `X * w`, and one delisting poisons every observation after it. This is the one place a fold cleans the window it is about to score, and it runs **once**, over the investable columns alone, before the series is formed and before a Weight Drift compounds. [`performance_summary`](@ref) of weights or of a result, each plot that forms a figure from weights and returns, and each value-level verb of a [`ReturnsResult`](@ref), such as [`expected_risk`](@ref) and [`risk_contribution`](@ref), clean their returns with it too, so a report reads a gap as a fold does.
 
 A **Held Gap** takes the library's strictness policy through [`strict_diagnostic`](@ref): a warning names the pairs and the pair contributes zero, or an `ArgumentError` names them under `strict`. A zero weight at a gap is silent. Nothing is renormalised, so the missing weight sits in cash on that observation, which is the one reading that invents no trade the weights never stated.
 
@@ -470,7 +481,7 @@ A fold hands this verb the window **viewed at the Investable Mask**, so a column
   - `w`: Portfolio weights, a population of them, or a weight path (observations × assets).
   - `X`: Asset returns, `observations × assets`.
   - `strict`: Whether a non-finite return at a held pair raises rather than warns.
-  - `nx`: Optional asset names of the columns of `X`. When given, the message names the held assets by them; otherwise it reports their column indices.
+  - `nx`: Optional labels of the columns of `X`, the asset names or the positions of the assets in the universe of the caller. When given, the message names the held assets by them; otherwise it reports their column indices.
 
 # Validation
 
@@ -490,7 +501,7 @@ A fold hands this verb the window **viewed at the Investable Mask**, so a column
   - [`performance_summary`](@ref)
 """
 function filter_held_gaps(w::Union{VecNum, VecVecNum, MatNum}, X::MatNum, strict::Bool;
-                          nx::Option{<:VecStr} = nothing)
+                          nx::Option{<:Union{VecStr, VecInt}} = nothing)
     if all(isfinite, X)
         return X
     end
@@ -501,16 +512,16 @@ function filter_held_gaps(w::Union{VecNum, VecVecNum, MatNum}, X::MatNum, strict
     return map(x -> isfinite(x) ? x : zero(x), X)
 end
 """
-    held_gap_msg(held::AbstractVector{<:Tuple{Integer, Integer}}, nx::Option{<:VecStr} = nothing)
+    held_gap_msg(held::AbstractVector{<:Tuple{Integer, Integer}}, nx::Option{<:Union{VecStr, VecInt}} = nothing)
 
 Write the message a Held Gap raises.
 
-The message names the assets, the count of pairs and the first observation, so a caller can find the delisting that made them, and it states the consequence: the pair contributes zero and the missing weight sits in cash. The assets are named by `nx` when it is given, because the window a fold filters is viewed at the Investable Mask and a column index of it is a reduced one; with no names the column indices are reported.
+The message names the assets, the count of pairs and the first observation, so a caller can find the delisting that made them, and it states the consequence: the pair contributes zero and the missing weight sits in cash. The assets are named by `nx` when it is given, because the window a fold filters is viewed at the Investable Mask and a column index of it is a reduced one; with no names the column indices are reported. A caller with no names and a mask gives the positions of the columns in its own universe as `nx`, integers, so the message reads `[2, 4]` with a mask and with none.
 
 # Arguments
 
   - `held`: The `(observation, asset)` pairs [`held_gap_pairs`](@ref) found.
-  - `nx`: Optional asset names of the window's columns.
+  - `nx`: Optional labels of the columns of the window, the asset names or the positions of the assets in the universe of the caller.
 
 # Returns
 
@@ -523,7 +534,7 @@ The message names the assets, the count of pairs and the first observation, so a
   - [`strict_diagnostic`](@ref)
 """
 function held_gap_msg(held::AbstractVector{<:Tuple{Integer, Integer}},
-                      nx::Option{<:VecStr} = nothing)
+                      nx::Option{<:Union{VecStr, VecInt}} = nothing)
     cols = unique(last.(held))
     assets = isnothing(nx) ? cols : nx[cols]
     return "a portfolio cannot earn a return an asset did not have. Assets $(assets) carry a non-finite return at $(length(held)) held (observation, asset) pair(s), the first at observation $(first(held)[1]). Those pairs contribute zero, so the weight of a missing asset sits in cash on that observation and the series understates the portfolio by whatever it would have earned. Pass `strict = true` to refuse instead, zero the weights over the observations the asset is inactive, or pass a weight history."
