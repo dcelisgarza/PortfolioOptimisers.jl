@@ -101,7 +101,7 @@ Does the M-step of [`BisquareReweighting`](@ref) from the location `mu` and the 
  2. Repeat at most `maxsteps` times:
      1. Take the weight of each observation, [`srho_weight`](@ref) of [`BisquareRho`](@ref) at its squared distance in the metric of the shape, divided by `s`.
      2. Take the weighted mean and the weighted scatter of determinant one with [`weighted_shape`](@ref).
-     3. Stop when the relative change of the shape and the change of the location in the metric of the shape are both below `sqrt(eps)`, see [`shape_converged`](@ref).
+     3. Stop when the relative change of the shape and the change of the location in the metric of the scatter are both below `sqrt(eps)`, see [`shape_converged`](@ref).
  3. Warn when the steps do not converge, and keep the last iterate.
  4. Build the fit of the covariance `s` times the shape with [`srho_fit`](@ref), with the weights at ``c^2``.
 
@@ -145,7 +145,7 @@ function bisquare_mstep(rw::BisquareReweighting, X::MatNum, mu::VecNum, sigma::M
     for _ in 1:maxsteps
         w = srho_weight.(Ref(rho), squared_distances(X, mu, V) ./ s, c2)
         mun, Vn = weighted_shape(X, w, mu, fixed)
-        done = shape_converged(mu, V, mun, Vn, tol)
+        done = shape_converged(mu, V, mun, Vn, s, tol)
         mu, V = mun, Vn
         if done
             break
@@ -200,7 +200,7 @@ The default gives the breakdown point one half and the efficiency 95 % of the sh
 
 `StatsAPI.fit` returns the location, the covariance, and the squared distance, the weight and the outlier flag of each observation in a [`RobustCovarianceResult`](@ref). The weight of an observation is its bisquare weight in the M-step. `cov` returns the covariance of that fit.
 
-The `me` of `s` fixes the centre of both parts, and a `mean` keyword does the same. The `q` of `s` and its `cache` are not read: the fit flags the outliers at the `q` of this estimator, and an [`Online`](@ref) wrapper reads the `cache` of this estimator.
+The `me` of `s` fixes the centre of both parts, and a `mean` keyword does the same. The fit flags the outliers at the `q` of this estimator, whose default is the `q` of `s`. An [`Online`](@ref) wrapper reads the `cache` of this estimator, so the constructor refuses a `cache` on `s`.
 
 The estimator has no exact update, so an [`Online`](@ref) wrapper refits it over the rows of its Sample Buffer, see [`SampleBufferState`](@ref).
 
@@ -213,7 +213,7 @@ $(DocStringExtensions.FIELDS)
     MMCovariance(;
         s::SCovariance = SCovariance(),
         rw::BisquareReweighting = BisquareReweighting(),
-        q::Number = 0.975,
+        q::Number = s.q,
         cache::Option{<:AbstractPartialFitState} = nothing
     ) -> MMCovariance
 
@@ -222,6 +222,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `0 < q < 1`.
+  - `isnothing(s.cache)`.
 
 ## Propagated parameters
 
@@ -287,11 +288,13 @@ MMCovariance
     function MMCovariance(s::SCovariance, rw::BisquareReweighting, q::Number,
                           cache::Option{<:AbstractPartialFitState})
         assert_open_probability(q, :q)
+        @argcheck(isnothing(s.cache),
+                  ArgumentError("an `Online` wrapper reads the `cache` of the MM estimator, not the `cache` of its S estimate. Set the `cache` of `MMCovariance`, and `cache = nothing` on `s`"))
         return new{typeof(s), typeof(rw), typeof(q), typeof(cache)}(s, rw, q, cache)
     end
 end
 function MMCovariance(; s::SCovariance = SCovariance(),
-                      rw::BisquareReweighting = BisquareReweighting(), q::Number = 0.975,
+                      rw::BisquareReweighting = BisquareReweighting(), q::Number = s.q,
                       cache::Option{<:AbstractPartialFitState} = nothing)::MMCovariance
     return MMCovariance(s, rw, q, cache)
 end
