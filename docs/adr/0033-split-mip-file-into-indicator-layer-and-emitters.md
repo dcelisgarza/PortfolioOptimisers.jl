@@ -152,3 +152,34 @@ registers the expression of degree one in place of a row. The tracking builder t
 so the keys of the rows do not move, and every head honours the bound. The rejected form gave the
 tracked measure the bound as its own `settings.ub`. A `FactorRiskContribution` ignores that bound, and the
 dependent mode needs an expression and not a row.
+
+## Amendment (2026-11-26)
+
+The bounds of an asset give the side of its held bit (#2372). Item 2 said that a held bit has no
+sign. That is true only for an asset whose bounds admit both signs. An asset with `lb >= 0` is
+long when it is held, and an asset with `ub <= 0` and `lb < 0` is short when it is held.
+
+The selector `run_mip_builder!` read the short part `sw` of the model to choose a builder, and a
+long threshold alone took the held builder. That builder wrote `w >= lt * ib` on every asset, so
+a long-short book could hold no short, and a short-only book was infeasible. A short threshold on
+a short-only book took the long-short builder and its `2N` binaries.
+
+Now `mip_sides` reads the bounds of each entry of the space, and the rule is:
+
+1. A pin with no consumer of a held bit takes the sign builder, for an explicit `xbgt` and for a
+   `WeightsFromParts` head alike. The held builder had served that head, and its bounds forbade
+   every short when they were finite.
+2. An explicit `xbgt` with a consumer of a held bit takes the long-short builder, as ADR 0032
+   states.
+3. A threshold, a fixed fee or a pin takes the long-short builder when an entry admits both
+   signs.
+4. Every other call takes the held builder. `HeldIndicators` carries the field `sht`, the entries
+   whose bounds admit a short weight and no long one. The thresholds, the fixed fees and the gates
+   of the pin read the side of each entry from it. `held_sides` sets it for each call, because two
+   calls with two sets of bounds can read one bundle.
+
+So a short-only book is the mirror of a long-only book: `N` binaries, and rows with no big-M
+slack. A book whose assets each admit one sign takes `N` binaries too. The rejected form added
+`lt_flag` to the old condition of the selector. It corrects the long-short case, but a short-only
+book keeps `2N` binaries, the selector still reads the model and not the bounds, and the
+`WeightsFromParts` head keeps its defect.

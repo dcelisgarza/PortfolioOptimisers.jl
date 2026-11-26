@@ -1260,12 +1260,103 @@ end
     # loudly and does not miscount. A held bundle has no binaries for the slack-closing
     # rows: the held builder pins the decomposition only for a `WeightsFromParts` head.
     ib = [1, 0, 1]
-    held = pe.HeldIndicators(ib, ib)
+    held = pe.HeldIndicators(ib, ib, falses(3))
     @test pe.held(held) === ib
     @test_throws MethodError pe.long_bin(held)
     ls = pe.LongShortIndicators([1, 0], [0, 1], [1, 0], [0, 1], [1, 1])
     @test pe.long_bin(ls) == [1, 0] && pe.short_bin(ls) == [0, 1]
     @test_throws MethodError pe.held(ls)
+    # A call sets the sides of its bounds on a held bundle. A long-short bundle carries its
+    # sign in its bits, so a held call that reads it gets it unchanged.
+    @test pe.held_sides(held, BitVector([0, 0, 1])).sht == [false, false, true]
+    @test pe.held_sides(held, trues(3)).ib === ib
+    @test pe.held_sides(ls, trues(2)) === ls
+end
+
+@testset "The bounds give the side of a held bit (#2372)" begin
+    hslv = Solver(; name = :highs, solver = HiGHS.Optimizer,
+                  settings = "log_to_console" => false,
+                  check_sol = (; allow_local = true, allow_almost = true))
+    Xs = 0.01 .* randn(StableRNG(2372), 120, 8) .+ 0.0005
+    nxs = ["a$i" for i in 1:8]
+    rdp = ReturnsResult(; nx = nxs, X = Xs)
+    rdn = ReturnsResult(; nx = nxs, X = -Xs)
+    function solve_s(rdx = rdp; obj = MinimumRisk(), kwargs...)
+        opt = JuMPOptimiser(; slv = hslv, kwargs...)
+        return optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = obj, opt = opt), rdx)
+    end
+    bundle(res) = PortfolioOptimisers.mip_indicators(res.model)
+    nbin(res) = count(JuMP.is_binary, JuMP.all_variables(res.model))
+    t = Threshold(; val = 0.1)
+    lwb = WeightBounds(; lb = 0.0, ub = 0.6)
+    swb = WeightBounds(; lb = -0.6, ub = 0.0)
+    short_only = (; wb = swb, bgt = -1, sbgt = 1)
+
+    # A long threshold beside an asset that admits both signs binds the long side alone. The
+    # held builder read it on every asset, so no short was feasible.
+    res = solve_s(; wb = WeightBounds(; lb = -0.5, ub = 0.6), sbgt = 0.3, lt = t,
+                  obj = MaximumReturn())
+    @test isa(res.retcode, OptimisationSuccess)
+    @test minimum(res.w) < -0.1
+    @test all(x -> x <= 1e-8 || x >= 0.1 - 1e-8, res.w)
+    @test isa(bundle(res), PortfolioOptimisers.LongShortIndicators)
+
+    # A short-only book is the mirror of a long-only book: one held bit for each asset, the
+    # short threshold on each held asset, and the weights of the long book on `-X`, negated.
+    long = solve_s(rdn; wb = lwb, lt = t)
+    free = solve_s(rdn; wb = lwb)
+    @test minimum(free.w) < 0.1 && minimum(long.w) >= 0.1 - 1e-8
+    short = solve_s(; short_only..., st = t)
+    @test isa(short.retcode, OptimisationSuccess)
+    @test isa(bundle(short), PortfolioOptimisers.HeldIndicators)
+    @test bundle(short).sht == trues(8)
+    @test nbin(short) == nbin(long) == 8
+    @test isapprox(short.w, -long.w; atol = 1e-8)
+    # A long threshold binds no asset of a short-only book. The held builder read it on every
+    # held asset, so the book was infeasible.
+    res = solve_s(; short_only..., lt = t)
+    @test isa(res.retcode, OptimisationSuccess)
+    @test isapprox(res.w, -free.w; atol = 1e-8)
+
+    # A fixed fee charges the side of each held asset. The objective reads the fee, so no
+    # asset of zero weight holds its bit.
+    res = solve_s(; short_only..., fees = Fees(; fl = 0.002, fs = 0.001),
+                  obj = MaximumReturn())
+    @test isa(res.retcode, OptimisationSuccess)
+    @test isa(bundle(res), PortfolioOptimisers.HeldIndicators)
+    @test haskey(res.model, :ffs) && !haskey(res.model, :ffl)
+    held = count(x -> abs(x) > 1e-8, res.w)
+    @test isapprox(JuMP.value(res.model[:ffs]), 0.001 * held; atol = 1e-8)
+
+    # A book of long-only and short-only assets takes one held bit for each asset too, and
+    # each threshold binds its own side.
+    mwb = WeightBounds(; lb = [fill(0.0, 4); fill(-0.6, 4)],
+                       ub = [fill(0.6, 4); fill(0.0, 4)])
+    res = solve_s(; wb = mwb, bgt = 0.5, sbgt = 0.5, lt = t, st = t)
+    @test isa(res.retcode, OptimisationSuccess)
+    @test isa(bundle(res), PortfolioOptimisers.HeldIndicators)
+    @test bundle(res).sht == [falses(4); trues(4)]
+    @test all(x -> abs(x) < 1e-8 || x >= 0.1 - 1e-8, res.w[1:4])
+    @test all(x -> abs(x) < 1e-8 || x <= -0.1 + 1e-8, res.w[5:8])
+
+    # A sub-group takes the side of its members.
+    S = zeros(4, 8)
+    for i in 1:4
+        S[i, (2i - 1):(2i)] .= 1
+    end
+    st = Threshold(; val = 0.3)
+    res = solve_s(; short_only..., smtx = S, sst = st)
+    @test isa(res.retcode, OptimisationSuccess)
+    @test all(x -> abs(x) < 1e-8 || x <= -0.3 + 1e-8, S * res.w)
+    sp = PortfolioOptimisers.SubsetMIPSpace([1.0 1.0 0.0; 0.0 0.0 -1.0; 1.0 0.0 0.0], :s, 1)
+    sides = PortfolioOptimisers.mip_sides(sp,
+                                          WeightBounds(; lb = [0.0, -1.0, 0.0],
+                                                       ub = [1.0, 0.0, 0.0]))
+    @test sides == ([true, false, true], [true, false, false])
+    sides = PortfolioOptimisers.mip_sides(sp,
+                                          WeightBounds(; lb = [0.0, -1.0, -1.0],
+                                                       ub = [1.0, 0.0, 1.0]))
+    @test sides == ([true, true, true], [true, true, false])
 end
 
 @testset "A vector of membership estimators is viewed estimator by estimator (#1912)" begin

@@ -202,6 +202,40 @@ function mip_bounds(sp::SubsetMIPSpace, b::VecNum)
     return sp.smtx * b
 end
 """
+    mip_sides(sp::AbstractMIPSpace, wb::WeightBounds{<:VecNum, <:VecNum}) -> Tuple
+    mip_sides(sp::SubsetMIPSpace, wb::WeightBounds{<:VecNum, <:VecNum}) -> Tuple
+
+Return the entries of the space `sp` whose bounds admit a long weight, and the entries whose bounds admit a short weight.
+
+An entry admits a long weight when its upper bound is above zero, and a short weight when its lower bound is below zero. The general method reads `wb` on the axis of `sp`, which is the case of the asset space and of the factor space ([`factor_weight_bounds`](@ref)). The optimiser expands an absent bound to an infinite one ([`weight_bounds_constraints`](@ref)), so an absent bound admits its side. A sub-group admits a side when a member with a positive coefficient admits that side, or a member with a negative coefficient admits the other side.
+
+The sign of an entry is a fact of the bounds, and not of the model. So [`run_mip_builder!`](@ref) reads these two vectors to choose the indicator bundle, and not the short part `sw` of the model. An entry that admits both signs needs a long bit and a short bit for a sign-specific feature. An entry that admits one sign needs one held bit, and its bounds give the sign ([`HeldIndicators`](@ref)).
+
+# Arguments
+
+  - `sp::AbstractMIPSpace`: Weight space of the entries.
+  - $(arg_dict[:wb_arg])
+
+# Returns
+
+  - `(lng, sht)::Tuple`: Two `BitVector`s with one entry for each entry of `sp`. `lng` marks the entries that admit a long weight, and `sht` the entries that admit a short weight.
+
+# Related
+
+  - [`mip_bounds`](@ref)
+  - [`run_mip_builder!`](@ref)
+  - [`HeldIndicators`](@ref)
+"""
+function mip_sides(::AbstractMIPSpace, wb::WeightBounds{<:VecNum, <:VecNum})::Tuple
+    return wb.ub .> 0, wb.lb .< 0
+end
+function mip_sides(sp::SubsetMIPSpace, wb::WeightBounds{<:VecNum, <:VecNum})::Tuple
+    lng, sht = mip_sides(AssetMIPSpace(), wb)
+    pos = sp.smtx .> 0
+    neg = sp.smtx .< 0
+    return (pos * lng + neg * sht) .> 0, (pos * sht + neg * lng) .> 0
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for a declared set of MIP binary indicators.
@@ -216,11 +250,11 @@ The bits divide into two kinds, and conflating them is a bug — a *held* bit sa
 in the portfolio (what cardinality counts), a *sign* bit says which side it is on. Bundles
 differ in which of the two they carry:
 
-| bundle                        | binaries    | states                  |
-|:----------------------------- |:----------- |:----------------------- |
-| [`HeldIndicators`](@ref)      | `ib`        | held / not              |
-| [`LongShortIndicators`](@ref) | `ilb`,`isb` | long / short / inactive |
-| [`SignIndicators`](@ref)      | `xb`        | long / short            |
+| bundle                        | binaries    | states                         |
+|:----------------------------- |:----------- |:------------------------------ |
+| [`HeldIndicators`](@ref)      | `ib`        | held / not, side of the bounds |
+| [`LongShortIndicators`](@ref) | `ilb`,`isb` | long / short / inactive        |
+| [`SignIndicators`](@ref)      | `xb`        | long / short                   |
 
 # Related
 
@@ -233,20 +267,29 @@ abstract type AbstractMIPIndicators end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Long-only indicators: one *held* bit per asset, and no sign.
+Held indicators: one *held* bit per entry, whose sign the bounds of the entry give.
+
+The bit of an entry carries no sign of its own. When the bounds of the entry admit one sign, a held entry is on that side, so the bit serves the threshold, the fixed fee and the decomposition pin of that side. [`run_mip_builder!`](@ref) gives this bundle to a call with a sign-specific feature only when no entry admits both signs ([`mip_sides`](@ref)). So a short-only book takes `N` bits, as a long-only book does.
 
 # Fields
 
   - `ib`: Binary held bit.
   - `i_mip`: Held gate — `ib` itself, or its continuous relaxation `ibf` when the budget is free.
+  - `sht`: `BitVector` of the entries whose bounds admit a short weight and no long one. A held entry of `sht` is short, and every other held entry is long. The bits belong to the weights and the sides to the bounds of a call, so [`held_sides`](@ref) sets `sht` for each call that reads the bundle.
 
 # Related
 
   - [`AbstractMIPIndicators`](@ref)
+  - [`held_sides`](@ref)
+  - [`mip_sides`](@ref)
 """
 @concrete struct HeldIndicators <: AbstractMIPIndicators
     ib
     i_mip
+    sht
+end
+function HeldIndicators(; ib, i_mip, sht::AbstractVector{Bool})
+    return HeldIndicators(ib, i_mip, sht)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -322,7 +365,7 @@ Return the *held binary* — the 0/1 per-asset quantity that cardinality sums, g
 gates, and integer phylogeny multiplies.
 
 Unlike [`held`](@ref), which returns the held *gate* (`i_mip`, the continuous relaxation `ibf`
-when the budget is free), this is always the raw binary: `ib` for the long-only bundle,
+when the budget is free), this is always the raw binary: `ib` for the held bundle,
 `ilb + isb` for the long-short one. Counting must key on a bit that is exactly 0 or 1 even when
 the budget is free and the gate relaxes — the same reason [`long_bin`](@ref) exists alongside
 [`long_gate`](@ref).
@@ -456,11 +499,40 @@ function mip_indicators!(model::JuMP.Model, sp::AssetMIPSpace,
     return ind
 end
 """
+    held_sides(ind::AbstractMIPIndicators, sht::AbstractVector{Bool})
+    held_sides(ind::HeldIndicators, sht::AbstractVector{Bool})
+
+Return the bundle `ind` with the sides of the call that reads it.
+
+The bits of the asset space belong to the weights, and two calls can read one bundle ([`mip_indicators!`](@ref)). The side of a held entry is a fact of the bounds of each call. So the method for [`HeldIndicators`](@ref) returns a bundle on the same bits with the short entries `sht` of the call. Every other bundle carries its sign in its bits, and the general method returns it unchanged.
+
+# Arguments
+
+  - `ind::AbstractMIPIndicators`: Indicator bundle that the call reads.
+  - `sht::AbstractVector{Bool}`: The entries of the call whose bounds admit a short weight and no long one, from [`mip_sides`](@ref).
+
+# Returns
+
+  - `ind::AbstractMIPIndicators`: The bundle of the call.
+
+# Related
+
+  - [`HeldIndicators`](@ref)
+  - [`mip_sides`](@ref)
+  - [`mip_constraints`](@ref)
+"""
+function held_sides(ind::AbstractMIPIndicators, ::AbstractVector{Bool})
+    return ind
+end
+function held_sides(ind::HeldIndicators, sht::AbstractVector{Bool})
+    return rebuild_struct(ind, (; sht = sht))
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the gate gating the *lower* weight bound in [`mip_wb`](@ref).
 
-The long-only bundle gates it with the held indicator (`w = 0` unless held); the long-short
+The held bundle gates it with the held indicator (`w = 0` unless held); the long-short
 bundle gates it with the short gate. See [`ub_gate`](@ref) for the upper bound.
 
 # Related
@@ -476,7 +548,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the gate gating the *upper* weight bound in [`mip_wb`](@ref).
 
-The long-only bundle gates it with the held indicator (`w = 0` unless held); the long-short
+The held bundle gates it with the held indicator (`w = 0` unless held); the long-short
 bundle gates it with the long gate. See [`lb_gate`](@ref) for the lower bound.
 
 # Related
@@ -502,16 +574,17 @@ Return the gates and binaries the exact-decomposition constraints key on.
 are always the binaries themselves, because the slack-closing constraints must key on a bit
 that is exactly 0 or 1 even when the budget is free and the gates relax.
 
-For [`HeldIndicators`](@ref) the held bit doubles as the sign. This bundle is asked for a
-decomposition only under a [`WeightsFromParts`](@ref) head, whose sign pair reads the gates
-alone, so the bundle has gates and no binaries.
+For [`HeldIndicators`](@ref) the bounds give the sign, see [`HeldIndicators`](@ref). The long
+gate is the held bit of a long entry and zero on a short entry, and the short gate is the
+reverse. Each is exactly 0 or 1, so the gate and the binary of a side are the same expression.
+With no short entry, the long gate is `ib` itself.
 
 # Related
 
   - [`AbstractMIPIndicators`](@ref)
 """
 function long_gate(ind::HeldIndicators)
-    return ind.ib
+    return any(ind.sht) ? ind.ib .* .!ind.sht : ind.ib
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -525,7 +598,7 @@ counterpart of [`long_gate`](@ref), which carries the full explanation.
   - [`AbstractMIPIndicators`](@ref)
 """
 function short_gate(ind::HeldIndicators)
-    return 1 .- ind.ib
+    return ind.ib .* ind.sht
 end
 function long_gate(ind::LongShortIndicators)
     return ind.il
@@ -722,7 +795,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Declare the long-only *held* indicators and the constraints that give them meaning.
+Declare the *held* indicators and the constraints that give them meaning.
 
 Creates one binary per asset and its gate with [`declare_mip_gate!`](@ref). When the budget `k` is
 a free variable, the gate is the continuous relaxation `ibf = ib * k`. The caller then applies [`mip_wb`](@ref), which
@@ -754,7 +827,8 @@ function declare_mip_indicators!(model::JuMP.Model, sp::AbstractMIPSpace,
                                  ss::Option{<:Number})
     ib, g = declare_mip_gate!(model, sp, :ib, :ibf, length(wx), wb, ss)
     i_mip = model[mip_key(sp, :i_mip)] = JuMP.@expression(model, g)
-    return HeldIndicators(ib, i_mip)
+    lng, sht = mip_sides(sp, wb)
+    return HeldIndicators(ib, i_mip, sht .& .!lng)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -926,9 +1000,11 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add a long-only MIP binary indicator variable and associated constraints to the JuMP optimisation model.
+Add a held MIP binary indicator variable and associated constraints to the JuMP optimisation model.
 
 Creates a binary variable per position indicating whether it is held. When `k` is a JuMP variable, introduces a continuous relaxation with big-M linking constraints. Optionally applies minimum-holding threshold, fixed-fee, and rebalancing constraints. The weight expression, bound mapping, and model key naming are selected by `sp`, so the same builder serves asset-space and sub-group constraints.
+
+The bounds of a position give its side ([`mip_sides`](@ref), [`held_sides`](@ref)). A position whose bounds admit a short weight and no long one takes the short threshold and the short fixed fee, and every other position takes the long ones. [`run_mip_builder!`](@ref) runs this builder with a sign-specific feature only when no position admits both signs, so a short-only book is the mirror of a long-only book.
 
 # Mathematical definition
 
@@ -951,7 +1027,8 @@ Minimum-holding threshold and cardinality:
 
 ```math
 \\begin{align}
-w_i &\\geq ibf_i\\, \\ell_i\\,, \\\\
+w_i &\\geq ibf_i\\, \\ell_i\\,, \\quad i \\notin \\mathcal{S}\\,, \\\\
+w_i &\\leq -ibf_i\\, s_i\\,, \\quad i \\in \\mathcal{S}\\,, \\\\
 \\sum_i ib_i &\\leq \\mathrm{card}\\,.
 \\end{align}
 ```
@@ -960,7 +1037,8 @@ Where:
 
   - ``w_i``: Weight expression for position ``i`` in the space of `sp`.
   - ``ibf_i``: Continuous relaxation of ``ib_i \\cdot k``.
-  - ``\\ell_i``: Minimum-holding threshold for position ``i``.
+  - ``\\ell_i``, ``s_i``: Long and short minimum-holding thresholds for position ``i``.
+  - ``\\mathcal{S}``: The positions whose bounds admit a short weight and no long one.
   - ``\\mathrm{card}``: Maximum number of non-zero positions (cardinality bound).
 
 # Arguments
@@ -968,12 +1046,16 @@ Where:
   - $(arg_dict[:model])
   - `sp::AbstractMIPSpace`: Weight space the constraints act on.
   - $(arg_dict[:wb_arg])
-  - `ffl::Option{<:Num_VecNum}`: Long-side fixed fee rate(s).
   - $(arg_dict[:lt_arg])
+  - $(arg_dict[:st_arg])
+  - `ffl::Option{<:Num_VecNum}`: Long-side fixed fee rate(s).
+  - `ffs::Option{<:Num_VecNum}`: Short-side fixed fee rate(s).
   - $(arg_dict[:ss_arg])
   - $(arg_dict[:lt_flag_arg])
-  - `ffl_flag::Bool`: Whether to add fixed fee expressions. Emitted by [`set_fixed_fees!`](@ref) against `ib`.
-  - $(arg_dict[:xbgt_flag_arg]) [`run_mip_builder!`](@ref) sets it here only for a [`WeightsFromParts`](@ref) head, whose sign pair this builder's `ib` serves.
+  - $(arg_dict[:st_flag_arg])
+  - `ffl_flag::Bool`: Whether to add long fixed fee expressions. Emitted by [`set_fixed_fees!`](@ref) against `ib`.
+  - `ffs_flag::Bool`: Whether to add short fixed fee expressions. Emitted by [`set_fixed_fees!`](@ref) against `ib`.
+  - $(arg_dict[:xbgt_flag_arg]) [`run_mip_builder!`](@ref) sets it here only for a [`WeightsFromParts`](@ref) head, whose sign pair this builder's `ib` serves with the sides of the bounds.
 
 # Returns
 
@@ -991,16 +1073,18 @@ Where:
   - [`WeightBounds`](@ref)
 """
 function mip_constraints(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBounds,
-                         ffl::Option{<:Num_VecNum}, lt::Option{<:Threshold},
-                         ss::Option{<:Number}, lt_flag::Bool, ffl_flag::Bool,
-                         xbgt_flag::Bool)
+                         lt::Option{<:Threshold}, st::Option{<:Threshold},
+                         ffl::Option{<:Num_VecNum}, ffs::Option{<:Num_VecNum},
+                         ss::Option{<:Number}, lt_flag::Bool, st_flag::Bool, ffl_flag::Bool,
+                         ffs_flag::Bool, xbgt_flag::Bool)
     wx = mip_wx!(model, sp)
+    lng, sht = mip_sides(sp, wb)
     # The bundle of the weights can be a long-short one that an earlier call declared. The
     # gate, the threshold and the fee each have a method for it.
-    ind = mip_indicators!(model, sp, HeldIndicators, wb, wx, ss)
+    ind = held_sides(mip_indicators!(model, sp, HeldIndicators, wb, wx, ss), sht .& .!lng)
     mip_wb(model, sp, wb, wx, ind)
-    set_threshold_constraints!(model, sp, ind, wx, lt, lt_flag)
-    set_fixed_fees!(model, sp, ind, ffl, nothing, ffl_flag, false)
+    set_threshold_constraints!(model, sp, ind, wx, lt, lt_flag, st, st_flag)
+    set_fixed_fees!(model, sp, ind, ffl, ffs, ffl_flag, ffs_flag)
     if xbgt_flag
         # Registered here rather than read from a local: the held declaration only builds the
         # big-M expression on its free-budget branch, so under a constant budget `ss` is still
@@ -1091,9 +1175,17 @@ Selects among the three builders on flags shared by the asset space and every su
   - [`sign_mip_constraints`](@ref) when `sign_only` — an explicit `xbgt` with nothing else to
     consume a held indicator, so a single sign bit per asset suffices (returns a
     [`SignIndicators`](@ref), which has no held indicator).
-  - [`short_mip_threshold_constraints`](@ref) when a short side exists (`shared_get(model, :sw)`) and
-    something needs it — a short threshold, a fixed fee, or a pinned decomposition.
-  - [`mip_constraints`](@ref) otherwise — the long-only held builder.
+  - [`short_mip_threshold_constraints`](@ref) when an explicit `xbgt` pins the decomposition, or
+    when an entry of `sp` admits both signs ([`mip_sides`](@ref)) and a sign-specific feature
+    needs the sign — a threshold, a fixed fee, or a pinned decomposition.
+  - [`mip_constraints`](@ref) otherwise — the held builder, whose bounds give the side of each
+    entry ([`HeldIndicators`](@ref)).
+
+The sides come from the bounds of the call and not from the short part `sw` of the model. A
+long threshold beside an entry that admits both signs then binds the long side alone, and it
+does not forbid the short side. A short-only book takes one held bit for each entry, and its
+short threshold and short fixed fee bind each held entry, as the long ones do in a long-only
+book.
 
 The asset caller ([`set_mip_constraints!`](@ref)) and the sub-group callers
 ([`set_all_smip_constraints!`](@ref), [`set_scardmip_constraints!`](@ref),
@@ -1137,13 +1229,17 @@ function run_mip_builder!(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBou
                           ffs::Option{<:Num_VecNum} = nothing, ffl_flag::Bool = false,
                           ffs_flag::Bool = false, xbgt_flag::Bool = false,
                           pin_flag::Bool = false, sign_only::Bool = false)
-    return if sign_only
-        sign_mip_constraints(model, sp, wb, ss)
-    elseif (st_flag || ffl_flag || ffs_flag || xbgt_flag) && shared_has(model, :sw)
+    if sign_only
+        return sign_mip_constraints(model, sp, wb, ss)
+    end
+    lng, sht = mip_sides(sp, wb)
+    signed = lt_flag || st_flag || ffl_flag || ffs_flag || pin_flag
+    return if xbgt_flag || signed && any(lng[i] && sht[i] for i in eachindex(lng, sht))
         short_mip_threshold_constraints(model, sp, wb, lt, st, ffl, ffs, ss, lt_flag,
                                         st_flag, ffl_flag, ffs_flag, pin_flag)
     else
-        mip_constraints(model, sp, wb, ffl, lt, ss, lt_flag, ffl_flag, pin_flag)
+        mip_constraints(model, sp, wb, lt, st, ffl, ffs, ss, lt_flag, st_flag, ffl_flag,
+                        ffs_flag, pin_flag)
     end
 end
 """
@@ -1162,7 +1258,7 @@ Two callers want the decomposition pinned, and they are the same request:
 
 Both route to [`set_exact_budget_constraints!`](@ref), which reads the contract back off the model and emits what that contract needs.
 
-Pinning needs a per-asset *sign* bit, which the long-only [`mip_constraints`](@ref) does not have — its `ib` marks an asset as *held* and is what cardinality counts. So an explicit `xbgt` is served by [`sign_mip_constraints`](@ref) when nothing else in the model needs binaries (`N` of them), and otherwise routed to [`short_mip_threshold_constraints`](@ref), whose `ilb`/`isb` it reuses for free. It is ignored when the model has no short side, there being no decomposition to pin.
+Pinning needs a per-asset *sign* bit. The `ib` of the held builder [`mip_constraints`](@ref) marks an asset as *held* and is what cardinality counts, and only the bounds of an asset give it a sign. So either request is served by [`sign_mip_constraints`](@ref) when nothing else in the model needs binaries (`N` of them). Otherwise an explicit `xbgt` goes to [`short_mip_threshold_constraints`](@ref), whose `ilb`/`isb` it reuses for free, and a [`WeightsFromParts`](@ref) head goes there when an asset admits both signs. A [`WeightsFromParts`](@ref) head whose assets each admit one sign takes the held builder, whose bit gives the side of the bounds ([`HeldIndicators`](@ref)). An explicit `xbgt` is ignored when the model has no short side, there being no decomposition to pin.
 
 # Two calls on one weight vector
 
@@ -1213,11 +1309,8 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
     # the weights are their own long part and the budgets are already exact.
     xbgt_flag = xbgt && shared_has(model, :sw)
     # A `WeightsFromParts` head needs no flag of its own to ask for the decomposition to be
-    # pinned: `w = lw - sw` is what its parts are *for*. It stays distinct from `xbgt_flag`
-    # because it also picks the builder below -- its `lw`/`sw` are the primitive variables,
-    # so it wants the long-only builder's gate on them, not a sign builder's.
-    wfp_flag = isa(decomposition_contract(model), WeightsFromParts)
-    pin_flag = xbgt_flag || wfp_flag
+    # pinned: `w = lw - sw` is what its parts are *for*.
+    pin_flag = xbgt_flag || isa(decomposition_contract(model), WeightsFromParts)
     ffl_flag, ffs_flag, ffl, ffs = if !isnothing(fees)
         non_zero_real_or_vec(fees.fl), non_zero_real_or_vec(fees.fs), fees.fl, fees.fs
     else
@@ -1236,20 +1329,18 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
     # The rows of this call take `prefix`, and the bits take the owner of the weights, so a
     # second call on the same weights reads the bits of the first.
     sp = AssetMIPSpace(prefix, weights_prefix(model, prefix))
-    # `xbgt` needs a per-asset *sign* bit, which only the long-short builder has: the
-    # long-only builder's `ib` marks an asset as held and carries no sign. When nothing here
-    # consumes a held indicator, the long-short builder's third state (inactive) is dead
-    # weight, so the lean sign-bit builder does the job with half the binaries. That branch
-    # returns `nothing` -- there is no held indicator, and by its own condition nothing below
-    # would read one.
-    sign_only = xbgt_flag && !(card_flag ||
-                               gcard_flag ||
-                               iplg_flag ||
-                               lt_flag ||
-                               st_flag ||
-                               ffl_flag ||
-                               ffs_flag ||
-                               wfp_flag)
+    # A pin needs a per-asset *sign* bit. The held builder's `ib` marks an asset as held, and
+    # only the bounds give it a sign. When nothing here consumes a held indicator, the
+    # long-short builder's third state (inactive) is dead weight, so the lean sign-bit builder
+    # does the job with half the binaries, whatever sides the bounds admit. Its bundle has no
+    # held indicator, and by its own condition nothing below would read one.
+    sign_only = pin_flag && !(card_flag ||
+                              gcard_flag ||
+                              iplg_flag ||
+                              lt_flag ||
+                              st_flag ||
+                              ffl_flag ||
+                              ffs_flag)
     # `mip_indicators!` registers the bundle in Model State, so integer phylogeny can gate on
     # the held indicator from its own emitter, called late in `assemble_jump_model!` beside
     # the semidefinite one, without the bundle being hand-threaded back. Only a bundle that
