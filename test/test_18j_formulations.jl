@@ -763,16 +763,28 @@ end
     Xb = randn(StableRNG(7), 30, 4) .* 0.01 .+ 0.001
     rdb = ReturnsResult(; nx = string.(1:4), X = Xb)
     prb = prior(EmpiricalPrior(), rdb)
+    # The testset checks that each formulation states the measure, so the solver runs at tight
+    # tolerances. At the default tolerances the formulations reach the flat minimum only to
+    # about 6e-4 in the weights, which the docstring of the measure measures.
     slvb = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
-                  settings = Dict("verbose" => false))
+                  check_sol = (; allow_local = true, allow_almost = true),
+                  settings = Dict("verbose" => false, "tol_gap_abs" => 1e-10,
+                                  "tol_gap_rel" => 1e-10, "tol_feas" => 1e-10))
     function bdv(r; obj = MinimumRisk())
         return optimise(MeanRisk(; r = r, obj = obj,
                                  opt = JuMPOptimiser(; pe = prb, slv = slvb)), rdb)
     end
     bdvar = BrownianDistanceVariance()
-    algs = [(a1, a2) for a1 in (QuadRiskExpr(), RSOCRiskExpr())
-            for a2 in
-                (NormOneConeBrownianDistanceVariance(), IneqBrownianDistanceVariance())]
+    pair_algs = (NormOneConeBrownianDistanceVariance(), IneqBrownianDistanceVariance())
+    algs = [(a1, a2) for a1 in (QuadRiskExpr(), RSOCRiskExpr(), SquaredSOCRiskExpr())
+            for a2 in (pair_algs..., ExactOrderedWeightsArray(),
+                       SortingNetworkOrderedWeightsArray())]
+    # The default is the quadratic form over the sorting network. The constructor refuses a
+    # risk expression that reports the root, and an OWA formulation that approximates.
+    @test isa(bdvar.alg1, QuadRiskExpr)
+    @test isa(bdvar.alg2, SortingNetworkOrderedWeightsArray)
+    @test_throws TypeError BrownianDistanceVariance(; alg1 = SOCRiskExpr())
+    @test_throws TypeError BrownianDistanceVariance(; alg2 = ApproxOrderedWeightsArray())
     # The functor is the bound of equation 9 of the paper. It equals twice the variance plus
     # the squared mean distance, and it exceeds the distance variance of Székely et al. by
     # 2 |D 1|^2 / T^3, which is zero for a constant series only.
@@ -788,10 +800,11 @@ end
     @test 6.8 < bdvar(x) / dvar < 7
     @test iszero(bdvar(fill(0.01, 5)))
     # At the minimum every formulation gives the same weights. The model reports the functor,
-    # and the distance matrix is the true one, because the risk increases in each distance.
-    # The bound is flat at its minimum, and the conic objective of RSOCRiskExpr reaches it to
-    # the tolerance of the solver only: 8.4e-5 in the weights, 1.2e-5 in the risk.
+    # the mean distance and the mean are the true ones, and so are the pair distances, because
+    # the risk increases in each of them. The bound is flat at its minimum, so the weights
+    # agree to the tolerance of the solver only.
     ref = bdv(bdvar)
+    Tb = size(Xb, 1)
     for (a1, a2) in algs
         res = bdv(BrownianDistanceVariance(; alg1 = a1, alg2 = a2))
         @test isa(res.retcode, OptimisationSuccess)
@@ -799,8 +812,20 @@ end
         xw = Xb * res.w
         @test isapprox(JuMP.value(res.model[:bdvariance_risk]), bdvar(xw); rtol = 5e-5)
         @test isapprox(JuMP.value(res.model[:risk]), bdvar(xw); rtol = 5e-5)
-        @test maximum(abs, JuMP.value.(res.model[:Dt]) .- abs.(xw .- xw')) < 1e-6
+        @test isapprox(JuMP.value(res.model[:bdvariance_md]), mean(abs.(xw .- xw'));
+                       rtol = 1e-5)
+        @test isapprox(JuMP.value(res.model[:bdvariance_mu]), mean(xw); rtol = 1e-6)
+        if a2 in pair_algs
+            pd = [abs(xw[i] - xw[j]) for j in 1:(Tb - 1) for i in (j + 1):Tb]
+            @test maximum(abs, JuMP.value.(res.model[:Dt]) .- pd) < 1e-6
+        else
+            @test !haskey(res.model, :Dt)
+        end
     end
+    # The mean distance is the OWA of the returns with the weights 2 (2t - T - 1) / T^2.
+    owa_w = PortfolioOptimisers.brownian_distance_owa_weights(Xb, Tb)
+    @test issorted(owa_w)
+    @test isapprox(dot(owa_w, sort(x[1:Tb])), mean(abs.(x[1:Tb] .- x[1:Tb]')); rtol = 1e-12)
     # A bound holds the functor under an objective that does not minimise the risk. The rotated
     # cone left a rank-one square in the risk expression, and Clarabel refused the bound.
     ub = 1.5 * bdvar(Xb * ref.w)
@@ -827,7 +852,33 @@ end
         @test haskey(res.model, :bdvariance_dev)
     end
     res = bdv(BrownianDistanceVariance(; alg1 = RSOCRiskExpr()))
-    @test haskey(res.model, :tsum_Dt) && haskey(res.model, :rsoc_sum_Dt)
-    @test isapprox(JuMP.value(res.model[:tsum_Dt]),
-                   (sum(JuMP.value.(res.model[:Dt])) / size(Xb, 1))^2; rtol = 1e-5)
+    @test haskey(res.model, :t_bdvariance_md) && haskey(res.model, :rsoc_bdvariance_md)
+    @test isapprox(JuMP.value(res.model[:t_bdvariance_md]),
+                   JuMP.value(res.model[:bdvariance_md])^2; rtol = 1e-5)
+    xw = Xb * res.w
+    @test isapprox(JuMP.value(res.model[:t_bdvariance_var]),
+                   2 * sum(abs2, xw .- mean(xw)) / Tb; rtol = 1e-5)
+    # A bound on the measure under RiskBudgeting. The row of the logarithm adds exponential
+    # cones, and Clarabel stops at SLOW_PROGRESS on such a model unless its scaling switch
+    # waits for a shorter step. With the setting of the docstring, every bound solves and
+    # holds. `v` is the risk of the solve with no bound, so none of the three bounds binds:
+    # the stall of #2353 happened on bounds that do not bind.
+    slvs = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                  check_sol = (; allow_local = true, allow_almost = true),
+                  settings = Dict("verbose" => false, "tol_gap_abs" => 1e-10,
+                                  "tol_gap_rel" => 1e-10, "tol_feas" => 1e-10,
+                                  "min_switch_step_length" => 1e-3))
+    rbo = JuMPOptimiser(; pe = prb, slv = slvs)
+    v = bdvar(Xb * optimise(RiskBudgeting(; opt = rbo, r = bdvar), rdb).w)
+    for f in (1.1, 3.0, 1000.0)
+        rb = RiskBudgeting(; opt = rbo,
+                           r = BrownianDistanceVariance(;
+                                                        settings = RiskMeasureSettings(;
+                                                                                       ub = f *
+                                                                                            v)))
+        res = optimise(rb, rdb)
+        @test isa(res.retcode, OptimisationSuccess)
+        @test bdvar(Xb * res.w) <= f * v * (1 + 1e-8)
+        @test isapprox(bdvar(Xb * res.w), v; rtol = 1e-5)
+    end
 end

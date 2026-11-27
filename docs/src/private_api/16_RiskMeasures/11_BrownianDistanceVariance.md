@@ -1,5 +1,5 @@
 ```@meta
-Description = "Brownian Distance Variance, private API of PortfolioOptimisers.jl: BrownianDistanceVarianceFormulation, BDVarRkFormulations."
+Description = "Brownian Distance Variance, private API of PortfolioOptimisers.jl: BrownianDistanceVarianceFormulation, BDVarRkFormulations, BDVarMeanDistanceFormulations."
 ```
 
 # Brownian Distance Variance: private API
@@ -7,4 +7,5 @@ Description = "Brownian Distance Variance, private API of PortfolioOptimisers.jl
 ```@docs
 BrownianDistanceVarianceFormulation
 BDVarRkFormulations
+BDVarMeanDistanceFormulations
 ```

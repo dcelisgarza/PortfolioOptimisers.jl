@@ -1266,7 +1266,7 @@ Three formulations optimise it. `ApproxOrderedWeightsArray`, the default, is a p
 
 ### Other measures
 
-- **BrownianDistanceVariance (BDVar)**: distance-covariance-based dispersion.
+- **BrownianDistanceVariance (BDVar)**: distance-covariance-based dispersion. The measure is the bound of the distance variance in its closed form, twice the variance plus the square of the **mean distance**, the mean of `|r_i - r_j|` over all pairs of observations. The mean distance is an OWA of the returns with nondecreasing weights. `alg2` selects its rows: a **pair formulation** (`IneqBrownianDistanceVariance`, `NormOneConeBrownianDistanceVariance`) holds one distance variable for each pair, at `T (T - 1) / 2` variables, and `ExactOrderedWeightsArray` or `SortingNetworkOrderedWeightsArray`, the default, states it as an OWA. `alg1` selects how the model states the two squares.
 - **WorstRealisation**: the worst single-period loss.
 - **NoRisk**: contributes no risk term, so an optimiser that takes a risk measure can state a problem that has no risk.
 - **Range**: the spread between the best and worst realisations.
