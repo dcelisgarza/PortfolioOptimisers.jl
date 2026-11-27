@@ -86,12 +86,12 @@ julia> s.ts
 # Related
 
   - [`ExogenousGraph`](@ref)
-  - [`ExG_ExGS`](@ref)
+  - [`AbstractExogenousGraph`](@ref)
   - [`graph_in_force`](@ref)
   - [`graph_view`](@ref)
   - [`ReturnsResult`](@ref)
 """
-@concrete struct ExogenousGraphSeries <: AbstractResult
+@concrete struct ExogenousGraphSeries <: AbstractExogenousGraph
     """
     Keys of the change points (keys × 1): strictly increasing 1-based row positions, or strictly increasing timestamps.
     """
@@ -112,22 +112,6 @@ function ExogenousGraphSeries(; ts::AbstractVector,
                               graphs::AbstractVector{<:Option{<:ExogenousGraph}})::ExogenousGraphSeries
     return ExogenousGraphSeries(ts, graphs)
 end
-"""
-    const ExG_ExGS = Union{ExogenousGraph, ExogenousGraphSeries}
-
-Alias for the two forms of an Exogenous Graph that the returns data holds.
-
-Matches a static [`ExogenousGraph`](@ref) or an [`ExogenousGraphSeries`](@ref).
-
-The field `G` of a [`ReturnsResult`](@ref) and of a [`PricesResult`](@ref) holds one of the two forms for each name of `ng`. The family is closed: a graph is in force at each row, or it changes at its keys. [`graph_in_force`](@ref), [`graph_view`](@ref) and [`graph_vcat`](@ref) dispatch on the two members.
-
-# Related
-
-  - [`ExogenousGraph`](@ref)
-  - [`ExogenousGraphSeries`](@ref)
-  - [`check_exogenous_graphs`](@ref)
-"""
-const ExG_ExGS = Union{ExogenousGraph, ExogenousGraphSeries}
 """
     isequal(a::ExogenousGraphSeries, b::ExogenousGraphSeries) -> Bool
     ==(a::ExogenousGraphSeries, b::ExogenousGraphSeries) -> Bool

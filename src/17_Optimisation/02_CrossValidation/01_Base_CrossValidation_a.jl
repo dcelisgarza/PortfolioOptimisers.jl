@@ -361,7 +361,7 @@ $(DocStringExtensions.FIELDS)
         ne::Option{<:VecStr} = nothing,
         E::Option{<:MatNum} = nothing,
         ng::Option{<:VecStr} = nothing,
-        G::Option{<:AbstractVector} = nothing,
+        G::Option{<:AbstractVector{<:AbstractExogenousGraph}} = nothing,
         ts::Option{<:VecDate} = nothing,
         iv::Option{<:VecNum_VecVecNum} = nothing,
         ivpa::Option{<:Num_VecNum} = nothing
@@ -442,7 +442,8 @@ Keywords correspond to the struct's fields.
                                      nf::Option{<:VecStr}, F::Option{<:MatNum},
                                      nb::Option{<:VecStr}, B::Option{<:VecNum_VecVecNum},
                                      ne::Option{<:VecStr}, E::Option{<:MatNum},
-                                     ng::Option{<:VecStr}, G::Option{<:AbstractVector},
+                                     ng::Option{<:VecStr},
+                                     G::Option{<:AbstractVector{<:AbstractExogenousGraph}},
                                      ts::Option{<:VecDate}, iv::Option{<:VecNum_VecVecNum},
                                      ivpa::Option{<:Num_VecNum})
         assert_prediction_series(nf, F, X, ts, :nf, :F)
@@ -512,7 +513,7 @@ function PredictionReturnsResult(; nx::Option{<:VecStr} = nothing,
                                  ne::Option{<:VecStr} = nothing,
                                  E::Option{<:MatNum} = nothing,
                                  ng::Option{<:VecStr} = nothing,
-                                 G::Option{<:AbstractVector} = nothing,
+                                 G::Option{<:AbstractVector{<:AbstractExogenousGraph}} = nothing,
                                  ts::Option{<:VecDate} = nothing,
                                  iv::Option{<:VecNum_VecVecNum} = nothing,
                                  ivpa::Option{<:Num_VecNum} = nothing)::PredictionReturnsResult

@@ -166,10 +166,14 @@ end
     rd = ReturnsResult(; nx = ["A", "B"], X = X, ng = ["supply", "cust"], G = [s, g3])
     @test rd.ng == ["supply", "cust"]
     @test rd.G[2] === g3
-    # A vector literal of a series and a static graph has an abstract element type.
-    @test eltype([s, g3]) == PO.AbstractResult
-    @test_throws ArgumentError ReturnsResult(; nx = ["A", "B"], X = X, ng = ["a"],
-                                             G = [1.0])
+    # A vector literal of a series and a static graph has the supertype of the family as its
+    # element type, and the bound of `G` refuses any other element (#2395).
+    @test eltype([s, g3]) == PO.AbstractExogenousGraph
+    @test_throws TypeError ReturnsResult(; nx = ["A", "B"], X = X, ng = ["a"], G = [1.0])
+    @test_throws TypeError PricesResult(;
+                                        X = TimeArray(Date(2024, 1, 1):Day(1):Date(2024, 1,
+                                                                                   10), X,
+                                                      ["A", "B"]), ng = ["a"], G = Any[g1])
     @test_throws IsNothingError ReturnsResult(; nx = ["A", "B"], X = X, ng = ["supply"])
     @test_throws IsNothingError ReturnsResult(; nx = ["A", "B"], X = X, G = [g1])
     @test_throws ArgumentError ReturnsResult(; nx = ["A", "B"], X = X, ng = ["a", "a"],

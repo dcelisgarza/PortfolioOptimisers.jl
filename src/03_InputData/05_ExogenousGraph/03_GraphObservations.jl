@@ -1,13 +1,13 @@
 """
     check_exogenous_graphs(ng::Nothing, G::Nothing, T, ts) -> nothing
-    check_exogenous_graphs(ng::Option{<:VecStr}, G::Option{<:AbstractVector},
+    check_exogenous_graphs(ng::Option{<:VecStr}, G::Option{<:AbstractVector{<:AbstractExogenousGraph}},
                            T::Option{<:Integer}, ts::Option{<:AbstractVector}) -> nothing
 
 Check the named Exogenous Graphs of a [`ReturnsResult`](@ref) or a [`PricesResult`](@ref) against their names and against the observation axis.
 
 The graphs share the observation axis with the returns, so an integer key of a series is a row of the returns data, and a date key compares with its timestamps. A graph has no asset axis, and a node needs no asset of the same name, so nothing else constrains the graphs.
 
-`G` takes any vector, and this function checks that each entry is one of the two forms of [`ExG_ExGS`](@ref). A vector literal of a static graph and a series has the element type `AbstractResult`, so a bound on the element type would refuse `G = [g, s]`.
+Each entry of `G` is an [`AbstractExogenousGraph`](@ref). A vector literal of a static graph and a series, `G = [g, s]`, has that element type.
 
 # Algorithm
 
@@ -28,7 +28,7 @@ The method that Julia selects is the algorithm.
   - `ng` and `G` are both given or both `nothing`. Raises an [`IsNothingError`](@ref).
   - `ng` is not empty, holds no empty name and holds no name twice. Raises an [`IsEmptyError`](@ref) or an `ArgumentError`.
   - `length(ng) == length(G)`. Raises a `DimensionMismatch`.
-  - The rules of [`check_graph_keys`](@ref) for each entry of `G`: each entry is an [`ExogenousGraph`](@ref) or an [`ExogenousGraphSeries`](@ref), and the keys of each series fit the observation axis.
+  - The rules of [`check_graph_keys`](@ref) for each entry of `G`: the keys of each series fit the observation axis.
 
 # Returns
 
@@ -44,7 +44,8 @@ function check_exogenous_graphs(::Nothing, ::Nothing, ::Option{<:Integer},
                                 ::Option{<:AbstractVector})::Nothing
     return nothing
 end
-function check_exogenous_graphs(ng::Option{<:VecStr}, G::Option{<:AbstractVector},
+function check_exogenous_graphs(ng::Option{<:VecStr},
+                                G::Option{<:AbstractVector{<:AbstractExogenousGraph}},
                                 T::Option{<:Integer}, ts::Option{<:AbstractVector})::Nothing
     @argcheck(!isnothing(ng),
               IsNothingError("ng cannot be nothing if G is not `nothing`: each Exogenous Graph of G needs a name"))
@@ -62,7 +63,6 @@ end
     check_graph_keys(g::ExogenousGraph, name, T, ts) -> nothing
     check_graph_keys(s::ExogenousGraphSeries{<:VecInt}, name, T, ts) -> nothing
     check_graph_keys(s::ExogenousGraphSeries{<:VecDate}, name, T, ts) -> nothing
-    check_graph_keys(x, name, T, ts)
 
 Check the keys of one named graph against the observation axis.
 
@@ -73,11 +73,10 @@ The method that Julia selects is the algorithm.
  1. A static graph: return `nothing`. It has no key.
  2. Integer keys: check that the returns data has rows, and that the last key is a row.
  3. Date keys: check that the returns data has timestamps, and that the type of the keys compares with them, with [`assert_timestamp_type`](@ref).
- 4. Any other value: throw an `ArgumentError`, because an entry of `G` is an [`ExogenousGraph`](@ref) or an [`ExogenousGraphSeries`](@ref).
 
 # Arguments
 
-  - `g`, `s`, `x`: The graph, the series, or another value.
+  - `g`, `s`: The graph or the series.
   - `name`: The name of the graph, which the messages quote.
   - `T`: The number of rows, or `nothing`.
   - `ts`: The timestamps of the rows, or `nothing`.
@@ -88,7 +87,6 @@ The method that Julia selects is the algorithm.
   - `last(s.ts) <= T`. Raises a `DomainError`.
   - A series with date keys needs timestamps, `ts` is not `nothing`. Raises an [`IsNothingError`](@ref).
   - The keys compare with `ts`. Raises an `ArgumentError`. See [`assert_timestamp_type`](@ref).
-  - `x` is a graph or a series. Raises an `ArgumentError` that names its type.
 
 # Returns
 
@@ -99,9 +97,6 @@ The method that Julia selects is the algorithm.
   - [`check_exogenous_graphs`](@ref)
   - [`ExogenousGraphSeries`](@ref)
 """
-function check_graph_keys(x, name::AbstractString, ::Any, ::Any)::Nothing
-    return throw(ArgumentError("each entry of G is an ExogenousGraph or an ExogenousGraphSeries, and the entry \"$name\" is a $(typeof(x))"))
-end
 function check_graph_keys(::ExogenousGraph, ::AbstractString, ::Any, ::Any)::Nothing
     return nothing
 end
@@ -651,7 +646,7 @@ end
     graph_vcat(a::ExogenousGraph, b::ExogenousGraph, name, Ta, tsa, Tb, tsb) -> ExogenousGraph
     graph_vcat(a::ExogenousGraphSeries{<:VecInt}, b::ExogenousGraphSeries{<:VecInt}, name, Ta, tsa, Tb, tsb) -> ExogenousGraphSeries
     graph_vcat(a::ExogenousGraphSeries{<:VecDate}, b::ExogenousGraphSeries{<:VecDate}, name, Ta, tsa, Tb, tsb) -> ExogenousGraphSeries
-    graph_vcat(a::ExG_ExGS, b::ExG_ExGS, name, Ta, tsa, Tb, tsb)
+    graph_vcat(a::AbstractExogenousGraph, b::AbstractExogenousGraph, name, Ta, tsa, Tb, tsb)
 
 Concatenate one named graph of two blocks of observations, `a` first. It is the inverse of [`graph_view`](@ref).
 
@@ -746,8 +741,8 @@ function graph_vcat(a::ExogenousGraphSeries{<:VecDate}, b::ExogenousGraphSeries{
     # The keys leave in the element type of their values, which the parts share.
     return ExogenousGraphSeries([k for k in ks], gs)
 end
-function graph_vcat(a::ExG_ExGS, b::ExG_ExGS, name::AbstractString, ::Any, ::Any, ::Any,
-                    ::Any)
+function graph_vcat(a::AbstractExogenousGraph, b::AbstractExogenousGraph,
+                    name::AbstractString, ::Any, ::Any, ::Any, ::Any)
     return throw(ArgumentError("a concatenation of two blocks joins one kind of Exogenous Graph, and the graph \"$name\" is $(graph_kind(a)) in the earlier block and $(graph_kind(b)) in the later block. Give the same kind in both blocks"))
 end
 """

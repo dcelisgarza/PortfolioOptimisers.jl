@@ -201,6 +201,25 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype of the two forms of an Exogenous Graph that the returns data holds: a static [`ExogenousGraph`](@ref), in force at each row, and an [`ExogenousGraphSeries`](@ref), which changes at its keys.
+
+The field `G` of a [`ReturnsResult`](@ref) and of a [`PricesResult`](@ref) is a vector of this type, one entry for each name of `ng`. A vector literal of a static graph and a series, such as `[g, s]`, has this element type.
+
+# Interfaces
+
+The family is closed. [`graph_in_force`](@ref), the views and the concatenations of the returns data, and the consumers of a graph dispatch on [`ExogenousGraph`](@ref) and on [`ExogenousGraphSeries`](@ref), and hold one method for each. A new member needs a method at each of them, so the library adds no member.
+
+# Related
+
+  - [`AbstractResult`](@ref)
+  - [`ExogenousGraph`](@ref)
+  - [`ExogenousGraphSeries`](@ref)
+  - [`check_exogenous_graphs`](@ref)
+"""
+abstract type AbstractExogenousGraph <: AbstractResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Holds one directed, weighted graph over named nodes, a relation between assets and other entities that the returns do not show.
 
 An edge from a supplier to a customer, an ownership stake or a flow of an input-output table is such a relation. The nodes have names, so a node can be an asset, an entity that is not an asset, such as a supplier that has no listing, or a label. A consumer finds the assets among the nodes by name. The graph accepts a negative weight, a self-loop and a cycle. A consumer that cannot read one of them states it with [`graph_requirements`](@ref).
@@ -273,13 +292,13 @@ true
 # Related
 
   - [`ExogenousGraphSeries`](@ref)
-  - [`ExG_ExGS`](@ref)
+  - [`AbstractExogenousGraph`](@ref)
   - [`adjacency`](@ref)
   - [`graph_in_force`](@ref)
   - [`graph_requirements`](@ref)
   - [`ReturnsResult`](@ref)
 """
-@concrete struct ExogenousGraph <: AbstractResult
+@concrete struct ExogenousGraph <: AbstractExogenousGraph
     """
     Names of the nodes (nodes × 1). Node `k` is row `k` and column `k` of `At`.
     """
@@ -569,3 +588,4 @@ function SimpleWeightedGraphs.SimpleWeightedDiGraph(g::ExogenousGraph)
 end
 
 export ExogenousGraph, adjacency
+public AbstractExogenousGraph

@@ -101,7 +101,7 @@ $(DocStringExtensions.FIELDS)
         B::Option{<:TimeSeries.TimeArray} = nothing,
         E::Option{<:TimeSeries.TimeArray} = nothing,
         ng::Option{<:VecStr} = nothing,
-        G::Option{<:AbstractVector} = nothing,
+        G::Option{<:AbstractVector{<:AbstractExogenousGraph}} = nothing,
         iv::Option{<:TimeSeries.TimeArray} = nothing,
         ivpa::Option{<:Num_VecNum} = nothing,
         pnl::Option{<:AssetPanel} = nothing,
@@ -194,9 +194,9 @@ julia> size(values(pr.X))
     function PricesResult(X::TimeSeries.TimeArray, F::Option{<:TimeSeries.TimeArray},
                           B::Option{<:TimeSeries.TimeArray},
                           E::Option{<:TimeSeries.TimeArray}, ng::Option{<:VecStr},
-                          G::Option{<:AbstractVector}, iv::Option{<:TimeSeries.TimeArray},
-                          ivpa::Option{<:Num_VecNum}, pnl::Option{<:AssetPanel},
-                          span::Option{<:AbstractMatrix{Bool}})
+                          G::Option{<:AbstractVector{<:AbstractExogenousGraph}},
+                          iv::Option{<:TimeSeries.TimeArray}, ivpa::Option{<:Num_VecNum},
+                          pnl::Option{<:AssetPanel}, span::Option{<:AbstractMatrix{Bool}})
         # The one entry point of integer data: every kernel downstream reads a float.
         X = float_if_integer(X)
         F = float_if_integer(F)
@@ -243,7 +243,8 @@ function PricesResult(; X::TimeSeries.TimeArray,
                       F::Option{<:TimeSeries.TimeArray} = nothing,
                       B::Option{<:TimeSeries.TimeArray} = nothing,
                       E::Option{<:TimeSeries.TimeArray} = nothing,
-                      ng::Option{<:VecStr} = nothing, G::Option{<:AbstractVector} = nothing,
+                      ng::Option{<:VecStr} = nothing,
+                      G::Option{<:AbstractVector{<:AbstractExogenousGraph}} = nothing,
                       iv::Option{<:TimeSeries.TimeArray} = nothing,
                       ivpa::Option{<:Num_VecNum} = nothing,
                       pnl::Option{<:AssetPanel} = nothing,

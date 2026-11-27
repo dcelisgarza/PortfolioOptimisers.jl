@@ -30,7 +30,7 @@ $(DocStringExtensions.FIELDS)
         ne::Option{<:VecStr} = nothing,
         E::Option{<:SampleBufferState} = nothing,
         ng::Option{<:VecStr} = nothing,
-        G::Option{<:AbstractVector} = nothing,
+        G::Option{<:AbstractVector{<:AbstractExogenousGraph}} = nothing,
         ts::Option{<:AbstractVector} = nothing,
         pnl::Option{<:AssetPanel} = nothing,
         max_history::Option{<:Integer} = nothing
@@ -123,7 +123,8 @@ Keywords correspond to the struct's fields. The defaults give the empty seed tha
                                 F::Option{<:SampleBufferState}, nb::Option{<:VecStr},
                                 B::Option{<:Union{SampleBufferState, AbstractVector}},
                                 ne::Option{<:VecStr}, E::Option{<:SampleBufferState},
-                                ng::Option{<:VecStr}, G::Option{<:AbstractVector},
+                                ng::Option{<:VecStr},
+                                G::Option{<:AbstractVector{<:AbstractExogenousGraph}},
                                 ts::Option{<:AbstractVector}, pnl::Option{<:AssetPanel},
                                 max_history::Option{<:Integer})
         @argcheck(n >= 0,
@@ -153,7 +154,7 @@ function ReturnsBufferState(; n::Integer = 0, nx::Option{<:VecStr} = nothing,
                             ne::Option{<:VecStr} = nothing,
                             E::Option{<:SampleBufferState} = nothing,
                             ng::Option{<:VecStr} = nothing,
-                            G::Option{<:AbstractVector} = nothing,
+                            G::Option{<:AbstractVector{<:AbstractExogenousGraph}} = nothing,
                             ts::Option{<:AbstractVector} = nothing,
                             pnl::Option{<:AssetPanel} = nothing,
                             max_history::Option{<:Integer} = nothing)::ReturnsBufferState

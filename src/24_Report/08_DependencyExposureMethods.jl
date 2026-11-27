@@ -88,7 +88,7 @@ end
     exposure_graphs(de::DependencyExposure, rd::Union{ReturnsResult, PredictionReturnsResult}) -> Tuple{Tuple, String}
     exposure_graphs(de::DependencyExposure, name::Option{<:AbstractString}, ng, G) -> Tuple{Tuple, String}
     exposure_graphs(de::DependencyExposure, gu::GraphUnion, ng, G) -> Tuple{Tuple, String}
-    exposure_graphs(de::DependencyExposure, G::ExG_ExGS) -> Tuple{Tuple, String}
+    exposure_graphs(de::DependencyExposure, G::AbstractExogenousGraph) -> Tuple{Tuple, String}
 
 Return the graph or the series of each part of the reach of `de`, and the name of the graph, after a check of each snapshot against [`graph_requirements`](@ref).
 
@@ -140,7 +140,7 @@ function exposure_graphs(de::DependencyExposure, gu::GraphUnion, ng, G)
                                  unknown = gu.unknown), exposure_parts(de.dir))
     return parts, String(graph_entry_label(gu))
 end
-function exposure_graphs(de::DependencyExposure, G::ExG_ExGS)
+function exposure_graphs(de::DependencyExposure, G::AbstractExogenousGraph)
     @argcheck(isnothing(de.ng),
               ArgumentError("an explicit graph replaces the lookup of `de.ng` in the returns data, so `de.ng` must be `nothing`, got $(repr(de.ng))"))
     for (key, g) in graph_snapshot_list(G)
@@ -181,7 +181,7 @@ function exposure_fold_block(de::DependencyExposure, pred::PredictionResult, par
 end
 """
     exposure_fold_blocks(de::DependencyExposure, folds::AbstractVector, G::Nothing, j::Integer) -> Tuple{Vector, String}
-    exposure_fold_blocks(de::DependencyExposure, folds::AbstractVector, G::ExG_ExGS, j::Integer) -> Tuple{Vector, String}
+    exposure_fold_blocks(de::DependencyExposure, folds::AbstractVector, G::AbstractExogenousGraph, j::Integer) -> Tuple{Vector, String}
 
 Return the block of rows of each fold of a prediction, and the name of the graph.
 
@@ -205,8 +205,8 @@ function exposure_fold_blocks(de::DependencyExposure, folds::AbstractVector, ::N
               for k in eachindex(folds)]
     return blocks, last(first(srcs))
 end
-function exposure_fold_blocks(de::DependencyExposure, folds::AbstractVector, G::ExG_ExGS,
-                              j::Integer)
+function exposure_fold_blocks(de::DependencyExposure, folds::AbstractVector,
+                              G::AbstractExogenousGraph, j::Integer)
     offs = fold_row_offsets(folds)
     parts, gname = exposure_graphs(de, G)
     return [exposure_fold_block(de, folds[k], parts, offs[k], offs[k], j)
@@ -315,15 +315,15 @@ end
     dependency_exposure(pred::Union{PredictionResult, MultiPeriodPredictionResult},
                         de::DependencyExposure = DependencyExposure(), j::Integer = 1)
     dependency_exposure(pred::Union{PredictionResult, MultiPeriodPredictionResult},
-                        G::ExG_ExGS, de::DependencyExposure = DependencyExposure(), j::Integer = 1)
+                        G::AbstractExogenousGraph, de::DependencyExposure = DependencyExposure(), j::Integer = 1)
     dependency_exposure(ppred::PopulationPredictionResult,
                         de::DependencyExposure = DependencyExposure(), j::Integer = 1)
-    dependency_exposure(ppred::PopulationPredictionResult, G::ExG_ExGS,
+    dependency_exposure(ppred::PopulationPredictionResult, G::AbstractExogenousGraph,
                         de::DependencyExposure = DependencyExposure(), j::Integer = 1)
     dependency_exposure(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                         de::DependencyExposure = DependencyExposure(), j::Integer = 1)
     dependency_exposure(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                        G::ExG_ExGS, de::DependencyExposure = DependencyExposure(), j::Integer = 1)
+                        G::AbstractExogenousGraph, de::DependencyExposure = DependencyExposure(), j::Integer = 1)
     dependency_exposure(W::VecNum_MatNum, rd::ReturnsResult,
                         de::DependencyExposure = DependencyExposure())
     dependency_exposure(w::VecNum, nx::VecStr, g::ExogenousGraph,
@@ -405,7 +405,7 @@ function dependency_exposure(pred::PredRes_MultiPredRes,
     return exposure_result(de,
                            exposure_fold_blocks(de, prediction_folds(pred), nothing, j)...)
 end
-function dependency_exposure(pred::PredRes_MultiPredRes, G::ExG_ExGS,
+function dependency_exposure(pred::PredRes_MultiPredRes, G::AbstractExogenousGraph,
                              de::DependencyExposure = DependencyExposure(),
                              j::Integer = 1)::DependencyExposureResult
     return exposure_result(de, exposure_fold_blocks(de, prediction_folds(pred), G, j)...)

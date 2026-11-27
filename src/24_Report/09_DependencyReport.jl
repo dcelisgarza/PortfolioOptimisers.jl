@@ -25,7 +25,7 @@ function report_dependency_pairs(dep)
         @argcheck(p isa Pair &&
                   first(p) isa AbstractString &&
                   (last(p) isa DependencyExposure ||
-                   last(p) isa Tuple{ExG_ExGS, DependencyExposure}),
+                   last(p) isa Tuple{AbstractExogenousGraph, DependencyExposure}),
                   ArgumentError("each element of `dependency` must be a pair `title::AbstractString => de::DependencyExposure` or `title => (G, de)` with G an ExogenousGraph or an ExogenousGraphSeries, and one element is $(repr(p))"))
     end
     return out

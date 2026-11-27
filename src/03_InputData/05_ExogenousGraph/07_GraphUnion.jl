@@ -652,11 +652,11 @@ function assert_union_key_kinds(parts::AbstractVector,
     return nothing
 end
 """
-    graph_union(gs::ExG_ExGS...;
+    graph_union(gs::AbstractExogenousGraph...;
                 w::Option{<:VecNum} = nothing,
                 nrm::Option{<:AbstractEdgeNormalisation} = nothing,
                 dir::AbstractEdgeDirection = OutEdges(),
-                unknown::AbstractUnknownEntryRule = EntrywiseUnknown()) -> ExG_ExGS
+                unknown::AbstractUnknownEntryRule = EntrywiseUnknown()) -> AbstractExogenousGraph
 
 Build the union of Exogenous Graphs, ``\\mathbf{A} = \\sum_{k} w_{k}\\, N(\\mathbf{A}_{k})``, as one [`ExogenousGraph`](@ref) or one [`ExogenousGraphSeries`](@ref).
 
@@ -689,7 +689,7 @@ A union of static graphs only is static. A union with a series is a series. Its 
 
 # Returns
 
-  - `g::ExG_ExGS`: The union.
+  - `g::AbstractExogenousGraph`: The union.
 
 # Examples
 
@@ -723,7 +723,7 @@ julia> adjacency(v)[1, 2], adjacency(v)[3, 2]
   - [`AbstractUnknownEntryRule`](@ref)
   - [`WeightShare`](@ref)
 """
-function graph_union(gs::ExG_ExGS...; w::Option{<:VecNum} = nothing,
+function graph_union(gs::AbstractExogenousGraph...; w::Option{<:VecNum} = nothing,
                      nrm::Option{<:AbstractEdgeNormalisation} = nothing,
                      dir::AbstractEdgeDirection = OutEdges(),
                      unknown::AbstractUnknownEntryRule = EntrywiseUnknown())

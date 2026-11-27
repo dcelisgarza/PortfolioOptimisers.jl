@@ -201,6 +201,7 @@ A named series over the observation axis that belongs to no asset, such as a Cur
 
 **Exogenous Graph**
 A named, directed, weighted graph over named nodes that the returns data holds beside its returns, an `ExogenousGraph`. It states a relation that the returns do not show, such as the suppliers of each asset, an ownership stake or an input-output table. A node can be an asset, an entity that is not an asset, or a label, and a consumer finds the assets among the nodes by name. The adjacency `At` holds the sources in its columns, `At[j, i]` the weight of the edge from node `i` to node `j`, so the out-edges of a node are one contiguous column. Each constructor takes the sources in its rows and transposes once. The graph accepts a negative weight, a self-loop and a cycle. A consumer that cannot read one of them states it with `graph_requirements`, and the entry of a user verb checks every snapshot before the first fold. `ng` holds the names and `G` the graphs of a `ReturnsResult` or a `PricesResult`. Two relations that must stay apart are two named graphs. See ADR 0242.
+Each entry of `G` is an `AbstractExogenousGraph`, the closed supertype of a static `ExogenousGraph` and an Exogenous Graph Series.
 The `PredictionReturnsResult` of a fold keeps the graphs of its test rows, and the series of a path keeps none.
 *Avoid*: a Panel Field, whose first axis is the assets and which cannot hold an edge between two nodes that are not assets. And the network of a `NetworkEstimator`, which the library estimates from the returns.
 

@@ -425,7 +425,7 @@ function exogenous_graphs(df::DataFrames.DataFrame, mf::DataFrames.DataFrame)
     return ng, G
 end
 """
-    graph_from_table_rows(name::AbstractString, rows::AbstractVector) -> ExG_ExGS
+    graph_from_table_rows(name::AbstractString, rows::AbstractVector) -> AbstractExogenousGraph
 
 Build one graph from its rows of an edge table read with no manifest: a static graph when each key is `missing`, and a series otherwise.
 
@@ -548,7 +548,7 @@ function graph_manifest_row!(specs::AbstractVector, kind::AbstractString,
     return specs
 end
 """
-    graph_from_spec(spec::GraphManifestEntry, rows::AbstractVector) -> ExG_ExGS
+    graph_from_spec(spec::GraphManifestEntry, rows::AbstractVector) -> AbstractExogenousGraph
 
 Build one graph from its [`GraphManifestEntry`](@ref) and the rows of the edge table.
 

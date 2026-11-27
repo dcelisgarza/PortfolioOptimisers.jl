@@ -174,7 +174,7 @@ $(DocStringExtensions.FIELDS)
         ne::Option{<:VecStr} = nothing,
         E::Option{<:MatNum} = nothing,
         ng::Option{<:VecStr} = nothing,
-        G::Option{<:AbstractVector} = nothing,
+        G::Option{<:AbstractVector{<:AbstractExogenousGraph}} = nothing,
         ts::Option{<:VecDate} = nothing,
         iv::Option{<:MatNum} = nothing,
         ivpa::Option{<:Num_VecNum} = nothing,
@@ -298,9 +298,9 @@ ReturnsResult
                            F::Option{<:MatNum}, nb::Option{<:VecStr},
                            B::Option{<:VecNum_MatNum}, ne::Option{<:VecStr},
                            E::Option{<:MatNum}, ng::Option{<:VecStr},
-                           G::Option{<:AbstractVector}, ts::Option{<:VecDate},
-                           iv::Option{<:MatNum}, ivpa::Option{<:Num_VecNum},
-                           pnl::Option{<:AssetPanel})
+                           G::Option{<:AbstractVector{<:AbstractExogenousGraph}},
+                           ts::Option{<:VecDate}, iv::Option{<:MatNum},
+                           ivpa::Option{<:Num_VecNum}, pnl::Option{<:AssetPanel})
         # The one entry point of integer data: every kernel downstream reads a float.
         X = float_if_integer(X)
         F = float_if_integer(F)
@@ -381,7 +381,7 @@ function ReturnsResult(; nx::Option{<:VecStr} = nothing, X::Option{<:MatNum} = n
                        nb::Option{<:VecStr} = nothing, B::Option{<:VecNum_MatNum} = nothing,
                        ne::Option{<:VecStr} = nothing, E::Option{<:MatNum} = nothing,
                        ng::Option{<:VecStr} = nothing,
-                       G::Option{<:AbstractVector} = nothing,
+                       G::Option{<:AbstractVector{<:AbstractExogenousGraph}} = nothing,
                        ts::Option{<:VecDate} = nothing, iv::Option{<:MatNum} = nothing,
                        ivpa::Option{<:Num_VecNum} = nothing,
                        pnl::Option{<:AssetPanel} = nothing)::ReturnsResult

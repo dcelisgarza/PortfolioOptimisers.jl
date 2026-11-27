@@ -172,6 +172,7 @@
         :AbstractEmptyPairAlgorithm,
         :AbstractEntropyPoolingViewFormulation,
         :AbstractEstimatorValueAlgorithm,
+        :AbstractExogenousGraph,
         :AbstractExpectedReturnsEstimator,
         :AbstractExposureEstimator,
         :AbstractFoldAggregation,

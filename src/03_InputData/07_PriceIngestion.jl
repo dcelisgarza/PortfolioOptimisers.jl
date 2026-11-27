@@ -516,7 +516,7 @@ end
                     ivpa::Option{<:Num_VecNum} = nothing,
                     pnl::Option{<:AssetPanel} = nothing,
                     ng::Option{<:VecStr} = nothing,
-                    G::Option{<:AbstractVector} = nothing) -> PricesResult
+                    G::Option{<:AbstractVector{<:AbstractExogenousGraph}} = nothing) -> PricesResult
     price_ingestion(est::PriceIngestion, pr::PricesResult) -> PricesResult
 
 Assemble raw price series into a [`PricesResult`](@ref) and its Listing Span.
@@ -620,7 +620,7 @@ function price_ingestion(est::PriceIngestion, X::TimeSeries.TimeArray;
                          ivpa::Option{<:Num_VecNum} = nothing,
                          pnl::Option{<:AssetPanel} = nothing,
                          ng::Option{<:VecStr} = nothing,
-                         G::Option{<:AbstractVector} = nothing)::PricesResult
+                         G::Option{<:AbstractVector{<:AbstractExogenousGraph}} = nothing)::PricesResult
     @argcheck(!isempty(X),
               IsEmptyError("`X` cannot be empty: the ingestion layer states a universe from a price panel"))
     assert_distinct_series_names(X, F, B, E)
