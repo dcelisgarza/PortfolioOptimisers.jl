@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Selects factors by the statistical significance of their coefficients.
 
-A candidate model is admissible when each p-value of its factor coefficients is at or below `t`. The test does not read the p-value of the intercept. This criterion reads the fitted coefficients and not one score of the whole model, so it is not a [`MinMaxValStepwiseRegressionCriterion`](@ref), and it has its own stepwise methods. The selection is never empty under either algorithm. When no factor clears `t`, [`add_best_factor_after_pval_failure!`](@ref) adds the factor whose one-factor model has the smallest p-value, and warns.
+A candidate model is admissible when each p-value of its factor coefficients is at or below `t`. The test does not read the p-value of the intercept. This criterion reads the fitted coefficients and not one score of the whole model, so it is not a [`MinMaxValStepwiseRegressionCriterion`](@ref), and it has its own stepwise methods. When no factor clears `t`, [`add_best_factor_after_pval_failure!`](@ref) adds the factor whose one-factor model has the smallest p-value, and warns. So the selection is empty under either algorithm only when no factor has a p-value: every p-value is `NaN`, or every model of one factor is a Saturated Fit, as on an asset with two observations.
 
 # Fields
 
@@ -57,9 +57,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Grows the factor set from empty, adding the factor that most improves the criterion.
 
-At each step the algorithm fits one model per excluded factor and keeps the best of them. It stops when no addition improves on the score of the set that it holds. Under a [`MinMaxValStepwiseRegressionCriterion`](@ref) the starting score is [`regression_threshold`](@ref), the worst value that the criterion can take, so the first addition always happens. Under [`PValue`](@ref) the step admits a candidate whose p-values all clear `t`.
+At each step the algorithm fits one model per excluded factor and keeps the best of them. It stops when no addition improves on the score of the set that it holds. Under a [`MinMaxValStepwiseRegressionCriterion`](@ref) the starting score is [`regression_threshold`](@ref), the worst value that the criterion can take, so the first addition happens when one model of one factor leaves a residual. A Saturated Fit scores that worst value, so the search never adds it. Under [`PValue`](@ref) the step admits a candidate whose p-values all clear `t`, and that is not a Saturated Fit.
 
-The selection is never empty under either criterion. Under a [`MinMaxValStepwiseRegressionCriterion`](@ref), [`BackwardElimination`](@ref) can return an empty selection, and this tag cannot. The two methods that run the steps state them: `_regression(::StepwiseRegression{<:PValue, <:ForwardSelection}, ::VecNum, ::MatNum)` and `_regression(::StepwiseRegression{<:MinMaxValStepwiseRegressionCriterion, <:ForwardSelection}, ::VecNum, ::MatNum)`.
+The selection is empty under either criterion only when every model of one factor is a Saturated Fit, as on an asset with two observations, or, under [`PValue`](@ref), when no factor has a p-value. Under a [`MinMaxValStepwiseRegressionCriterion`](@ref), [`BackwardElimination`](@ref) can also return an empty selection on a sample with no Saturated Fit, when the model of the intercept alone scores best. The two methods that run the steps state them: `_regression(::StepwiseRegression{<:PValue, <:ForwardSelection}, ::VecNum, ::MatNum)` and `_regression(::StepwiseRegression{<:MinMaxValStepwiseRegressionCriterion, <:ForwardSelection}, ::VecNum, ::MatNum)`.
 
 # Related
 

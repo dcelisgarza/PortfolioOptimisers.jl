@@ -1693,7 +1693,7 @@ end
 
 Return the threshold that a forward stepwise regression search starts from.
 
-The value is the worst score the criterion can take, so the first candidate model always improves on it. [`regression_polarity`](@ref) states which of `typemax` and `typemin` that is, and `typemax(Float64)` is `Inf`. Only [`ForwardSelection`](@ref) reads it. [`BackwardElimination`](@ref) starts from the score of the full model, because its first move must improve on a model that already exists.
+The value is the worst score the criterion can take, so the first candidate model that leaves a residual improves on it. A Saturated Fit scores the worst value too, as [`stepwise_score`](@ref) states, so it never improves on it. [`regression_polarity`](@ref) states which of `typemax` and `typemin` that is, and `typemax(Float64)` is `Inf`. Only [`ForwardSelection`](@ref) reads it. [`BackwardElimination`](@ref) starts from the score of the full model, because its first move must improve on a model that already exists.
 
 # Arguments
 
