@@ -208,6 +208,23 @@ without this rule, because its rebuild had an abstract type, and it allocates no
 vector whose element type is concrete or a `Union` takes the element types of the bound values,
 because a bound value can leave that type.
 
+A vector of one struct whose elements differ in a type parameter, such as
+`[Variance(), Variance(; sigma = S)]`, has a `UnionAll` element type. Julia cannot split it, so the
+predicate is a runtime answer on each element, and a ratio with such a side boxed its value at each
+bind, 48 bytes (#2386). A bound element can leave a `UnionAll` too, so the bind cannot keep it. The
+constructor of each ratio with a vector side narrows such a side to the `Union` of its element types
+with `concrete_typed_array_if_unionall`. The bind then infers, and a side with no data benchmark
+allocates nothing, for a `Union` of 8 types too. The copy costs 2.2 µs and 896 bytes one time for
+two `Variance`, and each evaluation of the ratio then splits the `Union`, 6 % faster on that side.
+A concrete or an abstract side compiles the narrowing to `return x`.
+
+An answer from the types alone was the other option. A slot of `deferred_slots` has a free type
+parameter with the bound `Any`, so each measure would need to state the types that the slot admits.
+That answer reaches a free parameter in a quantity slot, such as `sigma`. It cannot reach a free
+parameter in a slot that admits a data benchmark, such as `tr` of a `TrackingRiskMeasure` or a side
+of a nested ratio, so a side `[TrackingRiskMeasure(; tr = WeightsTracking(…)),
+TrackingRiskMeasure(; tr = ReturnsTracking(…))]` would still pay. The narrowing reaches both.
+
 The frame walk of a head follows the same rule. A composite measure walks its fields with
 `composite_frames`, which asks `holds_reader` of each field first. So a composite with no reader
 builds no path. A `MeanReturnRiskRatio` with no reader took 977 ns and 960 bytes at each walk

@@ -1072,7 +1072,7 @@ The function rebuilds an object through its keyword constructor only when a part
  1. When `x` holds no data benchmark, or `rd` is not a [`ReturnsResult`](@ref), return `x` unchanged. A data benchmark of a reader with no returns data stays unbound, and [`tracking_benchmark`](@ref) refuses it there.
  2. On a [`DataBenchmarkTracking`](@ref), refuse an `rd` that carries no benchmark. Otherwise return a new `DataBenchmarkTracking` that holds `rd.B`.
  3. On a [`TrackingError`](@ref), bind its `tr` field.
- 4. Bind each element of a vector, and return the vector itself when no element changes. A vector for which [`holds_data_benchmark`](@ref) is `false` comes back without a new vector. A vector whose element type is abstract, such as a vector of mixed risk measures, keeps that element type. So Julia infers the type of the bind, and a composite that holds the vector returns with no allocation when it holds no data benchmark.
+ 4. Bind each element of a vector, and return the vector itself when no element changes. A vector for which [`holds_data_benchmark`](@ref) is `false` comes back without a new vector. A vector whose element type is abstract, such as a vector of mixed risk measures, keeps that element type. So Julia infers the type of the bind, and a composite that holds the vector returns with no allocation when it holds no data benchmark. A vector of one struct whose elements differ in a type parameter has a `UnionAll` element type, which a bound element can leave. So a ratio measure narrows such a side in its constructor, with [`concrete_typed_array_if_unionall`](@ref).
 
 # Arguments
 
@@ -1174,7 +1174,7 @@ end
 function holds_data_benchmark(tr::TrackingError)
     return holds_data_benchmark(tr.tr)
 end
-function holds_data_benchmark(v::AbstractVector)
+function holds_data_benchmark(v::AbstractVector)::Bool
     return eltype(v) <: Number ? false : any(holds_data_benchmark, v)
 end
 

@@ -762,6 +762,8 @@ Keywords correspond to the struct's fields.
 
 Each axis takes one item or a vector of items, and only the **risk** axis has a scalariser. `rt` sums its terms at their `settings.scale` weights, and it skips a term whose `settings.rte` is `false`. `sca` scalarises `rk` into one number. Then the ratio divides one aggregate by the other. The return axis sums and never scalarises.
 
+A vector `rk` of one measure type whose elements differ in a type parameter, such as `[Variance(), Variance(; sigma = S)]`, is narrowed to the `Union` of the types of its elements with [`concrete_typed_array_if_unionall`](@ref). So the ratio holds a copy of such a vector, and the bind of a data benchmark costs nothing when the vector holds none.
+
 The field takes precedence over a `sca` keyword of the caller. A `sca` that the caller gives at the call site goes no further than this type. So the figure of an `ExpectedReturnRiskRatio` is always the figure that the type names.
 
 ## Validation
@@ -856,6 +858,9 @@ ExpectedReturnRiskRatio
             @argcheck(!isempty(rk), IsEmptyError("rk cannot be empty"))
         end
         @argcheck(isfinite(rf), IsNonFiniteError("rf must be finite, got $rf"))
+        # A side of one struct whose elements differ in a type parameter narrows to a `Union`,
+        # so the bind of a data benchmark infers and a side with none returns as itself (#2386).
+        rk = concrete_typed_array_if_unionall(rk)
         return new{typeof(settings), typeof(rt), typeof(rk), typeof(sca), typeof(rf)}(settings,
                                                                                       rt,
                                                                                       rk,

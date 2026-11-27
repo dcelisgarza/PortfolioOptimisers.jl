@@ -13,6 +13,10 @@ Description = "The walks of a data benchmark, of the previous weights, of the re
 
 - **The walk-forward of an optimiser whose `RiskRatio` holds previous weights**, such as a `TurnoverRiskMeasure` or a `WeightsTracking` whose `fixed` is `false`, runs its folds in sequence and gives each fold the weights of the fold before. Before this release, the folds ran in parallel, and each fold read the weights that the caller gave.
 
+## [Fields that change](@id migration-next-ratio-data-benchmark-fields)
+
+- **A side of a `NonOptimisationRiskRatio`, a `MeanReturnRiskRatio` or an `ExpectedReturnRiskRatio` that is a vector of one measure type whose elements differ in a type parameter**, such as `[Variance(), Variance(; sigma = S)]`, is now a copy whose element type is the `Union` of the types of its elements. So `r.r1 == v` holds, and `r.r1 === v` does not. Before this release, the ratio held the vector itself. A side whose element type is concrete or abstract is the vector itself, as before.
+
 ## [Warnings that are new](@id migration-next-ratio-data-benchmark-warnings)
 
 - **A `RiskRatio` or a `NonOptimisationRiskRatio` that holds a reader with no `x_src`**, such as an `UncertaintySetVariance` whose uncertainty set has a prior of its own, in a head with a reader that states `x_src = ExcessSource()`. The head names the reader in its warning, as it does for the other measures. Such a reader that states `x_src = ExcessSource()` also drops the observations at which a vector benchmark has a gap.
