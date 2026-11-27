@@ -268,9 +268,9 @@ Here is how you do it:
 
 ### A preview of the documentation of a pull request
 
-The documentation of each pull request from a branch of this repository deploys as a preview. A pull request from a fork builds the documentation but deploys no preview. The preview is at `https://dcelisgarza.github.io/PortfolioOptimisers.jl/previews/PR<number>/`. Each preview is a full build, and GitHub Pages refuses a site above 10 GiB, so the `Doc preview cleanup` workflow deletes a preview when its pull request closes. Each week it also deletes a preview whose pull request is not open.
+The documentation of each pull request from a branch of this repository deploys as a preview. A pull request from a fork builds the documentation but deploys no preview. The preview is at `https://dcelisgarza.github.io/PortfolioOptimisers.jl/previews/PR<number>/`. Each preview is a full build, and GitHub Pages refuses a site above 10 GiB, so the `Doc preview cleanup` workflow deletes a preview when its pull request closes. Each week it also deletes a preview whose pull request is not open. After each documentation run of a pull request, it keeps only the previews of the eight open pull requests updated last (`PAGES_KEEP_PREVIEWS`). The next push to a pull request deploys its preview again.
 
-The same workflow keeps the documentation of the five newest minor series online and deletes the older versions each week. A link into a deleted version stops resolving.
+The same workflow keeps the documentation of the five newest minor series online, and of each series only its newest patch. It deletes the other versions. A link into a deleted version, such as `/v0.34.3/`, stops resolving. The version selector lists only the newest patch of each series.
 
 ## Making a new release
 
