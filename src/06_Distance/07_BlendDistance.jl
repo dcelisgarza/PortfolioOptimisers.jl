@@ -239,7 +239,9 @@ D_{i,\\,j}^{2} &= \\sum_{k} w_{k} \\dfrac{1 - c_{k,\\,i,\\,j}}{2} = \\dfrac{1 - 
 \\end{align}
 ```
 
-because the normalised weights sum to `1`. So ``D`` is the chord distance of the weighted mean ``\\bar{c}``, and the default [`ChordSimilarity`](@ref) returns ``\\bar{c}`` exactly. ``\\bar{c}`` is also the cosine of the stacked vectors ``(\\sqrt{w_{1}}\\,\\boldsymbol{u}_{1},\\, \\sqrt{w_{2}}\\,\\boldsymbol{u}_{2},\\, \\ldots)`` of the unit-scaled feature vectors ``\\boldsymbol{u}_{k}`` of the parts. The canonical [`Distance`](@ref) of a correlation and [`ChordDist`](@ref) are chord parts. A scale rule or another blend rule breaks the identity, and [`ComplementSimilarity`](@ref) is then the default.
+because the normalised weights sum to `1`. So ``D`` is the chord distance of the weighted mean ``\\bar{c}``, and the default [`ChordSimilarity`](@ref) returns ``\\bar{c}`` exactly. ``\\bar{c}`` is also the cosine of the stacked vectors ``(\\sqrt{w_{1}}\\,\\boldsymbol{u}_{1},\\, \\sqrt{w_{2}}\\,\\boldsymbol{u}_{2},\\, \\ldots)`` of the unit-scaled feature vectors ``\\boldsymbol{u}_{k}`` of the parts. The canonical [`Distance`](@ref) of a correlation and [`ChordDist`](@ref) are chord parts. A scale rule or another blend rule breaks the identity. Another blend rule then takes [`ComplementSimilarity`](@ref) by default, and a scale rule keeps the default of the parts, which is not exact.
+
+The same identity holds for orthant chord parts, ``D_{k} = \\sqrt{1 - c_{k}}``, such as [`WalkDistance`](@ref): ``D^{2} = 1 - \\bar{c}``, and [`OrthantChordSimilarity`](@ref) returns ``\\bar{c}``. So a blend whose parts with a positive weight all hold [`OrthantChordSimilarity`](@ref) takes it by default. A blend of a chord part and an orthant chord part has no exact inverse, and it takes [`ChordSimilarity`](@ref). State `sim` for such a blend.
 
 # Mathematical definition
 
@@ -272,10 +274,10 @@ $(DocStringExtensions.FIELDS)
         alg::AbstractDistanceBlendAlgorithm = QuadraticBlend(),
         scale::Union{Nothing, AbstractDistanceScaleAlgorithm,
                      AbstractVector{<:Option{<:AbstractDistanceScaleAlgorithm}}} = nothing,
-        sim::AbstractSimilarityMatrixAlgorithm = default_similarity(alg)
+        sim::AbstractSimilarityMatrixAlgorithm = blend_similarity(alg, des, w)
     ) -> BlendDistance
 
-Keywords correspond to the struct's fields. The keyword `des` has no default. The constructor sets `sim` to [`default_similarity`](@ref) of `alg`, so the printed object shows the resolved similarity. The field `w` keeps the weights as the caller states them, and the kernel divides them by their sum.
+Keywords correspond to the struct's fields. The keyword `des` has no default. The constructor sets `sim` to [`blend_similarity`](@ref) of `alg`, `des` and `w`, so the printed object shows the resolved similarity. Under [`QuadraticBlend`](@ref), parts with a positive weight that hold one `sim` of the chord family give that `sim`, so a blend of [`WalkDistance`](@ref) parts takes [`OrthantChordSimilarity`](@ref). Every other blend takes the similarity of its rule. The field `w` keeps the weights as the caller states them, and the kernel divides them by their sum.
 
 ## Validation
 
@@ -311,6 +313,7 @@ BlendDistance
   - [`Distance`](@ref)
   - [`FeatureDistance`](@ref)
   - [`default_similarity`](@ref)
+  - [`blend_similarity`](@ref)
   - [`distance`](@ref)
   - [`cor_and_dist`](@ref)
   - [`feature_readable_mask`](@ref): composes the mask of each part with a positive weight.
@@ -369,7 +372,8 @@ function BlendDistance(; des::AbstractVector{<:AbstractDistanceEstimator},
                        alg::AbstractDistanceBlendAlgorithm = QuadraticBlend(),
                        scale::Union{Nothing, AbstractDistanceScaleAlgorithm,
                                     AbstractVector{<:Option{<:AbstractDistanceScaleAlgorithm}}} = nothing,
-                       sim::AbstractSimilarityMatrixAlgorithm = default_similarity(alg))::BlendDistance
+                       sim::AbstractSimilarityMatrixAlgorithm = blend_similarity(alg, des,
+                                                                                 w))::BlendDistance
     return BlendDistance(des, w, alg, scale, sim)
 end
 function default_similarity(::AbstractDistanceBlendAlgorithm)::ComplementSimilarity
@@ -377,6 +381,56 @@ function default_similarity(::AbstractDistanceBlendAlgorithm)::ComplementSimilar
 end
 function default_similarity(::QuadraticBlend)::ChordSimilarity
     return ChordSimilarity()
+end
+"""
+    blend_similarity(alg::AbstractDistanceBlendAlgorithm, des::AbstractVector, w)
+    blend_similarity(alg::QuadraticBlend, des::AbstractVector, w)
+
+Select the default `sim` of a [`BlendDistance`](@ref) from its blend rule `alg`, its parts `des` and its weights `w`.
+
+A rule alone sets the similarity of most blends, through [`default_similarity`](@ref) of the rule, which a rule of your own extends. A quadratic blend of parts of one chord family has an exact inverse that the parts set, so this function reads the parts under [`QuadraticBlend`](@ref).
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. The fallback: return [`default_similarity`](@ref) of `alg`.
+ 2. [`QuadraticBlend`](@ref): take the parts with a positive weight, every part when `w` is `nothing`. When each of them is a [`FeatureDistance`](@ref) or a [`BlendDistance`](@ref), and all of them hold one `sim` that is [`ChordSimilarity`](@ref) or [`OrthantChordSimilarity`](@ref), return that `sim`. Otherwise return [`default_similarity`](@ref) of `alg`, [`ChordSimilarity`](@ref).
+
+Each of the two similarities of step 2 is an inverse of the form ``S = 1 - a D^{2}``. The quadratic blend of such parts is the same form of the weighted mean of their similarities, so the `sim` of the parts recovers that mean exactly. So a blend of [`WalkDistance`](@ref) parts takes [`OrthantChordSimilarity`](@ref). A blend of a chord part and an orthant chord part has no exact inverse, so state its `sim`.
+
+# Arguments
+
+  - `alg`: The blend rule.
+  - `des`: The parts of the blend.
+  - `w`: The weights of the parts, or `nothing` for equal weights. A `w` of a wrong length gives no error here, so the constructor refuses it.
+
+# Returns
+
+  - `sim::AbstractSimilarityMatrixAlgorithm`: The default similarity of the blend.
+
+# Related
+
+  - [`BlendDistance`](@ref)
+  - [`default_similarity`](@ref)
+  - [`QuadraticBlend`](@ref)
+  - [`OrthantChordSimilarity`](@ref)
+"""
+function blend_similarity(alg::AbstractDistanceBlendAlgorithm, ::AbstractVector, ::Any)
+    return default_similarity(alg)
+end
+function blend_similarity(alg::QuadraticBlend, des::AbstractVector, w)
+    # The parts that enter. `zip` stops at the shorter of the two, so a `w` of a wrong length
+    # reaches the `DimensionMismatch` of the constructor and not a `BoundsError` here.
+    ps = isnothing(w) ? des : [d for (d, x) in zip(des, w) if zero(x) < x]
+    sims = unique(isa(d, Union{FeatureDistance, BlendDistance}) ? d.sim : nothing
+                  for d in ps)
+    sim = isone(length(sims)) ? only(sims) : nothing
+    return if isa(sim, Union{ChordSimilarity, OrthantChordSimilarity})
+        sim
+    else
+        default_similarity(alg)
+    end
 end
 """
     positive_parts(de::BlendDistance)
@@ -407,8 +461,8 @@ function positive_parts(de::BlendDistance)
     return isnothing(de.w) ? eachindex(de.des) : findall(x -> zero(x) < x, de.w)
 end
 """
-    blend_weights(w::Nothing, n::Integer)
-    blend_weights(w::VecNum, n::Integer)
+    blend_weights(w::Nothing, n::Integer, T::Type)
+    blend_weights(w::VecNum, n::Integer, T::Type)
 
 Give the normalised weights of the `n` parts of a [`BlendDistance`](@ref).
 
@@ -416,13 +470,14 @@ Give the normalised weights of the `n` parts of a [`BlendDistance`](@ref).
 
 The method that Julia selects is the algorithm.
 
- 1. `w` is `nothing`: return `n` equal weights of `1 / n`, as a range that allocates nothing.
- 2. `w` is a vector: return `w` divided by its sum, as a new vector. The function does not write to `w`.
+ 1. `w` is `nothing`: return `n` equal weights of `1 / n`, of the element type `T` of the distance matrices of the parts. So the default weights keep a `Float32` blend in `Float32`.
+ 2. `w` is a vector: return `w` divided by its sum, as a new vector. The weights of the caller set their own type, and the method does not read `T`. The function does not write to `w`.
 
 # Arguments
 
   - `w`: The field `w` of the blend.
   - `n`: The number of parts.
+  - `T`: The element type of the distance matrices of the parts.
 
 # Returns
 
@@ -433,10 +488,10 @@ The method that Julia selects is the algorithm.
   - [`BlendDistance`](@ref)
   - [`positive_parts`](@ref)
 """
-function blend_weights(::Nothing, n::Integer)
-    return range(inv(n), inv(n); length = n)
+function blend_weights(::Nothing, n::Integer, T::Type)
+    return fill(inv(T(n)), n)
 end
-function blend_weights(w::VecNum, ::Integer)
+function blend_weights(w::VecNum, ::Integer, ::Type)
     return w ./ sum(w)
 end
 """
@@ -555,7 +610,10 @@ function blend_distances(alg::PowerBlend, w::VecNum, Ds::AbstractVector{<:MatNum
         end
         return D
     end
-    return sum(w[k] .* Ds[k] .^ p for k in eachindex(w, Ds)) .^ inv(p)
+    S = sum(w[k] .* Ds[k] .^ p for k in eachindex(w, Ds))
+    # The root takes the type of the sum, so an integer `p` keeps a `Float32` blend in
+    # `Float32`: `inv(3)` is a `Float64`.
+    return S .^ inv(oftype(one(eltype(S)), p))
 end
 """
     reads_returns_matrix(de::AbstractDistanceEstimator) -> Bool
@@ -645,7 +703,8 @@ function distance(de::BlendDistance, ce, X; kwargs...)
     ks = positive_parts(de)
     Ds = [scale_distance(part_scale(de.scale, k), distance(de.des[k], ce, X; kwargs...))
           for k in ks]
-    return blend_distances(de.alg, blend_weights(de.w, length(de.des))[ks], Ds)
+    T = mapreduce(eltype, promote_type, Ds)
+    return blend_distances(de.alg, blend_weights(de.w, length(de.des), T)[ks], Ds)
 end
 """
     cor_and_dist(de::BlendDistance, ce, X; kwargs...)

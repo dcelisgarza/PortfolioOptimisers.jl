@@ -7,7 +7,7 @@ Every subtype defines a pure transformation of a distance matrix into a similari
 
 The family is open. An extension defines a member and a [`distance_to_similarity`](@ref) method for it.
 
-The PMFG path needs a similarity that is not negative, so the three fields that give it a similarity take the narrower [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref), not this type. These fields are `alg` of [`NetworkEstimator`](@ref), `sim` of [`DBHT`](@ref) and `sim` of [`LoGo`](@ref). The field `sim` of [`FeatureDistance`](@ref) takes all six members. Its similarity never reaches a PMFG, because each PMFG entry point computes the similarity again from its own field and discards the similarity that [`cor_and_dist`](@ref) returned.
+The PMFG path needs a similarity that is not negative, so the three fields that give it a similarity take the narrower [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref), not this type. These fields are `alg` of [`NetworkEstimator`](@ref), `sim` of [`DBHT`](@ref) and `sim` of [`LoGo`](@ref). The field `sim` of [`FeatureDistance`](@ref) takes all seven members. Its similarity never reaches a PMFG, because each PMFG entry point computes the similarity again from its own field and discards the similarity that [`cor_and_dist`](@ref) returned.
 
 # Related
 
@@ -18,6 +18,7 @@ The PMFG path needs a similarity that is not negative, so the three fields that 
   - [`ComplementSimilarity`](@ref)
   - [`AngularSimilarity`](@ref)
   - [`ChordSimilarity`](@ref)
+  - [`OrthantChordSimilarity`](@ref)
   - [`distance_to_similarity`](@ref)
   - [`default_similarity`](@ref)
   - [`DBHT`](@ref)
@@ -507,6 +508,7 @@ The function is a pure transformation with no domain of its own. It does not cal
       + `se::ComplementSimilarity`: Uses the linear complement of the distance.
       + `se::AngularSimilarity`: Inverts a normalised angular distance.
       + `se::ChordSimilarity`: Inverts a chord distance.
+      + `se::OrthantChordSimilarity`: Inverts an orthant chord distance.
 
   - `D`: The distance matrix.
 
@@ -683,10 +685,10 @@ A distance algorithm calls it to get the default of its similarity field from it
 
     `src/06_Distance/05_FeatureDistance.jl` declares the last three methods, next to their metrics, and this docstring documents them.
 
- 3. A [`BlendDistance`](@ref) calls it on its blend rule. `src/06_Distance/07_BlendDistance.jl` declares these two methods, and this docstring documents them.
+ 3. A [`BlendDistance`](@ref) calls it on its blend rule, through [`blend_similarity`](@ref). `src/06_Distance/07_BlendDistance.jl` declares these two methods, and this docstring documents them.
 
       + `alg::AbstractDistanceBlendAlgorithm` is the fallback, and returns [`ComplementSimilarity`](@ref).
-      + `alg::QuadraticBlend` returns [`ChordSimilarity`](@ref). On chord parts, the quadratic blend is the chord distance of the weighted mean of the cosines or correlations of the parts, and the chord similarity recovers that mean exactly.
+      + `alg::QuadraticBlend` returns [`ChordSimilarity`](@ref). On chord parts, the quadratic blend is the chord distance of the weighted mean of the cosines or correlations of the parts, and the chord similarity recovers that mean exactly. [`blend_similarity`](@ref) reads the parts too, and gives [`OrthantChordSimilarity`](@ref) to a quadratic blend of orthant chord parts.
 
 The pair that this function makes is correct, because it selects the inverse of the metric that it gets. A similarity that the caller selects has no such guarantee. [`ComplementSimilarity`](@ref), [`AngularSimilarity`](@ref) and [`ChordSimilarity`](@ref) state what a wrong pair returns.
 
@@ -728,6 +730,7 @@ OrthantChordSimilarity()
   - [`FeatureDistance`](@ref)
   - [`BlendDistance`](@ref)
   - [`QuadraticBlend`](@ref)
+  - [`blend_similarity`](@ref)
   - [`distance_to_similarity`](@ref)
 """
 function default_similarity(::Distances.SemiMetric)::ComplementSimilarity

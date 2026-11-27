@@ -74,6 +74,14 @@
     siblings name a concrete type for an allocation, and `convert(Float64, x)` names one
     for a conversion. Neither spelling stands in `src/` or `ext/` today. Add the pattern
     with the site, not before it, so that the census is never a rule with no reader.
+
+    Issue #2397. The census reads a spelling, and it cannot read a type that a value brings
+    at run time. Three sites widened a `Float32` blend and a `Float32` walk to `Float64` and
+    named no float type: `inv(n)` of an `Int` count of parts, `.^ inv(p)` of an `Int`
+    exponent, and the `Float64` rate of a default decay in `promote_type(eltype(M),
+    eltype(ws))`. The text `inv(n)` is the same for an `Int` and for a float, so a pattern
+    for it reds on correct sites. A `Float32` case in the test file of the kernel catches
+    this class, and each of the three sites has one.
     =#
 
     ROOT = normpath(joinpath(@__DIR__, ".."))

@@ -334,6 +334,7 @@ end
                                                # src/06_Distance (#2094).
                                                :collapse_rows => "a public verb with one method for each collapse rule: its `LastActiveRow` method calls `last_active_rows`, which `readable_window_rows` shares (rule 3, #2094)",
                                                :readable_window_rows => "one method for each form of the mask of readable cells: the matrix form calls `last_active_rows`, which two functions share, and every other form calls `collapse_rows`, a public verb (rule 3, #2094)",
+                                               :blend_similarity => "one method for each blend rule: both methods call `default_similarity`, a shared public verb and the hook of a blend rule of a user, which a defaulted slot of that verb would no longer reach (rule 3, #2397)",
                                                # src/08_Phylogeny (#2095).
                                                :reader_frames => "the case that rule 3 names: one method for each reader, and each calls `source_frames`, a shared public verb, or `field_frames`, which two functions share. The methods that call `field_frames` have one body in six files, so each stays beside its type (rule 3, #2095, the review of #2072)",
                                                :calc_distance_weighted_graph => "one method for each branch: the tree branch already weights its edges with the distance, so it calls `calc_weighted_adjacency_graph`, which 5 functions share (rule 3, #2095)",

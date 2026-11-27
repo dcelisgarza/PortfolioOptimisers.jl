@@ -133,6 +133,60 @@ end
         @test Db ≈ distance(fde, Zs) rtol = 1e-12
         @test chord_sim(Db) ≈
               w[1] .* chord_sim(distance(fde, Z1)) .+ w[2] .* chord_sim(distance(fde, Z2)) atol = 1e-14
+        # Orthant chord parts give the same identity under their own inverse, `1 - D²`, so a
+        # blend of them takes `OrthantChordSimilarity` by default (#2397). It took
+        # `ChordSimilarity`, `1 - 2D²`, which goes negative on these parts.
+        ode = FeatureDistance(; metric = OrthantChordDist())
+        Za, Zb = abs.(Z1), abs.(Z2)
+        orth_sim(D) = PO.distance_to_similarity(OrthantChordSimilarity(); D = D)
+        Do = PO.blend_distances(QuadraticBlend(), w, [distance(ode, Za), distance(ode, Zb)])
+        @test orth_sim(Do) ≈
+              w[1] .* orth_sim(distance(ode, Za)) .+ w[2] .* orth_sim(distance(ode, Zb)) atol = 1e-14
+        @test minimum(chord_sim(Do)) < 0 <= minimum(orth_sim(Do))
+        # On the path of a fit, the blend of two equal orthant parts is that part, S as well.
+        ob = BlendDistance(; des = [ode, ode], w = w)
+        @test ob.sim == OrthantChordSimilarity()
+        So, Dob = cor_and_dist(ode, ce, X; rd = rd)
+        Sb, Db = cor_and_dist(ob, ce, X; rd = rd)
+        @test Db ≈ Dob rtol = 1e-14
+        @test Sb ≈ So atol = 1e-14
+    end
+    @testset "The default similarity reads the parts with a positive weight" begin
+        ode = FeatureDistance(; metric = OrthantChordDist())
+        @test BlendDistance(; des = [ode, ode]).sim == OrthantChordSimilarity()
+        @test BlendDistance(; des = [ode, fde]).sim == ChordSimilarity()
+        @test BlendDistance(; des = [ode, rde]).sim == ChordSimilarity()
+        # A part with weight zero does not enter, so it does not count.
+        @test BlendDistance(; des = [ode, rde], w = [1, 0]).sim == OrthantChordSimilarity()
+        @test BlendDistance(; des = [rde, ode], w = [0.0, 2.0]).sim ==
+              OrthantChordSimilarity()
+        # A nested blend counts by its own `sim`.
+        @test BlendDistance(; des = [BlendDistance(; des = [ode]), ode]).sim ==
+              OrthantChordSimilarity()
+        # Another rule keeps the similarity of the rule.
+        @test BlendDistance(; des = [ode, ode], alg = ArithmeticBlend()).sim ==
+              ComplementSimilarity()
+        # A part whose `sim` is not of the chord family gives the default of the rule.
+        @test BlendDistance(; des = [FeatureDistance(; metric = AngularDist())]).sim ==
+              ChordSimilarity()
+        # A `w` of a wrong length still reaches the refusal of the constructor.
+        @test_throws DimensionMismatch BlendDistance(; des = [ode, ode], w = [1.0])
+    end
+    @testset "A Float32 blend stays in Float32 (#2397)" begin
+        X32 = Float32.(X)
+        des = [rde, Distance(; alg = CorrelationDistance())]
+        @test eltype(distance(rde, ce, X32)) == Float32
+        # The default weights and the root of an integer `p` gave `Float64`.
+        for alg in (QuadraticBlend(), ArithmeticBlend(), PowerBlend(; p = 3),
+                    PowerBlend(; p = Inf))
+            for w in (nothing, Float32[1, 3])
+                D32 = distance(BlendDistance(; des = des, w = w, alg = alg), ce, X32)
+                @test eltype(D32) == Float32
+                @test D32 ≈ distance(BlendDistance(; des = des, w = w, alg = alg), ce, X) rtol = 1e-4
+            end
+        end
+        @test PO.blend_weights(nothing, 4, Float32) == fill(0.25f0, 4)
+        @test PO.blend_weights([1, 3], 2, Float32) == [0.25, 0.75]
     end
 
     @testset "The constructor and its refusals" begin

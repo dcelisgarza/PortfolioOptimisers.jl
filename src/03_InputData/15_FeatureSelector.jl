@@ -426,13 +426,45 @@ function assert_feature_selector(sel::AbstractVector)::Nothing
     return nothing
 end
 """
+    selector_field_name(entry::Pair)
+    selector_field_name(entry)
+
+Read the name of the Panel Field that one Feature Selector entry names.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A paired entry names the Panel Field first: return `first(entry)`.
+ 2. A bare entry is the name: return `entry`.
+
+# Arguments
+
+  - `entry`: One entry of the Feature Selector.
+
+# Returns
+
+  - `name`: The name of the Panel Field.
+
+# Related
+
+  - [`select_fields_push!`](@ref)
+  - [`readable_assets`](@ref)
+"""
+function selector_field_name(entry::Pair)
+    return first(entry)
+end
+function selector_field_name(entry)
+    return entry
+end
+"""
     select_fields_push!(cols::AbstractVector{Tuple{Int, Int, Symbol}}, pnl::AssetPanel, entry, pool, strict::Bool) -> nothing
 
 Resolve one Feature Selector entry against an [`AssetPanel`](@ref)'s Panel Fields.
 
 # Algorithm
 
- 1. Read the Panel Field name off the entry: a paired entry names it first, and a bare entry is the name.
+ 1. Read the Panel Field name off the entry with [`selector_field_name`](@ref): a paired entry names it first, and a bare entry is the name.
  2. Find the Panel Field. Hand [`panel_selector_msg`](@ref) to [`strict_diagnostic`](@ref) and return when the panel holds none.
  3. A bare name expands to the Panel Field's value columns, through [`panel_value_columns!`](@ref).
  4. A name paired with a `Symbol` claims the Panel Field's one observed-mask column.
@@ -463,7 +495,7 @@ Resolve one Feature Selector entry against an [`AssetPanel`](@ref)'s Panel Field
 """
 function select_fields_push!(cols::AbstractVector{Tuple{Int, Int, Symbol}}, pnl::AssetPanel,
                              entry, pool, strict::Bool)::Nothing
-    name = isa(entry, Pair) ? first(entry) : entry
+    name = selector_field_name(entry)
     k = findfirst(f -> f.name == name, pnl.pf)
     if isnothing(k)
         strict_diagnostic(panel_selector_msg(name, pool), strict; id = @log_id(name))

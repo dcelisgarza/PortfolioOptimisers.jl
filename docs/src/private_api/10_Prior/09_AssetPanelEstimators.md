@@ -22,4 +22,5 @@ PortfolioOptimisers.walk_starts
 PortfolioOptimisers.walk_rescale!
 PortfolioOptimisers.walk_join!
 PortfolioOptimisers.walk_field
+PortfolioOptimisers.walk_field_name
 ```

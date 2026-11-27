@@ -1452,6 +1452,14 @@
         @test is_plot(plot_network(en_xn, pr_pv; rd = rd_xn))
         @test is_plot(plot_network(en_xn, res_pv; rd = rd_xn))
         @test_throws PortfolioOptimisers.IsNothingError plot_network(en_xn, prn_pv)
+        # The result arity takes the prior in `pr` and the returns data in `rd`, and views
+        # each at the Investable Mask of the result (#2397). With one keyword for both, a
+        # prior could not reach an Exogenous Graph.
+        @test is_plot(plot_network(en_xn, res_pv; pr = prn_pv, rd = rd_xn))
+        @test is_plot(plot_network(en_xn, res_pv; pr = res_pv.pr, rd = rd_xn))
+        @test is_plot(plot_network(ne_pv, res_pv; pr = prn_pv))
+        @test_throws PortfolioOptimisers.IsNothingError plot_network(en_xn, res_pv;
+                                                                     pr = prn_pv)
         cte_xn = CentralityEstimator(; pl = en_xn)
         for p_xn in (plot_centrality(cte_xn, rd_xn),
                      plot_centrality(cte_xn, prn_pv, nx_pv; rd = rd_xn),

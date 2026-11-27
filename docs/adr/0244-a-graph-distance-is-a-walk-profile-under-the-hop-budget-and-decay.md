@@ -34,10 +34,13 @@ decided this record, and issue #2172 built it.
 4. **The walk on `nrm = nothing` is scaled**: each hop vector is kept divided by its largest
    entry with its log scale apart, so it cannot overflow and is exact to rounding. Under
    `WeightShare` the total of each distribution is at most one, and the plain walk is used.
-5. **The element type is derived**: `promote_type(eltype(At), eltype(ws))`.
-6. **`readable_assets(ape, rd)`** is a hook of the producer interface, with the fallback
-   `nothing`. `feature_readable_mask` composes it for a `FeatureDistance` with a producer
-   before `investable_reduction`. An asset that is not a node of a graph has a placeholder in
+5. **The element type is derived**: `eltype(At)`, and each weight `w(h)` converts to it, as
+   `Proximity` converts its decay to the type of its data. So the `Float64` rate of the
+   default decay keeps a `Float32` graph in `Float32` (#2397).
+6. **`readable_assets(ape, rd, sel = nothing)`** is a hook of the producer interface, with
+   the fallback `nothing`. `feature_readable_mask` composes it for a `FeatureDistance` with a
+   producer before `investable_reduction`, and it passes `de.sel`. A missing node counts only
+   in the fields that `sel` keeps (#2397). An asset that is not a node of a graph has a placeholder in
    the fields of that graph. An asset whose profile is zero in every field has a placeholder in
    every field. Either is unreadable: a fit drops it with the `@info` of the reduction, and a
    direct call refuses it by name.
@@ -59,6 +62,6 @@ decided this record, and issue #2172 built it.
 - Where the oracle raises on an asset with no out-edge, HERC drops it and gives it a zero
   weight. Where the oracle refuses an overflow, the scaled walk agrees with `BigFloat` to
   2e-15.
-- `readable_assets` reads every field of the producer, not only the fields that `sel` picks.
-  A fit can then drop an asset that a `sel` of one graph could read.
+- `readable_assets` reads the fields that `sel` keeps. A fit and a direct call then drop the
+  same assets, also when `sel` keeps the fields of one graph alone.
 - `RegressionPanel` and `PhylogenyPanel` answer `nothing`, so their fits do not change.

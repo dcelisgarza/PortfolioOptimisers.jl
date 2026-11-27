@@ -6,7 +6,8 @@ module PortfolioOptimisersGraphRecipesExt
 using PortfolioOptimisers, GraphRecipes
 
 import PortfolioOptimisers: MatNum, VecNum, Option, Pr_RR, NwE_ClE_Cl, OptimisationResult,
-                            investable_plot_view, plot_returns_data, result_investable_view
+                            investable_plot_view, plot_returns_data, result_investable_view,
+                            result_investable_returns
 
 function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl, X::MatNum,
                                           nx::AbstractVector = 1:size(X, 2),
@@ -36,12 +37,15 @@ function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl, pr::Pr_RR,
                                             rd = plot_returns_data(pr, rd), kwargs...)
 end
 function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl, res::OptimisationResult;
-                                          rd::Option{<:Pr_RR} = nothing,
+                                          pr::Option{<:Pr_RR} = nothing,
+                                          rd::Option{<:ReturnsResult} = nothing,
                                           nx::AbstractVector = 1:length(res.w), kwargs...)
     # The method of the prior arity receives a viewed prior, whose mask is already
-    # `nothing`, so the pairing of the result's two universes happens here.
-    _, w, pr, _, nx = result_investable_view(res, rd, nothing, nx)
-    return PortfolioOptimisers.plot_network(pl, pr, w; nx = nx, kwargs...)
+    # `nothing`, so the pairing of the result's two universes happens here, for the prior and
+    # for the returns data alike. With no `pr`, the returns data stand in for it.
+    imsk, w, pr_i, _, nx = result_investable_view(res, isnothing(pr) ? rd : pr, nothing, nx)
+    rd_i = isnothing(rd) ? nothing : result_investable_returns(imsk, res, rd)
+    return PortfolioOptimisers.plot_network(pl, pr_i, w; nx = nx, rd = rd_i, kwargs...)
 end
 
 end

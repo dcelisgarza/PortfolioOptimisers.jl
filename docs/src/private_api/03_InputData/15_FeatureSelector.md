@@ -24,6 +24,7 @@ PortfolioOptimisers.feature_stack_eltype
 PortfolioOptimisers.stacked_axes
 PortfolioOptimisers.select_fields
 PortfolioOptimisers.select_fields_push!
+PortfolioOptimisers.selector_field_name
 PortfolioOptimisers.panel_selector_msg
 PortfolioOptimisers.assert_feature_selector
 PortfolioOptimisers.assert_selector_entry

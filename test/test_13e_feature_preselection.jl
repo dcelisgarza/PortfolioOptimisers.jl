@@ -671,6 +671,14 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         Ap = Bool[1 1 1; 1 1 1; 0 1 1]
         ds = fdist(StackObservations(); metric = Cityblock())
         @test distance(ds, Z3; amsk = Ap) == [0 16.5 6; 16.5 0 15; 6 15 0]
+        # The two chord metrics are ratios, so a partial pair takes no rescale. On these
+        # non-negative features the orthant chord is the chord times sqrt(2). It raised the
+        # refusal that names the method to add (#2397).
+        Dc = distance(fdist(StackObservations(); metric = ChordDist()), Z3; amsk = Ap)
+        Doc = distance(fdist(StackObservations(); metric = OrthantChordDist()), Z3;
+                       amsk = Ap)
+        @test Doc ≈ sqrt(2) .* Dc rtol = 1e-14
+        @test PO.stack_rescale(OrthantChordDist(), 0.3, 1:2, 5) == 0.3
         # A metric whose parameters hold one entry per coordinate keeps the entries of the
         # shared coordinates. It then reaches the refusal that names the method to add, where
         # it raised a DimensionMismatch.

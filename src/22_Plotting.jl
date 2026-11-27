@@ -783,7 +783,7 @@ function plot_histogram end
         kwargs...
     ) -> Plot
     plot_network(pl, pr::Pr_RR, w::Option{<:VecNum} = nothing; nx = 1:size(pr.X, 2), rd::Option{<:ReturnsResult} = nothing, threshold, kwargs...) -> Plot
-    plot_network(pl, res::OptimisationResult; rd::Option{<:Pr_RR} = nothing, nx = 1:length(res.w), threshold, kwargs...) -> Plot
+    plot_network(pl, res::OptimisationResult; pr::Option{<:Pr_RR} = nothing, rd::Option{<:ReturnsResult} = nothing, nx = 1:length(res.w), threshold, kwargs...) -> Plot
 
 Plot the network of the assets as a graph, with `GraphRecipes.graphplot`.
 
@@ -798,9 +798,9 @@ A non-investable asset is **not drawn**. The figure fits a phylogeny matrix on `
   - `nx`: Asset names. A [`ReturnsResult`](@ref) that carries `nx` replaces the argument with its own.
   - `w`: Portfolio weights that size the nodes, or `nothing` for one size.
   - `threshold`: Largest magnitude of an entry that draws no edge.
-  - `pr`: Prior result or [`ReturnsResult`](@ref). The figure reads its `X`.
+  - `pr`: Prior result or [`ReturnsResult`](@ref). The figure reads its `X`. With `res`, a keyword on the universe of `res.w`, or `nothing` for `rd`, and for the prior that `res` was fitted on when `rd` is `nothing` too.
   - `res`: Optimisation result. The figure reads its weights, which size the nodes, on its investable universe.
-  - `rd`: With `res`, a prior result or a returns result, or `nothing` for the prior that `res` was fitted on. In the other methods, the returns data that `pl` reads beside `X`, such as the graph of an [`ExogenousNetwork`](@ref). A returns result in `pr`, or with `res`, gives it.
+  - `rd`: The returns data that `pl` reads beside `X`, such as the graph of an [`ExogenousNetwork`](@ref). With `res`, it is on the universe of `res.w`, and the figure views it at the Investable Mask of `res`. A returns result in `pr` gives it.
 
 # Validation
 

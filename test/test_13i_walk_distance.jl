@@ -126,6 +126,14 @@ end
     @test eltype(S) == Float32
     # The config of row block 2 is (2, 0.5, true), dense.
     @test isapprox(D, Do[17:24, :]; atol = 1e-5)
+    # The default decay has the `Float64` rate `log(2)`, and the walk stays in `Float32`
+    # (#2397). It promoted the walk to `Float64`.
+    pnl = asset_panel(WalkProfilePanel(), nothing, rd, rd.X)
+    @test eltype(pnl.pf[1].vals) == Float32
+    _, S, D = walk_measure(WalkDistance(), rd)
+    @test eltype(D) == Float32
+    @test eltype(S) == Float32
+    @test isapprox(D, Do[17:24, :]; atol = 1e-5)
 end
 
 @testset "3. HERC at parity through a fixed cut, and the drop where the oracle raises" begin
@@ -257,6 +265,21 @@ end
     @test pz.pf[2].pmsk == repeat(1:8 .== 8, 1, 12)
     @test pz.pf[2].omsk == .!pz.pf[2].pmsk
     @test PortfolioOptimisers.readable_assets(WalkProfilePanel(; ng = ["g0", "gz"]), rdz) ==
+          (1:8 .!= 8)
+    # A `sel` of the fields of one graph reads the missing nodes of that graph alone, so the
+    # mask of a fit and the refusal of a direct call agree (#2397). It dropped a8 under a
+    # `sel` of g0, where a direct call reads a8.
+    walk_sel(sel) = FeatureDistance(; ape = WalkProfilePanel(; ng = ["g0", "gz"]),
+                                    metric = OrthantChordDist(), sel = sel)
+    de0 = walk_sel(["walk_out_g0"])
+    @test isnothing(PortfolioOptimisers.feature_readable_mask(de0, nothing, rdz))
+    @test all(isfinite, distance(de0, nothing, rdz.X; rd = rdz))
+    dez = walk_sel(["walk_out_gz"])
+    @test PortfolioOptimisers.feature_readable_mask(dez, nothing, rdz) == (1:8 .!= 8)
+    @test_throws r"\"a8\"" distance(dez, nothing, rdz.X; rd = rdz)
+    # A paired entry names its field first.
+    @test PortfolioOptimisers.readable_assets(de0.ape, rdz,
+                                              ["walk_out_gz" => WALK_NODES[1:2]]) ==
           (1:8 .!= 8)
 end
 

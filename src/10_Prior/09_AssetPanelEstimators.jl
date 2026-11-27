@@ -899,11 +899,11 @@ Under [`WeightShare`](@ref), each `h`-step distribution has a total of at most o
 
 # Assets that the walk cannot read
 
-  - An asset that is not a node of a graph has a placeholder in each field of that graph, and it is unreadable.
+  - An asset that is not a node of a graph has a placeholder in each field of that graph, and it is unreadable in those fields. A `sel` of a [`FeatureDistance`](@ref) that keeps no field of that graph reads the asset.
   - An asset with a zero profile in one field and a profile that is not zero in another field keeps a zero row in the first field, and it is readable.
   - An asset with a zero profile in every field has a placeholder in every field, and it is unreadable. Under the decays of the library, this is an asset with no edge along the walk directions. `self = true` gives every node a profile.
 
-[`readable_assets`](@ref) finds the unreadable assets from `rd` alone, so a fit drops them at its entry, and a direct call refuses them. The rule reads every field of the producer, and not only the fields that `sel` of a [`FeatureDistance`](@ref) picks.
+[`readable_assets`](@ref) finds the unreadable assets from `rd` alone, so a fit drops them at its entry, and a direct call refuses them. It reads the fields that `sel` of a [`FeatureDistance`](@ref) keeps, so the fit and the direct call drop the same assets.
 
 # Fields
 
@@ -1449,8 +1449,8 @@ Build the Panel Field of one graph and one single direction of a [`WalkProfilePa
 
  1. Find the assets that are nodes of the graph, `j`, and their node positions, `ka`.
  2. Resolve the budget with [`resolve_separation`](@ref), giving the count of hops `n`.
- 3. Check the decay over `0:n` with [`assert_separation_decay`](@ref), and score the weights `ws`, `w(0)` to `w(n)`, with [`separation_decay`](@ref).
- 4. Derive the element type `T` from `eltype(M)` and `eltype(ws)`, with `promote_type`.
+ 3. Check the decay over `0:n` with [`assert_separation_decay`](@ref).
+ 4. Take the element type `T` of `M`. Score the weights `ws`, `w(0)` to `w(n)`, with [`separation_decay`](@ref), and convert each weight to `T`, as [`Proximity`](@ref) converts its decay to the type of its data. So a `Float32` graph walks in `Float32` under the `Float64` rate of the default decay.
  5. Walk with [`walk_profiles`](@ref), giving `P`, and scale each column of `P` to unit length. A zero column stays zero.
  6. Write the profiles into the rows of `vals`, `assets × nodes`, at the rows `j`, with a zero row for every other asset.
  7. Mark a placeholder at each row of an asset that is not a node of the graph, or that `zall` marks, giving `pm`. When `pm` marks a row, the field holds the placeholder mask of the rows and its negation as the observed mask.
@@ -1487,8 +1487,10 @@ function walk_field(ape::WalkProfilePanel, X::MatNum, gname::AbstractString,
     ka = ia[j]
     n = resolve_separation(ape.sep, ape, X, M, ka).n.val
     assert_separation_decay(ape.decay, 0:n, n)
-    ws = [separation_decay(ape.decay, h, n) for h in 0:n]
-    T = promote_type(eltype(M), eltype(ws))
+    # The weights take the type of the adjacency, as `Proximity` takes the type of its data,
+    # so the `Float64` rate of the default decay keeps a `Float32` graph in `Float32`.
+    T = eltype(M)
+    ws = [T(separation_decay(ape.decay, h, n)) for h in 0:n]
     P = walk_profiles(ape.nrm, M, ka, ws, ape.self, T)
     for c in axes(P, 2)
         s = LinearAlgebra.norm(view(P, :, c))
@@ -1500,15 +1502,41 @@ function walk_field(ape::WalkProfilePanel, X::MatNum, gname::AbstractString,
     vals[j, :] = transpose(P)
     pm = (ia .== 0) .| zall
     pmsk = any(pm) ? repeat(pm, 1, length(nodes)) : nothing
-    return TensorPanelField(;
-                            name = string(resolve_panel_field_name(ape.prefix, "walk"), "_",
-                                          edge_direction_label(d), "_", gname),
-                            axis = "node", labels = nodes, vals = vals,
+    return TensorPanelField(; name = walk_field_name(ape, d, gname), axis = "node",
+                            labels = nodes, vals = vals,
                             omsk = isnothing(pmsk) ? nothing : .!pmsk, pmsk = pmsk)
 end
 """
-    readable_assets(ape::AbstractAssetPanelEstimator, rd) -> nothing
-    readable_assets(ape::WalkProfilePanel, rd::ReturnsResult) -> BitVector
+    walk_field_name(ape::WalkProfilePanel, d::AbstractEdgeDirection, gname::AbstractString) -> String
+
+Name the Panel Field of one graph and one single direction of a [`WalkProfilePanel`](@ref), `"<prefix>_<dir>_<graph>"`.
+
+[`walk_field`](@ref) names the field with it, and [`readable_assets`](@ref) matches the entries of a Feature Selector against it, so the two always agree.
+
+# Arguments
+
+  - `ape`: The producer. Its field `prefix` gives the first part, with the default `"walk"`.
+  - `d`: The single direction.
+  - `gname`: The name of the graph.
+
+# Returns
+
+  - `name::String`: The name of the field.
+
+# Related
+
+  - [`walk_field`](@ref)
+  - [`readable_assets`](@ref)
+  - [`resolve_panel_field_name`](@ref)
+"""
+function walk_field_name(ape::WalkProfilePanel, d::AbstractEdgeDirection,
+                         gname::AbstractString)
+    return string(resolve_panel_field_name(ape.prefix, "walk"), "_",
+                  edge_direction_label(d), "_", gname)
+end
+"""
+    readable_assets(ape::AbstractAssetPanelEstimator, rd, sel = nothing) -> nothing
+    readable_assets(ape::WalkProfilePanel, rd::ReturnsResult, sel = nothing) -> BitVector
 
 Mark the assets that the panel of a producer can read, from the returns data alone, or return `nothing` when the producer cannot tell before it fits.
 
@@ -1521,12 +1549,13 @@ The fallback returns `nothing`, for a producer whose unreadable assets the data 
 The method that Julia selects is the algorithm.
 
  1. The fallback: return `nothing`.
- 2. A [`WalkProfilePanel`](@ref): read the parts of the walk with [`walk_parts_of`](@ref), and mark the assets with a zero profile in every field with [`walk_unwalked`](@ref), giving `zall`. An asset is readable when `zall` does not mark it and it is a node of every graph.
+ 2. A [`WalkProfilePanel`](@ref): read the parts of the walk with [`walk_parts_of`](@ref), and mark the assets with a zero profile in every field with [`walk_unwalked`](@ref), giving `zall`. An asset is readable when `zall` does not mark it and it is a node of the graph of each field that `sel` keeps. These are the two causes of a placeholder in a field, so the mask agrees with the refusal of a direct call.
 
 # Arguments
 
   - `ape`: The producer.
   - $(arg_dict[:rd])
+  - `sel`: The Feature Selector of the consumer, `de.sel` of a [`FeatureDistance`](@ref), or `nothing` for every field. A field is kept when an entry names it, as [`selector_field_name`](@ref) reads the entry.
 
 # Validation
 
@@ -1543,14 +1572,20 @@ The method that Julia selects is the algorithm.
   - [`feature_readable_mask`](@ref)
   - [`assert_feature_readable`](@ref)
 """
-function readable_assets(::AbstractAssetPanelEstimator, ::Any)
+function readable_assets(::AbstractAssetPanelEstimator, ::Any, ::Any = nothing)
     return nothing
 end
-function readable_assets(ape::WalkProfilePanel, rd::ReturnsResult)
+function readable_assets(ape::WalkProfilePanel, rd::ReturnsResult,
+                         sel::Option{<:AbstractVector} = nothing)
     parts = walk_parts_of(ape, rd)
+    # A zero profile in every field puts a placeholder in every field, so it reads all the
+    # parts. A missing node puts one only in the fields of its graph.
     keep = .!walk_unwalked(ape, parts, length(rd.nx))
-    for (_, _, _, _, ia) in parts
-        keep .&= ia .> 0
+    for (gname, d, _, _, ia) in parts
+        name = walk_field_name(ape, d, gname)
+        if isnothing(sel) || any(entry -> selector_field_name(entry) == name, sel)
+            keep .&= ia .> 0
+        end
     end
     return keep
 end
