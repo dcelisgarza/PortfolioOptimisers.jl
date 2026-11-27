@@ -107,7 +107,7 @@ end
 
 Return the requirements that a consumer of an Exogenous Graph states for each snapshot that it reads, as a tuple of [`AbstractGraphRequirement`](@ref)s.
 
-The fallback returns `()`: a value that reads no Exogenous Graph needs nothing of one. A consumer of a graph returns its requirements, for example `(NonNegativeWeights(),)`, and implements [`graph_names`](@ref), which names the graphs that it reads. The entry of a user verb, such as `optimise`, a cross-validation or a prior, walks the estimator tree one time, and checks each snapshot of each graph that each consumer names with [`assert_graph_entry`](@ref). A direct call of the consumer checks the one snapshot that it reads, with [`consumer_graph`](@ref).
+The fallback returns `()`: a value that reads no Exogenous Graph needs nothing of one. A consumer of a graph returns its requirements, for example `(NonNegativeWeights(),)`, and implements [`graph_names`](@ref), which names the graphs that it reads. The entry of a user verb, such as `optimise` or a cross-validation, walks the estimator tree one time, and checks each snapshot of each graph that each consumer names with [`assert_graph_entry`](@ref). A direct call of the consumer checks the one snapshot that it reads, with [`consumer_graph`](@ref).
 
 # Arguments
 
@@ -273,7 +273,7 @@ Check each snapshot of one graph that a consumer names, or of each part of a uni
 The method that Julia selects is the algorithm.
 
  1. A name, or `nothing` for the only graph: find the graph with [`graph_position`](@ref), and check each of its snapshots with [`assert_graph_requirements`](@ref).
- 2. A [`GraphUnion`](@ref): check each part by step 1, and check that the keys of the parts are of one kind with [`assert_union_key_kinds`](@ref).
+ 2. A [`GraphUnion`](@ref): find the graph of each part with [`graph_position`](@ref). Check each part with a positive weight, [`union_kept`](@ref), by step 1, and check that the keys of these parts are of one kind with [`assert_union_key_kinds`](@ref). A part with the weight `0` does not enter the union, so no requirement reads it.
 
 # Arguments
 
@@ -404,7 +404,7 @@ end
 
 Check, at the entry of a user verb, every snapshot of each Exogenous Graph that a consumer in the tree of `est` names.
 
-A consumer that cannot read a negative weight or a self-loop states it with [`graph_requirements`](@ref). A check at each fold comes late, because a fold is a view that drops the snapshots of its future, so fold 1 cannot see the bad snapshot that fold 80 reads. So `optimise`, the fold loop of a cross-validation and `prior` call this function one time, before the first view or fold, and it checks every snapshot of the full returns data. The walk also refuses a consumer that names a graph that the returns data does not hold.
+A consumer that cannot read a negative weight or a self-loop states it with [`graph_requirements`](@ref). A check at each fold comes late, because a fold is a view that drops the snapshots of its future, so fold 1 cannot see the bad snapshot that fold 80 reads. So `optimise` and the fold loop of a cross-validation call this function one time, before the first view or fold, and it checks every snapshot of the full returns data. A direct call of `prior` has no fold. Each consumer in it reads the snapshot at the last row of the returns data that it gets, and [`consumer_graph`](@ref) checks that snapshot. The walk also refuses a consumer that names a graph that the returns data does not hold.
 
 # Algorithm
 
@@ -458,7 +458,7 @@ A consumer calls this function in its fit. It reads one snapshot, so a direct ca
 The method that Julia selects is the algorithm.
 
  1. A name, or `nothing`: find the graph with [`graph_position`](@ref), and the snapshot at the last row with [`graph_snapshot`](@ref). Check it with [`assert_graph_requirements`](@ref).
- 2. A [`GraphUnion`](@ref): read the snapshot of each part in force at the last row, check each with [`assert_graph_requirements`](@ref), choose the parts under the rule `gu.unknown`, and build their union along `dir`, with [`union_in_force`](@ref).
+ 2. A [`GraphUnion`](@ref): read the snapshot of each part in force at the last row, check each part with a positive weight, [`union_kept`](@ref), with [`assert_graph_requirements`](@ref), choose the parts under the rule `gu.unknown`, and build their union along `dir`, with [`union_in_force`](@ref).
 
 # Arguments
 

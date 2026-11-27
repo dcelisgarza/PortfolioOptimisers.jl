@@ -514,7 +514,9 @@ end
                     E::Option{<:TimeSeries.TimeArray} = nothing,
                     iv::Option{<:TimeSeries.TimeArray} = nothing,
                     ivpa::Option{<:Num_VecNum} = nothing,
-                    pnl::Option{<:AssetPanel} = nothing) -> PricesResult
+                    pnl::Option{<:AssetPanel} = nothing,
+                    ng::Option{<:VecStr} = nothing,
+                    G::Option{<:AbstractVector} = nothing) -> PricesResult
     price_ingestion(est::PriceIngestion, pr::PricesResult) -> PricesResult
 
 Assemble raw price series into a [`PricesResult`](@ref) and its Listing Span.
@@ -527,7 +529,7 @@ The caller does not name the value type of the `PricesResult`. The layer promote
 
 # Algorithm
 
- 1. Check with [`assert_distinct_series_names`](@ref) that the asset, factor and benchmark series keep their names through the join, and that no Exogenous Series takes the name of one of them. The join renames a name that two tables share, and a block would then take another block's column.
+ 1. Check with [`assert_distinct_series_names`](@ref) that the asset, factor and benchmark series keep their names through the join, and that no Exogenous Series takes the name of one of them. The join renames a name that two tables share, and a block would then take another block's column. Check the Exogenous Graphs against the clock of `X` with [`check_exogenous_graphs`](@ref).
  2. Promote the value types that the three price tables contribute through [`series_value_type`](@ref), and widen the result with [`absence_type`](@ref), giving the target type. Unify the absent-price spelling of the three tables in that type with [`unify_gaps`](@ref), so a gap means one thing from here on.
  3. Join the factor and the benchmark series onto the asset clock under `join_method`. A left join keeps the asset clock and pads the others where they are silent. An outer join adds the rows that one series has and another does not, and can pad every table. An inner join keeps the rows that every table has. Before a join that can pad, ask [`assert_pad_spellable`](@ref), which throws an error that names a type that cannot spell the pad.
  4. Write the padding report lines of the asset, factor and benchmark tables against the joined clock with [`padding_report_line`](@ref), before the collapse renumbers it.
@@ -535,7 +537,7 @@ The caller does not name the value type of the `PricesResult`. The layer promote
  6. Split the joined series back into the asset, factor and benchmark blocks, all on one clock.
  7. Align the implied volatilities to that clock with [`align_series`](@ref), in the type that [`absence_type`](@ref) derives from their own type, and pad the observations where they are silent. Write their report line, and carry `ivpa` through. An implied volatility is a volatility and not a price, so the layer carries it and never converts it to a return. Align the Exogenous Series `E` to the same clock in the same way, and write its report line. `E` is aligned and never joined, so it adds and drops no observation of the assets: a series one consumer reads must not change the universe of every asset. It is a level series, so [`prices_to_returns`](@ref) converts it.
  8. Name what the layer padded with [`assert_join_padding`](@ref), which warns, or refuses under `strict`.
- 9. Put a caller's [`AssetPanel`](@ref) on the emitted clock with [`project_panel_clock`](@ref). A caller states a Panel Field on the clock of the table they hold, and the join and the collapse move that clock, so the projection happens here. Each period of a collapse takes the Panel Field values of the last row of its group, as [`LastRow`](@ref) does. The timestamp function of `collapse_args` does not change this row, so under `(Dates.week, first, last)` the prices and the Panel Field values of a week come from one day. A static panel has no observation axis, and the layer carries it through unchanged.
+ 9. Put a caller's [`AssetPanel`](@ref) on the emitted clock with [`project_panel_clock`](@ref). A caller states a Panel Field on the clock of the table they hold, and the join and the collapse move that clock, so the projection happens here. Each period of a collapse takes the Panel Field values of the last row of its group, as [`LastRow`](@ref) does, and [`ingestion_row_clock`](@ref) finds that row. The timestamp function of `collapse_args` does not change this row, so under `(Dates.week, first, last)` the prices and the Panel Field values of a week come from one day. A static panel has no observation axis, and the layer carries it through unchanged. Put the Exogenous Graphs `G` on the emitted clock at the same rows with [`graphs_ingestion_view`](@ref), and carry their names `ng`.
 10. Read the **Listing Span** off the asset block with [`listing_span`](@ref), unless the caller declared one. A declared span replaces the answer of the Span Rule.
 11. Return the [`PricesResult`](@ref) that carries all of it.
 
@@ -551,7 +553,9 @@ Under the default join the emitted clock is the asset table's, so `timestamp(pr.
   - `iv`: Optional implied volatilities, one column per asset, on any clock. The layer aligns them to the emitted clock and pads `NaN` where they are silent.
   - `ivpa`: Optional implied volatility adjustment.
   - `pnl`: Optional [`AssetPanel`](@ref) of Panel Fields the caller already holds. The layer keeps its Panel Fields and does not read its masks. A time-varying panel carries an `amsk` by construction, so that field cannot carry a declaration. A listing statement goes in `span`.
-  - `pr`: A [`PricesResult`](@ref), for the second form. The layer ingests its series again. It keeps a span that `pr` states unless `est.span` overrides it, and the Span Rule runs only where neither states one.
+  - `ng`: Optional names of the Exogenous Graphs, one for each entry of `G`.
+  - `G`: Optional Exogenous Graphs, one [`ExogenousGraph`](@ref) or [`ExogenousGraphSeries`](@ref) for each name of `ng`, on the clock of `X`. An integer key of a series is a row of `X`. The layer moves each series onto the emitted clock.
+  - `pr`: A [`PricesResult`](@ref), for the second form. The layer ingests its series and its Exogenous Graphs again. It keeps a span that `pr` states unless `est.span` overrides it, and the Span Rule runs only where neither states one.
 
 # Validation
 
@@ -560,6 +564,7 @@ Under the default join the emitted clock is the asset table's, so `timestamp(pr.
   - At least one of `X`, `F` and `B` has an element type that is not `Missing` alone. Raises a `DomainError`, from [`absence_type`](@ref).
   - A declared `span` has the size of the asset block after the join and the collapse. Raises a `DimensionMismatch`.
   - The value type carries an absence wherever the layer might spell one. Raises a `DomainError` naming the type, from [`absent_value`](@ref).
+  - The rules of [`check_exogenous_graphs`](@ref) for `ng` and `G`, against the rows and the timestamps of `X`.
   - `pnl` describes the assets of `X`, and a time-varying `pnl` also its observations. Raises a `DimensionMismatch`, from [`project_panel_clock`](@ref).
   - Each row that a time-varying `pnl` takes is a row of `X`. Without a collapse, this is each emitted row. With a collapse, it is the last joined row of each period. An outer join that adds a row breaks this. Raises an `ArgumentError`, from [`matched_row_indices`](@ref).
   - The layer padded nothing, under `strict`. Raises an `ArgumentError` carrying the padding report, from [`assert_join_padding`](@ref). Otherwise the layer warns.
@@ -603,6 +608,8 @@ julia> Matrix(pr.span)
   - [`padding_report_line`](@ref)
   - [`assert_join_padding`](@ref)
   - [`project_panel_clock`](@ref)
+  - [`ingestion_row_clock`](@ref)
+  - [`graphs_ingestion_view`](@ref)
   - [`LastObservation`](@ref)
 """
 function price_ingestion(est::PriceIngestion, X::TimeSeries.TimeArray;
@@ -611,10 +618,14 @@ function price_ingestion(est::PriceIngestion, X::TimeSeries.TimeArray;
                          E::Option{<:TimeSeries.TimeArray} = nothing,
                          iv::Option{<:TimeSeries.TimeArray} = nothing,
                          ivpa::Option{<:Num_VecNum} = nothing,
-                         pnl::Option{<:AssetPanel} = nothing)::PricesResult
+                         pnl::Option{<:AssetPanel} = nothing,
+                         ng::Option{<:VecStr} = nothing,
+                         G::Option{<:AbstractVector} = nothing)::PricesResult
     @argcheck(!isempty(X),
               IsEmptyError("`X` cannot be empty: the ingestion layer states a universe from a price panel"))
     assert_distinct_series_names(X, F, B, E)
+    ts_old = TimeSeries.timestamp(X)
+    check_exogenous_graphs(ng, G, length(ts_old), ts_old)
     nx = TimeSeries.colnames(X)
     #! The three price tables are laid in one table by the join, so they take one value
     #! type, and it is the one the return arithmetic would widen them to: derived from the
@@ -660,11 +671,14 @@ function price_ingestion(est::PriceIngestion, X::TimeSeries.TimeArray;
     #! The collapse is the one step here that renumbers an observation, and a Panel Field is
     #! stated on the clock of the table the caller holds, so the projection is owed here
     #! rather than by the conversion: after `price_ingestion`, the PricesResult states one
-    #! clock and everything it holds is on it.
-    pnl = project_panel_clock(pnl, tsj, X, est.collapse_args)
+    #! clock and everything it holds is on it. The Exogenous Graphs are on the caller's
+    #! clock too, so they take the same rows.
+    ts_row = ingestion_row_clock(tsj, est.collapse_args)
+    pnl = project_panel_clock(pnl, ts_row, X)
+    G = graphs_ingestion_view(G, ts_row, ts_old, ts)
     span = isnothing(est.span) ? listing_span(values(Xa)) : est.span
     return PricesResult(; X = Xa, F = Fa, B = Ba, E = Ea, iv = iva, ivpa = ivpa, pnl = pnl,
-                        span = span)
+                        ng = ng, G = G, span = span)
 end
 function price_ingestion(est::PriceIngestion, pr::PricesResult)::PricesResult
     #! The span of `pr` is a declaration already made, and a declaration is never
@@ -674,31 +688,29 @@ function price_ingestion(est::PriceIngestion, pr::PricesResult)::PricesResult
     #! it by its shape.
     est = rebuild_struct(est, (; span = isnothing(est.span) ? pr.span : est.span))
     return price_ingestion(est, pr.X; F = pr.F, B = pr.B, E = pr.E, iv = pr.iv,
-                           ivpa = pr.ivpa, pnl = pr.pnl)
+                           ivpa = pr.ivpa, pnl = pr.pnl, ng = pr.ng, G = pr.G)
 end
 """
-    project_panel_clock(pnl::Nothing, tsj, X::TimeSeries.TimeArray, ca::Tuple) -> nothing
-    project_panel_clock(pnl::AssetPanel, tsj, X::TimeSeries.TimeArray, ca::Tuple) -> AssetPanel
+    project_panel_clock(pnl::Nothing, ts_row::AbstractVector, X::TimeSeries.TimeArray) -> nothing
+    project_panel_clock(pnl::AssetPanel, ts_row::AbstractVector, X::TimeSeries.TimeArray) -> AssetPanel
 
 Put a caller's [`AssetPanel`](@ref) on the clock the ingestion emits.
 
 A caller states a Panel Field on the clock of the table they hold. The join and the collapse of [`price_ingestion`](@ref) move that clock, so [`price_ingestion`](@ref) makes the projection. After it, the `PricesResult` states one clock and everything it holds is on that clock. A static panel has no observation axis, so [`feature_row_indices`](@ref) returns `Colon()` for it and the panel passes through unchanged.
 
-A collapse puts many rows into one period. Each period takes the Panel Field values of the last row of its group, as [`LastRow`](@ref) does. The timestamp function of `ca` does not change this row. So under `(Dates.week, first, last)` a week pairs the prices of its last day with the Panel Field values of the same day.
+A collapse puts many rows into one period. Each period takes the Panel Field values of the last row of its group, as [`LastRow`](@ref) does. [`ingestion_row_clock`](@ref) finds that row. The timestamp function of the collapse does not change it. So under `(Dates.week, first, last)` a week pairs the prices of its last day with the Panel Field values of the same day.
 
 # Algorithm
 
  1. `pnl` is `nothing`: return `nothing`.
  2. Otherwise read the incoming clock `ts_old` and the asset names off `X`, and check the panel against them with [`check_asset_panel`](@ref).
- 3. Find the timestamp of the row that each emitted observation takes, giving `ts_row`. Without a collapse, `ts_row` is `tsj`. With a collapse, collapse the row positions of `tsj` with the period and timestamp functions of `ca` and the value function `last`. This gives the last row of each group, as `TimeSeries.collapse` forms the groups, and `ts_row` holds the timestamps of those rows.
- 4. Find the rows of `ts_row` in the incoming clock with [`feature_row_indices`](@ref), and view the panel over them with [`port_opt_view`](@ref). The view takes the whole asset axis and its names, so that it also cuts a square tensor Panel Field on its label axis.
+ 3. Find the rows of `ts_row` in the incoming clock with [`feature_row_indices`](@ref), and view the panel over them with [`port_opt_view`](@ref). The view takes the whole asset axis and its names, so that it also cuts a square tensor Panel Field on its label axis.
 
 # Arguments
 
   - `pnl`: The caller's [`AssetPanel`](@ref), or `nothing`.
-  - `tsj`: The timestamps of the joined table, before the collapse.
+  - `ts_row`: The timestamp of the joined row that each emitted observation takes, from [`ingestion_row_clock`](@ref).
   - `X`: The asset table the caller passed. Its timestamps are the incoming clock, and its column names are the asset names.
-  - `ca`: The `collapse_args` of the [`PriceIngestion`](@ref). An empty tuple states no collapse.
 
 # Validation
 
@@ -716,26 +728,56 @@ A collapse puts many rows into one period. Each period takes the Panel Field val
   - [`feature_row_indices`](@ref)
   - [`port_opt_view`](@ref)
   - [`check_asset_panel`](@ref)
+  - [`ingestion_row_clock`](@ref)
   - [`LastObservation`](@ref)
 """
-function project_panel_clock(::Nothing, ::Any, ::TimeSeries.TimeArray, ::Tuple)
+function project_panel_clock(::Nothing, ::AbstractVector, ::TimeSeries.TimeArray)
     return nothing
 end
-function project_panel_clock(pnl::AssetPanel, tsj, X::TimeSeries.TimeArray,
-                             ca::Tuple)::AssetPanel
+function project_panel_clock(pnl::AssetPanel, ts_row::AbstractVector,
+                             X::TimeSeries.TimeArray)::AssetPanel
     ts_old = TimeSeries.timestamp(X)
     nx = string.(TimeSeries.colnames(X))
     check_asset_panel(pnl, length(nx), length(ts_old), "the number of asset price columns")
-    #! The collapse of the row positions groups them as the collapse of the prices does, so
-    #! each period takes its last row whatever the timestamp and value functions pick.
-    ts_row = if isempty(ca)
-        tsj
-    else
-        tsj[values(TimeSeries.collapse(TimeSeries.TimeArray(tsj, collect(eachindex(tsj))),
-                                       ca[1], ca[2], last))]
-    end
     return port_opt_view(pnl, feature_row_indices(pnl, ts_row, ts_old),
                          collect(eachindex(nx)), nx)
+end
+"""
+    ingestion_row_clock(tsj::AbstractVector, ca::Tuple) -> AbstractVector
+
+Return the timestamp of the joined row that each observation of [`price_ingestion`](@ref) takes, the clock `ts_row`.
+
+A collapse puts many rows into one period, and each period takes the values of the last row of its group. The timestamp function of `ca` names the period, and it does not change this row. So under `(Dates.week, first, last)` the emitted row of a week carries the timestamp of its first day and takes the row of its last day. [`project_panel_clock`](@ref) and [`graphs_ingestion_view`](@ref) read `ts_row`, so the Panel Fields and the Exogenous Graphs of a period come from the row of its prices.
+
+# Algorithm
+
+ 1. No collapse, `ca` is empty: return `tsj`. Each emitted row is a joined row.
+ 2. Otherwise: collapse the row positions of `tsj` with the period and timestamp functions of `ca` and the value function `last`. This gives the last row of each group, as `TimeSeries.collapse` forms the groups. Return the timestamps of those rows.
+
+# Arguments
+
+  - `tsj`: The timestamps of the joined table, before the collapse.
+  - `ca`: The `collapse_args` of the [`PriceIngestion`](@ref). An empty tuple states no collapse.
+
+# Returns
+
+  - `ts_row::AbstractVector`: One timestamp of `tsj` for each emitted observation.
+
+# Related
+
+  - [`price_ingestion`](@ref)
+  - [`project_panel_clock`](@ref)
+  - [`graphs_ingestion_view`](@ref)
+"""
+function ingestion_row_clock(tsj::AbstractVector, ca::Tuple)
+    if isempty(ca)
+        return tsj
+    end
+    #! The collapse of the row positions groups them as the collapse of the prices does, so
+    #! each period takes its last row whatever the timestamp and value functions pick.
+    return tsj[values(TimeSeries.collapse(TimeSeries.TimeArray(tsj,
+                                                               collect(eachindex(tsj))),
+                                          ca[1], ca[2], last))]
 end
 """
     listing_span_view(span::Nothing, ts_new, ts_old, j) -> nothing

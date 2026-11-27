@@ -14,6 +14,9 @@ PortfolioOptimisers.graph_rows
 PortfolioOptimisers.graph_view
 PortfolioOptimisers.graphs_view
 PortfolioOptimisers.graphs_clock_view
+PortfolioOptimisers.graphs_ingestion_view
+PortfolioOptimisers.graph_ingestion_view
+PortfolioOptimisers.graph_on_rows
 PortfolioOptimisers.graph_vcat
 PortfolioOptimisers.graph_at_end
 PortfolioOptimisers.graph_kind

@@ -1,11 +1,12 @@
 ```@meta
-Description = "Price ingestion, private API of PortfolioOptimisers.jl: project_panel_clock, unify_gaps, assert_no_infinite_price, series_value_type, absence_type, …"
+Description = "Price ingestion, private API of PortfolioOptimisers.jl: project_panel_clock, ingestion_row_clock, unify_gaps, assert_no_infinite_price, series_value_type, …"
 ```
 
 # Price ingestion: private API
 
 ```@docs
 PortfolioOptimisers.project_panel_clock
+PortfolioOptimisers.ingestion_row_clock
 PortfolioOptimisers.unify_gaps
 PortfolioOptimisers.assert_no_infinite_price
 PortfolioOptimisers.series_value_type

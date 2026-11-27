@@ -44,9 +44,8 @@ function assert_graph_names(names::VecStr, sym::Sym_Str)::Nothing
     @argcheck(!isempty(names), IsEmptyError("$sym cannot be empty"))
     @argcheck(all(!isempty, names),
               ArgumentError("$sym holds an empty name at position $(findfirst(isempty, names)), and each name must have one character or more"))
-    k = findfirst(i -> names[i] in view(names, 1:(i - 1)), eachindex(names))
-    @argcheck(isnothing(k),
-              ArgumentError("$sym holds the name \"$(isnothing(k) ? "" : names[k])\" more than one time, and each name must be unique"))
+    @argcheck(allunique(names),
+              ArgumentError("$sym holds the name \"$(first_duplicate(names))\" more than one time, and each name must be unique"))
     return nothing
 end
 function assert_graph_names(name::AbstractString, sym::Sym_Str)::Nothing
@@ -374,9 +373,8 @@ end
 function exogenous_graph(nodes::Option{<:VecStr}, ::Nothing, ::Nothing, ::Nothing,
                          edges::AbstractVector)
     pairs_seen = [(String(e[1]), String(e[2])) for e in edges]
-    k = findfirst(i -> pairs_seen[i] in view(pairs_seen, 1:(i - 1)), eachindex(pairs_seen))
-    @argcheck(isnothing(k),
-              ArgumentError("an edge list holds each pair of a source and a target one time, and the edge $(isnothing(k) ? "" : edge_text(pairs_seen[k])) comes more than one time. Add the two weights into one edge, or keep one of them"))
+    @argcheck(allunique(pairs_seen),
+              ArgumentError("an edge list holds each pair of a source and a target one time, and the edge $(edge_text(first_duplicate(pairs_seen))) comes more than one time. Add the two weights into one edge, or keep one of them"))
     nodes = edge_list_nodes(nodes, pairs_seen)
     pos = Dict(name => k for (k, name) in pairs(nodes))
     T = mapreduce(e -> typeof(e[3]), promote_type, edges; init = Bool)

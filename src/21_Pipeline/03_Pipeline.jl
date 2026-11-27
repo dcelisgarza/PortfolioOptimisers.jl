@@ -379,40 +379,6 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the first element of `xs` that repeats an earlier element.
-
-The error for a repeated step name shows this element, and not the whole collection. Only the failure path of the [`Pipeline`](@ref) constructor calls this function.
-
-# Arguments
-
-  - `xs`: A collection of names.
-
-# Returns
-
-  - The first element that repeats an earlier one, or `nothing` when every element is unique.
-
-# Related
-
-  - [`Pipeline`](@ref)
-"""
-function first_duplicate(xs)
-    if isempty(xs)
-        return nothing
-    end
-    #! `typeof(first(xs))`, not `eltype(xs)`: over an abstract `Tuple{Vararg{String}}` the
-    #! latter is inferred as `Union{}`, and JET reports the set's lookup.
-    seen = Set{typeof(first(xs))}()
-    for x in xs
-        if x in seen
-            return x
-        end
-        push!(seen, x)
-    end
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 Validate that each step of a [`Pipeline`](@ref) reads only slots that are filled, and makes stale no slot that an earlier step wrote.
 
 The check walks the steps in order, through [`foreach_step`](@ref). `slots` holds the slot that each step writes, see [`pipe_writes`](@ref). [`last_slot_writer`](@ref) reads it to find the last earlier step that writes a slot, so the message can name that step.

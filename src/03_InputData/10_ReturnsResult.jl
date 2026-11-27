@@ -526,7 +526,8 @@ Return a view of the `ReturnsResult` object for assets at indices `j`, observati
  5. When `B` is a matrix, it holds one column per asset, so view `nb` at `j` and view `B` as `view(rd.B, i, j)`. When `B` is a vector, every asset shares it, so view it as `view(rd.B, i)` and pass `nb` through.
  6. View the Exogenous Series as `view(rd.E, i, :)`, and pass its names `ne` through. View the timestamps `ts` at `i`, the implied volatilities as `view(rd.iv, i, j)`, and the adjustment `ivpa` at `j`.
  7. View the [`AssetPanel`](@ref) `pnl` with [`port_opt_view`](@ref) at the observations `i` and the assets `j`, and give it the asset names `rd.nx`. The view slices both axes of every Panel Field and of both universe masks. It also slices the label axis of a tensor Panel Field whose labels are the asset names, see [`features_are_assets`](@ref). A static panel has no observation axis and ignores `i`, as a scalar `ivpa` ignores `j`.
- 8. Rebuild the [`ReturnsResult`](@ref).
+ 8. View the Exogenous Graphs `G` at the observations `i` with [`graphs_view`](@ref), and pass their names `ng` through. A static graph is in force at each row and passes through. A series keeps the graph in force at the first row of the view and its keys inside the view, see [`graph_view`](@ref).
+ 9. Rebuild the [`ReturnsResult`](@ref).
 
 Each field that is `nothing` stays `nothing`. No step copies data.
 
@@ -542,6 +543,7 @@ Each field that is `nothing` stays `nothing`. No step copies data.
   - `ts` is not `nothing` when `i` holds timestamps, and `i` holds no names. Raises an `ArgumentError`. See [`timestamp_positions`](@ref).
   - The timestamps of `i` compare with `ts`, and `ts` holds `i` when `i` is one timestamp. Raises an `ArgumentError`. See [`assert_timestamp_type`](@ref).
   - Every name of `j` is in `nx`, and every name of `k` is in `nf`. Raises an `ArgumentError`. See [`label_positions`](@ref).
+  - When `G` holds an [`ExogenousGraphSeries`](@ref), the positions of `i` are in clock order, because a graph of a series is in force from its key to the next key. This holds also when no consumer reads the graph. Raises an `ArgumentError`. See [`graph_rows`](@ref).
   - A window that keeps no observation or no asset raises the `IsEmptyError` of the [`ReturnsResult`](@ref) constructor.
 
 # Returns

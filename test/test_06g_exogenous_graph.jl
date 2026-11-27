@@ -316,6 +316,77 @@ end
     @test PO.port_opt_view(pr, :, :) === pr
 end
 
+@testset "price_ingestion carries the graphs onto the emitted clock (#2395)" begin
+    # 2024-01-01 is a Monday, so the 21 days are three weeks.
+    ts = collect(Date(2024, 1, 1):Day(1):Date(2024, 1, 21))
+    P = TimeArray(ts, 100 .+ cumsum(rand(StableRNG(6), 21, 2); dims = 1), ["A", "B"])
+    si = ExogenousGraphSeries(; ts = [1, 9, 17], graphs = [g1, g2, nothing])
+    sd = ExogenousGraphSeries(; ts = [Date(2024, 1, 3), Date(2024, 1, 10)],
+                              graphs = [g1, g2])
+    pr = PricesResult(; X = P, ng = ["i", "d", "s"], G = [si, sd, g3])
+    # No collapse: the clock does not move, so the graphs do not change, and the returns
+    # data reads them.
+    p0 = price_ingestion(PriceIngestion(), pr)
+    @test p0.ng == pr.ng
+    @test p0.G[1] == si
+    @test p0.G[2] == sd
+    @test p0.G[3] === g3
+    rd = prices_to_returns(p0)
+    @test rd.ng == pr.ng
+    @test graph_in_force(rd, "d") == g2
+    @test graph_in_force(PO.port_opt_view(rd, 1:15, :), "i") == g2
+    # The keywords of the table form.
+    pk = price_ingestion(PriceIngestion(), P; ng = ["i"], G = [si])
+    @test pk.ng == ["i"] && pk.G[1] == si
+    # A weekly collapse named by the first day: each week takes the graph in force at the row
+    # of its prices, its last day, also for a date key that falls inside the week.
+    est = PriceIngestion(; collapse_args = (Dates.week, first, last))
+    pw = price_ingestion(est, pr)
+    tw = timestamp(pw.X)
+    @test tw == [Date(2024, 1, 1), Date(2024, 1, 8), Date(2024, 1, 15)]
+    @test pw.G[1] == ExogenousGraphSeries([1, 2, 3], [g1, g2, nothing])
+    @test pw.G[2] == ExogenousGraphSeries(tw[1:2], [g1, g2])
+    @test pw.G[3] === g3
+    @test graph_in_force(PO.port_opt_view(pw, 1:1), "d") == g1
+    @test prices_to_returns(pw).ng == pr.ng
+    # An outer join adds two rows before the asset table: no integer key is in force there.
+    F = TimeArray(Date(2023, 12, 30):Day(1):Date(2024, 1, 21), rand(StableRNG(7), 23, 1),
+                  ["F1"])
+    po = @test_logs (:warn,) match_mode = :any price_ingestion(PriceIngestion(;
+                                                                              join_method = :outer),
+                                                               PricesResult(; X = P, F = F,
+                                                                            ng = ["i", "s"],
+                                                                            G = [si, g3]))
+    @test po.G[1] == ExogenousGraphSeries([3, 11, 19], [g1, g2, nothing])
+    @test po.G[2] === g3
+    # The graph in force at each emitted row is the graph in force at the row of its prices,
+    # for random series of both kinds and random collapses.
+    rng = StableRNG(8)
+    pool = [g1, g2, g3, nothing]
+    for _ in 1:200
+        ks = sort!(randperm(rng, 21)[1:rand(rng, 1:5)])
+        gs = Union{Nothing, typeof(g1)}[rand(rng, pool) for _ in ks]
+        s1 = ExogenousGraphSeries(ks, gs)
+        s2 = ExogenousGraphSeries(ts[ks] .- Day(rand(rng, 0:2)), gs)
+        ca = rand(rng, ((), (Dates.week, first, last), (Dates.week, last, last)))
+        e = PriceIngestion(; collapse_args = ca)
+        out = price_ingestion(e, PricesResult(; X = P, ng = ["a", "b"], G = [s1, s2]))
+        row = PO.ingestion_row_clock(ts, ca)
+        to = timestamp(out.X)
+        @test all(i -> isequal(as_of(out.G[1], i), as_of(s1, searchsortedlast(ts, row[i]))),
+                  eachindex(row))
+        @test all(i -> isequal(as_of(out.G[2], to[i]), as_of(s2, row[i])), eachindex(row))
+    end
+    # A date key after the last row is dropped, so no graph is in force at any emitted row.
+    pl = price_ingestion(PriceIngestion(), P; ng = ["d"],
+                         G = [ExogenousGraphSeries([Date(2024, 2, 1)], [g1])])
+    @test pl.G[1] == ExogenousGraphSeries([ts[1]], [nothing])
+    # The graphs are checked against the clock of the table the caller passed.
+    @test_throws DomainError price_ingestion(PriceIngestion(), P; ng = ["i"],
+                                             G = [ExogenousGraphSeries([22], [g1])])
+    @test_throws IsNothingError price_ingestion(PriceIngestion(), P; ng = ["i"])
+end
+
 @testset "vcat_observations joins the graphs" begin
     ts = collect(Date(2024, 1, 1):Day(1):Date(2024, 1, 12))
     X = rand(StableRNG(6), 12, 2)

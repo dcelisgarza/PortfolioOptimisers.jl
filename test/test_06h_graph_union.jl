@@ -269,6 +269,27 @@ end
                                                                             ng = ["supply",
                                                                                   "credit"])]),
                                               gu_rd([gu_supply(), gu_credit()])))
+        # A part with the weight 0 does not enter the union, so the requirements of the
+        # consumer and the check of the key kinds skip it (#2395). Its name must still be a
+        # graph of the returns data.
+        neg = ExogenousGraph(; edges = [("S", "A", -1.0)])
+        z = GraphUnion(; ng = ["supply", "credit"], w = [1.0, 0.0])
+        zrd = gu_rd([gu_supply(), ExogenousGraphSeries(; ts = [1, 9], graphs = [neg, bad])])
+        @test isnothing(GU.assert_graph_entry(WalkProfilePanel(; ng = [z]), zrd))
+        zg = GU.consumer_graph(WalkProfilePanel(; ng = [z]), zrd, z, OutEdges())
+        @test zg.nodes == gu_supply().nodes
+        @test adjacency(zg) == adjacency(gu_supply())
+        @test_throws ArgumentError GU.assert_graph_entry(WalkProfilePanel(;
+                                                                          ng = [GraphUnion(;
+                                                                                           ng = ["supply",
+                                                                                                 "debt"],
+                                                                                           w = [1.0,
+                                                                                                0.0])]),
+                                                         zrd)
+        dkey = ExogenousGraphSeries(; ts = [Date(2020, 1, 1)], graphs = [gu_credit()])
+        ikey = ExogenousGraphSeries(; ts = [1], graphs = [gu_supply()])
+        @test isa(graph_union(ikey, dkey; w = [1.0, 0.0]), ExogenousGraphSeries)
+        @test_throws ArgumentError graph_union(ikey, dkey)
         # The element type promotes over the parts and `w`.
         f1 = ExogenousGraph(; nodes = ["A", "B"], A = Float32[0 1; 0 0])
         f2 = ExogenousGraph(; nodes = ["A", "B"], A = Float32[0 0; 1 0])

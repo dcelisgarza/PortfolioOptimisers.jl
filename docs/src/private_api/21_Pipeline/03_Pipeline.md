@@ -1,11 +1,10 @@
 ```@meta
-Description = "Pipeline, private API of PortfolioOptimisers.jl: first_duplicate, assert_step_declarations, assert_nested_data_slots, assert_slot_order, last_slot_writer, …"
+Description = "Pipeline, private API of PortfolioOptimisers.jl: assert_step_declarations, assert_nested_data_slots, assert_slot_order, last_slot_writer, foreach_step, …"
 ```
 
 # Pipeline: private API
 
 ```@docs
-first_duplicate
 assert_step_declarations
 assert_nested_data_slots
 assert_slot_order

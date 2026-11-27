@@ -531,6 +531,123 @@ function graphs_clock_view(G::AbstractVector, ts_new, ts_old)
     return graphs_view(G, matched_row_indices(ts_new, ts_old), ts_old)
 end
 """
+    graphs_ingestion_view(G::Nothing, ts_row, ts_old, ts) -> Nothing
+    graphs_ingestion_view(G::AbstractVector, ts_row, ts_old, ts) -> Vector
+
+Return the named graphs of the caller on the clock that [`price_ingestion`](@ref) emits, with [`graph_ingestion_view`](@ref) on each.
+
+The join and the collapse of the ingestion move the clock, so a view of the caller's clock cannot state the graphs. An outer join adds a row that the caller's table does not hold, and a collapse whose timestamp function is not `last` names a period by a timestamp that is not the row of its prices.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. No graph: return `nothing`, and read no timestamp.
+ 2. Otherwise: put each graph on the emitted clock with [`graph_ingestion_view`](@ref).
+
+# Arguments
+
+  - `G`: The graphs, or `nothing`.
+  - `ts_row`: The timestamp of the joined row that each emitted observation takes, from [`ingestion_row_clock`](@ref).
+  - `ts_old`: The timestamps of the caller's asset table, the clock of an integer key.
+  - `ts`: The timestamps of the emitted clock.
+
+# Returns
+
+  - The graphs on the emitted clock, or `nothing`.
+
+# Related
+
+  - [`graph_ingestion_view`](@ref)
+  - [`price_ingestion`](@ref)
+  - [`graphs_clock_view`](@ref)
+"""
+function graphs_ingestion_view(::Nothing, ::Any, ::Any, ::Any)
+    return nothing
+end
+function graphs_ingestion_view(G::AbstractVector, ts_row, ts_old, ts)
+    return [graph_ingestion_view(g, ts_row, ts_old, ts) for g in G]
+end
+"""
+    graph_ingestion_view(g::ExogenousGraph, ts_row, ts_old, ts) -> ExogenousGraph
+    graph_ingestion_view(s::ExogenousGraphSeries{<:VecInt}, ts_row, ts_old, ts) -> ExogenousGraphSeries
+    graph_ingestion_view(s::ExogenousGraphSeries{<:VecDate}, ts_row, ts_old, ts) -> ExogenousGraphSeries
+
+Return one graph of the caller on the clock that [`price_ingestion`](@ref) emits.
+
+The emitted row `i` takes the prices of the joined row at the timestamp `ts_row[i]`, and it carries the timestamp `ts[i]`. So the graph in force at the emitted row `i` is the graph in force at `ts_row[i]`. An integer key is a row of the caller's table, so the graph in force at `ts_row[i]` is the graph in force at the last row of that table at or before `ts_row[i]`. A row that an outer join adds before the first row of the table has no graph in force. A date key compares with `ts_row[i]` directly.
+
+The series on the emitted clock has a key at each emitted row at which another key comes in force, with [`graph_on_rows`](@ref). An integer key becomes the position of that row, and a date key becomes its timestamp `ts[i]`. So a date key that falls in a gap moves to the next emitted row, and a key after the last row is dropped, as [`graph_view`](@ref) drops it.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A static graph: return `g`. It is in force at each row.
+ 2. Integer keys: find the last row `p` of `ts_old` at or before each timestamp of `ts_row` with `searchsortedlast`, then the position of the last key at or before `p`. Build the series on the emitted rows `1:length(ts_row)`.
+ 3. Date keys: find the position of the last key at or before each timestamp of `ts_row` with `searchsortedlast`. Build the series on the timestamps `ts`.
+
+# Arguments
+
+  - `g`, `s`: The graph or the series.
+  - `ts_row`: The timestamp of the joined row that each emitted observation takes.
+  - `ts_old`: The timestamps of the caller's asset table.
+  - `ts`: The timestamps of the emitted clock, one for each entry of `ts_row`.
+
+# Returns
+
+  - The graph, or the series on the emitted clock.
+
+# Related
+
+  - [`graphs_ingestion_view`](@ref)
+  - [`graph_on_rows`](@ref)
+  - [`graph_view`](@ref)
+"""
+function graph_ingestion_view(g::ExogenousGraph, ::Any, ::Any, ::Any)
+    return g
+end
+function graph_ingestion_view(s::ExogenousGraphSeries{<:VecInt}, ts_row::AbstractVector,
+                              ts_old::AbstractVector, ::AbstractVector)
+    q = [searchsortedlast(s.ts, searchsortedlast(ts_old, t)) for t in ts_row]
+    return graph_on_rows(s, q, collect(eachindex(ts_row)))
+end
+function graph_ingestion_view(s::ExogenousGraphSeries{<:VecDate}, ts_row::AbstractVector,
+                              ::AbstractVector, ts::AbstractVector)
+    q = [searchsortedlast(s.ts, t) for t in ts_row]
+    return graph_on_rows(s, q, ts)
+end
+"""
+    graph_on_rows(s::ExogenousGraphSeries, q::AbstractVector{<:Integer}, ks::AbstractVector) -> ExogenousGraphSeries
+
+Build the series of change points that states the key `q[i]` of `s` in force at each row `i`.
+
+A row with `q[i] == 0` comes before the first key of `s`, so no graph is in force there. The new series has a key at each row at which `q` changes to a positive position, and the key of that row is `ks[i]`. When no row has a graph in force, the series is one `nothing` key at the first row, as [`graph_view`](@ref) states it.
+
+# Arguments
+
+  - `s`: The series.
+  - `q`: The position of the key of `s` in force at each row, in clock order, 0 before the first key.
+  - `ks`: The key of each row in the new series: its position, or its timestamp.
+
+# Returns
+
+  - `s′::ExogenousGraphSeries`: The series on the rows.
+
+# Related
+
+  - [`graph_ingestion_view`](@ref)
+  - [`graph_view`](@ref)
+"""
+function graph_on_rows(s::ExogenousGraphSeries, q::AbstractVector{<:Integer},
+                       ks::AbstractVector)
+    i = [j for j in eachindex(q) if q[j] > 0 && (j == firstindex(q) || q[j] != q[j - 1])]
+    if isempty(i)
+        return ExogenousGraphSeries(ks[1:1], [nothing])
+    end
+    return ExogenousGraphSeries(ks[i], s.graphs[q[i]])
+end
+"""
     graph_vcat(a::ExogenousGraph, b::ExogenousGraph, name, Ta, tsa, Tb, tsb) -> ExogenousGraph
     graph_vcat(a::ExogenousGraphSeries{<:VecInt}, b::ExogenousGraphSeries{<:VecInt}, name, Ta, tsa, Tb, tsb) -> ExogenousGraphSeries
     graph_vcat(a::ExogenousGraphSeries{<:VecDate}, b::ExogenousGraphSeries{<:VecDate}, name, Ta, tsa, Tb, tsb) -> ExogenousGraphSeries

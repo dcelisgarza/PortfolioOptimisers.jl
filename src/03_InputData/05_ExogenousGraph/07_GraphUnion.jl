@@ -97,7 +97,7 @@ Keywords correspond to the struct's fields.
   - A `String` in `name` is not empty. Raises an [`IsEmptyError`](@ref). See [`assert_panel_field_name`](@ref).
   - `unknown` implements [`union_parts_in_force`](@ref). [`KindwiseUnknown`](@ref) raises a `MethodError`.
 
-The checks against the returns data run at the entry of the user verb, before the first fold: each name is a graph of the returns data, each snapshot of each part meets the requirements of the consumer, and the keys of the parts are of one kind. See [`assert_consumer_entry`](@ref). Non-negative parts and non-negative weights give a non-negative union, so the union needs no check of its own.
+The checks against the returns data run at the entry of the user verb, before the first fold: each name is a graph of the returns data, each snapshot of each part with a positive weight meets the requirements of the consumer, and the keys of these parts are of one kind. A part with the weight `0` does not enter the union, so these checks skip it, see [`union_kept`](@ref). See [`assert_consumer_entry`](@ref). Non-negative parts and non-negative weights give a non-negative union, so the union needs no check of its own.
 
 # Examples
 
@@ -321,12 +321,13 @@ end
     union_kept(w::Nothing, n::Integer) -> Vector{Int}
     union_kept(w::VecNum, n::Integer) -> Vector{Int}
 
-Return the positions of the parts of a union that enter the sum: every part under unit weights, and each part with a positive weight otherwise. A part with the weight `0` is skipped, so its nodes and its keys do not enter the union.
+Return the positions of the parts of a union that enter the sum: every part under unit weights, and each part with a positive weight otherwise. A part with the weight `0` is skipped, so its nodes and its keys do not enter the union. The requirements of a consumer and the check of the key kinds do not read it either. A consumer still finds its name in the returns data, because a name that the data does not hold is a wrong spec.
 
 # Related
 
   - [`graph_union`](@ref)
   - [`union_in_force`](@ref)
+  - [`assert_consumer_entry`](@ref)
 """
 function union_kept(::Nothing, n::Integer)
     return collect(1:n)
@@ -665,8 +666,8 @@ A union of static graphs only is static. A union with a series is a series. Its 
 
 # Algorithm
 
- 1. Check the parts, the weights, the key kinds, and that `unknown` has a method of [`union_parts_in_force`](@ref).
- 2. Keep the parts with a positive weight, [`union_kept`](@ref).
+ 1. Check the parts, the weights, and that `unknown` has a method of [`union_parts_in_force`](@ref).
+ 2. Keep the parts with a positive weight, [`union_kept`](@ref), and check their key kinds. A part with the weight `0` does not enter the union, so its kind is free.
  3. Static parts only: build the union with [`union_snapshot`](@ref).
  4. A series among the parts: find the keys with [`union_series_keys`](@ref), and build the union at each key with [`union_at_key`](@ref).
 
@@ -733,10 +734,10 @@ function graph_union(gs::ExG_ExGS...; w::Option{<:VecNum} = nothing,
     @argcheck(!(isone(n) && isnothing(nrm)),
               ArgumentError("a union of one graph with `nrm = nothing` is the graph itself. Use the graph, or give a normalisation such as `nrm = WeightShare()` for a normalised graph"))
     assert_union_weights(w, n)
-    assert_union_key_kinds(parts, string.(1:n))
     union_parts_in_force(unknown, trues(n))
     keep = union_kept(w, n)
     kept, wk = parts[keep], union_weights(w, keep)
+    assert_union_key_kinds(kept, string.(keep))
     if !any(g -> isa(g, ExogenousGraphSeries), kept)
         return union_snapshot(kept, wk, nrm, dir)
     end
@@ -811,20 +812,22 @@ function consumer_graph(consumer, ng::Option{<:VecStr}, G::Option{<:AbstractVect
     ks = [graph_position(ng, name) for name in gu.ng]
     parts = [G[k] for k in ks]
     snaps = [union_part_at(p, union_row_key(p, T, ts)) for p in parts]
-    for (k, (g, key)) in zip(ks, snaps)
+    for p in union_kept(gu.w, length(ks))
+        g, key = snaps[p]
         if !isnothing(g)
-            assert_graph_requirements(consumer, g, ng[k], key, "")
+            assert_graph_requirements(consumer, g, ng[ks[p]], key, "")
         end
     end
     return union_in_force(gu, parts, snaps, dir)
 end
 function assert_consumer_entry(consumer, gu::GraphUnion, ng, G,
                                path::AbstractString)::Nothing
-    for name in gu.ng
-        assert_consumer_entry(consumer, name, ng, G, path)
+    ks = [graph_position(ng, name) for name in gu.ng]
+    keep = union_kept(gu.w, length(ks))
+    for p in keep
+        assert_consumer_entry(consumer, gu.ng[p], ng, G, path)
     end
-    assert_union_key_kinds([G[graph_position(ng, name)] for name in gu.ng],
-                           ["\"$name\"" for name in gu.ng])
+    assert_union_key_kinds(G[ks[keep]], ["\"$(gu.ng[p])\"" for p in keep])
     return nothing
 end
 

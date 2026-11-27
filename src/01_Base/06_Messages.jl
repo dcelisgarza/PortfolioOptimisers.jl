@@ -68,6 +68,42 @@ function suggest_declared_key(key, candidates)
                                                   0.5))
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the first element of `xs` that repeats an earlier element.
+
+An error for a repeated name shows this element, and not the whole collection. The function reads each element one time, with a `Set` of the elements before it, so a check of a long collection, such as the edges of a large Exogenous Graph, stays linear.
+
+# Arguments
+
+  - `xs`: A collection of names, pairs of names, or timestamps.
+
+# Returns
+
+  - The first element that repeats an earlier one, or `nothing` when every element is unique.
+
+# Related
+
+  - [`Pipeline`](@ref)
+  - [`assert_graph_names`](@ref)
+  - [`exogenous_graph`](@ref)
+"""
+function first_duplicate(xs)
+    if isempty(xs)
+        return nothing
+    end
+    #! `typeof(first(xs))`, not `eltype(xs)`: over an abstract `Tuple{Vararg{String}}` the
+    #! latter is inferred as `Union{}`, and JET reports the set's lookup.
+    seen = Set{typeof(first(xs))}()
+    for x in xs
+        if x in seen
+            return x
+        end
+        push!(seen, x)
+    end
+    return nothing
+end
+"""
     unknown_variable_msg(v, nx, key; candidates = nx, axis::AbstractString = "asset",
                          consequence::AbstractString = "term dropped") -> String
 
