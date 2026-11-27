@@ -785,6 +785,17 @@ end
             @test po.port_opt_view(st, [2, 1]).G === st.G
             @test po.port_opt_view(st, [2, 1]).n == 10
         end
+        # A block can hold dated keys after its last row. The state after one step holds the
+        # keys of the batch view of its rows, with a cap and with none (#2396). The step takes
+        # the block itself, because a view of it drops the keys first.
+        blk = ReturnsResult(; nx = nx, X = X[1:6, :], ts = ts[1:6], ng = ["g"], G = [dated])
+        for w in (nothing, 4)
+            st = partial_fit!(RBS(; max_history = w), blk; own_returns = true)
+            b = rows(blk, isnothing(w) ? (1:6) : (3:6))
+            @test length(st.G[1].ts) == 1
+            @test isequal(st.G, b.G)
+            @test isequal(po.returns_result(st, st.X).G, b.G)
+        end
         # The first step pins the names, and a step that states another graph for a row that
         # holds one is refused.
         rdg = ReturnsResult(; nx = nx, X = X, ng = ["g"], G = [g1])

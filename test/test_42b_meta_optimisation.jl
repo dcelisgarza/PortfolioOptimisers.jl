@@ -83,6 +83,21 @@
         @test r.w ≈ W * r.reso.w
     end
 
+    @testset "the outer returns hold no Exogenous Graph, with folds and without (#2396)" begin
+        # A synthetic asset is not a node of the graph, so neither arm passes it on.
+        g = ExogenousGraph(; edges = [("1", "2", 0.4), ("S", "3", 0.5)])
+        rdg = ReturnsResult(; nx = string.(1:N), X = X, ts = ts, ng = ["g"], G = [g])
+        st = Stacking(; opti = opti, opto = InverseVolatility())
+        r = optimise(st, rdg)
+        W = hcat([x.w for x in r.resi]...)
+        for c in (nothing, cv)
+            ro = PO.predict_outer_returns(c, st, PO.FullUniverse(), rdg, r.resi[1].pr,
+                                          nothing, W, r.resi)
+            @test ro.nx == ["_1", "_2", "_3"]
+            @test isnothing(ro.ng) && isnothing(ro.G)
+        end
+    end
+
     @testset "outer_optimisation_finaliser names every failed stage" begin
         st = Stacking(; opti = opti, opto = InverseVolatility())
         r = optimise(st, rd)

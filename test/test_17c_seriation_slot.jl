@@ -159,6 +159,25 @@
         @test isempty(PO.spectral_seriation(zeros(0, 0)).order)
     end
 
+    @testset "A Stacking carries the memory to its inner and outer optimisers (#2396)" begin
+        sp = HierarchicalRiskParity(; ser = SpectralSeriation())
+        st = Stacking(; pe = Online(EmpiricalPrior()), opti = [sp, InverseVolatility()],
+                      opto = sp)
+        p = cross_val_predict(st, rd, OnlineIndexWalkForward(100, 50))
+        @test length(p.pred) == 2
+        c = PO.carry_fold_state(st, p.pred[1])
+        @test c.opti[1].ser.cache.order == p.pred[1].res.resi[1].ser.order
+        @test c.opto.ser.cache.order == p.pred[1].res.reso.ser.order
+        # An optimiser with no memory keeps its identity, and so does a Stacking of them.
+        @test c.opti[2] === st.opti[2]
+        iv = Stacking(; opti = [InverseVolatility(), EqualWeighted()],
+                      opto = InverseVolatility())
+        pv = cross_val_predict(iv, rd, IndexWalkForward(100, 50))
+        @test PO.carry_fold_state(iv, pv.pred[1]) === iv
+        # A result that is not a StackingResult, such as a fallback, takes the generic method.
+        @test PO.carry_fold_state(st, nothing) === st
+    end
+
     @testset "A Float32 sample stays in Float32" begin
         rd32 = ReturnsResult(; nx = ["A$i" for i in 1:8], X = Float32.(X))
         @test eltype(optimise(HierarchicalRiskParity(; ser = SpectralSeriation()), rd32).w) ==

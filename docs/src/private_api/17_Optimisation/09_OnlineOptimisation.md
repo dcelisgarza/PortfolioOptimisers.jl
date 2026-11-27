@@ -13,6 +13,7 @@ PortfolioOptimisers.fold_returns
 PortfolioOptimisers.fold_optimiser
 PortfolioOptimisers.online_state_seed(::Union{EqualWeighted, RandomWeighted, BestConstantRebalancedPortfolio}, max_history::PortfolioOptimisers.Option{<:Integer})
 PortfolioOptimisers.carry_fold_state(est::Union{PortfolioOptimisers.HierarchicalRiskParity{<:Any, <:PortfolioOptimisers.SpectralSeriation}, PortfolioOptimisers.SchurComplementHierarchicalRiskParity{<:Any, <:PortfolioOptimisers.SpectralSeriation}}, pred::PortfolioOptimisers.PredictionResult)
+PortfolioOptimisers.carry_fold_state(est::Stacking, pred::PortfolioOptimisers.PredictionResult)
 PortfolioOptimisers.update_online_estimator(opt::PortfolioOptimisers.JuMPOptimisationEstimator)
 PortfolioOptimisers.online_unreached_path
 PortfolioOptimisers.assert_stateless_schedule

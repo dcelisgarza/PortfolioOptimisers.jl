@@ -475,7 +475,7 @@ The graph form of [`fold_column`](@ref). The join is the one of [`vcat_observati
 The method that Julia selects is the algorithm.
 
  1. No graph: return `nothing`.
- 2. Take `Gb` when the state covers no row, `Ta` is zero, and join `Ga` and `Gb` with [`graphs_vcat`](@ref) otherwise.
+ 2. View `Gb` on its `Tb` rows with [`graphs_view`](@ref) when the state covers no row, `Ta` is zero, and join `Ga` and `Gb` with [`graphs_vcat`](@ref) otherwise. Both arms drop the keys of `Gb` after its last row, so the state after one step equals the batch view of its rows.
  3. When the `Ta + Tb` rows are more than the cap, view the joined graphs on the last `max_history` rows with [`graphs_view`](@ref).
 
 # Arguments
@@ -509,7 +509,9 @@ end
 function fold_graphs(ng::VecStr, Ga::Option{<:AbstractVector}, Gb::AbstractVector,
                      Ta::Integer, Tb::Integer, tsa::Option{<:AbstractVector},
                      tsb::Option{<:AbstractVector}, max_history::Option{<:Integer})
-    G = iszero(Ta) ? Gb : graphs_vcat(ng, Ga, Gb, Ta, tsa, Tb, tsb)
+    # A block can hold keys after its last row. The view drops them, as `graphs_vcat` drops
+    # them from both sides, so the state after one step equals the batch view of its rows.
+    G = iszero(Ta) ? graphs_view(Gb, 1:Tb, tsb) : graphs_vcat(ng, Ga, Gb, Ta, tsa, Tb, tsb)
     T = Ta + Tb
     n = capped_count(T, max_history)
     if n == T

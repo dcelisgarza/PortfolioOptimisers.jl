@@ -1182,7 +1182,7 @@ Without folds:
  1. View `rd` onto the observations the Prior Result answers on with [`outer_prior_rows`](@ref). Prepare the returns data of the outer problem from it with [`prepare_outer_rd`](@ref) under the rule `opt.pcol`, giving `nb`, `B`, `iv`, `ivpa`, `pnl` and the buffer `X`.
  2. Take the returns that the sub-portfolios are scored on with [`outer_returns_source`](@ref) under the source that `pr` records, giving `src`. It is the Prior Result, or the returns of the Prior Result with the benchmark added back when `pr` records `x_src = ExcessSource()`.
  3. For each inner result `res` in `resi`, write its net returns with [`calc_net_returns`](@ref) to column `i` of `X`, on `src` and Fees viewed onto sub-portfolio `i`.
- 4. Build the [`ReturnsResult`](@ref), with the asset names `_1`, `_2`, … and the factors and timestamps of `rd`.
+ 4. Build the [`ReturnsResult`](@ref), with the asset names `_1`, `_2`, … and the factors and timestamps of `rd`. The Exogenous Graphs of `rd` are over the assets, and a synthetic asset is not a node of them, so the result holds no graph. The arm with folds holds none either.
 
 With cross-validation:
 
@@ -1224,9 +1224,11 @@ function predict_outer_returns(::Nothing, opt, u::SubPortfolioUniverse, rd::Retu
         X[:, i] = calc_net_returns(res, sub_portfolio_view(u, src, i),
                                    sub_portfolio_view(u, fees, i))
     end
+    # The Exogenous Graphs are over the assets, and a synthetic asset is not a node of them,
+    # so the outer returns hold none, as the arm with folds holds none.
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
-                         nb = nb, B = B, ne = rd.ne, E = rd.E, ng = rd.ng, G = rd.G,
-                         ts = rd.ts, iv = iv, ivpa = ivpa, pnl = pnl)
+                         nb = nb, B = B, ne = rd.ne, E = rd.E, ts = rd.ts, iv = iv,
+                         ivpa = ivpa, pnl = pnl)
 end
 function predict_outer_returns(cv::OptCVE_Onl, opt, u::SubPortfolioUniverse,
                                rd::ReturnsResult, ::AbstractPriorResult, ::Option{<:Fees},

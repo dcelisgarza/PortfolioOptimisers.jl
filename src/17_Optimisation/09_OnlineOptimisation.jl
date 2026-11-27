@@ -804,6 +804,19 @@ Write the coordinates and the order of the spectral fit of a fold into the memor
 
 This is the fold memory of [`SpectralSeriation`](@ref) in the online arm of a walk-forward. The next fold projects these coordinates onto its own eigenspace, and breaks a tie by this order. The memory is over the universe of the estimator, `NaN` at an asset that the fold did not order, see [`seriation_state`](@ref).
 
+The memory reaches a bare HRP or Schur, and an inner or the outer optimiser of a [`Stacking`](@ref), through the method of [`carry_fold_state`](@ref) for a `Stacking`.
+
+!!! warning
+
+    In these cases each fold fits the seriation from its configuration, with no memory of the last fold:
+
+      - A [`TimeDependent`](@ref) schedule in `ser`. A schedule replaces the value of its field at each fold, and no schedule carries a state across a swap.
+      - An inner or the outer optimiser of a [`NestedClustered`](@ref). The clusters change from fold to fold, so the universe of an inner optimiser changes, and the coordinates of two clusters are not comparable.
+      - The optimisation step of a [`Pipeline`](@ref). A universe step can select other assets at each fold, and the prediction does not record which, so the memory of a fold has no universe to map onto.
+      - A fallback in `fb`.
+
+    A finite allocation and a schedule of optimisers take no online step, so [`partial_fit!`](@ref) refuses them before the first fold.
+
 # Algorithm
 
  1. Read the optimisation result `res` of the prediction `pred`, and dispatch on it.
@@ -841,6 +854,54 @@ function carry_fold_state(est::Union{HierarchicalRiskParity{<:Any, <:SpectralSer
                                                                                  <:SpectralSeriationResult}})
     cache = seriation_state(res.ser, result_investable_mask(res))
     return rebuild_struct(est, (; ser = rebuild_struct(est.ser, (; cache = cache))))
+end
+"""
+    carry_fold_state(est::Stacking, pred::PredictionResult)
+    carry_fold_state(est::Stacking, res::StackingResult)
+    carry_fold_state(opti::AbstractVector, resi::AbstractVector)
+
+Write the memory of the fit of a fold into the inner and the outer optimisers of a [`Stacking`](@ref).
+
+Each inner optimiser of a `Stacking` solves over every asset, and the outer optimiser solves over one synthetic asset for each inner optimiser. So the universe of each optimiser is the same at each fold, and the memory of its last fit is over that universe. The method writes the memory of each inner result into its inner optimiser, and the memory of the outer result into the outer optimiser, with [`carry_fold_state`](@ref) on each.
+
+# Algorithm
+
+ 1. Read the optimisation result `res` of the prediction `pred`, and dispatch on it. A fallback result takes the generic method, which returns `est` unchanged.
+ 2. Carry each inner result of `res.resi` into its inner optimiser of `est.opti`. A schedule of the whole field `opti` takes the generic method and does not change.
+ 3. Carry the outer result `res.reso` into `est.opto`.
+ 4. Return `est` when no optimiser changed, and `est` rebuilt around the new optimisers otherwise.
+
+# Arguments
+
+  - `est`: The threaded `Stacking`.
+  - `pred`: The prediction of the fold.
+  - `res`: The optimisation result of the prediction.
+  - `opti`, `resi`: The inner optimisers, and their results in the same order.
+
+# Returns
+
+  - `est`: The `Stacking` with the new memories, or `est` itself.
+  - `opti`: The inner optimisers with the new memories, or `opti` itself when none changed.
+
+# Related
+
+  - [`carry_fold_state`](@ref)
+  - [`Stacking`](@ref)
+"""
+function carry_fold_state(est::Stacking, pred::PredictionResult)
+    return carry_fold_state(est, pred.res)
+end
+function carry_fold_state(est::Stacking, res::StackingResult)
+    opti = carry_fold_state(est.opti, res.resi)
+    opto = carry_fold_state(est.opto, res.reso)
+    if opti === est.opti && opto === est.opto
+        return est
+    end
+    return rebuild_struct(est, (; opti = opti, opto = opto))
+end
+function carry_fold_state(opti::AbstractVector, resi::AbstractVector)
+    carried = map(carry_fold_state, opti, resi)
+    return all(map(===, carried, opti)) ? opti : carried
 end
 """
     update_online_estimator(opt::JuMPOptimisationEstimator)

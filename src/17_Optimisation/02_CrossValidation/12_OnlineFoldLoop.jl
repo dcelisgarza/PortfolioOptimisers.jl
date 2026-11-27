@@ -115,7 +115,7 @@ end
 
 Write the memory of the fit of a fold into the estimator that the online arm threads.
 
-A member above the prior can keep a memory of its last fit, as a [`SpectralSeriation`](@ref) in the seriation of [`HierarchicalRiskParity`](@ref) or of [`SchurComplementHierarchicalRiskParity`](@ref) does. The fit of a fold reads the threaded estimator and returns a prediction, so the arm writes the memory back after the fit, through this function. The generic method returns `est`, because most estimators keep no memory of their fit. An ordinary walk-forward fits each fold from the configuration, so it keeps no memory, and it does not call this function.
+A member above the prior can keep a memory of its last fit, as a [`SpectralSeriation`](@ref) in the seriation of [`HierarchicalRiskParity`](@ref) or of [`SchurComplementHierarchicalRiskParity`](@ref) does. The fit of a fold reads the threaded estimator and returns a prediction, so the arm writes the memory back after the fit, through this function. A [`Stacking`](@ref) forwards it to its inner and outer optimisers. The generic method returns `est`, because most estimators keep no memory of their fit. An ordinary walk-forward fits each fold from the configuration, so it keeps no memory, and it does not call this function.
 
 # Arguments
 
