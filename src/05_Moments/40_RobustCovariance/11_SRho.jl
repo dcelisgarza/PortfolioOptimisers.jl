@@ -9,12 +9,12 @@ Each method reads the squared distance ``t = d^2 / s`` of an observation, where 
 
 # Interfaces
 
-To implement a new rho function, subtype `AbstractSRho`, keep each parameter in a field, and implement four methods:
+To implement a new rho function, subtype `AbstractSRho`, keep each parameter in a field, implement the first three methods, and implement the fourth when the M-scale is not consistent at the normal model:
 
   - `PortfolioOptimisers.s_tuning(rho, bdp::Number, n::Integer, p::Integer) -> Tuple{Number, Number}`: Returns the tuning constant `k` of the rho function and the right side `b` of the equation of the M-scale, for the breakdown point `bdp` of `n` observations of `p` assets.
   - `PortfolioOptimisers.srho(rho, t::Number, k::Number) -> Number`: Returns the rho function at the squared distance `t`, a number from zero to one.
   - `PortfolioOptimisers.srho_weight(rho, t::Number, k::Number) -> Number`: Returns the weight of an observation at the squared distance `t`, a number from zero to one.
-  - `PortfolioOptimisers.s_consistency(rho, d2::VecNum, p::Integer) -> Number`: Returns the factor that makes the covariance consistent at the normal model, from the squared distances `d2` in the metric of the scale times the shape.
+  - `PortfolioOptimisers.s_consistency(rho, d2::VecNum, p::Integer) -> Number`: Returns the factor that makes the covariance consistent at the normal model, from the squared distances `d2` in the metric of the scale times the shape. The fallback returns one, the factor of a rho whose tuning constant makes the M-scale consistent.
 
 # Related
 
@@ -242,12 +242,12 @@ function srho_weight(::RockeRho, t::Number, g::Number)
     return abs(v) > 1 ? zero(v) : 1 - abs2(v)
 end
 """
-    s_consistency(rho::BisquareRho, d2::VecNum, p::Integer) -> Number
+    s_consistency(rho::AbstractSRho, d2::VecNum, p::Integer) -> Number
     s_consistency(rho::RockeRho, d2::VecNum, p::Integer) -> Number
 
 Returns the factor that makes the covariance of an S fit consistent at the normal model.
 
-The constant of the bisquare rho already makes the M-scale consistent, so its factor is one. The Rocke rho is centred at the typical distance, so its factor is the median of the squared distances over the median of the ``\\chi^2_p`` distribution, as for [`TylerCovariance`](@ref).
+The fallback returns one. It is the factor of a rho whose tuning constant already makes the M-scale consistent, such as [`BisquareRho`](@ref), and of a rho of a user that defines no method. The Rocke rho is centred at the typical distance, so its factor is the median of the squared distances over the median of the ``\\chi^2_p`` distribution, as for [`TylerCovariance`](@ref).
 
 # Arguments
 
@@ -264,7 +264,7 @@ The constant of the bisquare rho already makes the M-scale consistent, so its fa
   - [`AbstractSRho`](@ref)
   - [`srho_fit`](@ref)
 """
-function s_consistency(::BisquareRho, d2::VecNum, ::Integer)
+function s_consistency(::AbstractSRho, d2::VecNum, ::Integer)
     return one(eltype(d2))
 end
 function s_consistency(::RockeRho, d2::VecNum, p::Integer)

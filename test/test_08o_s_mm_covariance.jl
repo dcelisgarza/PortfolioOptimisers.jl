@@ -31,6 +31,18 @@ function s_outlier_sample(rng, n, p, nbad, shift)
     X[bad, :] .= shift .+ randn(rng, nbad, p)
     return X, clean, bad
 end
+# A rho of a user with the three methods of the interface of v0.34.15 alone, and no
+# `s_consistency`: the bisquare rho under another name.
+struct UserBisquareRho <: POS.AbstractSRho end
+function POS.s_tuning(::UserBisquareRho, bdp::Number, n::Integer, p::Integer)
+    return POS.s_tuning(BisquareRho(), bdp, n, p)
+end
+function POS.srho(::UserBisquareRho, t::Number, k::Number)
+    return POS.srho(BisquareRho(), t, k)
+end
+function POS.srho_weight(::UserBisquareRho, t::Number, k::Number)
+    return POS.srho_weight(BisquareRho(), t, k)
+end
 
 @testset "S and MM covariance estimators (#2255)" begin
     X = s_parity_sample(2255, 100, 3, 5)
@@ -282,6 +294,13 @@ end
         @test size(POS.port_opt_view(ce, [1, 3]).alg.ce.shr.tgt) == (2, 2)
         w = POS.StatsBase.Weights(fill(1.0, 100))
         @test POS.factory(ce, w).alg.ce.me.w === w
+        # A rho of a user that defines no `s_consistency` takes the factor one, as in v0.34.15.
+        rb = StatsAPI.fit(SCovariance(), X)
+        ru = StatsAPI.fit(SCovariance(; rho = UserBisquareRho()), X)
+        @test ru.mu == rb.mu
+        @test ru.sigma == rb.sigma
+        @test ru.d2 == rb.d2
+        @test POS.s_consistency(UserBisquareRho(), rb.d2, 3) === 1.0
         @test_throws DomainError RockeRho(; arp = 1)
         @test_throws DomainError FastS(; n_starts = 0)
         @test_throws DomainError FastS(; n_starts = 3, n_best = 5)
