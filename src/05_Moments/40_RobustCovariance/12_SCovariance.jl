@@ -51,6 +51,161 @@ DetS()
 """
 struct DetS <: AbstractSAlgorithm end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Searches the S estimate from random starts.
+
+The search of [salibianbarrera2006](@cite) draws `n_starts` random subsets of ``p + 1`` observations, see [`fasts_random_start`](@ref). Each subset gives a start: the mean and the covariance of its observations. The search does `n_refine` I-steps from each start, keeps the `n_best` estimates with the smallest M-scales, does I-steps from each until the estimate does not change, and returns the best. The default number of starts is the number that the manual of the R package `rrcov`, version 1.7-7, states for `method = "sfast"`.
+
+The search draws random numbers, so the type has the fields `rng` and `seed`. [`resolve_rng`](@ref) combines them when the search runs. With `seed = nothing`, two calls can give two estimates. [`DetS`](@ref) is the default of [`SCovariance`](@ref) for that reason.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    FastS(;
+        n_starts::Integer = 20,
+        n_refine::Integer = 2,
+        n_best::Integer = 5,
+        rng::Random.AbstractRNG = Random.default_rng(),
+        seed::Option{<:Integer} = nothing
+    ) -> FastS
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `n_starts`, `n_refine` and `n_best` are positive.
+  - `n_best <= n_starts`.
+
+# Examples
+
+```jldoctest
+julia> FastS(; seed = 42)
+FastS
+  n_starts ┼ Int64: 20
+  n_refine ┼ Int64: 2
+    n_best ┼ Int64: 5
+       rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
+      seed ┴ Int64: 42
+```
+
+# Related
+
+  - [`AbstractSAlgorithm`](@ref)
+  - [`DetS`](@ref)
+  - [`SCovariance`](@ref)
+  - [`resolve_rng`](@ref)
+
+# References
+
+  - $(ref_dict[:salibianbarrera2006]) Not read. The estimate agrees with the R package `rrcov`, version 1.7-7.
+"""
+@concrete struct FastS <: AbstractSAlgorithm
+    """
+    $(field_dict[:mcd_n_starts])
+    """
+    n_starts
+    """
+    $(field_dict[:s_n_refine])
+    """
+    n_refine
+    """
+    $(field_dict[:mcd_n_best])
+    """
+    n_best
+    """
+    $(field_dict[:rng])
+    """
+    rng
+    """
+    $(field_dict[:seed])
+    """
+    seed
+    function FastS(n_starts::Integer, n_refine::Integer, n_best::Integer,
+                   rng::Random.AbstractRNG, seed::Option{<:Integer})
+        @argcheck(n_starts > 0 && n_refine > 0 && n_best > 0,
+                  DomainError((n_starts, n_refine, n_best),
+                              "n_starts, n_refine and n_best must be positive"))
+        @argcheck(n_best <= n_starts,
+                  DomainError((n_best, n_starts),
+                              "n_best must not be larger than n_starts, got n_best = $n_best and n_starts = $n_starts"))
+        return new{typeof(n_starts), typeof(n_refine), typeof(n_best), typeof(rng),
+                   typeof(seed)}(n_starts, n_refine, n_best, rng, seed)
+    end
+end
+function FastS(; n_starts::Integer = 20, n_refine::Integer = 2, n_best::Integer = 5,
+               rng::Random.AbstractRNG = Random.default_rng(),
+               seed::Option{<:Integer} = nothing)::FastS
+    return FastS(n_starts, n_refine, n_best, rng, seed)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Searches the S estimate from the fit of another robust estimator.
+
+The search takes one start, the location and the covariance of the fit of `ce`, and does I-steps from it until the estimate does not change. An MCD fit with [`DetMCD`](@ref), the default, is deterministic, so two calls give the same estimate. The S estimate is then the nearest minimum of the M-scale to the MCD fit, and it has the efficiency of an S estimate, which the MCD has not. A fixed centre of the S fit is the `mean` keyword of the fit of `ce`, so it wins over the `me` of `ce`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    RobustStartS(;
+        ce::AbstractRobustCovarianceEstimator = MCDCovariance()
+    ) -> RobustStartS
+
+Keywords correspond to the struct's fields.
+
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `ce`: Recursively updated through [`factory`](@ref).
+
+## View parameters
+
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
+
+  - `ce`: Recursively viewed through [`port_opt_view`](@ref).
+
+# Examples
+
+```jldoctest
+julia> RobustStartS(; ce = TylerCovariance())
+RobustStartS
+  ce ┼ TylerCovariance
+     │    me ┼ nothing
+     │    ve ┼ nothing
+     │   shr ┼ nothing
+     │     w ┼ nothing
+     │     q ┴ Float64: 0.975
+```
+
+# Related
+
+  - [`AbstractSAlgorithm`](@ref)
+  - [`DetS`](@ref)
+  - [`MCDCovariance`](@ref)
+  - [`SCovariance`](@ref)
+"""
+@propagatable @concrete struct RobustStartS <: AbstractSAlgorithm
+    """
+    $(field_dict[:s_start_ce])
+    """
+    @fprop @vprop ce
+    function RobustStartS(ce::AbstractRobustCovarianceEstimator)
+        return new{typeof(ce)}(ce)
+    end
+end
+function RobustStartS(;
+                      ce::AbstractRobustCovarianceEstimator = MCDCovariance())::RobustStartS
+    return RobustStartS(ce)
+end
+"""
     S_MAX_ITER
 
 The largest number of iterations of one fixed point of an S or MM fit, 1000.
@@ -71,9 +226,11 @@ Estimates the location and the covariance of the returns with an S estimator, wh
 
 The S estimator of [davies1987](@cite) takes the location ``\\boldsymbol{\\mu}`` and the shape ``\\mathbf{V}`` of determinant one that make the M-scale ``s`` of the squared distances smallest. The covariance is ``s \\mathbf{V}``. The rho function `rho` is bounded, so a share of outliers below the breakdown point `bdp` cannot move the estimate without bound. Each observation has the continuous weight of the rho function, see [`srho_weight`](@ref), so an outlier has a weight near zero and the estimate needs no hard cut-off. The estimate goes through these steps:
 
- 1. The search `alg` finds the starts, see [`DetS`](@ref).
+ 1. The search `alg` finds the starts, see [`DetS`](@ref), [`FastS`](@ref) and [`RobustStartS`](@ref).
  2. The I-steps of [`s_isteps`](@ref) improve each start until it does not change.
- 3. The fit keeps the estimate with the smallest M-scale.
+ 3. The fit keeps the estimate with the smallest M-scale, and multiplies its covariance by the consistency factor of the rho function, see [`s_consistency`](@ref). The factor is one for [`BisquareRho`](@ref).
+
+With many assets, [`RockeRho`](@ref) gives a better balance of efficiency and resistance than the bisquare rho.
 
 At `bdp = 0.5`, the efficiency of the S estimate at the normal model is low for few assets. [`MMCovariance`](@ref) takes an M-step from it to a high efficiency, with the same breakdown point.
 
@@ -131,6 +288,7 @@ Keywords correspond to the struct's fields.
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `me`: Recursively updated through [`factory`](@ref).
+  - `alg`: Recursively updated through [`factory`](@ref).
   - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
@@ -138,6 +296,7 @@ Keywords correspond to the struct's fields.
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
   - `me`: Recursively viewed through [`port_opt_view`](@ref).
+  - `alg`: Recursively viewed through [`port_opt_view`](@ref).
   - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 # Examples
@@ -158,7 +317,10 @@ SCovariance
   - [`RobustCovarianceResult`](@ref)
   - [`MMCovariance`](@ref)
   - [`BisquareRho`](@ref)
+  - [`RockeRho`](@ref)
   - [`DetS`](@ref)
+  - [`FastS`](@ref)
+  - [`RobustStartS`](@ref)
   - [`MCDCovariance`](@ref)
 
 # References
@@ -183,7 +345,7 @@ SCovariance
     """
     $(field_dict[:s_alg])
     """
-    alg
+    @fprop @vprop alg
     """
     $(field_dict[:rob_q])
     """
@@ -287,14 +449,14 @@ end
 
 Builds the fit of an S or MM estimate from its location and its covariance.
 
-The squared distance of an observation is its distance in the metric of `sigma`, from [`squared_distances`](@ref). Its weight is [`srho_weight`](@ref) at that distance, and its flag is the one of [`robust_outliers`](@ref) at `q`.
+The weight of an observation is [`srho_weight`](@ref) at its squared distance in the metric of `sigma`, from [`squared_distances`](@ref). The covariance of the fit is `sigma` times the factor of [`s_consistency`](@ref), and the squared distances of the fit are in its metric. The flag of an observation is the one of [`robust_outliers`](@ref) at `q`.
 
 # Arguments
 
   - `rho`: The rho function of the weights.
   - `X`: The data matrix, `observations × assets`.
   - `mu`: The location.
-  - `sigma`: The covariance, the scale times the shape.
+  - `sigma`: The covariance, the scale times the shape, before the consistency factor.
   - `k`: The tuning constant of the rho function.
   - `q`: The probability of the cut-off of the outliers.
 
@@ -309,9 +471,13 @@ The squared distance of an observation is its distance in the metric of `sigma`,
 """
 function srho_fit(rho::AbstractSRho, X::MatNum, mu::VecNum, sigma::MatNum, k::Number,
                   q::Number)
+    p = length(mu)
     d2 = squared_distances(X, mu, sigma)
-    return RobustCovarianceResult(mu, sigma, d2, srho_weight.(Ref(rho), d2, k),
-                                  robust_outliers(nothing, d2, length(mu), q), nothing)
+    w = srho_weight.(Ref(rho), d2, k)
+    f = s_consistency(rho, d2, p)
+    d2 ./= f
+    return RobustCovarianceResult(mu, sigma * f, d2, w, robust_outliers(nothing, d2, p, q),
+                                  nothing)
 end
 """
     s_search(alg::AbstractSAlgorithm, rho::AbstractSRho, X::MatNum, centre::Option{<:VecNum},
@@ -360,10 +526,12 @@ function s_search(alg::AbstractSAlgorithm, rho::AbstractSRho, X::MatNum,
 end
 """
     s_starts(alg::DetS, X::MatNum, centre::Option{<:VecNum}, h::Integer) -> Vector{Tuple{VecNum, MatNum}}
+    s_starts(alg::FastS, X::MatNum, centre::Option{<:VecNum}, h::Integer) -> Vector{Tuple{VecNum, MatNum}}
+    s_starts(alg::RobustStartS, X::MatNum, centre::Option{<:VecNum}, h::Integer) -> Vector{Tuple{VecNum, MatNum}}
 
 Returns the start locations and scatters of the search `alg`.
 
-The [`DetS`](@ref) method standardises the data with [`mcd_standardise`](@ref), takes the six start subsets of [`detmcd_initset`](@ref) over the directions of [`detmcd_directions`](@ref), and fits each subset in the units of the data with [`mcd_fit_rows`](@ref). With a fixed centre, the location of each start is the centre.
+The [`DetS`](@ref) method standardises the data with [`mcd_standardise`](@ref), takes the six start subsets of [`detmcd_initset`](@ref) over the directions of [`detmcd_directions`](@ref), and fits each subset in the units of the data with [`mcd_fit_rows`](@ref). With a fixed centre, the location of each start is the centre. The [`FastS`](@ref) method resolves the generator from `alg.rng` and `alg.seed` with [`resolve_rng`](@ref), and draws `alg.n_starts` starts with [`fasts_random_start`](@ref). The [`RobustStartS`](@ref) method fits `alg.ce` with the centre as its `mean` keyword, and returns its location and its covariance.
 
 # Arguments
 
@@ -391,11 +559,56 @@ function s_starts(::DetS, X::MatNum, centre::Option{<:VecNum}, h::Integer)
     return [mcd_fit_rows(X, detmcd_initset(Z, P, h, fixed), centre)
             for P in detmcd_directions(Z)]
 end
+function s_starts(alg::FastS, X::MatNum, centre::Option{<:VecNum}, ::Integer)
+    rng = resolve_rng(alg.rng, alg.seed)
+    return [fasts_random_start(rng, X, centre) for _ in 1:(alg.n_starts)]
+end
+function s_starts(alg::RobustStartS, X::MatNum, centre::Option{<:VecNum}, ::Integer)
+    fit = StatsAPI.fit(alg.ce, X; mean = centre)
+    return [(fit.mu, fit.sigma)]
+end
+"""
+    fasts_random_start(rng::Random.AbstractRNG, X::MatNum, centre::Option{<:VecNum})
+        -> Tuple{VecNum, MatNum}
+
+Draws one start of [`FastS`](@ref).
+
+The function draws ``p + 1`` observations with no repetition. While their covariance matrix is singular, it adds one more observation that it draws from the rest, as [`fastmcd_random_start`](@ref) does. The start is the location and the scatter of the drawn observations, from [`mcd_fit_rows`](@ref).
+
+# Arguments
+
+  - `rng`: The random number generator.
+  - `X`: The data matrix, `observations × assets`.
+  - `centre`: The fixed centre, or `nothing`.
+
+# Returns
+
+  - `(mu, S)`: The location and the scatter of the start.
+
+# Related
+
+  - [`FastS`](@ref)
+  - [`s_starts`](@ref)
+"""
+function fasts_random_start(rng::Random.AbstractRNG, X::MatNum, centre::Option{<:VecNum})
+    n, p = size(X)
+    idx = StatsBase.sample(rng, 1:n, min(p + 1, n); replace = false)
+    mu, S = mcd_fit_rows(X, idx, centre)
+    while length(idx) < n && isnothing(scatter_cholesky(S))
+        push!(idx, rand(rng, setdiff(1:n, idx)))
+        mu, S = mcd_fit_rows(X, idx, centre)
+    end
+    return mu, S
+end
 """
     s_refine(alg::AbstractSAlgorithm, rho::AbstractSRho, X::MatNum, starts, fixed::Bool,
              k::Number, b::Number) -> Vector{Tuple{VecNum, MatNum}}
+    s_refine(alg::FastS, rho::AbstractSRho, X::MatNum, starts, fixed::Bool,
+             k::Number, b::Number) -> Vector{Tuple{VecNum, MatNum}}
 
-Keeps the best starts of a search. The default method keeps every start.
+Keeps the best starts of a search.
+
+The default method keeps every start. The [`FastS`](@ref) method does `alg.n_refine` I-steps from each start with [`s_isteps`](@ref), and returns the `alg.n_best` estimates with the smallest M-scales, in increasing order of the scale.
 
 # Arguments
 
@@ -420,13 +633,19 @@ function s_refine(::AbstractSAlgorithm, ::AbstractSRho, ::MatNum, starts, ::Bool
                   ::Number)
     return starts
 end
+function s_refine(alg::FastS, rho::AbstractSRho, X::MatNum, starts, fixed::Bool, k::Number,
+                  b::Number)
+    runs = [s_isteps(rho, X, mu, S, fixed, k, b, alg.n_refine) for (mu, S) in starts]
+    best = nearest_positions(map(r -> r[3], runs), min(alg.n_best, length(runs)))
+    return [(runs[i][1], runs[i][2]) for i in best]
+end
 """
     s_isteps(rho::AbstractSRho, X::MatNum, mu::VecNum, S::MatNum, fixed::Bool, k::Number,
              b::Number, maxsteps::Integer) -> Tuple{VecNum, MatNum, Number, Bool}
 
 Does I-steps of an S estimate from the location `mu` and the scatter `S`.
 
-An I-step is a step of the fixed-point equations of [lopuhaa1989](@cite), which state that an S estimate is an M-estimate with the weights of its own rho function. The step does not increase the M-scale. It stops when the relative change of the shape and the change of the location in the metric of the scatter are both below `sqrt(eps)`, or after `maxsteps` steps.
+An I-step is a step of the fixed-point equations of [lopuhaa1989](@cite), which state that an S estimate is an M-estimate with the weights of its own rho function. For a rho function that is concave in ``t``, such as [`BisquareRho`](@ref), the step does not increase the M-scale. [`RockeRho`](@ref) is convex below ``t = 1``, so the step has no such bound, and the search keeps the start with the smallest M-scale. It stops when the relative change of the shape and the change of the location in the metric of the scatter are both below `sqrt(eps)`, or after `maxsteps` steps.
 
 # Algorithm
 
@@ -567,4 +786,4 @@ function unit_determinant!(S::MatNum)
 end
 
 public AbstractSAlgorithm, s_starts, s_refine
-export DetS, SCovariance
+export DetS, FastS, RobustStartS, SCovariance

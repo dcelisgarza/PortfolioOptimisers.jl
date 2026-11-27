@@ -3,21 +3,23 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the rho functions of an S estimator of location and scatter.
 
-An S estimator of [davies1987](@cite) finds the location and the scatter of determinant one whose distances have the smallest M-scale. The rho function gives the M-scale, see [`m_scale`](@ref). It is bounded, so an observation far from the centre adds a fixed amount to the equation of the scale, and it cannot move the estimate much. The weight of an observation in the fit is the derivative of the rho function, see [`srho_weight`](@ref). [`BisquareRho`](@ref) is a subtype.
+An S estimator of [davies1987](@cite) finds the location and the scatter of determinant one whose distances have the smallest M-scale. The rho function gives the M-scale, see [`m_scale`](@ref). It is bounded, so an observation far from the centre adds a fixed amount to the equation of the scale, and it cannot move the estimate much. The weight of an observation in the fit is the derivative of the rho function, see [`srho_weight`](@ref). [`BisquareRho`](@ref) and [`RockeRho`](@ref) are its subtypes.
 
 Each method reads the squared distance ``t = d^2 / s`` of an observation, where ``s`` is the M-scale of the squared distances.
 
 # Interfaces
 
-To implement a new rho function, subtype `AbstractSRho`, keep each parameter in a field, and implement three methods:
+To implement a new rho function, subtype `AbstractSRho`, keep each parameter in a field, implement the first three methods, and implement the fourth when the M-scale is not consistent at the normal model:
 
   - `PortfolioOptimisers.s_tuning(rho, bdp::Number, n::Integer, p::Integer) -> Tuple{Number, Number}`: Returns the tuning constant `k` of the rho function and the right side `b` of the equation of the M-scale, for the breakdown point `bdp` of `n` observations of `p` assets.
   - `PortfolioOptimisers.srho(rho, t::Number, k::Number) -> Number`: Returns the rho function at the squared distance `t`, a number from zero to one.
-  - `PortfolioOptimisers.srho_weight(rho, t::Number, k::Number) -> Number`: Returns the weight of an observation at the squared distance `t`, one at the centre.
+  - `PortfolioOptimisers.srho_weight(rho, t::Number, k::Number) -> Number`: Returns the weight of an observation at the squared distance `t`, a number from zero to one.
+  - `PortfolioOptimisers.s_consistency(rho, d2::VecNum, p::Integer) -> Number`: Returns the factor that makes the covariance consistent at the normal model, from the squared distances `d2` in the metric of the scale times the shape. The fallback returns one, the factor of a rho whose tuning constant makes the M-scale consistent.
 
 # Related
 
   - [`BisquareRho`](@ref)
+  - [`RockeRho`](@ref)
   - [`SCovariance`](@ref)
   - [`m_scale`](@ref)
 
@@ -66,11 +68,87 @@ BisquareRho()
 """
 struct BisquareRho <: AbstractSRho end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The rho function of Rocke, a translated bisquare whose weights fall on both sides of the typical distance.
+
+With many assets, the squared distances of a normal sample are near their mean ``p``, and few observations are near the centre. The bisquare rho of a high breakdown point then gives a low efficiency, or rejects too few outliers. The rho of [rocke1996](@cite) is zero below ``1 - \\gamma`` and one above ``1 + \\gamma``, where ``t = d^2/s`` is centred at one. Its width ``\\gamma`` comes from the asymptotic rejection probability `arp`, the share of the observations of a normal sample that get the weight zero. The right side of the M-scale is ``\\mathrm{bdp} \\, (1 - p/n)``, see [`s_tuning`](@ref). The parity with `rrcov` below holds at the default `bdp = 0.5`, and another `bdp` has no reference value. The M-scale is the root of a monotone equation, which [`m_scale`](@ref) brackets and bisects. The scale is not consistent at the normal model, so the fit multiplies the covariance by the median of the squared distances over the median of the ``\\chi^2_p`` distribution, see [`s_consistency`](@ref).
+
+The R package `rrcov`, version 1.7-7, with `method = "rocke"`, gives the same estimate where its iterations reach the minimum. On five of six parity samples, the two agree to `1e-3`, and the M-scale of this fit is the smaller one. On the sixth, 40 observations of 6 assets, `rrcov` stops at a local minimum whose M-scale is 1.7 % larger than the one that [`DetS`](@ref) finds.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\rho(t) &= \\begin{cases} 0 & t < 1 - \\gamma\\,, \\\\ \\frac{1}{2} + \\frac{t - 1}{4 \\gamma} \\left(3 - \\left(\\frac{t - 1}{\\gamma}\\right)^2\\right) & \\lvert t - 1 \\rvert \\le \\gamma\\,, \\\\ 1 & t > 1 + \\gamma\\,, \\end{cases} & w(t) &= \\begin{cases} 1 - \\left(\\frac{t - 1}{\\gamma}\\right)^2 & \\lvert t - 1 \\rvert \\le \\gamma\\,, \\\\ 0 & \\text{otherwise}\\,, \\end{cases} \\\\
+\\gamma &= \\min\\left(\\frac{\\chi^2_{p, 1 - \\mathrm{arp}}}{p} - 1, 1\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``t``: The squared distance of an observation, divided by the M-scale.
+  - ``w``: The weight of the observation, the derivative of ``\\rho`` divided by its largest value.
+  - ``\\chi^2_{p, 1 - \\mathrm{arp}}``: The quantile ``1 - \\mathrm{arp}`` of the ``\\chi^2_p`` distribution.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    RockeRho(;
+        arp::Number = 0.1
+    ) -> RockeRho
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `0 < arp < 1`.
+  - At the fit, `arp < 1 - cdf(Chisq(p), p)`, so that the width is positive, see [`s_tuning`](@ref).
+
+# Examples
+
+```jldoctest
+julia> RockeRho()
+RockeRho
+  arp ┴ Float64: 0.1
+```
+
+# Related
+
+  - [`AbstractSRho`](@ref)
+  - [`BisquareRho`](@ref)
+  - [`SCovariance`](@ref)
+
+# References
+
+  - $(ref_dict[:rocke1996]) Not read. The width, the right side and the consistency factor agree with the R package `rrcov`, version 1.7-7.
+  - $(ref_dict[:maronna2019]) Not read.
+"""
+@concrete struct RockeRho <: AbstractSRho
+    """
+    $(field_dict[:s_arp])
+    """
+    arp
+    function RockeRho(arp::Number)
+        assert_open_probability(arp, :arp)
+        return new{typeof(arp)}(arp)
+    end
+end
+function RockeRho(; arp::Number = 0.1)::RockeRho
+    return RockeRho(arp)
+end
+"""
     s_tuning(rho::BisquareRho, bdp::Number, n::Integer, p::Integer) -> Tuple{Number, Number}
+    s_tuning(rho::RockeRho, bdp::Number, n::Integer, p::Integer) -> Tuple{Number, Number}
 
 Returns the tuning constant of the rho function and the right side of the equation of the M-scale.
 
-The bisquare rho takes the constant ``c^2`` of [`bisquare_constant`](@ref), and the right side is `bdp`. Neither depends on the number of observations.
+The bisquare rho takes the constant ``c^2`` of [`bisquare_constant`](@ref), and the right side is `bdp`. Neither depends on the number of observations. The Rocke rho takes the width ``\\gamma`` of [`RockeRho`](@ref), and the right side ``\\mathrm{bdp} \\, (1 - p/n)``. At `bdp = 1/2` that is the right side of the largest breakdown point that ``n`` observations of ``p`` assets permit.
+
+The width ``\\gamma`` is positive only when `arp` is below ``1 - F_{\\chi^2_p}(p)``, which is about 0.32 at ``p = 1`` and rises towards one half as ``p`` grows. Otherwise, the method raises a `DomainError`, because every observation would get the weight zero.
 
 # Arguments
 
@@ -91,16 +169,25 @@ The bisquare rho takes the constant ``c^2`` of [`bisquare_constant`](@ref), and 
 function s_tuning(::BisquareRho, bdp::Number, ::Integer, p::Integer)
     return bisquare_constant(bdp, p), bdp
 end
+function s_tuning(rho::RockeRho, bdp::Number, n::Integer, p::Integer)
+    chisq = Distributions.Chisq(p)
+    g = Distributions.quantile(chisq, 1 - rho.arp) / p - 1
+    @argcheck(g > 0,
+              DomainError(rho.arp,
+                          "the width of the Rocke rho is positive only when `arp < 1 - cdf(Chisq(p), p)`, which is $(1 - Distributions.cdf(chisq, p)) for p = $p, got arp = $(rho.arp)"))
+    return min(g, one(g)), bdp * (1 - p / n)
+end
 """
     srho(rho::BisquareRho, t::Number, c2::Number) -> Number
+    srho(rho::RockeRho, t::Number, g::Number) -> Number
 
-Returns the bisquare rho function at the squared distance `t`, see [`BisquareRho`](@ref).
+Returns the rho function at the squared distance `t`, see [`BisquareRho`](@ref) and [`RockeRho`](@ref).
 
 # Arguments
 
   - `rho`: The rho function.
   - `t`: The squared distance, divided by the M-scale.
-  - `c2`: The tuning constant ``c^2``.
+  - `c2`, `g`: The tuning constant ``c^2`` of the bisquare rho, or the width ``\\gamma`` of the Rocke rho.
 
 # Returns
 
@@ -115,20 +202,31 @@ function srho(::BisquareRho, t::Number, c2::Number)
     r = t / c2
     return r >= 1 ? one(r) : 1 - (1 - r)^3
 end
+function srho(::RockeRho, t::Number, g::Number)
+    v = (t - 1) / g
+    return if v < -1
+        zero(v)
+    elseif v > 1
+        one(v)
+    else
+        v * (3 - abs2(v)) / 4 + one(v) / 2
+    end
+end
 """
     srho_weight(rho::BisquareRho, t::Number, c2::Number) -> Number
+    srho_weight(rho::RockeRho, t::Number, g::Number) -> Number
 
-Returns the bisquare weight of an observation at the squared distance `t`, see [`BisquareRho`](@ref).
+Returns the weight of an observation at the squared distance `t`, see [`BisquareRho`](@ref) and [`RockeRho`](@ref).
 
 # Arguments
 
   - `rho`: The rho function.
   - `t`: The squared distance, divided by the M-scale.
-  - `c2`: The tuning constant ``c^2``.
+  - `c2`, `g`: The tuning constant ``c^2`` of the bisquare rho, or the width ``\\gamma`` of the Rocke rho.
 
 # Returns
 
-  - `w::Number`: The weight, one at the centre and zero beyond ``c^2``.
+  - `w::Number`: The weight, from zero to one. The bisquare weight is one at the centre and zero beyond ``c^2``. The Rocke weight is one at ``t = 1`` and zero outside ``1 \\pm \\gamma``.
 
 # Related
 
@@ -139,12 +237,50 @@ function srho_weight(::BisquareRho, t::Number, c2::Number)
     r = t / c2
     return r >= 1 ? zero(r) : (1 - r)^2
 end
+function srho_weight(::RockeRho, t::Number, g::Number)
+    v = (t - 1) / g
+    return abs(v) > 1 ? zero(v) : 1 - abs2(v)
+end
+"""
+    s_consistency(rho::AbstractSRho, d2::VecNum, p::Integer) -> Number
+    s_consistency(rho::RockeRho, d2::VecNum, p::Integer) -> Number
+
+Returns the factor that makes the covariance of an S fit consistent at the normal model.
+
+The fallback returns one. It is the factor of a rho whose tuning constant already makes the M-scale consistent, such as [`BisquareRho`](@ref), and of a rho of a user that defines no method. The Rocke rho is centred at the typical distance, so its factor is the median of the squared distances over the median of the ``\\chi^2_p`` distribution, as for [`TylerCovariance`](@ref).
+
+# Arguments
+
+  - `rho`: The rho function.
+  - `d2`: The squared distance of each observation, in the metric of the scale times the shape.
+  - `p`: The number of assets.
+
+# Returns
+
+  - `f::Number`: The factor of the covariance.
+
+# Related
+
+  - [`AbstractSRho`](@ref)
+  - [`srho_fit`](@ref)
+"""
+function s_consistency(::AbstractSRho, d2::VecNum, ::Integer)
+    return one(eltype(d2))
+end
+function s_consistency(::RockeRho, d2::VecNum, p::Integer)
+    return Statistics.median(d2) / Distributions.quantile(Distributions.Chisq(p), 0.5)
+end
 """
     m_scale(rho::AbstractSRho, t::VecNum, k::Number, b::Number, s::Number) -> Number
+    m_scale(rho::RockeRho, t::VecNum, g::Number, b::Number, s::Number) -> Number
 
 Returns the M-scale of the squared distances `t`, the value ``s`` at which the mean of ``\\rho(t_i / s)`` is `b`.
 
-The fixed-point step ``s \\leftarrow s \\, \\overline{\\rho(t/s)} / b`` converges to the scale from any positive start, because the rho function is bounded and does not decrease. The step stops when the relative change is at most `4 * eps`, or after [`S_MAX_ITER`](@ref) steps. A start near the scale, such as the scale of the last step of the fit, needs few steps.
+The mean of ``\\rho(t_i / s)`` does not increase with ``s``, so the root is unique where the mean is not flat.
+
+The general method does the fixed-point step ``s \\leftarrow s \\, \\overline{\\rho(t/s)} / b``. The step converges to the scale from any positive start when ``\\rho(t) / t`` does not increase, as for [`BisquareRho`](@ref). It stops when the relative change is at most `4 * eps`, or after [`S_MAX_ITER`](@ref) steps. A start near the scale, such as the scale of the last step of the fit, needs few steps.
+
+The Rocke rho rises steeply in a band of width ``2 \\gamma``, and ``\\gamma`` falls as the number of assets grows. The fixed-point step then oscillates: from about 20 assets, it stops at no root. So the method for [`RockeRho`](@ref) halves or doubles the start until the two ends of an interval hold the root, and bisects that interval.
 
 # Arguments
 
@@ -177,6 +313,24 @@ function m_scale(rho::AbstractSRho, t::VecNum, k::Number, b::Number, s::Number)
         end
     end
     return s
+end
+function m_scale(rho::RockeRho, t::VecNum, g::Number, b::Number, s::Number)
+    excess = r -> Statistics.mean(x -> srho(rho, x / r, g), t) - b
+    # The ends take the type of the equation, so that the bisection is as fine as the equation.
+    lo = hi = s * one(excess(s))
+    for _ in 1:S_MAX_ITER
+        if excess(lo) >= 0
+            break
+        end
+        lo /= 2
+    end
+    for _ in 1:S_MAX_ITER
+        if excess(hi) <= 0
+            break
+        end
+        hi *= 2
+    end
+    return lo == hi ? lo : Roots.find_zero(excess, (lo, hi), Roots.Bisection())
 end
 """
     chisq_truncated_moment(p::Integer, c2::Number, a::AbstractVector{<:Number}) -> Number
@@ -255,17 +409,75 @@ function bisquare_constant(bdp::Number, p::Integer)
     return Roots.find_zero(excess, (lo, 6 * p / bdp), Roots.Bisection())
 end
 """
-    bisquare_efficiency(p::Integer, c2::Number) -> Number
+$(DocStringExtensions.TYPEDEF)
 
-Returns the asymptotic efficiency of the shape of a bisquare M-estimator of scatter at the normal model, relative to the sample covariance.
+Abstract supertype for the parts of an M-estimate whose efficiency at the normal model tunes the constant of [`BisquareReweighting`](@ref).
 
-[salibianbarrera2006](@cite) states the asymptotic variance ``\\sigma_1`` of the shape of an M-estimator. The formula below writes it for the bisquare function in the squared distance ``t``. The efficiency is ``1 / \\sigma_1``. It rises from zero to one as ``c^2`` rises, and the constant of [`BisquareReweighting`](@ref) at 95 % is ``6.0963^2`` for three assets, the value of the R package `rrcov`, version 1.7-7.
+The bisquare M-step has one constant, so it fixes the efficiency of one part. [`ShapeEfficiency`](@ref) and [`LocationEfficiency`](@ref) are its subtypes. At one constant, the efficiency of the location is the higher of the two, so the constant of the shape at 95 % is the larger one.
+
+# Interfaces
+
+To implement a new target, subtype `AbstractEfficiencyTarget`, and implement one method:
+
+  - `PortfolioOptimisers.bisquare_efficiency(target, p::Integer, c2::Number) -> Number`: Returns the asymptotic efficiency of that part of a bisquare M-estimate with the constant `c2`, for `p` assets. It rises with `c2`.
+
+# Related
+
+  - [`ShapeEfficiency`](@ref)
+  - [`LocationEfficiency`](@ref)
+  - [`BisquareReweighting`](@ref)
+"""
+abstract type AbstractEfficiencyTarget <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Tunes the bisquare M-step to the efficiency of the shape, the default of [`BisquareReweighting`](@ref) and of `CovMMest` of the R package `rrcov`, version 1.7-7. A covariance is a shape and a scale, and the scale of an MM estimate comes from its S estimate, so this target sets the efficiency of the covariance.
+
+# Examples
+
+```jldoctest
+julia> ShapeEfficiency()
+ShapeEfficiency()
+```
+
+# Related
+
+  - [`AbstractEfficiencyTarget`](@ref)
+  - [`LocationEfficiency`](@ref)
+"""
+struct ShapeEfficiency <: AbstractEfficiencyTarget end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Tunes the bisquare M-step to the efficiency of the location, as `CovMMest` of the R package `rrcov`, version 1.7-7, does with `eff.shape = FALSE`. The constant is smaller than the one of [`ShapeEfficiency`](@ref) at the same efficiency, so the step rejects outliers sooner and the shape has a lower efficiency.
+
+# Examples
+
+```jldoctest
+julia> LocationEfficiency()
+LocationEfficiency()
+```
+
+# Related
+
+  - [`AbstractEfficiencyTarget`](@ref)
+  - [`ShapeEfficiency`](@ref)
+"""
+struct LocationEfficiency <: AbstractEfficiencyTarget end
+"""
+    bisquare_efficiency(target::ShapeEfficiency, p::Integer, c2::Number) -> Number
+    bisquare_efficiency(target::LocationEfficiency, p::Integer, c2::Number) -> Number
+
+Returns the asymptotic efficiency of a part of a bisquare M-estimate of location and scatter at the normal model, relative to the sample mean and the sample covariance.
+
+[salibianbarrera2006](@cite) states the asymptotic variance ``\\sigma_1`` of the shape and the asymptotic variance ``\\sigma_\\mu`` of the location of an M-estimator. The formulas below write them for the bisquare function in the squared distance ``t``. The efficiency is ``1 / \\sigma_1`` or ``1 / \\sigma_\\mu``. It rises from zero to one as ``c^2`` rises. At 95 % and three assets, the constant of the shape is ``6.0963^2`` and the one of the location is ``5.4902^2``, the values of the R package `rrcov`, version 1.7-7. For one asset, the constant of the location is ``4.685^2``, the classical constant of the bisquare M-estimator of location.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\sigma_1 &= \\frac{p (p + 2) \\, \\mathbb{E}\\left[t^2 (1 - t/c^2)^4 \\mathbb{1}\\{t \\le c^2\\}\\right]}{\\mathbb{E}\\left[t (1 - t/c^2) \\left((p + 2) - (p + 6) t / c^2\\right) \\mathbb{1}\\{t \\le c^2\\}\\right]^2}\\,.
+\\sigma_1 &= \\frac{p (p + 2) \\, \\mathbb{E}\\left[t^2 (1 - t/c^2)^4 \\mathbb{1}\\{t \\le c^2\\}\\right]}{\\mathbb{E}\\left[t (1 - t/c^2) \\left((p + 2) - (p + 6) t / c^2\\right) \\mathbb{1}\\{t \\le c^2\\}\\right]^2}\\,, \\\\
+\\sigma_\\mu &= \\frac{\\mathbb{E}\\left[t (1 - t/c^2)^4 \\mathbb{1}\\{t \\le c^2\\}\\right] / p}{\\mathbb{E}\\left[\\left(1 - (2 + 4/p) t / c^2 + (1 + 4/p) t^2 / c^4\\right) \\mathbb{1}\\{t \\le c^2\\}\\right]^2}\\,.
 \\end{align}
 ```
 
@@ -275,6 +487,7 @@ Where:
 
 # Arguments
 
+  - `target`: The part of the estimate.
   - `p`: The number of assets.
   - `c2`: The tuning constant ``c^2``.
 
@@ -284,14 +497,21 @@ Where:
 
 # Related
 
+  - [`AbstractEfficiencyTarget`](@ref)
   - [`BisquareReweighting`](@ref)
   - [`chisq_truncated_moment`](@ref)
 
 # References
 
-  - $(ref_dict[:salibianbarrera2006]) Not read. The formula agrees with the R package `rrcov`, version 1.7-7.
+  - $(ref_dict[:salibianbarrera2006]) Not read. The formulas agree with the R package `rrcov`, version 1.7-7.
 """
-function bisquare_efficiency(p::Integer, c2::Number)
+function bisquare_efficiency(::LocationEfficiency, p::Integer, c2::Number)
+    a = inv(c2)
+    num = chisq_truncated_moment(p, c2, [one(a), -(2 + 4 / p) * a, (1 + 4 / p) * a^2])
+    den = chisq_truncated_moment(p, c2, [zero(a), one(a), -4 * a, 6 * a^2, -4 * a^3, a^4])
+    return abs2(num) / (den / p)
+end
+function bisquare_efficiency(::ShapeEfficiency, p::Integer, c2::Number)
     a = inv(c2)
     num = p *
           (p + 2) *
@@ -302,5 +522,6 @@ function bisquare_efficiency(p::Integer, c2::Number)
     return abs2(den) / num
 end
 
-public AbstractSRho, s_tuning, srho, srho_weight
-export BisquareRho
+public AbstractSRho, s_tuning, srho, srho_weight, s_consistency, AbstractEfficiencyTarget,
+       bisquare_efficiency
+export BisquareRho, RockeRho, ShapeEfficiency, LocationEfficiency

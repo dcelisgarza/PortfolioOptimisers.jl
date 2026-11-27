@@ -256,6 +256,10 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :s_rho => "`rho`: Rho function of the M-scale of the S estimate, a subtype of [`AbstractSRho`](@ref).",#
                  :s_bdp => "`bdp`: Breakdown point of the S estimate, the largest share of outliers that cannot move it without bound, `0 < bdp <= 1/2`.",#
                  :s_alg => "`alg`: Search algorithm of the S estimate, a subtype of [`AbstractSAlgorithm`](@ref).",#
+                 :s_arp => "`arp`: Asymptotic rejection probability of the Rocke rho, the share of the observations of a normal sample that get the weight zero, `0 < arp < 1`.",#
+                 :s_n_refine => "`n_refine`: Number of I-steps from each start before the search keeps the best starts.",#
+                 :s_start_ce => "`ce`: Robust covariance estimator whose fit is the start of the S search, a subtype of [`AbstractRobustCovarianceEstimator`](@ref).",#
+                 :mm_target => "`target`: Part of the estimate whose efficiency `eff` tunes the constant of the M-step, a subtype of [`AbstractEfficiencyTarget`](@ref).",#
                  :mm_eff => "`eff`: Asymptotic efficiency of the shape of the M-step at the normal model, relative to the sample covariance, `0 < eff < 1`.",#
                  :mm_s => "`s`: S estimator of the first part of the MM estimate, an [`SCovariance`](@ref). It gives the breakdown point and the scale.",#
                  :mm_rw => "`rw`: M-step of the second part of the MM estimate, a [`BisquareReweighting`](@ref). It gives the efficiency.",#

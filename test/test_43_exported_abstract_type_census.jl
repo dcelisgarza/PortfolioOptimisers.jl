@@ -161,6 +161,7 @@
         :AbstractDiagonalConstruction,
         :AbstractDistanceAlgorithm,
         :AbstractDistanceEstimator,
+        :AbstractEfficiencyTarget,
         :AbstractEmptyPairAlgorithm,
         :AbstractEntropyPoolingViewFormulation,
         :AbstractEstimatorValueAlgorithm,

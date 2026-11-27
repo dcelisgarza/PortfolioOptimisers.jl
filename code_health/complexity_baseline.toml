@@ -204,9 +204,9 @@ commit = "2252e4f368"
 "src/05_Moments/40_RobustCovariance/08_TylerShrinkage.jl" = { cyc = 4, cog = 6, arg = 6, cyc_sum = 37, cog_sum = 25, arg_sum = 74, macros = [] }
 "src/05_Moments/40_RobustCovariance/09_TylerCovariance.jl" = { cyc = 7, cog = 12, arg = 7, cyc_sum = 23, cog_sum = 15, arg_sum = 56, macros = ["@propagatable"] }
 "src/05_Moments/40_RobustCovariance/10_RobustExpectedReturns.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 6, cog_sum = 5, arg_sum = 11, macros = ["@propagatable"] }
-"src/05_Moments/40_RobustCovariance/11_SRho.jl" = { cyc = 3, cog = 3, arg = 5, cyc_sum = 12, cog_sum = 8, arg_sum = 22, macros = [] }
-"src/05_Moments/40_RobustCovariance/12_SCovariance.jl" = { cyc = 3, cog = 3, arg = 8, cyc_sum = 17, cog_sum = 8, arg_sum = 55, macros = ["@propagatable"] }
-"src/05_Moments/40_RobustCovariance/13_MMCovariance.jl" = { cyc = 4, cog = 4, arg = 7, cyc_sum = 15, cog_sum = 9, arg_sum = 24, macros = ["@propagatable"] }
+"src/05_Moments/40_RobustCovariance/11_SRho.jl" = { cyc = 6, cog = 8, arg = 5, cyc_sum = 29, cog_sum = 22, arg_sum = 48, macros = [] }
+"src/05_Moments/40_RobustCovariance/12_SCovariance.jl" = { cyc = 3, cog = 3, arg = 8, cyc_sum = 29, cog_sum = 13, arg_sum = 79, macros = ["@propagatable"] }
+"src/05_Moments/40_RobustCovariance/13_MMCovariance.jl" = { cyc = 4, cog = 4, arg = 7, cyc_sum = 15, cog_sum = 9, arg_sum = 25, macros = ["@propagatable"] }
 "src/06_Distance/01_Base_Distance.jl" = { cyc = 2, cog = 1, arg = 2, cyc_sum = 3, cog_sum = 2, arg_sum = 2, macros = [] }
 "src/06_Distance/02_Distance.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 33, cog_sum = 18, arg_sum = 112, macros = [] }
 "src/06_Distance/03_DistanceDistance.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 6, cog_sum = 5, arg_sum = 19, macros = [] }
