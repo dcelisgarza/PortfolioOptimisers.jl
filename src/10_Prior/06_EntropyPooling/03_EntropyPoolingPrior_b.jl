@@ -383,7 +383,7 @@ function ep_sbar(sbar::Nothing, T::Integer, alpha::Number, w::VecNum, ord::VecIn
     s = T
     for (j, o) in enumerate(Iterators.reverse(ord))
         cw += w[o]
-        if cw + j * eps(float(cw)) >= alpha
+        if cw + j * eps(cw) >= alpha
             s = j
             break
         end
