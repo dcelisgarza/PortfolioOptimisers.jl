@@ -861,7 +861,8 @@ end
     # A bound on the measure under RiskBudgeting. The row of the logarithm adds exponential
     # cones, and Clarabel stops at SLOW_PROGRESS on such a model unless its scaling switch
     # waits for a shorter step. With the setting of the docstring, every bound solves and
-    # holds, from a tight one to one that does not bind.
+    # holds. `v` is the risk of the solve with no bound, so none of the three bounds binds:
+    # the stall of #2353 happened on bounds that do not bind.
     slvs = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                   check_sol = (; allow_local = true, allow_almost = true),
                   settings = Dict("verbose" => false, "tol_gap_abs" => 1e-10,
