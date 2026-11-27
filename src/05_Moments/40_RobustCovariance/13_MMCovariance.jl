@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Fits the location and the shape again with the soft weights of the bisquare function, with the scale of the raw fit fixed.
 
-The M-step of [tatsuoka2000](@cite) and [salibianbarrera2006](@cite) keeps the scale ``s = \\lvert \\mathbf{\\Sigma}_0 \\rvert^{1/p}`` of the raw covariance ``\\mathbf{\\Sigma}_0``, and solves the fixed point of a bisquare M-estimator of the location and of the shape of determinant one from the raw fit. Its constant ``c^2`` is larger than the one of the raw fit, so the step gives a high efficiency at the normal model, see [`bisquare_efficiency`](@ref). The raw fit gives the breakdown point, and the step keeps it. The weight of an observation falls from one at the centre to zero at ``c^2``, see [`BisquareRho`](@ref).
+The M-step of [tatsuoka2000](@cite) and [salibianbarrera2006](@cite) keeps the scale ``s = \\lvert \\mathbf{\\Sigma}_0 \\rvert^{1/p}`` of the raw covariance ``\\mathbf{\\Sigma}_0``, and solves the fixed point of a bisquare M-estimator of the location and of the shape of determinant one from the raw fit. Its constant ``c^2`` is larger than the one of the raw fit, so the step gives the efficiency `eff` at the normal model to the part `target` of the estimate, see [`bisquare_efficiency`](@ref). The raw fit gives the breakdown point, and the step keeps it. The weight of an observation falls from one at the centre to zero at ``c^2``, see [`BisquareRho`](@ref).
 
 The step is the second part of [`MMCovariance`](@ref). It also follows an [`MCDCovariance`](@ref) with `rw = BisquareReweighting()`, a soft reweighting in place of the hard weights of [`MCDReweighting`](@ref). The scale of the MCD is consistent at the normal model, so the efficiency holds there too.
 
@@ -14,7 +14,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     BisquareReweighting(;
-        eff::Number = 0.95
+        eff::Number = 0.95,
+        target::AbstractEfficiencyTarget = ShapeEfficiency()
     ) -> BisquareReweighting
 
 Keywords correspond to the struct's fields.
@@ -28,7 +29,8 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> BisquareReweighting()
 BisquareReweighting
-  eff ┴ Float64: 0.95
+     eff ┼ Float64: 0.95
+  target ┴ ShapeEfficiency()
 ```
 
 # Related
@@ -37,6 +39,7 @@ BisquareReweighting
   - [`MMCovariance`](@ref)
   - [`MCDCovariance`](@ref)
   - [`BisquareRho`](@ref)
+  - [`AbstractEfficiencyTarget`](@ref)
 
 # References
 
@@ -48,18 +51,23 @@ BisquareReweighting
     $(field_dict[:mm_eff])
     """
     eff
-    function BisquareReweighting(eff::Number)
+    """
+    $(field_dict[:mm_target])
+    """
+    target
+    function BisquareReweighting(eff::Number, target::AbstractEfficiencyTarget)
         assert_open_probability(eff, :eff)
-        return new{typeof(eff)}(eff)
+        return new{typeof(eff), typeof(target)}(eff, target)
     end
 end
-function BisquareReweighting(; eff::Number = 0.95)::BisquareReweighting
-    return BisquareReweighting(eff)
+function BisquareReweighting(; eff::Number = 0.95,
+                             target::AbstractEfficiencyTarget = ShapeEfficiency())::BisquareReweighting
+    return BisquareReweighting(eff, target)
 end
 """
     mm_constant(rw::BisquareReweighting, p::Integer) -> Number
 
-Returns the tuning constant ``c^2`` of the bisquare function at which the shape of the M-step has the efficiency `rw.eff` at the normal model.
+Returns the tuning constant ``c^2`` of the bisquare function at which the part `rw.target` of the M-step has the efficiency `rw.eff` at the normal model.
 
 The efficiency of [`bisquare_efficiency`](@ref) rises with ``c^2``, so a bisection finds the constant. The interval starts at ``[p/2, p]``. Its lower bound halves and its upper bound doubles until it holds the constant.
 
@@ -78,7 +86,7 @@ The efficiency of [`bisquare_efficiency`](@ref) rises with ``c^2``, so a bisecti
   - [`bisquare_efficiency`](@ref)
 """
 function mm_constant(rw::BisquareReweighting, p::Integer)
-    excess(c2) = bisquare_efficiency(p, c2) - rw.eff
+    excess(c2) = bisquare_efficiency(rw.target, p, c2) - rw.eff
     hi = p * one(rw.eff)
     lo = hi / 2
     while excess(lo) > 0
@@ -250,7 +258,8 @@ MMCovariance
      │   alg ┼ DetS()
      │     q ┴ Float64: 0.975
   rw ┼ BisquareReweighting
-     │   eff ┴ Float64: 0.95
+     │      eff ┼ Float64: 0.95
+     │   target ┴ ShapeEfficiency()
    q ┴ Float64: 0.975
 ```
 

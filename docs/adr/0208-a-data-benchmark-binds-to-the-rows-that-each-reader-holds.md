@@ -183,3 +183,32 @@ session that built it chose the four details below, and the maintainer accepted 
   [#1663](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1663)).
 - Scoring a prediction against its benchmark is
   [#1664](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1664).
+
+## Amendment (2026-11-25)
+
+`bind_data_benchmark` had one method for each type that holds a tracking part, and no ratio measure
+had one. So a data benchmark inside a `RiskRatio`, a `NonOptimisationRiskRatio`, a
+`MeanReturnRiskRatio` or an `ExpectedReturnRiskRatio` stayed unbound, and the call raised (#2330).
+
+One method on `AbstractBaseRiskMeasure` now binds the parts that `deferred_slots` declares. A
+composite declares its measures there for the resolution of a Deferred Quantity, so a new composite
+needs no method of the bind.
+
+The maintainer ruled that no other measure pays for the repair. `holds_data_benchmark` guards the
+method and the vector method, and the types decide it, so it is a constant for one measure and for a
+vector of one concrete type. A vector of mixed measures pays one dynamic call for each element. It
+allocated 736 bytes at each bind before, and it allocates nothing now. A form that binds each element
+and compares the answers lost on the same measurement, because the returns data is boxed once for
+each element.
+
+A vector whose element type is abstract, such as a `Vector{RiskMeasure}`, keeps that element type
+in the bind. The type decides the branch, so Julia infers the type of the rebuild of a composite
+that holds the vector. A ratio whose side is a mixed vector allocated 144 bytes at each bind
+without this rule, because its rebuild had an abstract type, and it allocates nothing with it. A
+vector whose element type is concrete or a `Union` takes the element types of the bound values,
+because a bound value can leave that type.
+
+The frame walk of a head follows the same rule. A composite measure walks its fields with
+`composite_frames`, which asks `holds_reader` of each field first. So a composite with no reader
+builds no path. A `MeanReturnRiskRatio` with no reader took 977 ns and 960 bytes at each walk
+before, and it takes 0 bytes now.

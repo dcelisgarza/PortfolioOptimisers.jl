@@ -8,7 +8,7 @@ jet = "0.13.3"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "5ff3c2a58c"
+commit = "0f1f6c3448"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
