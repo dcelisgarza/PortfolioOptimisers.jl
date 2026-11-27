@@ -12,4 +12,5 @@ VariableTracking
 PortfolioOptimisers.returns_tracking_path
 PortfolioOptimisers.assert_folds_track_no_series
 PortfolioOptimisers.bind_data_benchmark(::Any, ::Any)
+PortfolioOptimisers.holds_data_benchmark(::Any)
 ```
