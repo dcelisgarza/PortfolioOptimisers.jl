@@ -542,7 +542,7 @@ The steps whose values the last optimiser receives join the group of that optimi
 
 A Pipeline takes the online step. [`partial_fit!`](@ref) runs the steps in order, and folds each block of observations through them into the **row owner**. The row owner is the prior step, or the optimiser step when the pipeline has no prior step. `fit(pipe)` with no data returns the fitted [`PipelineResult`](@ref). Each step before the row owner is one of three kinds.
 
-  - A row-local step folds its rows and emits the transformed rows. [`PricesToReturns`](@ref), [`PriceGapFill`](@ref) with a [`CarriedPrice`](@ref), and [`MissingDataFilter`](@ref) at `row_thr = 1` are row-local.
+  - A row-local step folds its rows and emits the transformed rows. [`PricesToReturns`](@ref), [`PriceGapFill`](@ref) with a [`CarriedPrice`](@ref), [`MissingDataFilter`](@ref) at `row_thr = 1`, and [`PriceJumpFilter`](@ref) are row-local.
   - A universe-only step folds nothing. An [`AbstractAssetSelector`](@ref) and the column filter of a `MissingDataFilter` are universe-only. `fit(pipe)` with no data fits such a step again over the rows of the row owner, and applies its universe as a view.
   - A window-valued step, and every other step that writes a Data Slot, stops the warm-up with an error that names it. `Online(pipe)` is the declared refit that accepts such a step.
 
@@ -812,7 +812,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the [routing target](@ref PIPELINE_ROUTING_TARGETS) that a constraint result names by its type alone, or `nothing`.
 
-Four result types name one optimiser field each. A [`WeightBounds`](@ref) goes to `:wb`, a [`LinearConstraint`](@ref) to `:lcse`, a phylogeny constraint result to `:ple`, and a [`RiskBudget`](@ref) to `:rkb`. Every other type returns `nothing`, and needs a target beside it, see [`TargetedConstraint`](@ref).
+Five result types name one optimiser field each. A [`WeightBounds`](@ref) goes to `:wb`, a [`LinearConstraint`](@ref) to `:lcse`, a phylogeny constraint result to `:ple`, a [`ConcentrationLimit`](@ref) to `:conc`, and a [`RiskBudget`](@ref) to `:rkb`. Every other type returns `nothing`, and needs a target beside it, see [`TargetedConstraint`](@ref).
 
 This function is the only part of the fan-out that the type decides. It also decides whether the value of a step needs a wrapper. [`add_constraint_result`](@ref) wraps a value only when the value cannot name its own target, so the `constraints` slot holds a bare result where it can.
 
@@ -833,6 +833,7 @@ implicit_constraint_target(::WeightBounds)::Symbol = :wb
 implicit_constraint_target(::LinearConstraint)::Symbol = :lcse
 implicit_constraint_target(::AbstractPhylogenyConstraintResult)::Symbol = :ple
 implicit_constraint_target(::RiskBudget)::Symbol = :rkb
+implicit_constraint_target(::ConcentrationLimit)::Symbol = :conc
 implicit_constraint_target(::Any) = nothing
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

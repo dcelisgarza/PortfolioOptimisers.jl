@@ -14,9 +14,10 @@ on:
 
 concurrency:
   # Skip intermediate builds: always.
-  # Cancel intermediate builds: only if it is a pull request build.
+  # Cancel intermediate builds: only of a pull request or of a `dev-` branch, whose new head
+  # has runs of its own. ADR 0220.
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') || startsWith(github.ref, 'refs/heads/dev-') }}
 
 jobs:
   build:

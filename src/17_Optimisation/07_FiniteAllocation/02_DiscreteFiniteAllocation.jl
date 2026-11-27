@@ -181,18 +181,27 @@ $(DocStringExtensions.FIELDS)
                                                  dev = AbsoluteWeightDeviation()),
         unit::LuE_Lu = LotUnit(),
         sets::Option{<:UniverseSets} = nothing,
+        idx::Option{<:VecInt} = nothing,
         strict::Bool = false,
-        fb::Option{<:FOptE_FOpt} = GreedyAllocation(; unit = unit, sets = sets,
+        fb::Option{<:FOptE_FOpt} = GreedyAllocation(; unit = unit, sets = sets, idx = idx,
                                                     strict = strict)
     ) -> DiscreteAllocation
 
-Keywords correspond to the struct's fields. The default fallback reads the same `unit`, `sets` and `strict`, so a failed solve falls back to the same lots.
+Keywords correspond to the struct's fields. The default fallback reads the same `unit`, `sets`, `idx` and `strict`, so a failed solve falls back to the same lots.
 
 ## Validation
 
   - If `slv` is a vector: `!isempty(slv)`.
   - `sc > 0`, `so > 0`.
   - $(val_dict[:unit])
+
+## View parameters
+
+`DiscreteAllocation` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - A [`LotUnit`](@ref) in `unit` is sliced to the selected assets.
+  - A [`LotUnitEstimator`](@ref) in `unit` and its `sets` pass through unchanged, and `idx` takes the positions of the selected assets. The allocation resolves the estimator on the whole universe and then keeps these positions, so a name of an asset that the view left out gives no diagnostic.
+  - `fb` goes through [`view_child`](@ref), which views a fallback estimator and keeps a fallback result.
 
 # Examples
 
@@ -214,11 +223,13 @@ DiscreteAllocation
     unit ┼ LotUnit
          │   val ┴ Int64: 1
     sets ┼ nothing
+     idx ┼ nothing
   strict ┼ Bool: false
       fb ┼ GreedyAllocation
          │     unit ┼ LotUnit
          │          │   val ┴ Int64: 1
          │     sets ┼ nothing
+         │      idx ┼ nothing
          │   strict ┼ Bool: false
          │       fb ┴ nothing
 ```
@@ -230,6 +241,7 @@ DiscreteAllocation
   - [`FiniteAllocationOptimisationEstimator`](@ref)
   - [`GreedyAllocation`](@ref)
   - [`set_discrete_error!`](@ref)
+  - [`port_opt_view`](@ref)
 
 # References
 
@@ -261,6 +273,10 @@ DiscreteAllocation
     """
     sets
     """
+    $(field_dict[:idx_alloc])
+    """
+    idx
+    """
     $(field_dict[:strict_opt])
     """
     strict
@@ -270,31 +286,79 @@ DiscreteAllocation
     fb
     function DiscreteAllocation(slv::Slv_VecSlv, sc::Number, so::Number,
                                 wf::JuMPWeightFinaliserFormulation, unit::LuE_Lu,
-                                sets::Option{<:UniverseSets}, strict::Bool,
-                                fb::Option{<:FOptE_FOpt})
+                                sets::Option{<:UniverseSets}, idx::Option{<:VecInt},
+                                strict::Bool, fb::Option{<:FOptE_FOpt})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
         @argcheck(sc > zero(sc), DomainError(sc, "sc must be > 0"))
         @argcheck(so > zero(so), DomainError(so, "so must be > 0"))
-        if isa(unit, LotUnitEstimator)
-            @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when unit is a LotUnitEstimator"))
-        end
+        assert_allocation_unit(unit, sets, idx)
         return new{typeof(slv), typeof(sc), typeof(so), typeof(wf), typeof(unit),
-                   typeof(sets), typeof(strict), typeof(fb)}(slv, sc, so, wf, unit, sets,
-                                                             strict, fb)
+                   typeof(sets), typeof(idx), typeof(strict), typeof(fb)}(slv, sc, so, wf,
+                                                                          unit, sets, idx,
+                                                                          strict, fb)
     end
 end
 function DiscreteAllocation(; slv::Slv_VecSlv, sc::Number = 1, so::Number = 1,
                             wf::JuMPWeightFinaliserFormulation = ErrorWeightFinaliser(;
                                                                                       dev = AbsoluteWeightDeviation()),
                             unit::LuE_Lu = LotUnit(),
-                            sets::Option{<:UniverseSets} = nothing, strict::Bool = false,
+                            sets::Option{<:UniverseSets} = nothing,
+                            idx::Option{<:VecInt} = nothing, strict::Bool = false,
                             fb::Option{<:FOptE_FOpt} = GreedyAllocation(; unit = unit,
                                                                         sets = sets,
+                                                                        idx = idx,
                                                                         strict = strict))::DiscreteAllocation
-    return DiscreteAllocation(slv, sc, so, wf, unit, sets, strict, fb)
+    return DiscreteAllocation(slv, sc, so, wf, unit, sets, idx, strict, fb)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a copy of [`DiscreteAllocation`](@ref) for the assets `i`.
+
+Call it after a selection, with the index that cut the returns data, so that the allocator buys the lots of the assets that the selection kept.
+
+# Algorithm
+
+ 1. Take the lot unit and the positions of the assets `i` with [`allocation_unit_view`](@ref).
+ 2. View `fb` at `i` through [`view_child`](@ref), so the fallback reads the same assets.
+ 3. Rebuild the allocator with the new `unit`, `idx` and `fb`. The other fields hold no value for each asset, and `sets` stays whole.
+
+# Arguments
+
+  - `da`: The allocator.
+  - `i`: Indices of the assets that the view keeps.
+  - `args...`: Forwarded to the view of `fb`.
+
+# Returns
+
+  - `da::DiscreteAllocation`: The allocator restricted to the assets at `i`.
+
+# Examples
+
+```jldoctest
+julia> sets = UniverseSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
+
+julia> unit = LotUnitEstimator(; val = Dict(\"A\" => 100, \"B\" => 0.5));
+
+julia> alloc = DiscreteAllocation(; slv = Solver(; solver = nothing), unit = unit, sets = sets);
+
+julia> PortfolioOptimisers.port_opt_view(alloc, [2, 3]).idx == [2, 3]
+true
+```
+
+# Related
+
+  - [`DiscreteAllocation`](@ref)
+  - [`allocation_unit_view`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`view_child`](@ref)
+"""
+function port_opt_view(da::DiscreteAllocation, i, args...)::DiscreteAllocation
+    unit, idx = allocation_unit_view(da.unit, da.sets, da.idx, i)
+    return rebuild_struct(da,
+                          (; unit = unit, idx = idx, fb = view_child(da.fb, i, args...)))
 end
 """
     set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,
@@ -708,7 +772,7 @@ function _optimise(da::DiscreteAllocation, fai::FiniteAllocationInput;
                    str_names::Bool = false, save::Bool = true, kwargs...)
     p, cash, ca = fai.prices, fai.cash, fai.ca
     w, lbgt, sbgt, lidx, sidx, lsf, ssf = prepare_finite_allocation(fai)
-    lu = allocation_lot_unit(da.unit, da.sets, da.strict, fai)
+    lu = allocation_lot_unit(da.unit, da.sets, da.idx, da.strict, fai)
     sshares, scost, sw, _, sfee, sretcode, smodel = finite_sub_allocation(-view(w, sidx),
                                                                           view(p, sidx),
                                                                           nothing_scalar_array_view(lu,

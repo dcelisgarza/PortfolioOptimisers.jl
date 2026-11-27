@@ -939,6 +939,62 @@ end
         included = [3]
         @test_logs PO.add_best_factor_after_pval_failure!(tgt, included, F, ynoise)
         @test included == [3]
+
+        # A response with no variance has no p-value at any factor. The function adds no
+        # factor, and never the index 0, which named no factor and made a `BoundsError` (#2370).
+        included = Int[]
+        @test_logs PO.add_best_factor_after_pval_failure!(tgt, included, F, zeros(T))
+        @test isempty(included)
+        rz = @test_logs((:warn, r"Asset 2: the stepwise"),
+                        regression(StepwiseRegression(), [y zeros(T)], F))
+        @test iszero(rz.M[2, :]) && iszero(rz.b[2])
+    end
+
+    @testset "An asset fits on the rows where its return is finite (#2370)" begin
+        # A late listing: asset 2 has no return over the first 40 observations.
+        Xg = [y ynoise y .+ ynoise]
+        Xg[1:40, 2] .= NaN
+        keep = 41:T
+        w = AnalyticWeights(collect(range(0.5, 1.5; length = T)))
+        for (re, rek) in ((StepwiseRegression(), StepwiseRegression()),
+                          (factory(StepwiseRegression(), w),
+                           factory(StepwiseRegression(), AnalyticWeights(w[keep]))))
+            rr = regression(re, Xg, F)
+            # The gapped asset gets the fit of its own history, and no other asset changes.
+            rk = regression(rek, Xg[keep, 2:2], F[keep, :])
+            rf = regression(re, Xg[:, [1, 3]], F)
+            @test rr.M[2, :] ≈ rk.M[1, :] && rr.b[2] ≈ rk.b[1]
+            @test rr.M[[1, 3], :] == rf.M && rr.b[[1, 3]] == rf.b
+            @test rr.edof[2] == rk.edof[1] && rr.edof[2] < rr.edof[1]
+        end
+        # A dimension reduction keeps the basis of every observation of F, so a full-rank
+        # reduction recovers the least squares fit of the asset on its own rows, intercept
+        # included, with or without weights.
+        for (re, wt) in ((DimensionReductionRegression(), ones(length(keep))),
+                         (factory(DimensionReductionRegression(), w), w[keep]))
+            rr = regression(re, Xg, F)
+            sw = sqrt.(wt)
+            ols = ([ones(length(keep)) F[keep, :]] .* sw) \ (Xg[keep, 2] .* sw)
+            @test [rr.b[2]; rr.M[2, :]] ≈ ols
+            @test rr.M[[1, 3], :] ≈ regression(re, Xg[:, [1, 3]], F).M
+        end
+        # The active mask states the same gap as a `NaN` on finite returns, and the regression
+        # reads it in the pass that reads the finiteness. A mask of another shape is refused.
+        Xa = [y ynoise y .+ ynoise]
+        amsk = trues(T, 3)
+        amsk[1:40, 2] .= false
+        for re in (StepwiseRegression(), DimensionReductionRegression())
+            @test regression(re, Xa, F; active_mask = amsk).M ≈ regression(re, Xg, F).M
+            @test_throws DimensionMismatch regression(re, Xa, F; active_mask = trues(T, 2))
+        end
+        # An asset with no finite return has no observation to fit, so the regression
+        # refuses and names it, for both estimators.
+        Xd = copy(Xg)
+        Xd[:, 3] .= NaN
+        for re in (StepwiseRegression(), DimensionReductionRegression())
+            @test_throws r"asset 3 carries no finite and active return" regression(re, Xd,
+                                                                                   F)
+        end
     end
 
     @testset "Insertion order" begin
