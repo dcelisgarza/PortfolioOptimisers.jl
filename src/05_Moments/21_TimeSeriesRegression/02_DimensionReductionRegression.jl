@@ -599,7 +599,7 @@ Where:
 
  1. On the second method, cut `re` to `rows` with [`shared_series_estimator`](@ref), take `mu_r` as the mean of the rows `rows` of `F` under the mean estimator of the standardisation of the cut `re`, and do the steps below on `y[rows]`, `x1[rows, :]` and `mu_r`.
  2. Read the weights of `re.retgt` with [`regression_target_weights`](@ref), and call them `w`. Take the mean of `y`, weighted by `w` when it is not `nothing`, and call it `mean_y`.
- 3. Fit `re.retgt` to `x1` and `y` with [`asset_fit_coefficients`](@ref), with the leading column of ones named to it by `factory(re.retgt, InterceptColumn(1))`, and drop the leading coefficient. Call the rest `beta_pc`. A Saturated Fit, which leaves no residual, gets the intercept alone and a warning, so its `beta_pc` is zero.
+ 3. Fit `re.retgt` to `x1` and `y` with [`asset_fit_coefficients`](@ref), with the leading column of ones named to it by `factory(re.retgt, InterceptColumn(1))`, and drop the leading coefficient. Call the rest `beta_pc`. A Saturated Fit, which leaves less than one residual degree of freedom, gets the intercept alone and a warning, so its `beta_pc` is zero.
  4. Map `beta_pc` through `Vp` and divide by `sigma`. Call the result `beta`, the coefficients in the original factor space.
  5. Subtract the `mu_r`-weighted sum of `beta` from `mean_y`, and call the result `beta0`.
  6. Prepend `beta0` to `beta`.

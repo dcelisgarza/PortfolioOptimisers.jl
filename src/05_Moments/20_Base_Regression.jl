@@ -2180,18 +2180,46 @@ function asset_fit_rows(x::VecNum, a::Option{<:AbstractVector{<:Bool}},
     return rows
 end
 """
+    is_saturated_fit(fri, x1::MatNum) -> Bool
+
+Return `true` when a fit is a Saturated Fit, which leaves less than one residual degree of freedom.
+
+The function reads the residual count of the fit with [`residual_count`](@ref), and compares it with one. An unpenalised fit has an integer count, so the test is the test of a count that is not positive. A penalised fit states a real count, and under a weak penalty that count goes to zero and not below it. So a count between zero and one spends less than one full parameter on the residual, and the fit interpolates the returns as a count of zero does. The fit of the intercept alone leaves at least one, because [`asset_fit_rows`](@ref) gives each asset two cells. So the rule needs no tolerance.
+
+[`asset_fit_coefficients`](@ref) reads it to refit a Saturated Fit, and the stepwise search of [`StepwiseRegression`](@ref) reads it to admit only a factor set that leaves a residual.
+
+# Arguments
+
+  - `fri`: The fitted model.
+  - `x1`: The design of the fit, `observations × parameters`.
+
+# Returns
+
+  - `flag::Bool`: `true` when `residual_count(fri, x1) < 1`.
+
+# Related
+
+  - [`residual_count`](@ref)
+  - [`asset_fit_coefficients`](@ref)
+  - [`StepwiseRegression`](@ref)
+"""
+function is_saturated_fit(fri, x1::MatNum)::Bool
+    nu = residual_count(fri, x1)
+    return nu < one(nu)
+end
+"""
     asset_fit_coefficients(tgt::AbstractRegressionTarget, x1::MatNum, x::VecNum,
                            i::Integer) -> Tuple{Vector, Real}
 
 Fits the model of one asset of a time-series regression, and refits a Saturated Fit on the intercept alone.
 
-A Saturated Fit leaves no residual degree of freedom: an asset with fewer cells in the fit than the parameters of its model plus one. Its coefficients interpolate the returns and are not an estimate, and its residual variance is zero, so a factor prior reads the asset as a pure factor bet. The function reads the residual count of the fit with [`residual_count`](@ref). When the count is not positive, it warns, names the asset, and fits the intercept column alone. Each factor column then gets a coefficient of zero, as a column that the pivot of `GLM` drops. A fit that leaves a residual does not change. A penalised target states its own count, so a penalised fit on more columns than rows keeps its coefficients while its count is positive.
+A Saturated Fit leaves less than one residual degree of freedom: an asset with fewer cells in the fit than the parameters of its model plus one. Its coefficients interpolate the returns and are not an estimate, and its residual variance is zero, so a factor prior reads the asset as a pure factor bet. The function tests the fit with [`is_saturated_fit`](@ref). On a Saturated Fit, it warns, names the asset, and fits the intercept column alone. Each factor column then gets a coefficient of zero, as a column that the pivot of `GLM` drops. A fit that leaves a residual does not change. A penalised target states its own count, so a penalised fit on more columns than rows keeps its coefficients while its count is at least one.
 
-[`asset_fit_rows`](@ref) gives each asset at least two cells, so the fit of the intercept alone leaves a residual.
+[`asset_fit_rows`](@ref) gives each asset at least two cells, so the fit of the intercept alone leaves a residual. The stepwise search admits only a factor set that leaves a residual, so for [`StepwiseRegression`](@ref) the refit is the last guard: for a factor set that a caller pins, and for a backward search whose full set has no admissible one-removal set.
 
 # Algorithm
 
- 1. Fit `tgt` to `x1` and `x`, and read its residual count `nu`. Return the coefficients and `nu` when `nu` is positive.
+ 1. Fit `tgt` to `x1` and `x`. Return the coefficients and the residual count `nu` of the fit when [`is_saturated_fit`](@ref) is `false`.
  2. Otherwise warn, and fit `tgt` to the first column of `x1`, the column of ones, and `x`.
  3. Return a vector of zeros of the width of `x1` with the intercept of step 2 first, and the residual count of the fit of step 2.
 
@@ -2217,11 +2245,10 @@ A Saturated Fit leaves no residual degree of freedom: an asset with fewer cells 
 function asset_fit_coefficients(tgt::AbstractRegressionTarget, x1::MatNum, x::VecNum,
                                 i::Integer)
     fri = StatsAPI.fit(tgt, x1, x)
-    nu = residual_count(fri, x1)
-    if nu > zero(nu)
-        return StatsAPI.coef(fri), nu
+    if !is_saturated_fit(fri, x1)
+        return StatsAPI.coef(fri), residual_count(fri, x1)
     end
-    @warn("Asset $i: the fit spends every one of its $(size(x1, 1)) observations on its $(size(x1, 2)) parameters, and leaves no residual. The asset gets an intercept-only model, and its row of the loadings matrix is all zeros.",
+    @warn("Asset $i: the fit spends every one of its $(size(x1, 1)) observations on its $(size(x1, 2)) parameters, and leaves less than one residual degree of freedom. The asset gets an intercept-only model, and its row of the loadings matrix is all zeros.",
           maxlog = log_limit(:warn), _id = @log_id())
     x0 = x1[:, 1:1]
     f0 = StatsAPI.fit(tgt, x0, x)

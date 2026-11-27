@@ -998,15 +998,20 @@ end
 
     @testset "A Saturated Fit keeps the intercept alone (#2371)" begin
         # Asset 2 has two finite returns. A model with a factor on two rows interpolates them
-        # and leaves no residual, so both estimators fit the intercept alone and warn.
+        # and leaves no residual, so both estimators fit the intercept alone and warn. The
+        # stepwise search admits no such model, so it selects no factor and says so (#2387).
         Xs = [y ynoise y .+ ynoise]
         Xs[1:(T - 2), 2] .= NaN
         last2 = (T - 1):T
         w = AnalyticWeights(collect(range(0.5, 1.5; length = T)))
         for re in (StepwiseRegression(), DimensionReductionRegression(),
                    factory(StepwiseRegression(), w), factory(DimensionReductionRegression(), w))
-            rr = @test_logs((:warn, r"Asset 2: the fit spends every one of its 2"),
-                            match_mode = :any, regression(re, Xs, F))
+            msg = if re isa StepwiseRegression
+                r"Asset 2: the stepwise search selected no factor"
+            else
+                r"Asset 2: the fit spends every one of its 2"
+            end
+            rr = @test_logs((:warn, msg), match_mode = :any, regression(re, Xs, F))
             wt = if isnothing(PO.regression_target_weights(if re isa StepwiseRegression
                                                                re.tgt
                                                            else
@@ -1037,6 +1042,97 @@ end
         for re in (StepwiseRegression(), DimensionReductionRegression())
             @test_throws r"asset 2 carries 1 finite and active return" regression(re, X1, F)
             @test_throws ArgumentError regression(re, Xs[T:T, [1, 3]], F[T:T, :])
+        end
+    end
+
+    @testset "Each fit leaves a residual: the search (#2387) and a penalised count (#2388)" begin
+        # The data of the two reproductions: three factors, and asset 2 with `n` finite
+        # returns. A saturated set has a residual of almost zero, so it scored best under
+        # `:aic`, `:bic` and `:r2`, and a backward search started from it.
+        rs = StableRNG(1)
+        Ts = 60
+        Fs = randn(rs, Ts, 3) ./ 100
+        Xr = Fs * randn(rs, 3, 3) .+ randn(rs, Ts, 3) ./ 1000
+        crits = (:aic, :bic, :r2, :adjr2, PValue())
+
+        # The predicate reads the count of the design through the fallback of residual_count.
+        @test PO.is_saturated_fit(nothing, ones(2, 2))
+        @test !PO.is_saturated_fit(nothing, ones(3, 2))
+
+        # On 4 rows the forward search stops at the largest set that leaves a residual. It
+        # selected [2, 3, 1] before the fix.
+        r4 = (Ts - 3):Ts
+        @test PO.stepwise_factor_set(StepwiseRegression(; crit = :aic), Xr[r4, 2],
+                                     Fs[r4, :], 2) == [2, 3]
+
+        # On 3 and 4 rows every search selects a set that leaves a residual, and the asset
+        # keeps the loadings of that set. A backward search on 3 rows has no set of one
+        # removal that leaves a residual, so it returns the full set, and the regression
+        # fits the intercept alone and warns.
+        for n in (3, 4), crit in crits, alg in (ForwardSelection(), BackwardElimination())
+            Xg = copy(Xr)
+            Xg[1:(Ts - n), 2] .= NaN
+            rows = (Ts - n + 1):Ts
+            re = StepwiseRegression(; crit = crit, alg = alg)
+            inc = PO._regression(re, Xr[rows, 2], Fs[rows, :])
+            if alg isa BackwardElimination && n == 3
+                @test sort(collect(inc)) == 1:3
+                rr = @test_logs((:warn, r"Asset 2: the fit spends every one of its 3"),
+                                match_mode = :any, regression(re, Xg, Fs))
+                @test iszero(rr.M[2, :]) && rr.edof[2] == 2
+            else
+                f1 = [ones(n) Fs[rows, inc]]
+                @test !isempty(inc) &&
+                      !PO.is_saturated_fit(StatsAPI.fit(tgt, f1, Xr[rows, 2]), f1)
+                rr = regression(re, Xg, Fs)
+                @test rr.M[2, inc] ≈ (f1 \ Xr[rows, 2])[2:end]
+                @test rr.edof[2] == n - 1 - length(inc) >= 1
+            end
+        end
+
+        # On 2 rows no factor leaves a residual. A forward search selects none and says so. A
+        # backward search keeps the full set, and the regression refits it.
+        X2 = copy(Xr)
+        X2[1:(Ts - 2), 2] .= NaN
+        for crit in crits, alg in (ForwardSelection(), BackwardElimination())
+            msg = if alg isa ForwardSelection
+                r"Asset 2: the stepwise search selected no factor"
+            else
+                r"Asset 2: the fit spends every one of its 2"
+            end
+            rr = @test_logs((:warn, msg), match_mode = :any,
+                            regression(StepwiseRegression(; crit = crit, alg = alg), X2,
+                                       Fs))
+            @test iszero(rr.M[2, :]) && rr.edof[2] == 1
+        end
+
+        # The first removal of a backward p-value search from a saturated set: a factor on 4
+        # rows, none on 3 rows. A single factor on 2 rows leaves the set with no factor, which
+        # has no p-value to fail, so the search selects nothing and says so.
+        r3 = (Ts - 2):Ts
+        @test !iszero(PO.saturated_set_pval_removal(tgt, Xr[r4, 2], Fs[r4, :]))
+        @test iszero(PO.saturated_set_pval_removal(tgt, Xr[r3, 2], Fs[r3, :]))
+        r2 = (Ts - 1):Ts
+        @test PO.saturated_set_pval_removal(tgt, Xr[r2, 2], Fs[r2, 1:1]) == 1
+        reb = StepwiseRegression(; alg = BackwardElimination())
+        @test isempty(PO._regression(reb, Xr[r2, 2], Fs[r2, 1:1]))
+        @test_logs((:warn, r"Asset 1: the stepwise search selected no factor"),
+                   regression(reb, Xr[r2, 2:2], Fs[r2, 1:1]))
+
+        # A penalised fit on fewer rows than columns states a count of almost zero, not zero.
+        # It is saturated, and the asset gets the intercept alone.
+        x1 = [ones(2) Fs[r2, :]]
+        fe = StatsAPI.fit(factory(ElasticNet(), InterceptColumn(1)), x1, Xr[r2, 2])
+        @test 0 < PO.residual_count(fe, x1) < 1 && PO.is_saturated_fit(fe, x1)
+        for n in (2, 3)
+            Xg = copy(Xr)
+            Xg[1:(Ts - n), 2] .= NaN
+            rr = @test_logs((:warn, r"Asset 2: "), match_mode = :any,
+                            regression(DimensionReductionRegression(; retgt = ElasticNet()),
+                                       Xg, Fs))
+            @test iszero(rr.M[2, :]) && rr.edof[2] >= 1
+            rr = regression(StepwiseRegression(; crit = :aic, tgt = ElasticNet()), Xg, Fs)
+            @test rr.edof[2] >= 1
         end
     end
 

@@ -35,6 +35,7 @@ glm_weights
 glm_fit_kwargs
 PortfolioOptimisers.assert_finite_factor_rows
 asset_fit_coefficients
+is_saturated_fit
 ```
 
 ## References

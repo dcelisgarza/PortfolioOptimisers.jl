@@ -12,6 +12,8 @@ _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriterion, <:Bac
 add_best_factor_after_pval_failure!
 get_forward_reg_incl_excl!
 get_backward_reg_incl!
+saturated_set_pval_removal
+stepwise_score
 assert_stepwise_included
 assert_stepwise_regression
 stepwise_factor_set
