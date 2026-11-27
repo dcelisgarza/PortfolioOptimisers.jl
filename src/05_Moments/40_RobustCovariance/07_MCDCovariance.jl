@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the reweighting steps that follow a raw robust fit.
 
-The raw MCD reads only `h` of the observations, so its efficiency is low. A reweighting step fits the location and the scatter again over the observations that the raw fit does not flag. [`MCDReweighting`](@ref) gives the hard weights of [rousseeuw1999](@cite).
+The raw MCD reads only `h` of the observations, so its efficiency is low. A reweighting step fits the location and the scatter again from the raw fit. [`MCDReweighting`](@ref) gives the hard weights of [rousseeuw1999](@cite) to the observations that the raw fit does not flag. [`BisquareReweighting`](@ref) gives the soft weights of a bisquare M-step, which is also the second part of [`MMCovariance`](@ref).
 
 # Interfaces
 
@@ -14,6 +14,7 @@ To implement a new reweighting step, subtype `AbstractRobustReweighting`, keep e
 # Related
 
   - [`MCDReweighting`](@ref)
+  - [`BisquareReweighting`](@ref)
   - [`MCDCovariance`](@ref)
 """
 abstract type AbstractRobustReweighting <: AbstractAlgorithm end
@@ -106,7 +107,7 @@ The minimum covariance determinant of [rousseeuw1999](@cite) reads only the `h` 
 
  1. The search `alg` finds the subset, see [`DetMCD`](@ref) and [`FastMCD`](@ref).
  2. The raw location is the mean of the subset, and the raw scatter is its covariance. The scatter gets the consistency factor of [croux1999](@cite), see [`mcd_consistency`](@ref), and the small-sample factor `ssc` of [pison2002](@cite), see [`MCDSmallSampleCorrection`](@ref).
- 3. The reweighting step `rw` fits the location and the scatter again over the observations that the raw fit does not flag, see [`MCDReweighting`](@ref). `rw = nothing` gives the raw MCD.
+ 3. The reweighting step `rw` fits the location and the scatter again over the observations that the raw fit does not flag, see [`MCDReweighting`](@ref). [`BisquareReweighting`](@ref) gives soft weights in place of the hard ones. `rw = nothing` gives the raw MCD.
 
 `StatsAPI.fit` returns the location, the scatter, and the squared distance, the weight and the outlier flag of each observation in a [`RobustCovarianceResult`](@ref). `cov` returns the scatter of that fit.
 
@@ -152,6 +153,7 @@ Keywords correspond to the struct's fields.
   - `1/2 <= alpha <= 1`.
   - `0 < q < 1`.
   - `shr` or `ssc` is `nothing`.
+  - `shr` is `nothing` when `rw` is a [`BisquareReweighting`](@ref). The M-step needs more observations than assets, and it does not shrink.
 
 ## Propagated parameters
 
@@ -247,6 +249,8 @@ MCDCovariance
         assert_open_probability(q, :q)
         @argcheck(isnothing(shr) || isnothing(ssc),
                   ArgumentError("the small-sample correction holds for an MCD with no shrinkage. Set `ssc = nothing` with a `shr`"))
+        @argcheck(isnothing(shr) || !isa(rw, BisquareReweighting),
+                  ArgumentError("the bisquare M-step needs more observations than assets, and it does not shrink. Use `rw = MCDReweighting()` or `rw = nothing` with a `shr`"))
         return new{typeof(me), typeof(alg), typeof(alpha), typeof(shr), typeof(ssc),
                    typeof(rw), typeof(q), typeof(cache)}(me, alg, alpha, shr, ssc, rw, q,
                                                          cache)
