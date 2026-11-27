@@ -1171,6 +1171,35 @@ end
     @test_throws DomainError AssetRedistribution(; idx = 0)
     @test_throws BoundsError AssetRedistribution(; idx = 9)([0.5, 0.5], [false, true])
 end
+@testset "A rule for an Unpriced Asset names only assets of the book (#2341)" begin
+    using PortfolioOptimisers, Test
+    w = [0.5, 0.3, 0.2]
+    # The check does not read the prices: a wrong position is refused on a date on which
+    # every asset has a price too, and a correct one passes on both dates.
+    for p in ([10.0, 20.0, 5.0], [10.0, 20.0, NaN])
+        fai(upw) = FiniteAllocationInput(; w = w, prices = p, cash = 1e3, upw = upw)
+        for idx in (4, 7, [1, 4], UInt8(4))
+            bad = AssetRedistribution(; idx = idx)
+            @test_throws DomainError fai(bad)
+            @test_throws DomainError fai(SideRedistribution(; l = bad))
+            @test_throws DomainError fai(SideRedistribution(; s = bad))
+            @test_throws DomainError FiniteAllocationInput(w, p, 1e3, 1e3, nothing, nothing,
+                                                           nothing, ProceedsCollateral(),
+                                                           bad)
+        end
+        for upw in (nothing, ProportionalRedistribution(), EvenRedistribution(),
+                    AssetRedistribution(; idx = 3), AssetRedistribution(; idx = 1:3),
+                    SideRedistribution(; l = AssetRedistribution(; idx = [1, 3])),
+                    (w, m) -> [0.5, 0.3, 0.0])
+            @test isa(optimise(GreedyAllocation(), fai(upw)).retcode, OptimisationSuccess)
+        end
+    end
+    # A mask is not a list of positions. An all-`true` mask has no entry below one, and it
+    # failed only in the functor.
+    @test_throws ArgumentError AssetRedistribution(; idx = true)
+    @test_throws ArgumentError AssetRedistribution(; idx = [true, true, true])
+    @test_throws ArgumentError AssetRedistribution(; idx = trues(3))
+end
 @testset "The cash of a finite allocation is the cash that the account holds (#1961)" begin
     using PortfolioOptimisers, Test, HiGHS
     slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
