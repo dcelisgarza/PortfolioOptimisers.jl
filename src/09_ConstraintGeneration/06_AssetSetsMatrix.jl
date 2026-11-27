@@ -5,6 +5,8 @@ Names the Universe Sets key whose groups become the rows of a binary asset-group
 
 [`asset_sets_matrix`](@ref) reads the key from a [`UniverseSets`](@ref). It returns one row for each distinct group value and one column for each asset. A row is the indicator of one group, and a sub-group constraint sums over the assets that the row marks.
 
+The field `on` limits the matrix to some assets. It names assets or groups of `sets.dict`, and only the assets that it names give rows. A group of the key that holds none of these assets gives no row. So one key of issuers can serve two rules: a rule over the standard issuers and a rule over the issuers of covered bonds, see [`ConcentrationLimitEstimator`](@ref).
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -12,7 +14,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     AssetSetsMatrixEstimator(;
-        val::AbstractString
+        val::AbstractString,
+        on::Option{<:Union{AbstractString, VecStr}} = nothing
     ) -> AssetSetsMatrixEstimator
 
 Keywords correspond to the struct's fields.
@@ -20,6 +23,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `!isempty(val)`.
+  - If `on` is a string, `!isempty(on)`. If `on` is a vector, it is not empty and each name in it is not empty.
 
 # Examples
 
@@ -30,11 +34,17 @@ julia> sets = UniverseSets(; xkey = \"nx\",
 
 julia> est = AssetSetsMatrixEstimator(; val = \"nx_sector\")
 AssetSetsMatrixEstimator
-  val ┴ String: "nx_sector"
+  val ┼ String: "nx_sector"
+   on ┴ nothing
 
 julia> asset_sets_matrix(est, sets)
 2×3 transpose(::BitMatrix) with eltype Bool:
  1  1  0
+ 0  0  1
+
+julia> asset_sets_matrix(AssetSetsMatrixEstimator(; val = \"nx_sector\", on = [\"B\", \"C\"]), sets)
+2×3 BitMatrix:
+ 0  1  0
  0  0  1
 ```
 
@@ -43,6 +53,7 @@ julia> asset_sets_matrix(est, sets)
   - [`UniverseSets`](@ref)
   - [`asset_sets_matrix`](@ref)
   - [`AbstractConstraintEstimator`](@ref)
+  - [`ConcentrationLimitEstimator`](@ref)
 
 # References
 
@@ -54,13 +65,22 @@ julia> asset_sets_matrix(est, sets)
     $(field_dict[:asets_val])
     """
     val
-    function AssetSetsMatrixEstimator(val::AbstractString)::AssetSetsMatrixEstimator
+    """
+    $(field_dict[:asets_on])
+    """
+    on
+    function AssetSetsMatrixEstimator(val::AbstractString,
+                                      on::Option{<:Union{AbstractString, VecStr}} = nothing)::AssetSetsMatrixEstimator
         @argcheck(!isempty(val), IsEmptyError("val cannot be empty"))
-        return new{typeof(val)}(val)
+        # `vcat` gives a one-name vector for a string, so one check reads both forms.
+        @argcheck(isnothing(on) || (!isempty(on) && !any(isempty, vcat(on))),
+                  IsEmptyError("on cannot be empty, and cannot hold an empty name"))
+        return new{typeof(val), typeof(on)}(val, on)
     end
 end
-function AssetSetsMatrixEstimator(; val::AbstractString)::AssetSetsMatrixEstimator
-    return AssetSetsMatrixEstimator(val)
+function AssetSetsMatrixEstimator(; val::AbstractString,
+                                  on::Option{<:Union{AbstractString, VecStr}} = nothing)::AssetSetsMatrixEstimator
+    return AssetSetsMatrixEstimator(val, on)
 end
 """
     const MatNum_ASetMatE = Union{AssetSetsMatrixEstimator, MatNum}
@@ -196,7 +216,7 @@ function asset_sets_matrix(smtx::AbstractString, sets::UniverseSets)
     return transpose(A)
 end
 """
-    asset_sets_matrix(smtx::Option{<:MatNum}, args...)
+    asset_sets_matrix(smtx::Option{<:MatNum}, args...; kwargs...)
 
 Return a precomputed membership matrix, or `nothing`, unchanged.
 
@@ -206,6 +226,7 @@ A caller can give the membership matrix itself in place of an [`AssetSetsMatrixE
 
   - `smtx`: A precomputed membership matrix, or `nothing`.
   - `args...`: More positional arguments, which the method ignores.
+  - `kwargs...`: More keyword arguments, which the method ignores.
 
 # Returns
 
@@ -217,50 +238,129 @@ A caller can give the membership matrix itself in place of an [`AssetSetsMatrixE
   - [`AssetSetsMatrixEstimator`](@ref)
   - [`asset_sets_matrix`](@ref)
 """
-function asset_sets_matrix(smtx::Option{<:MatNum}, args...)
+function asset_sets_matrix(smtx::Option{<:MatNum}, args...; kwargs...)
     return smtx
 end
 """
-    asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::UniverseSets)
+    asset_sets_matrix(smtx::AssetSetsMatrixEstimator{<:Any, Nothing}, sets::UniverseSets;
+                      kwargs...)
+    asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::UniverseSets;
+                      strict::Bool = false)
 
-Build the membership matrix from the group name key that `smtx` holds. The method calls:
+Build the membership matrix from the group name key that `smtx` holds, over the assets that `smtx.on` names.
 
-    asset_sets_matrix(smtx.val, sets)
+The method for `on = nothing` returns the matrix of every asset, `asset_sets_matrix(smtx.val, sets)`. The other method reads the names in `on`.
+
+# Algorithm
+
+The method that reads the names in `on`:
+
+ 1. Build the matrix of the key, `asset_sets_matrix(smtx.val, sets)`.
+ 2. Make the mask of the assets that `smtx.on` names, with [`asset_name_mask`](@ref).
+ 3. Clear each column of the matrix whose asset is not in the mask. Then drop each row that holds no asset, and return the rows that remain as a `BitMatrix`.
 
 # Arguments
 
   - `smtx`: An [`AssetSetsMatrixEstimator`](@ref) that holds the group name key to read.
   - `sets`: A [`UniverseSets`](@ref) that holds the asset universe and the groups.
+  - $(arg_dict[:strict])
+  - `kwargs...`: The keywords of a caller, which the method for `on = nothing` ignores.
 
 # Validation
 
   - The group name key method of [`asset_sets_matrix`](@ref) checks `smtx.val`.
+  - The rules of [`asset_name_mask`](@ref) for `smtx.on`.
 
 # Returns
 
-  - `A`: The `transpose` of a `BitMatrix`, of size (number of groups) × (number of assets), as the group name key method returns it.
+  - `A`: The membership matrix, of size (number of groups) × (number of assets). It is the `transpose` of a `BitMatrix`, as the group name key method returns it, when `smtx.on` is `nothing`, and a `BitMatrix` otherwise.
 
 # Related
 
   - [`asset_sets_matrix`](@ref)
   - [`AssetSetsMatrixEstimator`](@ref)
+  - [`asset_name_mask`](@ref)
   - [`UniverseSets`](@ref)
 """
-function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::UniverseSets)
+function asset_sets_matrix(smtx::AssetSetsMatrixEstimator{<:Any, Nothing},
+                           sets::UniverseSets; kwargs...)
     return asset_sets_matrix(smtx.val, sets)
 end
+function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::UniverseSets;
+                           strict::Bool = false)
+    A = asset_sets_matrix(smtx.val, sets)
+    B = A .& transpose(asset_name_mask(smtx.on, sets, strict))
+    return B[vec(any(B; dims = 2)), :]
+end
 """
-    asset_sets_matrix(smtx::VecMatNum_ASetMatE,
-                      sets::Option{<:UniverseSets})
+    asset_name_mask(on::Union{AbstractString, VecStr}, sets::UniverseSets, strict::Bool)
+
+Return the mask of the assets of `sets` that the names in `on` give.
+
+A name is an asset or a group of `sets.dict`, and a group gives each of its members. [`name_to_val!`](@ref) resolves each name, so the mask follows the rules of every name of the library. A name on the Non-Investable Axis drops with no message, and an unknown name is reported through [`strict_diagnostic`](@ref).
+
+# Algorithm
+
+ 1. Make a mask of `false` over the asset universe `sets.dict[sets.xkey]`.
+ 2. For each name in `on`, set the mask to `true` at the assets that the name gives, with [`name_to_val!`](@ref). The counterpart axis is [`counterpart_axis_names`](@ref) of the asset universe.
+ 3. Return the mask.
+
+# Arguments
+
+  - `on`: One name, or a vector of names.
+  - `sets`: A [`UniverseSets`](@ref) that holds the asset universe and the groups.
+  - $(arg_dict[:strict])
+
+# Validation
+
+  - Each name of `on` names an asset, a group, or an entry of the Non-Investable Axis. An `ArgumentError` is thrown when `strict` is `true`, and a warning is issued otherwise.
+
+# Returns
+
+  - `msk::BitVector`: `true` at each asset that a name of `on` gives.
+
+# Examples
+
+```jldoctest
+julia> sets = UniverseSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"], \"G\" => [\"A\", \"C\"]));
+
+julia> PortfolioOptimisers.asset_name_mask(\"G\", sets, false)
+3-element BitVector:
+ 1
+ 0
+ 1
+```
+
+# Related
+
+  - [`AssetSetsMatrixEstimator`](@ref)
+  - [`name_to_val!`](@ref)
+  - [`counterpart_axis_names`](@ref)
+"""
+function asset_name_mask(on::Union{AbstractString, VecStr}, sets::UniverseSets,
+                         strict::Bool)::BitVector
+    nx = sets.dict[sets.xkey]
+    other = counterpart_axis_names(sets, sets.xkey)
+    msk = falses(length(nx))
+    # `vcat` gives a one-name vector for a string, so one loop reads both forms.
+    for name in vcat(on)
+        name_to_val!(nx, sets.dict, name, true, msk, strict, sets.xkey, other)
+    end
+    return msk
+end
+"""
+    asset_sets_matrix(smtx::VecMatNum_ASetMatE, sets::UniverseSets; strict::Bool = false)
+    asset_sets_matrix(smtx::VecMatNum_ASetMatE, ::Nothing; kwargs...)
 
 Apply [`asset_sets_matrix`](@ref) to each entry of the vector.
 
-Each entry dispatches to its own method, so one vector can hold estimators and precomputed matrices together.
+Each entry dispatches to its own method, so one vector can hold estimators and precomputed matrices together. The method for `nothing` serves a vector of precomputed matrices, which needs no `sets`. It reads no `strict`, because no estimator entry resolves without `sets`.
 
 # Arguments
 
   - `smtx`: A vector whose entries are each an [`AssetSetsMatrixEstimator`](@ref) or a precomputed numeric matrix.
   - `sets`: A [`UniverseSets`](@ref) that holds the asset universe and the groups, or `nothing` when no entry is an estimator.
+  - $(arg_dict[:strict]) The method on a [`UniverseSets`](@ref) gives it to each estimator entry.
 
 # Validation
 
@@ -276,8 +376,12 @@ Each entry dispatches to its own method, so one vector can hold estimators and p
   - [`VecMatNum_ASetMatE`](@ref)
   - [`UniverseSets`](@ref)
 """
-function asset_sets_matrix(smtx::VecMatNum_ASetMatE, sets::Option{<:UniverseSets})
-    return [asset_sets_matrix(smtxi, sets) for smtxi in smtx]
+function asset_sets_matrix(smtx::VecMatNum_ASetMatE, sets::UniverseSets;
+                           strict::Bool = false)
+    return [asset_sets_matrix(smtxi, sets; strict = strict) for smtxi in smtx]
+end
+function asset_sets_matrix(smtx::VecMatNum_ASetMatE, ::Nothing; kwargs...)
+    return [asset_sets_matrix(smtxi, nothing) for smtxi in smtx]
 end
 """
     panel_input_name(sets::UniverseSets, key::AbstractString) -> String

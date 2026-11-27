@@ -57,7 +57,7 @@ weights, and not the floor that holds the cost.
 # Settings the centring model does not read
 
 `lcse`, `cte`, `card`, `gcarde`, `scard`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`,
-`sglt`, `sgst`, `lt`, `st`, `xbgt`, `ss`, `tn`, `tr`, `ple`, `l2c`, `lpc`, `linfc`, `l1`,
+`sglt`, `sgst`, `conc`, `lt`, `st`, `xbgt`, `ss`, `tn`, `tr`, `ple`, `l2c`, `lpc`, `linfc`, `l1`,
 `l2`, `linf`, `lp`, `ccnt`, `cobj`, and the fixed part of `fees`. A fixed fee is charged for
 each position held, so it needs the binary variables of `set_mip_constraints!`.
 

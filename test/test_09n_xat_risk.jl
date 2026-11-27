@@ -401,6 +401,34 @@ rel_dd(x) = cumprod(1 .+ x) ./ accumulate(max, cumprod(1 .+ x); init = one(eltyp
         cv = ConditionalValueatRisk()
         @test PO.gain_tail_measure(cv) === cv
         @test PO.gain_tail_measure(vd).alg.dist == Normal(-0.1, 2.0)
+        # A `GainTail` is the gain tail alone, so the range is its loss tail plus the
+        # `GainTail` of its gain tail, also when the portfolio pays a fee. `factory` fills the
+        # moments of the tail that it holds, and it reads no series without the weights.
+        fees = Fees(; l = 1e-3)
+        for (ls, gn) in ((cv, vd), (vd, cv), (cv, WorstRealisation()))
+            rg = GenericValueatRiskRange(; loss = ls, gain = gn)
+            gt = PO.GainTail(; r = gn)
+            for fe in (nothing, fees)
+                @test isapprox(expected_risk(rg, w, pr, fe),
+                               expected_risk(ls, w, pr, fe) + expected_risk(gt, w, pr, fe))
+            end
+        end
+        gt = PO.GainTail(vd)
+        @test isapprox(expected_risk(gt, w, pr), dot(pr.mu, w) - zc * sd)
+        @test_throws ArgumentError expected_risk_from_returns(gt, pr.X * w)
+        @test PO.deferred_slots(gt).r === vd && PO.calibration_slots(gt).r === vd
+        # A tail of a range of a user can read the weights alone.
+        @test isapprox(expected_risk(PO.GainTail(StandardDeviation()), w, pr),
+                       expected_risk(StandardDeviation(), w, pr))
+        # A tail that reads the asset returns and the fees has no value on the negated
+        # portfolio. It raised a `MethodError` deep in the functor, or an error about a
+        # precomputed series that the caller did not give.
+        nw = length(w)
+        for t in (LowOrderMoment(; mu = fill(0.001, nw)),
+                  TrackingRiskMeasure(; tr = WeightsTracking(; w = fill(inv(nw), nw))))
+            @test_throws "so a range cannot value it as a tail" expected_risk(PO.GainTail(t),
+                                                                              w, pr)
+        end
         # The model builds the same gain tail, so its risk equals the functor and the range.
         cslv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                       settings = Dict("verbose" => false))

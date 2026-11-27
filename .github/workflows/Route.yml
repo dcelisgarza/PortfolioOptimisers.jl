@@ -1,0 +1,91 @@
+name: Route
+
+# The `**Lands on:**` line of ADR 0240. `code_health/lands_on.sh` owns the grammar and the checks,
+# and a session runs it by hand. This workflow runs it on each issue and on each pull request:
+#
+# - An issue takes one label `route: <route>`, or `route: none` when its line is absent or wrong.
+#   A wrong line turns the run red.
+# - The check `Route` of a pull request is red when its base, or its number, does not agree with
+#   the route of an issue that it closes.
+# - A push to a pull request carries the `Review` status to the new head when its diff did not
+#   change, and a change of its base takes the status away (`code_health/review_stamp.sh`).
+#
+# No merge waits for a job of this file. It has no push run, so ADR 0220 skips nothing here.
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  issue:
+    name: Route of the issue
+    if: github.event_name == 'issues' && github.repository == 'dcelisgarza/PortfolioOptimisers.jl'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+      - name: Check the line, and set the label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          git fetch -q --depth 1 origin +refs/heads/main:refs/remotes/origin/main
+          git fetch -q --depth 1 origin +refs/heads/dev:refs/remotes/origin/dev || true
+          rc=0
+          parsed="$(bash code_health/lands_on.sh issue "$NUMBER")" || rc=$?
+          route="$(cut -f1 <<< "$parsed")"
+          label="route: ${route:-none}"
+          gh label create "$label" --color D4C5F9 --force \
+            --description "The route of the Lands on line (ADR 0240)"
+          while IFS= read -r old; do
+            [ -n "$old" ] && [ "$old" != "$label" ] || continue
+            gh issue edit "$NUMBER" --remove-label "$old"
+          done < <(gh issue view "$NUMBER" --json labels \
+            --jq '.labels[].name | select(startswith("route: "))')
+          gh issue edit "$NUMBER" --add-label "$label"
+          # An issue from a form has no line yet. The session that takes it writes the line.
+          [ "$rc" -eq 3 ] || exit "$rc"
+
+  pull_request:
+    name: Route
+    # A fork has no route: the maintainer moves its branch into this repository (ADR 0240).
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      statuses: write
+    steps:
+      # The default ref is the merge of the head into the base, which is where this file came from. So
+      # the scripts are there also for a branch that started before they were on its base.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Carry the review to the new head
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: bash code_health/review_stamp.sh carry "$NUMBER"
+      - name: Check the pull request against the routes of its issues
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: bash code_health/lands_on.sh pr "$NUMBER"
