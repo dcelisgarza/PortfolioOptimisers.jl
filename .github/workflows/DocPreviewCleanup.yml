@@ -10,20 +10,31 @@ on:
     # Sunday, 04:00 UTC.
     - cron: "0 4 * * 0"
   workflow_dispatch:
+  # Each preview that `Docs.yml` deploys can pass the cap of `PAGES_KEEP_PREVIEWS`, so the cap is
+  # applied again after each run of `Docs.yml` on a pull request. The job skips every other run.
+  workflow_run:
+    workflows: [Docs]
+    types: [completed]
 
-# GitHub Pages refuses a site above 10 GiB. `gh-pages` passed that limit once, and every deployment
-# failed for two days (#1722). This job keeps the size of `gh-pages` bounded. It deletes two things:
+# GitHub Pages refuses a site above 10 GiB. `gh-pages` passed that limit twice, and every deployment
+# failed until it was cut (#1722). This job keeps the size of `gh-pages` bounded. It deletes three
+# things:
 #
 # - A preview under `previews/PR<number>` whose pull request is not open. `Docs.yml` builds a
 #   preview for each pull request. The job deletes every such preview, not only the one of the pull
 #   request that closed, so a preview that an earlier run missed still goes.
-# - Every released version outside the `PAGES_KEEP_MINORS` newest minor series. Documenter never
-#   deletes a version, and Pages expands each alias link of a version into a full copy, so each
-#   release adds about twice the size of one build. `.github/pages_prune.py` holds that logic.
+# - A preview of an open pull request outside the `PAGES_KEEP_PREVIEWS` most recently updated ones.
+#   One preview is a full build of about 0.28 GiB, and twenty open pull requests hold more than half
+#   of the limit. The next push to such a pull request deploys its preview again.
+# - Every released version outside the `PAGES_KEEP_MINORS` newest minor series, and every patch of
+#   a kept series but its newest. Documenter never deletes a version, and Pages expands each alias
+#   link of a version into a full copy. The project releases once per pull request, so the patches
+#   of one series add up fast. `.github/pages_prune.py` holds that logic.
 #
-# A URL into a deleted version, such as `/v0.12/`, stops resolving. That is the price of the cap.
-# `PagesHealth.yml` watches the size of the site and the result of each deployment.
+# A URL into a deleted version, such as `/v0.12/` or `/v0.34.3/`, stops resolving. That is the
+# price of the cap. `PagesHealth.yml` watches the size of the site and the result of each deployment.
 env:
+  PAGES_KEEP_PREVIEWS: "8"
   PAGES_KEEP_MINORS: "5"
 
 concurrency:
@@ -32,8 +43,9 @@ concurrency:
   # preview build that is in progress. Without the cancellation, a build that started before the
   # close deploys after the cleanup, and its preview comes back.
   #
-  # A scheduled or manual run has the ref of a branch, and the Docs group of a branch holds its
-  # deploy, which must not be cancelled. Such a run takes a group of its own and cancels nothing.
+  # A scheduled, manual or `workflow_run` run has the ref of a branch, and the Docs group of a branch
+  # holds its deploy, which must not be cancelled. Such a run takes a group of its own and cancels
+  # nothing.
   group: >-
     ${{ github.event_name == 'pull_request' && format('Docs-{0}', github.ref) || 'doc-preview-cleanup-sweep' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -41,6 +53,10 @@ concurrency:
 jobs:
   doc-preview-cleanup:
     name: Delete the unwanted previews and the old versions
+    # After `Docs.yml`, run only when a pull-request run finished: only such a run deploys a
+    # preview. A push run of `main` deploys a version, and the next close or week prunes it.
+    if: >-
+      github.event_name != 'workflow_run' || (github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     # `gh-pages` takes one writer at a time. Two cleanups that run together push over each other,
     # so queue them instead of cancelling them. A queued run that a newer one replaces loses
@@ -71,10 +87,16 @@ jobs:
         run: |
           set -euo pipefail
           base="$(git rev-parse HEAD)"
+          if ! [[ "${PAGES_KEEP_PREVIEWS}" =~ ^[0-9]+$ ]]; then
+            echo "::error::PAGES_KEEP_PREVIEWS is '${PAGES_KEEP_PREVIEWS}'. It must be a whole number."
+            exit 1
+          fi
           # A failed listing stops the job here. It must never read as "no pull request is open",
-          # because that deletes every preview.
-          wanted="$(gh pr list --repo "${GITHUB_REPOSITORY}" --state open \
-            --limit 1000 --json number --jq '.[] | "previews/PR\(.number)"')"
+          # because that deletes every preview. The previews kept are those of the open pull
+          # requests updated last.
+          wanted="$(gh pr list --repo "${GITHUB_REPOSITORY}" --state open --limit 1000 \
+            --json number,updatedAt \
+            --jq "sort_by(.updatedAt) | reverse | .[:${PAGES_KEEP_PREVIEWS}][] | \"previews/PR\(.number)\"")"
           previews=0
           for dir in previews/PR*; do
             [ -d "${dir}" ] || continue
@@ -89,12 +111,12 @@ jobs:
           versions="$(python3 -I ../tools/.github/pages_prune.py . | tee /dev/stderr | wc -l)"
           git add -A .
           if git diff --cached --quiet; then
-            echo "No preview to delete, and no version outside the ${PAGES_KEEP_MINORS} newest minor series."
+            echo "No preview outside the ${PAGES_KEEP_PREVIEWS} kept ones, and no version to delete."
             exit 0
           fi
           git config user.name "Documenter.jl"
           git config user.email "documenter@juliadocs.github.io"
-          git commit -m "delete ${previews} previews and ${versions} versions outside the ${PAGES_KEEP_MINORS} newest minor series"
+          git commit -m "delete ${previews} previews and ${versions} versions: keep ${PAGES_KEEP_PREVIEWS} previews and the newest patch of ${PAGES_KEEP_MINORS} minor series"
           # A plain delete leaves every preview and version in the history of the branch, so the
           # repository never gets smaller. Replace the history with one commit that holds the
           # current tree.

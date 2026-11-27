@@ -8,7 +8,7 @@ jet = "0.13.3"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "666cfa9753"
+commit = "5ff3c2a58c"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -210,6 +210,9 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/40_RobustCovariance/08_TylerShrinkage.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/40_RobustCovariance/09_TylerCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/40_RobustCovariance/10_RobustExpectedReturns.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/11_SRho.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/12_SCovariance.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/13_MMCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
@@ -665,6 +668,9 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/40_RobustCovariance/08_TylerShrinkage.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/40_RobustCovariance/09_TylerCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/40_RobustCovariance/10_RobustExpectedReturns.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/11_SRho.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/12_SCovariance.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/13_MMCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
@@ -1120,6 +1126,9 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/40_RobustCovariance/08_TylerShrinkage.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/40_RobustCovariance/09_TylerCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/40_RobustCovariance/10_RobustExpectedReturns.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/11_SRho.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/12_SCovariance.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/40_RobustCovariance/13_MMCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }

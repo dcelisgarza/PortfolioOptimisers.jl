@@ -66,6 +66,7 @@ To implement a new price-level estimator, subtype `AbstractPricesPreprocessingEs
   - [`AbstractPricesPreprocessingResult`](@ref)
   - [`PriceGapFill`](@ref)
   - [`MissingDataFilter`](@ref)
+  - [`PriceJumpFilter`](@ref)
   - [`PricesResult`](@ref)
 """
 abstract type AbstractPricesPreprocessingEstimator <: AbstractPreprocessingEstimator end
@@ -144,6 +145,7 @@ To implement a new price-level result, subtype `AbstractPricesPreprocessingResul
   - [`AbstractPricesPreprocessingEstimator`](@ref)
   - [`PriceGapFillResult`](@ref)
   - [`MissingDataFilterResult`](@ref)
+  - [`PriceJumpFilterResult`](@ref)
 """
 abstract type AbstractPricesPreprocessingResult <: AbstractPreprocessingResult end
 """
