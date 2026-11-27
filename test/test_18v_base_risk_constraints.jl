@@ -960,6 +960,13 @@ end
         @test isa(res.retcode, OptimisationSuccess)
         # The first measure alone adds a risk term.
         @test length(res.model[:risk_vec]) == 1
+        # #2391: the second measure adds no variable and no row. `BrownianDistanceVariance`
+        # built the deviation cone of the ignored bound.
+        one_m = solve_ui(T()).model
+        @test JuMP.num_variables(res.model) == JuMP.num_variables(one_m)
+        @test JuMP.num_constraints(res.model; count_variable_in_set_constraints = true) ==
+              JuMP.num_constraints(one_m; count_variable_in_set_constraints = true)
+        @test !haskey(res.model, :bdvariance_dev)
         # A second measure with the default settings loses its risk term, and warns too.
         @test_logs((:warn, msg), match_mode = :any, solve_ui([T(), T()]))
         # One measure, and a second one that changes nothing, log no warning.
