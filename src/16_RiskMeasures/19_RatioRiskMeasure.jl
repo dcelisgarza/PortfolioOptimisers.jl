@@ -152,6 +152,8 @@ Keywords correspond to the struct's fields.
 
 Each side takes one risk measure or a vector of them, and each side has its own scalariser. `sca1` combines `r1`, and `sca2` combines `r2`. Each scalariser field comes directly after the field that it combines, and the two scalarisers can differ.
 
+A side that is a vector of one measure type whose elements differ in a type parameter, such as `[Variance(), Variance(; sigma = S)]`, is narrowed to the `Union` of the types of its elements with [`concrete_typed_array_if_unionall`](@ref). So the ratio holds a copy of such a side, and the bind of a data benchmark costs nothing when the side holds none.
+
 The two fields take precedence over a `sca` keyword of the caller. The ratio does not pass that keyword to its sides, so its value always uses the scalarisers that the type holds.
 
 ## Validation
@@ -239,6 +241,10 @@ NonOptimisationRiskRatio
         if isa(r2, VecBaseRM)
             @argcheck(!isempty(r2), IsEmptyError("r2 cannot be empty"))
         end
+        # A side of one struct whose elements differ in a type parameter narrows to a `Union`,
+        # so the bind of a data benchmark infers and a side with none returns as itself (#2386).
+        r1 = concrete_typed_array_if_unionall(r1)
+        r2 = concrete_typed_array_if_unionall(r2)
         return new{typeof(settings), typeof(r1), typeof(sca1), typeof(r2), typeof(sca2)}(settings,
                                                                                          r1,
                                                                                          sca1,
