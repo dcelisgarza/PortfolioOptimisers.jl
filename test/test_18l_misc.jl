@@ -686,8 +686,8 @@ end
                         nf = nf, F = Fm, ts = rd.ts)
     xs = ExcessSource()
     jo(s) = JuMPOptimiser(; pe = EmpiricalPrior(; x_src = s), slv = slv)
-    ho(s) = HierarchicalOptimiser(; pe = EmpiricalPrior(; x_src = s),
-                                  cle = ClustersEstimator(; x_src = s))
+    ho(s) = HierarchicalOptimiser(; pe = EmpiricalPrior(; x_src = s))
+    cl(s) = ClustersEstimator(; x_src = s)
     usv(s) = UncertaintySetVariance(;
                                     ucs = DeltaUncertaintySet(;
                                                               pe = EmpiricalPrior(;
@@ -707,9 +707,13 @@ end
                                 rba = FactorRiskBudgeting(;
                                                           re = DimensionReductionRegression(;
                                                                                             x_src = s)),
-                                opt = jo(s)), s -> HierarchicalRiskParity(; opt = ho(s)),
-             s -> HierarchicalEqualRiskContribution(; opt = ho(s)),
-             s -> SchurComplementHierarchicalRiskParity(; opt = ho(s)),
+                                opt = jo(s)),
+             s -> HierarchicalRiskParity(; opt = ho(s),
+                                         ser = HierarchicalSeriation(; cle = cl(s))),
+             s -> HierarchicalEqualRiskContribution(; opt = ho(s), cle = cl(s)),
+             s -> SchurComplementHierarchicalRiskParity(; opt = ho(s),
+                                                        ser = HierarchicalSeriation(;
+                                                                                    cle = cl(s))),
              s -> InverseVolatility(; pe = EmpiricalPrior(; x_src = s)),
              s -> SubsetResampling(; opt = MeanRisk(; opt = jo(s)), seed = 3, n_subsets = 3,
                                    subset_size = 5))
@@ -773,9 +777,9 @@ end
     @test PO.group_frames(frc).raw == ["re"]
     @test PO.group_frames(MeanRisk(; opt = JuMPOptimiser(; pe = epx, slv = s1))).raw == []
     hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = epx))
-    @test PO.group_frames(hrp).raw == ["opt.cle"]
+    @test PO.group_frames(hrp).raw == ["ser.cle"]
     @test PO.group_source(hrp) === xs
-    @test PO.group_frames(HierarchicalRiskParity()).raw == ["opt.pe", "opt.cle"]
+    @test PO.group_frames(HierarchicalRiskParity()).raw == ["opt.pe", "ser.cle"]
     @test PO.group_source(HierarchicalRiskParity()) === nothing
     nco = NestedClustered(; pe = eraw, cle = ClustersEstimator(; x_src = DataSource()),
                           opti = MeanRisk(; opt = JuMPOptimiser(; pe = epx, slv = s1)),
@@ -791,7 +795,8 @@ end
     # The slot is a slot of the Constraint Block, so its path passes through the block (#2039).
     @test PO.group_frames(JuMPOptimiser(; pe = epx, slv = s1, cte = CentralityConstraint())).raw ==
           ["cbe.cte"]
-    @test PO.group_frames(HierarchicalOptimiser(; pe = epx)).raw == ["cle"]
+    # The configuration holds no clustering since #2174: the seriation of HRP holds it.
+    @test isempty(PO.group_frames(HierarchicalOptimiser(; pe = epx)).raw)
     rb = RiskBudgeting(; opt = JuMPOptimiser(; pe = eraw, slv = s1),
                        rba = FactorRiskBudgeting(; re = StepwiseRegression(; x_src = xs)))
     @test PO.group_frames(rb).excess
@@ -819,11 +824,11 @@ end
     # A forgotten raw reader beside a reader of the Excess Frame warns at construction, and
     # names the head and the path. A stated mix is silent.
     @test_logs (:warn,
-                r"`HierarchicalRiskParity` holds a reader that states `x_src = ExcessSource\(\)`.*`opt.cle`") HierarchicalRiskParity(;
+                r"`HierarchicalRiskParity` holds a reader that states `x_src = ExcessSource\(\)`.*`ser.cle`") HierarchicalRiskParity(;
                                                                                                                                      opt = HierarchicalOptimiser(;
                                                                                                                                                                  pe = epx))
-    @test_logs HierarchicalRiskParity(;
-                                      opt = HierarchicalOptimiser(; pe = epx,
+    @test_logs HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = epx),
+                                      ser = HierarchicalSeriation(;
                                                                   cle = ClustersEstimator(;
                                                                                           x_src = DataSource())))
     for mk in (opt -> InverseVolatility(; pe = epx), opt -> MeanRisk(; opt = opt),

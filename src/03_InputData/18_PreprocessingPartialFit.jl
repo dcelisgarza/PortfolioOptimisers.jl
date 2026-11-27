@@ -12,8 +12,8 @@ The function concatenates the [`AssetPanel`](@ref)s with [`Base.vcat(a::AssetPan
 
 The method that Julia selects is the algorithm.
 
- 1. [`PricesResult`](@ref): check that the implied-volatility adjustment `ivpa` of `b` equals the one of `a`. Concatenate the prices `X`, the factors `F`, the benchmark `B`, the Exogenous Series `E` and the implied volatilities `iv` with [`vcat_optional`](@ref), which also checks the column names. Concatenate the panel `pnl` and the Listing Span `span` with [`vcat_optional`](@ref).
- 2. [`ReturnsResult`](@ref): check that the names `nx`, `nf`, `nb` and `ne` and the adjustment `ivpa` of `b` equal the ones of `a`. Concatenate `X`, `F`, `B`, `E`, the timestamps `ts` and `iv` with [`vcat_optional`](@ref), and the panel `pnl` with [`vcat_returns_panel`](@ref), which lets one block hold no panel.
+ 1. [`PricesResult`](@ref): check that the implied-volatility adjustment `ivpa` and the graph names `ng` of `b` equal the ones of `a`. Concatenate the prices `X`, the factors `F`, the benchmark `B`, the Exogenous Series `E` and the implied volatilities `iv` with [`vcat_optional`](@ref), which also checks the column names. Concatenate the Exogenous Graphs `G` with [`graphs_vcat`](@ref), and the panel `pnl` and the Listing Span `span` with [`vcat_optional`](@ref).
+ 2. [`ReturnsResult`](@ref): check that the names `nx`, `nf`, `nb`, `ne` and `ng` and the adjustment `ivpa` of `b` equal the ones of `a`. Concatenate `X`, `F`, `B`, `E`, the timestamps `ts` and `iv` with [`vcat_optional`](@ref), the Exogenous Graphs `G` with [`graphs_vcat`](@ref), and the panel `pnl` with [`vcat_returns_panel`](@ref), which lets one block hold no panel.
 
 # Arguments
 
@@ -39,10 +39,14 @@ The method that Julia selects is the algorithm.
 """
 function vcat_observations(a::PricesResult, b::PricesResult)
     assert_pinned_value(a.ivpa, b.ivpa, :ivpa)
+    assert_pinned_value(a.ng, b.ng, :ng)
+    tsa = TimeSeries.timestamp(a.X)
+    tsb = TimeSeries.timestamp(b.X)
+    G = graphs_vcat(a.ng, a.G, b.G, length(tsa), tsa, length(tsb), tsb)
     return PricesResult(; X = vcat_optional(a.X, b.X, :X), F = vcat_optional(a.F, b.F, :F),
                         B = vcat_optional(a.B, b.B, :B), E = vcat_optional(a.E, b.E, :E),
-                        iv = vcat_optional(a.iv, b.iv, :iv), ivpa = a.ivpa,
-                        pnl = vcat_optional(a.pnl, b.pnl, :pnl),
+                        ng = a.ng, G = G, iv = vcat_optional(a.iv, b.iv, :iv),
+                        ivpa = a.ivpa, pnl = vcat_optional(a.pnl, b.pnl, :pnl),
                         span = vcat_optional(a.span, b.span, :span))
 end
 function vcat_observations(a::ReturnsResult, b::ReturnsResult)
@@ -51,10 +55,13 @@ function vcat_observations(a::ReturnsResult, b::ReturnsResult)
     assert_pinned_value(a.nb, b.nb, :nb)
     assert_pinned_value(a.ne, b.ne, :ne)
     assert_pinned_value(a.ivpa, b.ivpa, :ivpa)
+    assert_pinned_value(a.ng, b.ng, :ng)
+    G = graphs_vcat(a.ng, a.G, b.G, observation_count(a.X, a.F), a.ts,
+                    observation_count(b.X, b.F), b.ts)
     return ReturnsResult(; nx = a.nx, X = vcat_optional(a.X, b.X, :X), nf = a.nf,
                          F = vcat_optional(a.F, b.F, :F), nb = a.nb,
                          B = vcat_optional(a.B, b.B, :B), ne = a.ne,
-                         E = vcat_optional(a.E, b.E, :E),
+                         E = vcat_optional(a.E, b.E, :E), ng = a.ng, G = G,
                          ts = vcat_optional(a.ts, b.ts, :ts),
                          iv = vcat_optional(a.iv, b.iv, :iv), ivpa = a.ivpa,
                          pnl = vcat_returns_panel(a, b))
@@ -637,8 +644,8 @@ function returns_with_series(rd::ReturnsResult, R::AbstractMatrix,
         pnl = attach_universe_masks(pnl, amsk, emsk)
     end
     return ReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = F, nb = rd.nb, B = B,
-                         ne = rd.ne, E = E, ts = rd.ts, iv = rd.iv, ivpa = rd.ivpa,
-                         pnl = pnl)
+                         ne = rd.ne, E = E, ng = rd.ng, G = rd.G, ts = rd.ts, iv = rd.iv,
+                         ivpa = rd.ivpa, pnl = pnl)
 end
 """
     fit_preprocessing(ptr::PricesToReturns)

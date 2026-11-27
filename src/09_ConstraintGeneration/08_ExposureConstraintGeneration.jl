@@ -9,6 +9,7 @@ The limit comes from the mechanism. A re-basis rewrites a row and does not chang
 
   - Cardinality, sub-group cardinality and buy-in thresholds index the binary held-indicators, not the weights.
   - The weight bounds of each asset need no counterpart in another basis. ``lb \\leq \\mathbf{P}^\\intercal\\boldsymbol{w} \\leq ub`` is a linear constraint, and this mechanism already takes it.
+  - A gross, long or short cap reads the long and the short parts of the weights. A [`PositionConstraintEstimator`](@ref) around the re-based row states it.
   - Turnover and tracking error are norm forms. ``\\lVert \\mathbf{P}^\\intercal(\\boldsymbol{w} - \\boldsymbol{w}_0) \\rVert`` has a meaning, but it needs its own variables and cones. Its re-basis is possible in mathematics, but not with this mechanism.
   - A fee is a price per traded position, which the model subtracts from the return. It is not a constraint on the weights.
 
@@ -16,7 +17,7 @@ Each absence is a property of the constraint, not a gap in the code.
 
 The tracking of a factor needs no re-basis. [`ReturnsTracking`](@ref) takes a benchmark return series, and the return series of a factor is a column of the factor matrix. Pass that column directly.
 
-The family has one member now, [`FactorSpace`](@ref). The abstract type lets the family get more members. Any linear change of basis in the weights can be a member and use the same code path, for example a currency, a sector, or an exposure table from the caller.
+The family has two members. [`FactorSpace`](@ref) is the basis of the factors of a regression, and [`DependencySpace`](@ref) is the basis of the nodes of an Exogenous Graph. Any linear change of basis in the weights can be a member and use the same code path, for example a currency, a sector, or an exposure table from the caller.
 
 The family has no `AssetSpace`, by design. The asset frame is the absence of a re-basis, and a bare [`LinearConstraintEstimator`](@ref) states it. An `AssetSpace` member would make [`ExposureConstraintEstimator`](@ref) a wrapper that changes nothing and returns the rows of the constraint it wraps, bit for bit.
 
@@ -35,18 +36,18 @@ There is no fallback. This method makes every check that the basis needs, so the
   - `space`: The basis.
   - `sets`: The declared universe the names resolve against.
   - `rr`: The loadings of the prior, or `nothing`.
-  - `rd`: Returns from which the space can refit, or `nothing`. A space that refits from `rd` states the source of the refit on its own reader, for example in the `x_src` field of a regression estimator.
+  - `rd`: Returns from which the space can refit or read its basis, or `nothing`. A space that refits from `rd` states the source of the refit on its own reader, for example in the `x_src` field of a regression estimator.
 
 ### Returns
 
-  - `basis`: The change of basis, in the form that `rebase_linear_constraints` reads for this space.
-  - `key::AbstractString`: The key of `sets.dict` against which the names of the row resolve.
+  - `basis`: The change of basis, a [`RowBasis`](@ref). A regression result has names under a key of `sets.dict`, and a [`ConstraintBasis`](@ref) holds its own names.
+  - `key::Option{<:AbstractString}`: The key of `sets.dict` against which the names of the row resolve, or `nothing` for a [`ConstraintBasis`](@ref).
 
 ## Asset view
 
   - `PortfolioOptimisers.port_opt_view(space::AbstractConstraintSpace, i, args...) -> AbstractConstraintSpace`: A copy of the space over the selected assets.
 
-A basis has the assets on one axis and the names of the space on the other. The generic fallback returns an algorithm unchanged, so it is wrong for every member of this family. [`FactorSpace`](@ref) has the reference method. It slices the loadings by asset and keeps the whole factor axis.
+The generic fallback returns an algorithm unchanged. It is wrong for a space that holds a basis, because a basis has the assets on one axis. [`FactorSpace`](@ref) has the reference method. It slices the loadings by asset and keeps the whole factor axis. A space that holds no asset index, as [`DependencySpace`](@ref), uses the fallback.
 
 ### Arguments
 
@@ -57,9 +58,28 @@ A basis has the assets on one axis and the names of the space on the other. The 
 
   - `space::AbstractConstraintSpace`: The basis over the selected assets.
 
+## Wrapped constraint
+
+  - `PortfolioOptimisers.assert_space_constraint(space::AbstractConstraintSpace, lce) -> nothing`: Refuse a wrapped constraint that the space cannot re-base, at construction. The fallback refuses nothing. A space whose columns change between fits refuses a precomputed [`LinearConstraint`](@ref), which holds columns and no names.
+
+### Arguments
+
+  - `space`: The basis.
+  - `lce`: The wrapped constraint.
+
+## Pipeline step
+
+  - `PortfolioOptimisers.pipe_reads(space::AbstractConstraintSpace) -> Tuple`: The slots that the space reads as a [`Pipeline`](@ref) step. The fallback gives `(:returns, :prior)`. A space that reads no loadings of a prior gives `(:returns,)`.
+
+### Arguments
+
+  - `space`: The basis.
+
 # Related
 
   - [`FactorSpace`](@ref)
+  - [`DependencySpace`](@ref)
+  - [`ConstraintBasis`](@ref)
   - [`ExposureConstraintEstimator`](@ref)
 """
 abstract type AbstractConstraintSpace <: AbstractAlgorithm end
@@ -138,6 +158,42 @@ function FactorSpace(; re::Option{<:RegE_Reg} = nothing)::FactorSpace
     return FactorSpace(re)
 end
 """
+    assert_space_constraint(space::AbstractConstraintSpace, lce) -> nothing
+    assert_space_constraint(space::DependencySpace, lce::LinearConstraint) -> Union{}
+    assert_space_constraint(space::DependencySpace, lce::AbstractVector) -> nothing
+
+Refuse a wrapped constraint that a constraint space cannot re-base, at the construction of the [`ExposureConstraintEstimator`](@ref).
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Any other space or constraint: return `nothing`.
+ 2. A [`DependencySpace`](@ref) and a precomputed [`LinearConstraint`](@ref): refuse. The nodes of a graph change over time, so a column with no name has no meaning in a later fit.
+ 3. A [`DependencySpace`](@ref) and a vector: check each element.
+
+# Arguments
+
+  - `space`: The constraint space.
+  - `lce`: The wrapped constraint.
+
+# Validation
+
+  - A [`DependencySpace`](@ref) takes no precomputed [`LinearConstraint`](@ref). Raises an `ArgumentError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ExposureConstraintEstimator`](@ref)
+  - [`AbstractConstraintSpace`](@ref)
+"""
+function assert_space_constraint(::AbstractConstraintSpace, ::Any)::Nothing
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Wrapper that re-bases a linear constraint into another basis.
@@ -148,7 +204,7 @@ The projection happens at generation time, and constraint generation gives an or
 
 The re-basis is on this type, and not on [`LinearConstraintEstimator`](@ref), by design. That type also goes to `gcarde` and `sgcarde`, which build rows over the binary held-indicators. A projected row is not integral, and it is not an index into those indicators. The bounds of those two slots do not admit this wrapper. Thus the type system makes the category error impossible, and no check at run time is necessary.
 
-An `ExposureConstraintEstimator` is also a [`Pipeline`](@ref) step without a wrapper. The step reads the `prior` slot for its basis, and writes an ordinary [`LinearConstraint`](@ref) over the assets into `constraints`. The factor names resolve against the `nf` axis that [`pipeline_asset_sets`](@ref) builds from `rd.nf`, so the axis and the loadings agree by construction. For a factor mandate, use the `lcse` field of a [`JuMPOptimiser`](@ref), not the step. The step projects once, against the prior that it read. The field projects again against the prior of the optimiser, in each fold. [`constraint_step_value`](@ref) states the trade-off in full.
+An `ExposureConstraintEstimator` is also a [`Pipeline`](@ref) step without a wrapper. With a [`FactorSpace`](@ref), the step reads the `prior` slot for its basis, and writes an ordinary [`LinearConstraint`](@ref) over the assets into `constraints`. The factor names resolve against the `nf` axis that [`pipeline_asset_sets`](@ref) builds from `rd.nf`, so the axis and the loadings agree by construction. For a factor mandate, use the `lcse` field of a [`JuMPOptimiser`](@ref), not the step. The step projects once, against the prior that it read. The field projects again against the prior of the optimiser, in each fold. [`constraint_step_value`](@ref) states the trade-off in full.
 
 # Fields
 
@@ -166,8 +222,9 @@ Keywords correspond to the struct's fields. `space` has no default, and the call
 ## Validation
 
   - If `lce` is an `AbstractVector`, `!isempty(lce)`.
+  - The space can re-base `lce`, see [`assert_space_constraint`](@ref).
 
-The constructor checks only that condition. Constraint generation makes every check that the basis needs. The names are on the factor axis and the basis comes from the prior, and one object cannot see both. [`constraint_space_basis`](@ref) makes those three checks and states them.
+The constructor checks only those conditions. Constraint generation makes every check that the basis needs. The names and the basis come from different objects, for example the factor axis and the prior, and one object cannot see both. [`constraint_space_basis`](@ref) makes those checks and states them.
 
 # Examples
 
@@ -194,6 +251,7 @@ julia> lcr.ineq.B
 
   - [`AbstractConstraintSpace`](@ref)
   - [`FactorSpace`](@ref)
+  - [`DependencySpace`](@ref)
   - [`LinearConstraintEstimator`](@ref)
   - [`LinearConstraint`](@ref)
   - [`linear_constraints`](@ref)
@@ -221,6 +279,7 @@ julia> lcr.ineq.B
         if isa(lce, AbstractVector)
             @argcheck(!isempty(lce), IsEmptyError("lce cannot be empty"))
         end
+        assert_space_constraint(space, lce)
         return new{typeof(lce), typeof(space)}(lce, space)
     end
 end
@@ -254,12 +313,13 @@ const VecEcE_LcE_Lc = AbstractVector{<:EcE_LcE_Lc}
 
 Alias for an [`EcE_LcE_Lc`](@ref) or a vector of them.
 
-It is the bound of `lcse`, the only slot that admits a re-basis. `gcarde` and `sgcarde` keep the narrower aliases built on [`LcE_Lc`](@ref). That difference is the enforcement that [`ExposureConstraintEstimator`](@ref) describes.
+It is the bound of the constraint that a [`PositionConstraintEstimator`](@ref) wraps. The slot `lcse`, the only slot that admits a re-basis, takes the wider [`PcE_Pc_EcE_LcE_Lc`](@ref) or a vector of them. `gcarde` and `sgcarde` keep the narrower aliases built on [`LcE_Lc`](@ref). That difference is the enforcement that [`ExposureConstraintEstimator`](@ref) describes.
 
 # Related
 
   - [`EcE_LcE_Lc`](@ref)
   - [`VecEcE_LcE_Lc`](@ref)
+  - [`PositionConstraintEstimator`](@ref)
 """
 const EcE_LcE_Lc_VecEcE_LcE_Lc = Union{EcE_LcE_Lc, VecEcE_LcE_Lc}
 """
@@ -297,7 +357,7 @@ Return a copy of an [`ExposureConstraintEstimator`](@ref) over the selected asse
 
 The method passes the wrapped constraint through and views the space, and it does nothing more. The wrapped shape is written in the names of the space, so an asset index has no meaning for it. The basis of the space is the only part of the estimator that has an asset index.
 
-The generic vector method of [`port_opt_view`](@ref) covers a [`VecEcE_LcE_Lc`](@ref) slot, mixed or not. It views each element in turn, and does not slice the list of constraints by asset index.
+The generic vector method of [`port_opt_view`](@ref) covers a vector in the slot `lcse`, mixed or not. It views each element in turn, and does not slice the list of constraints by asset index.
 
 # Arguments
 
@@ -385,16 +445,20 @@ function factor_space_regression(::Nothing, rr::Option{<:AbstractLoadingsRegress
     return rr
 end
 """
-    constraint_space_basis(space::AbstractConstraintSpace, sets::UniverseSets, rr, rd)
-        -> (basis, key)
+    constraint_space_basis(space::FactorSpace, sets::UniverseSets, rr, rd) -> (basis, key)
+    constraint_space_basis(space::DependencySpace, sets::UniverseSets, rr, rd) -> (basis, key)
 
 Resolve the basis through which a re-based constraint projects, and the key against which its names resolve. Throw if either is not usable.
 
 This function makes every check that a space needs before the assembly of the first row, so the assembly loop can assume a consistent basis. A [`FactorSpace`](@ref) needs two checks. The loadings must come from one of the three sources that [`factor_space_regression`](@ref) ranks. The factor axis must be declared, and it must agree with the loadings on the number of factors. [`factor_universe`](@ref) makes the second check, and every other reader of the declared axis also uses it.
 
-`rd` holds the returns from which the space can refit. The [`JuMPOptimiser`](@ref) and the [`Pipeline`](@ref) step pass it, and the standalone route passes `nothing`.
+A [`DependencySpace`](@ref) reads the Exogenous Graph in force at the last row of `rd`, and the names of its rows are the nodes of the graph. It reads neither `rr` nor a factor axis.
+
+`rd` holds the returns from which the space can refit or read its basis. The [`JuMPOptimiser`](@ref) and the [`Pipeline`](@ref) step pass it, and the standalone route passes `nothing` by default.
 
 # Algorithm
+
+The method that Julia selects is the algorithm. These are the steps of a [`FactorSpace`](@ref), and [`DependencySpace`](@ref) states its steps.
 
  1. Resolve `rr`, the loadings, with [`factor_space_regression`](@ref) over the three sources `space.re`, `rr` and `rd`, under the source of `space.re`.
  2. Raise when `rr` is `nothing`. No source holds a basis, and no row can be assembled.
@@ -403,14 +467,14 @@ This function makes every check that a space needs before the assembly of the fi
 
 # Arguments
 
-  - `space`: The [`FactorSpace`](@ref) whose basis the function resolves.
-  - `sets`: The declared universe. It must hold the factor axis that `rr` names, under `sets.tfkey` or `sets.cfkey`.
+  - `space`: The space whose basis the function resolves.
+  - `sets`: The declared universe. For a [`FactorSpace`](@ref) it must hold the factor axis that `rr` names, under `sets.tfkey` or `sets.cfkey`. For a [`DependencySpace`](@ref) its `sets.xkey` entry names the assets.
   - `rr`: The loadings of the prior, or `nothing`.
-  - `rd`: Returns from which the space can refit, or `nothing` on the standalone route.
+  - `rd`: Returns from which the space can refit or read its basis, or `nothing` on the standalone route.
 
 # Validation
 
-The names come from the factor axis, but the basis comes from the prior. The two can disagree in ways that no single object can check. Thus this function makes the three checks below, and the constructor makes none of them.
+[`DependencySpace`](@ref) states its own checks. For a [`FactorSpace`](@ref), the names come from the factor axis, but the basis comes from the prior. The two can disagree in ways that no single object can check. Thus this function makes the three checks below, and the constructor makes none of them.
 
   - A missing basis throws, whatever the value of `strict`. `strict` controls unknown names, and an unknown name affects one row. The generator drops that row, and the rest is still the problem that the caller described. A missing regression is different, because no row can be built. A silent drop of all rows gives a feasible portfolio that looks plausible and has none of the requested exposure. "Missing" means that no source holds loadings. The space can give its own through the `re` field of [`FactorSpace`](@ref), so a factor mandate works on a prior with no factor block. Raises an [`IsNothingError`](@ref).
   - A missing factor axis throws. [`factor_universe`](@ref) raises a `KeyError` that names the key that [`factor_axis_key`](@ref) chose. The axis is optional on [`UniverseSets`](@ref), but a constraint written against the axis needs it.
@@ -418,13 +482,14 @@ The names come from the factor axis, but the basis comes from the prior. The two
 
 # Returns
 
-  - `basis::AbstractLoadingsRegressionResult`: The loadings through which the rows project.
-  - `key::AbstractString`: The key against which the names of the row resolve. For a [`FactorSpace`](@ref) it is the [`factor_axis_key`](@ref) of `rr`.
+  - `basis::RowBasis`: The basis through which the rows project: the loadings for a [`FactorSpace`](@ref), and a [`ConstraintBasis`](@ref) for a [`DependencySpace`](@ref).
+  - `key::Option{<:AbstractString}`: The key against which the names of the row resolve. For a [`FactorSpace`](@ref) it is the [`factor_axis_key`](@ref) of `rr`. For a [`DependencySpace`](@ref) it is `nothing`, because the basis holds the names.
 
 # Related
 
   - [`ExposureConstraintEstimator`](@ref)
   - [`FactorSpace`](@ref)
+  - [`DependencySpace`](@ref)
   - [`factor_space_regression`](@ref)
   - [`factor_universe`](@ref)
 """
@@ -510,11 +575,56 @@ function project_linear_constraint(lc::LinearConstraint, M::MatNum;
     end
 end
 """
+    declared_basis(basis::ConstraintBasis, sets::UniverseSets, key::Nothing) -> ConstraintBasis
+    declared_basis(basis::ConstraintBasis, sets::UniverseSets, key::AbstractString) -> ConstraintBasis
+
+Put a basis on the names that a wrapped constraint declares.
+
+The names of a basis can change between fits, for example the nodes of a graph over time. A constraint that names an entry which the basis does not hold yet loses the whole row. The `key` of the wrapped [`LinearConstraintEstimator`](@ref) declares every name under one entry of `sets.dict`, and a declared name that the basis does not hold has a zero column.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. No key: return `basis`.
+ 2. A key: read the declared names, find the column of each in `basis`, and copy the columns into a matrix over the declared names. A name with no column keeps zeros.
+
+# Arguments
+
+  - `basis`: The basis.
+  - `sets`: The declared universe, which holds the declared names under `key`.
+  - `key`: The key of the wrapped constraint, or `nothing`.
+
+# Validation
+
+  - `sets.dict` holds `key`. Raises a `KeyError`.
+
+# Returns
+
+  - `basis::ConstraintBasis`: The basis on the declared names.
+
+# Related
+
+  - [`rebase_linear_constraints`](@ref)
+  - [`ConstraintBasis`](@ref)
+"""
+function declared_basis(basis::ConstraintBasis, ::UniverseSets, ::Nothing)
+    return basis
+end
+function declared_basis(basis::ConstraintBasis, sets::UniverseSets, key::AbstractString)
+    nx = sets.dict[key]
+    col = walk_positions(basis.nx, nx)
+    k = findall(>(0), col)
+    M = zeros(eltype(basis.M), size(basis.M, 1), length(nx))
+    M[:, k] = view(basis.M, :, col[k])
+    return ConstraintBasis(M, nx, basis.axis, key)
+end
+"""
     rebase_linear_constraints(lce, sets::UniverseSets, basis, key; datatype, strict, bl_flag)
 
 Re-base one wrapped shape. The method depends on the shape that the [`ExposureConstraintEstimator`](@ref) wraps:
 
-  - The method parses a [`LinearConstraintEstimator`](@ref) and assembles it against `key`, and projects each term during the assembly. When the wrapped estimator has `key === nothing`, the key of the space applies, not `sets.xkey`. For a [`FactorSpace`](@ref), that key is the factor axis of `rr`.
+  - The method parses a [`LinearConstraintEstimator`](@ref) and assembles it against `key`, and projects each term during the assembly. When the wrapped estimator has `key === nothing`, the key of the space applies, not `sets.xkey`. For a [`FactorSpace`](@ref), that key is the factor axis of `rr`. A [`ConstraintBasis`](@ref) holds its own names, and the `key` of the wrapped estimator replaces them through [`declared_basis`](@ref).
   - The method projects a precomputed [`LinearConstraint`](@ref) as a whole with [`project_linear_constraint`](@ref).
   - The method maps a vector element by element, in the same way as [`linear_constraints`](@ref) for a vector of estimators.
 
@@ -524,15 +634,16 @@ The two single-shape methods reach the same row by two routes. The estimator rou
 
  1. For a [`LinearConstraintEstimator`](@ref), pick the key: `lce.key` when the wrapped estimator states one, and `key` otherwise.
  2. Call [`linear_constraints`](@ref) on `lce.val` against that key, with `basis` passed as `rr`. [`constraint_row_term`](@ref) then sums the selected columns of `basis.M` for each named term, which is the projection done one term at a time.
- 3. For a precomputed [`LinearConstraint`](@ref), call [`project_linear_constraint`](@ref) on it with `basis.M` and `strict`, which projects the assembled coefficient matrix in one product. `basis.M` is the only field of the basis either route reads, so the regression's intercept never enters.
- 4. For a vector, apply steps 1 to 3 to each element in turn and return the results in the order of the input.
+ 3. With a [`ConstraintBasis`](@ref), put the basis on the declared names with [`declared_basis`](@ref) in step 1, and drop the Non-Investable Axis of `sets` before step 2. An asset that left the problem can still be a name of the basis, so a group keeps it.
+ 4. For a precomputed [`LinearConstraint`](@ref), call [`project_linear_constraint`](@ref) on it with `basis.M` and `strict`, which projects the assembled coefficient matrix in one product. `basis.M` is the only field of the basis either route reads, so the regression's intercept never enters.
+ 5. For a vector, apply steps 1 to 4 to each element in turn and return the results in the order of the input.
 
 # Arguments
 
   - `lce`: The wrapped shape. It is a [`LinearConstraintEstimator`](@ref), a [`LinearConstraint`](@ref), or a vector of either.
   - `sets`: The declared universe the names resolve against.
-  - `basis`: The loadings that [`constraint_space_basis`](@ref) resolved.
-  - `key`: The key against which the names resolve, when the wrapped estimator states no key.
+  - `basis`: The [`RowBasis`](@ref) that [`constraint_space_basis`](@ref) resolved.
+  - `key`: The key against which the names resolve, when the wrapped estimator states no key, or `nothing` for a [`ConstraintBasis`](@ref).
   - `datatype`: Data type of the assembled row.
   - `strict`: If `true`, a name that the universe does not resolve throws, and a row whose coefficients are all zero raises an [`IsZeroError`](@ref). If `false`, each case warns. The function drops the row in both cases.
   - `bl_flag`: If `true`, a group expands to the mean over its members, as the Black-Litterman views need. If `false`, it expands to the sum.
@@ -544,6 +655,7 @@ The two single-shape methods reach the same row by two routes. The estimator rou
 # Related
 
   - [`ExposureConstraintEstimator`](@ref)
+  - [`declared_basis`](@ref)
   - [`project_linear_constraint`](@ref)
   - [`constraint_row_term`](@ref): the per-term half of the projection, which the estimator route reaches through [`linear_constraints`](@ref).
 """
@@ -556,15 +668,22 @@ function rebase_linear_constraints(lce::LinearConstraintEstimator, sets::Univers
                               datatype = datatype, strict = strict, bl_flag = bl_flag,
                               rr = basis)
 end
-function rebase_linear_constraints(lce::LinearConstraint, ::UniverseSets,
-                                   basis::AbstractLoadingsRegressionResult,
-                                   ::AbstractString; strict::Bool = false,
+function rebase_linear_constraints(lce::LinearConstraintEstimator, sets::UniverseSets,
+                                   basis::ConstraintBasis, ::Nothing;
+                                   datatype::DataType = Float64, strict::Bool = false,
+                                   bl_flag::Bool = false)::Option{<:LinearConstraint}
+    basis = declared_basis(basis, sets, lce.key)
+    # The view over every asset drops the Non-Investable Axis and keeps the rest.
+    return linear_constraints(lce.val, port_opt_view(sets, :); datatype = datatype,
+                              strict = strict, bl_flag = bl_flag, rr = basis)
+end
+function rebase_linear_constraints(lce::LinearConstraint, ::UniverseSets, basis::RowBasis,
+                                   ::Option{<:AbstractString}; strict::Bool = false,
                                    kwargs...)::Option{<:LinearConstraint}
     return project_linear_constraint(lce, basis.M; strict = strict)
 end
-function rebase_linear_constraints(lce::VecLcE_Lc, sets::UniverseSets,
-                                   basis::AbstractLoadingsRegressionResult,
-                                   key::AbstractString; kwargs...)
+function rebase_linear_constraints(lce::VecLcE_Lc, sets::UniverseSets, basis::RowBasis,
+                                   key::Option{<:AbstractString}; kwargs...)
     return [rebase_linear_constraints(lc, sets, basis, key; kwargs...) for lc in lce]
 end
 """
@@ -578,17 +697,17 @@ Make the constraint over the assets that is equivalent to a re-based constraint.
 
 The method checks the basis of the space once with [`constraint_space_basis`](@ref), then re-bases the wrapped shape. The result is an ordinary [`LinearConstraint`](@ref), or a vector of them when the estimator wraps a vector. It is the same as a constraint written in asset names, and no step after constraint generation needs to know about the re-basis.
 
-`rd` holds the returns from which a space can refit its basis. A [`JuMPOptimiser`](@ref) passes its returns. A standalone call keeps the default `nothing`, and then a space whose `re` must refit throws, with a message that names the fixes. See [`factor_space_regression`](@ref).
+`rd` holds the returns from which a space can refit or read its basis. A [`JuMPOptimiser`](@ref) passes its returns. A standalone call keeps the default `nothing`, and then a space whose `re` must refit throws, with a message that names the fixes. See [`factor_space_regression`](@ref). A [`DependencySpace`](@ref) throws too, because its graph is in `rd`.
 
 # Arguments
 
   - `lcs`: The [`ExposureConstraintEstimator`](@ref) whose rows the method re-bases.
-  - `sets`: The declared universe. It holds the factor axis that `rr` names, under `sets.tfkey` or `sets.cfkey`.
+  - `sets`: The declared universe. For a [`FactorSpace`](@ref) it holds the factor axis that `rr` names, under `sets.tfkey` or `sets.cfkey`.
   - `datatype`: Data type of the assembled row.
   - `strict`: If `true`, a name that the universe does not resolve throws, and a row whose coefficients are all zero raises an [`IsZeroError`](@ref). If `false`, each case warns. The function drops the row in both cases.
   - `bl_flag`: If `true`, a group expands to the mean over its members, as the Black-Litterman views need. If `false`, it expands to the sum.
   - `rr`: The loadings, when the caller holds them and the space states none.
-  - `rd`: Returns from which the space can refit, or `nothing` on the standalone route.
+  - `rd`: Returns from which the space can refit or read its basis, or `nothing` on the standalone route.
 
 # Returns
 
@@ -609,43 +728,6 @@ function linear_constraints(lcs::ExposureConstraintEstimator, sets::UniverseSets
     basis, key = constraint_space_basis(lcs.space, sets, rr, rd)
     return rebase_linear_constraints(lcs.lce, sets, basis, key; datatype = datatype,
                                      strict = strict, bl_flag = bl_flag)
-end
-"""
-    linear_constraints(lcs::VecEcE_LcE_Lc, sets::UniverseSets; datatype::DataType = Float64,
-                       strict::Bool = false, bl_flag::Bool = false,
-                       rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
-                       rd::Option{<:ReturnsResult} = nothing)
-
-Apply [`linear_constraints`](@ref) to each element of a vector that can mix re-based constraints and constraints over the assets. The method passes the loadings and the returns to each element. The narrower `VecLcE` method still applies to a vector that holds only [`LinearConstraintEstimator`](@ref)s.
-
-Each element resolves its own basis, so one vector can hold a space that reads the prior and a space that states or refits its own basis.
-
-# Arguments
-
-  - `lcs`: The vector of shapes, a mix of re-based constraints and constraints over the assets.
-  - `sets`: The declared universe the names resolve against.
-  - `datatype`: Data type of the assembled rows.
-  - `strict`: If `true`, a name that the universe does not resolve throws, and a row whose coefficients are all zero raises an [`IsZeroError`](@ref). If `false`, each case warns. The function drops the row in both cases.
-  - `bl_flag`: If `true`, a group expands to the mean over its members, as the Black-Litterman views need. If `false`, it expands to the sum.
-  - `rr`: The loadings, which the method passes to every element.
-  - `rd`: Returns from which the space of an element can refit, which the method passes to every element.
-
-# Returns
-
-  - `lcs`: One result per entry of the input, in the order of the input. An entry is a [`LinearConstraint`](@ref) or `nothing`.
-
-# Related
-
-  - [`ExposureConstraintEstimator`](@ref)
-  - [`linear_constraints`](@ref)
-"""
-function linear_constraints(lcs::VecEcE_LcE_Lc, sets::UniverseSets;
-                            datatype::DataType = Float64, strict::Bool = false,
-                            bl_flag::Bool = false,
-                            rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
-                            rd::Option{<:ReturnsResult} = nothing)
-    return [linear_constraints(lc, sets; datatype = datatype, strict = strict,
-                               bl_flag = bl_flag, rr = rr, rd = rd) for lc in lcs]
 end
 """
     reader_frames(space::FactorSpace, path::AbstractString, refit::Bool)
@@ -679,4 +761,4 @@ function reader_frames(ece::ExposureConstraintEstimator, path::AbstractString, r
 end
 
 export FactorSpace, ExposureConstraintEstimator
-public AbstractConstraintSpace, constraint_space_basis
+public AbstractConstraintSpace, constraint_space_basis, assert_space_constraint

@@ -179,14 +179,14 @@ end
 
 Answer whether `x` reads the returns matrix with a plain moment estimator, which refuses a gap in the matrix.
 
-A graph reader, a clustering, network, phylogeny or centrality estimator, computes the correlation of the returns matrix with its `ce`. [`gap_fill_value`](@ref) on `ce` states what the estimator does with a gap. A finite answer marks a plain estimator, which refuses a gapped sample. `NaN` marks a mask-aware estimator, which reads the observed cells. A [`FeatureDistance`](@ref) reads the features of an Asset Panel and not the returns matrix, so a reader that holds one is not plain. A precomputed result reads nothing.
+A graph reader, a clustering, network, phylogeny, centrality or seriation estimator, computes the correlation of the returns matrix with its `ce`. [`gap_fill_value`](@ref) on `ce` states what the estimator does with a gap. A finite answer marks a plain estimator, which refuses a gapped sample. `NaN` marks a mask-aware estimator, which reads the observed cells. A [`FeatureDistance`](@ref) reads the features of an Asset Panel and not the returns matrix, so a reader that holds one is not plain. A reader that holds a [`BlendDistance`](@ref) is plain when one of its parts reads the returns matrix. A precomputed result reads nothing.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
  1. A `Tuple` or a vector: `true` when one of its entries is plain.
- 2. A [`ClustersEstimator`](@ref) or a [`NetworkEstimator`](@ref): `true` when `gap_fill_value(x.ce)` is finite, and `false` when `x.de` is a [`FeatureDistance`](@ref).
+ 2. A [`ClustersEstimator`](@ref), a [`NetworkEstimator`](@ref) or a [`SpectralSeriation`](@ref): `true` when [`reads_returns_matrix`](@ref) of `x.de` answers `true` and `gap_fill_value(x.ce)` is finite. So a [`FeatureDistance`](@ref) answers `false`, and a [`BlendDistance`](@ref) answers `true` when one of its parts reads the returns.
  3. An estimator that holds a graph reader: forward to the reader that it holds.
  4. Every other value, a precomputed result and `nothing` among them: `false`.
 
@@ -203,6 +203,7 @@ The method that Julia selects is the algorithm.
   - [`assert_graph_readable`](@ref)
   - [`graph_reader_mask`](@ref)
   - [`gap_fill_value`](@ref)
+  - [`reads_returns_matrix`](@ref)
 """
 function plain_graph_reader(::Any)
     return false
@@ -210,15 +211,15 @@ end
 function plain_graph_reader(xs::Union{Tuple, AbstractVector})
     return any(plain_graph_reader, xs)
 end
-function plain_graph_reader(x::Union{ClustersEstimator, NetworkEstimator})
-    return isfinite(gap_fill_value(x.ce))
-end
-function plain_graph_reader(::Union{ClustersEstimator{<:Any, <:FeatureDistance},
-                                    NetworkEstimator{<:Any, <:FeatureDistance}})
-    return false
+function plain_graph_reader(x::Union{ClustersEstimator, NetworkEstimator,
+                                     SpectralSeriation})
+    return reads_returns_matrix(x.de) && isfinite(gap_fill_value(x.ce))
 end
 function plain_graph_reader(x::NetworkClustersEstimator)
     return plain_graph_reader(x.nte)
+end
+function plain_graph_reader(x::HierarchicalSeriation)
+    return plain_graph_reader(x.cle)
 end
 function plain_graph_reader(x::Union{CentralityEstimator, SemiDefinitePhylogenyEstimator,
                                      IntegerPhylogenyEstimator})
@@ -533,12 +534,11 @@ function implied_volatility_picker(pr::Pr_RR, X::MatNum, iv::Option{<:MatNum})
     return view(iv, prior_data_rows(pr, size(iv, 1), size(X, 1)), :)
 end
 """
-    graph_verb_keywords(; ivpa = nothing, branchorder = nothing, strict::Bool = false,
-                        dims::Integer = 1) -> Nothing
+    graph_verb_keywords(; ivpa = nothing, strict::Bool = false, dims::Integer = 1) -> Nothing
 
 Refuse a keyword that a graph verb over a [`Pr_RR`](@ref) does not forward.
 
-A graph verb forwards its keywords to the asset-returns method, and the moment estimators of that method ignore a keyword that they do not know. So a keyword that the library removed would run with no error. Each graph verb over a `Pr_RR` calls this function with its own keywords, so an unknown keyword raises the `MethodError` of the language. The four keywords are the ones that the callers of the library forward: `ivpa` to an implied volatility estimator, `branchorder` to a hierarchical clustering, `strict` to a centrality constraint, and `dims`, which the call overrides with `dims = 1`.
+A graph verb forwards its keywords to the asset-returns method, and the moment estimators of that method ignore a keyword that they do not know. So a keyword that the library removed would run with no error. Each graph verb over a `Pr_RR` calls this function with its own keywords, so an unknown keyword raises the `MethodError` of the language. The three keywords are the ones that the callers of the library forward: `ivpa` to an implied volatility estimator, `strict` to a centrality constraint, and `dims`, which the call overrides with `dims = 1`. The branch order of a hierarchical clustering is a field of its algorithm, see [`AbstractBranchOrder`](@ref), so a `branchorder` keyword raises the `MethodError`.
 
 # Returns
 
@@ -549,8 +549,7 @@ A graph verb forwards its keywords to the asset-returns method, and the moment e
   - [`clusterise`](@ref)
   - [`centrality_constraints`](@ref)
 """
-function graph_verb_keywords(; ivpa = nothing, branchorder = nothing, strict::Bool = false,
-                             dims::Integer = 1)
+function graph_verb_keywords(; ivpa = nothing, strict::Bool = false, dims::Integer = 1)
     return nothing
 end
 """
@@ -593,6 +592,46 @@ function clusterise(cle::AbstractClustersEstimator, pr::Pr_RR;
     assert_graph_readable(cle, X)
     return clusterise(cle, X; pr = pr, rd = rd, iv = implied_volatility_picker(pr, X, iv),
                       kwargs..., dims = 1)
+end
+"""
+    seriate(ser::AbstractSeriationEstimator, pr::Pr_RR; kwargs...)
+
+Order the assets of a prior result, or of the returns data, with a seriation estimator.
+
+This is the method of [`clusterise`](@ref) over a prior result, for a seriation.
+
+# Algorithm
+
+ 1. Pick the asset returns matrix `X` from the source that the member states, [`returns_source`](@ref), with [`returns_matrix_picker`](@ref). Refuse a gap in `X` that a plain graph reader cannot read, with [`assert_graph_readable`](@ref).
+ 2. Call the asset-returns method of [`seriate`](@ref) with `X`, passing both results on as `pr` and `rd` and `dims = 1` last, and return the seriation result it produces.
+
+# Arguments
+
+  - `ser`: The seriation estimator.
+  - $(arg_dict[:pr_rr])
+  - $(arg_dict[:rd]) Read for `X` under the source of the member, and passed on to the estimator tree.
+  - $(arg_dict[:iv_x_src])
+  - `kwargs...`: Additional keyword arguments passed to the seriation estimator. An unknown keyword raises a `MethodError`, see [`graph_verb_keywords`](@ref).
+
+# Returns
+
+  - `res::AbstractSeriationResult`: The order of the assets.
+
+# Related
+
+  - [`AbstractSeriationEstimator`](@ref)
+  - [`seriate`](@ref)
+  - [`clusterise`](@ref)
+  - [`returns_matrix_picker`](@ref)
+"""
+function seriate(ser::AbstractSeriationEstimator, pr::Pr_RR;
+                 rd::Option{<:ReturnsResult} = nothing, iv::Option{<:MatNum} = nothing,
+                 kwargs...)
+    graph_verb_keywords(; kwargs...)
+    X = returns_matrix_picker(pr, rd, returns_source(ser))
+    assert_graph_readable(ser, X)
+    return seriate(ser, X; pr = pr, rd = rd, iv = implied_volatility_picker(pr, X, iv),
+                   kwargs..., dims = 1)
 end
 """
     phylogeny_matrix(pl::NwE_ClE_Cl, pr::AbstractPriorResult;

@@ -211,7 +211,7 @@ end
         pipe_zs = Pipeline(;
                            steps = (sel_feat, EmpiricalPrior(),
                                     HierarchicalRiskParity(;
-                                                           opt = HierarchicalOptimiser(;
+                                                           ser = HierarchicalSeriation(;
                                                                                        cle = ClustersEstimator(;
                                                                                                                de = FeatureDistance(;
                                                                                                                                     ape = PhylogenyPanel()))))))
@@ -738,33 +738,36 @@ end
     rd = drop_rd()
     @test isnothing(PO.investable_mask(prior(pe, rd)))
     cle = ClustersEstimator(; de = FeatureDistance(; sel = ["f"]))
-    ho = HierarchicalOptimiser(; pe = pe, cle = cle)
+    ho = HierarchicalOptimiser(; pe = pe)
+    sr = HierarchicalSeriation(; cle = cle)
     slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                  settings = Dict("verbose" => false))
     jo = JuMPOptimiser(; pe = pe, slv = slv,
                        ple = SemiDefinitePhylogenyEstimator(; pl = cle))
     msg = (:info, r"1 asset\(s\) left the investable universe .*\[\"d\"\]")
-    for (name, opt) in ("HierarchicalRiskParity" => HierarchicalRiskParity(; opt = ho),
-                        "HierarchicalEqualRiskContribution" =>
-                            HierarchicalEqualRiskContribution(; opt = ho),
-                        "SchurComplementHierarchicalRiskParity" =>
-                            SchurComplementHierarchicalRiskParity(; opt = ho),
-                        # The vector arms enter at sites of their own (#1771).
-                        "HierarchicalRiskParity, a vector of measures" =>
-                            HierarchicalRiskParity(; r = [Variance(), ConditionalValueatRisk()], opt = ho),
-                        "SchurComplementHierarchicalRiskParity, a vector of params" =>
-                            SchurComplementHierarchicalRiskParity(;
-                                                                  params = [SchurComplementParams(),
-                                                                            SchurComplementParams(;
-                                                                                                  gamma = 0.5)],
-                                                                  opt = ho),
-                        "NestedClustered" =>
-                            NestedClustered(; pe = pe, cle = cle, opti = InverseVolatility(; pe = pe),
-                                            opto = InverseVolatility(; pe = pe)),
-                        "MeanRisk" => MeanRisk(; opt = jo),
-                        "SubsetResampling" =>
-                            SubsetResampling(; pe = pe, opt = HierarchicalRiskParity(; opt = ho),
-                                             subset_size = 4, n_subsets = 3))
+    for (name, opt) in
+        ("HierarchicalRiskParity" => HierarchicalRiskParity(; opt = ho, ser = sr),
+         "HierarchicalEqualRiskContribution" =>
+             HierarchicalEqualRiskContribution(; opt = ho, cle = cle),
+         "SchurComplementHierarchicalRiskParity" =>
+             SchurComplementHierarchicalRiskParity(; opt = ho, ser = sr),
+         # The vector arms enter at sites of their own (#1771).
+         "HierarchicalRiskParity, a vector of measures" =>
+             HierarchicalRiskParity(; r = [Variance(), ConditionalValueatRisk()], opt = ho,
+                                    ser = sr),
+         "SchurComplementHierarchicalRiskParity, a vector of params" =>
+             SchurComplementHierarchicalRiskParity(;
+                                                   params = [SchurComplementParams(),
+                                                             SchurComplementParams(;
+                                                                                   gamma = 0.5)],
+                                                   opt = ho, ser = sr),
+         "NestedClustered" =>
+             NestedClustered(; pe = pe, cle = cle, opti = InverseVolatility(; pe = pe),
+                             opto = InverseVolatility(; pe = pe)),
+         "MeanRisk" => MeanRisk(; opt = jo),
+         "SubsetResampling" =>
+             SubsetResampling(; pe = pe, opt = HierarchicalRiskParity(; opt = ho, ser = sr),
+                              subset_size = 4, n_subsets = 3))
         @testset "$(name)" begin
             res = @test_logs msg match_mode = :any optimise(opt, rd)
             @test iszero(res.w[4])
@@ -774,24 +777,24 @@ end
     # Stacking clusters inside its members alone: the clustering member drops `d`, and the
     # member that reads no feature keeps it.
     st = Stacking(; pe = pe,
-                  opti = [HierarchicalRiskParity(; opt = ho), InverseVolatility(; pe = pe)],
+                  opti = [HierarchicalRiskParity(; opt = ho, ser = sr),
+                          InverseVolatility(; pe = pe)],
                   opto = InverseVolatility(; pe = pe))
     res = optimise(st, rd)
     @test iszero(res.resi[1].w[4])
     @test res.resi[2].w[4] > 0
     # The masked result names `d` as non-investable.
-    res = optimise(HierarchicalRiskParity(; opt = ho), rd)
+    res = optimise(HierarchicalRiskParity(; opt = ho, ser = sr), rd)
     @test PO.result_investable_mask(res) == BitVector([1, 1, 1, 0, 1])
     # LastActiveRow reads `d` at row 20, so nothing drops.
     cla = ClustersEstimator(; de = FeatureDistance(; sel = ["f"], alg = LastActiveRow()))
-    res = optimise(HierarchicalRiskParity(;
-                                          opt = HierarchicalOptimiser(; pe = pe, cle = cla)),
-                   rd)
+    res = optimise(HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pe),
+                                          ser = HierarchicalSeriation(; cle = cla)), rd)
     @test res.w[4] > 0
     @testset "The rule for an empty pair, in a fit" begin
         rdq, prq = pair_rd()
-        hq(p) = HierarchicalRiskParity(;
-                                       opt = HierarchicalOptimiser(; pe = prq,
+        hq(p) = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = prq),
+                                       ser = HierarchicalSeriation(;
                                                                    cle = ClustersEstimator(;
                                                                                            de = FeatureDistance(;
                                                                                                                 sel = ["f"],

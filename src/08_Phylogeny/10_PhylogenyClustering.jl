@@ -9,8 +9,8 @@ The type of `alg` selects the clustering routine, and `onc` selects the number o
 
  1. Cluster `P` into `res`, through the branch that `alg` selects.
 
-      + [`HClustAlgorithm`](@ref): [`branch_ordered_hclust`](@ref) under `alg.linkage` on `Val(branchorder)`.
-      + [`DBHT`](@ref): [`DBHTs`](@ref) over `P` and `S`. The last value that it returns is the clustering.
+      + [`HClustAlgorithm`](@ref): [`branch_ordered_hclust`](@ref) under `alg.linkage` and `alg.branchorder`.
+      + [`DBHT`](@ref): [`DBHTs`](@ref) over `P` and `S`, under `alg.root` and `alg.branchorder`. The last value that it returns is the clustering.
       + [`AbstractNonHierarchicalClusteringAlgorithm`](@ref): [`optimal_number_clusters`](@ref), which returns the clustering and the number of clusters together.
 
  2. Select the number of clusters `k` with [`optimal_number_clusters`](@ref) over `onc`, `res` and `P`. The third branch already has `k` from step 1.
@@ -33,8 +33,6 @@ The type of `alg` selects the clustering routine, and `onc` selects the number o
 
   - `P::MatNum`: Symmetric matrix of pseudo-distances from the network.
 
-  - `branchorder`: Order method for the dendrogram branches, `:optimal` by default. [`branch_ordered_hclust`](@ref) and [`DBHTs`](@ref) state what each value does.
-
 # Returns
 
   - `clr::Clusters`: Clustering result. It holds the clustering, the similarity matrix, the distance matrix, the matrix of pseudo-distances and the number of clusters.
@@ -49,20 +47,20 @@ The type of `alg` selects the clustering routine, and `onc` selects the number o
   - [`clusterise`](@ref)
 """
 function _clusterise(alg::HClustAlgorithm, onc::AbstractOptimalNumberClustersEstimator,
-                     S::MatNum, D::MatNum, P::MatNum; branchorder::Symbol = :optimal)
-    res = branch_ordered_hclust(P, alg.linkage, Val(branchorder))
+                     S::MatNum, D::MatNum, P::MatNum)
+    res = branch_ordered_hclust(P, alg.linkage, alg.branchorder)
     k = optimal_number_clusters(onc, res, P)
     return Clusters(; res = res, S = S, D = D, P = P, k = k)
 end
 function _clusterise(alg::DBHT, onc::AbstractOptimalNumberClustersEstimator, S::MatNum,
-                     D::MatNum, P::MatNum; branchorder::Symbol = :optimal)
-    res = DBHTs(P, S; branchorder = branchorder, root = alg.root, sim = alg.sim)[end]
+                     D::MatNum, P::MatNum)
+    res = DBHTs(P, S; branchorder = alg.branchorder, root = alg.root, sim = alg.sim)[end]
     k = optimal_number_clusters(onc, res, P)
     return Clusters(; res = res, S = S, D = D, P = P, k = k)
 end
 function _clusterise(alg::AbstractNonHierarchicalClusteringAlgorithm,
                      onc::AbstractOptimalNumberClustersEstimator, S::MatNum, D::MatNum,
-                     P::MatNum; kwargs...)
+                     P::MatNum)
     res, k = optimal_number_clusters(onc, alg, P)
     return Clusters(; res = res, S = S, D = D, P = P, k = k)
 end
@@ -70,7 +68,7 @@ end
     clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:Any,
                                                                 <:AbstractTreeType,
                                                                 <:HopCount}},
-               X::MatNum; dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
+               X::MatNum; dims::Int = 1, kwargs...)
 
 Cluster the assets over a minimum spanning tree, and return a [`Clusters`](@ref) result.
 
@@ -94,9 +92,7 @@ The fourth type parameter is bound to [`HopCount`](@ref), so a [`PathLength`](@r
 
   - `nte`: Network clustering estimator, whose [`NetworkEstimator`](@ref) builds a minimum spanning tree.
   - $(arg_dict[:X])
-  - $(arg_dict[:dims])
-  - `branchorder`: Order method for the dendrogram branches, `:optimal` by default. [`branch_ordered_hclust`](@ref) and [`DBHTs`](@ref) state what each value does.
-  - `kwargs...`: Keyword arguments for the estimators of `nte`.
+  - $(arg_dict[:dims])  - `kwargs...`: Keyword arguments for the estimators of `nte`.
 
 # Validation
 
@@ -120,7 +116,7 @@ The fourth type parameter is bound to [`HopCount`](@ref), so a [`PathLength`](@r
 function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:Any,
                                                                      <:AbstractTreeType,
                                                                      <:HopCount}},
-                    X::MatNum; dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
+                    X::MatNum; dims::Int = 1, kwargs...)
     S, D = cor_and_dist(nte.nte.de, nte.nte.ce, X; dims = dims, kwargs...)
     assert_distance_reader_rows(D)
     P = zeros(eltype(D), size(D))
@@ -143,14 +139,13 @@ function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:An
         P .+= D^i - A^i
     end
     P .-= LinearAlgebra.Diagonal(P)
-    return _clusterise(nte.alg, nte.onc, S, D, LinearAlgebra.Symmetric(P);
-                       branchorder = branchorder)
+    return _clusterise(nte.alg, nte.onc, S, D, LinearAlgebra.Symmetric(P))
 end
 """
     clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:Any,
                                                                 <:AbstractNonNegativeSimilarityMatrixAlgorithm,
                                                                 <:HopCount}},
-               X::MatNum; dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
+               X::MatNum; dims::Int = 1, kwargs...)
 
 Cluster the assets over a planar maximally filtered graph (PMFG), and return a [`Clusters`](@ref) result.
 
@@ -175,9 +170,7 @@ The fourth type parameter is bound to [`HopCount`](@ref), so a [`PathLength`](@r
 
   - `nte`: Network clustering estimator, whose [`NetworkEstimator`](@ref) builds a PMFG from a similarity matrix.
   - $(arg_dict[:X])
-  - $(arg_dict[:dims])
-  - `branchorder`: Order method for the dendrogram branches, `:optimal` by default. [`branch_ordered_hclust`](@ref) and [`DBHTs`](@ref) state what each value does.
-  - `kwargs...`: Keyword arguments for the estimators of `nte`.
+  - $(arg_dict[:dims])  - `kwargs...`: Keyword arguments for the estimators of `nte`.
 
 # Validation
 
@@ -203,7 +196,7 @@ The fourth type parameter is bound to [`HopCount`](@ref), so a [`PathLength`](@r
 function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:Any,
                                                                      <:AbstractNonNegativeSimilarityMatrixAlgorithm,
                                                                      <:HopCount}},
-                    X::MatNum; dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
+                    X::MatNum; dims::Int = 1, kwargs...)
     S, D = cor_and_dist(nte.nte.de, nte.nte.ce, X; dims = dims, kwargs...)
     assert_distance_reader_rows(D)
     assert_similarity_domain(nte.nte.alg, nte.nte.de, D)
@@ -220,8 +213,7 @@ function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:An
         P .+= S^i - Rpm^i
     end
     P .-= LinearAlgebra.Diagonal(P)
-    return _clusterise(nte.alg, nte.onc, S, D, LinearAlgebra.Symmetric(P);
-                       branchorder = branchorder)
+    return _clusterise(nte.alg, nte.onc, S, D, LinearAlgebra.Symmetric(P))
 end
 """
     const HClE_HCl = Union{ClustersEstimator{<:Any, <:Any,

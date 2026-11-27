@@ -307,3 +307,22 @@ carriers already pins it, and a later step with another `ivpa` is refused by nam
   `step_active_mask` no longer refuses `iv`. The step of a covariance estimator in
   `covariance_forecast_evaluation` refuses it itself, because its exact fold keeps numbers alone
   ([#1646](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1646), ADR 0204).
+
+## Amendment (2026-11-23)
+
+**A member above the prior keeps a state of its own** (#2169, built in #2174). The decision of
+this ADR still holds for the observations: `partial_fit!(opt, rd)` folds them into the prior
+alone, and `optimise(opt)` with no returns runs the batch path. A `SpectralSeriation` in the
+field `ser` of HRP or Schur adds one more state, which is not a statistic of the observations:
+the coordinates and the order of its last fit, a `SpectralSeriationState` in its `cache`.
+
+- The online arm of a walk-forward writes it after the fit of each fold, through
+  `carry_fold_state(est, pred)`. The generic method returns `est`, so every other estimator is
+  unchanged. The next fold views the state onto its Investable Mask, projects the coordinates
+  onto its own eigenspace and breaks a tie by the order, as the `partial_fit` of the oracle
+  does.
+- The state is over the universe of the estimator, with `NaN` at an asset that the last fit
+  did not order, so an asset can leave and come back.
+- `merge_states` refuses two states, because the memory is not a sufficient statistic.
+- An ordinary walk-forward fits each fold from the configuration, so it keeps no memory, as in
+  the oracle. `partial_fit!(ser, X)` is the step of the memory outside an optimiser.

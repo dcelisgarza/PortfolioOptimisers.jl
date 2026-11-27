@@ -549,14 +549,17 @@ end
                           fb = nothing)
     @test PO.result_investable_mask(kres) == imsk
     # The hierarchical core answers directly, and its two leaves answer through the core.
-    hres = HierarchicalResult(; pr = prk, clr = nothing, wb = nothing, fees = nothing,
+    hres = HierarchicalResult(; pr = prk, wb = nothing, fees = nothing,
                               retcode = OptimisationSuccess(), w = w_keep, imsk = imsk)
     @test PO.result_investable_mask(hres) == imsk
     @test hres.w == w_full
-    hrp = HierarchicalRiskParityResult(; hr = hres, r = Variance(), sca = SumScalariser(),
-                                       fb = nothing)
+    hrp = HierarchicalRiskParityResult(; hr = hres,
+                                       ser = FixedSeriationResult(; order = [1, 2]),
+                                       r = Variance(), sca = SumScalariser(), fb = nothing)
     @test PO.result_investable_mask(hrp) == imsk
-    herc = HierarchicalEqualRiskContributionResult(; hr = hres, ri = Variance(),
+    herc = HierarchicalEqualRiskContributionResult(; hr = hres,
+                                                   clr = clusterise(ClustersEstimator(),
+                                                                    prk), ri = Variance(),
                                                    ro = Variance(), scai = SumScalariser(),
                                                    scao = SumScalariser(), fb = nothing)
     @test PO.result_investable_mask(herc) == imsk
@@ -566,8 +569,11 @@ end
                                   w = w_keep, imsk = imsk, fb = nothing)
     @test PO.result_investable_mask(ncres) == imsk
     scres = SchurComplementHierarchicalRiskParityResult(; pr = prk, wb = nothing,
-                                                        clr = nothing, fees = nothing,
-                                                        r = Variance(), gamma = 0.5,
+                                                        ser = FixedSeriationResult(;
+                                                                                   order = [1,
+                                                                                            2]),
+                                                        fees = nothing, r = Variance(),
+                                                        gamma = 0.5,
                                                         retcode = OptimisationSuccess(),
                                                         w = w_keep, imsk = imsk,
                                                         fb = nothing)
@@ -1074,7 +1080,8 @@ end
     # The clustering states the prior as its source, so it reads the filled matrix too. A
     # clustering of the returns data meets the gap itself (ADR 0211, decision 8).
     resh = optimise(HierarchicalRiskParity(; r = ConditionalValueatRisk(),
-                                           opt = HierarchicalOptimiser(; pe = pe,
+                                           opt = HierarchicalOptimiser(; pe = pe),
+                                           ser = HierarchicalSeriation(;
                                                                        cle = ClustersEstimator(;
                                                                                                x_src = PriorSource()))),
                     rd)
@@ -1102,9 +1109,11 @@ end
     # The prior fills the gap of the young asset `d` in its own returns only. The clustering
     # reads the returns data, which keep the gap, so its `ce` decides (ADR 0211, decision 8).
     rd = ReturnsResult(; nx = nx, X = Xmix, pnl = pnl_mix)
-    hrp(; kwargs...) = HierarchicalRiskParity(; r = ConditionalValueatRisk(),
-                                              opt = HierarchicalOptimiser(; pe = pe,
-                                                                          kwargs...))
+    function hrp(; cle = ClustersEstimator(), kwargs...)
+        return HierarchicalRiskParity(; r = ConditionalValueatRisk(),
+                                      opt = HierarchicalOptimiser(; pe = pe, kwargs...),
+                                      ser = HierarchicalSeriation(; cle = cle))
+    end
     cvg_ce = PortfolioOptimisersCovariance(; ce = Covariance(; cvg = CoveragePolicy()))
     left_c = (:info, r"left the investable universe.*\[\"c\"\]")
 
@@ -1194,18 +1203,19 @@ end
                                                                              min_coverage = 0.6)))
     cle = ClustersEstimator(; ce = sce)
     nte = NetworkEstimator(; ce = sce)
-    hopt(s) = HierarchicalOptimiser(; pe = pe, cle = cle, strict = s)
+    hopt(s) = HierarchicalOptimiser(; pe = pe, strict = s)
+    hser = HierarchicalSeriation(; cle = cle)
     jopt(s; kwargs...) = JuMPOptimiser(; pe = pe, slv = slv, strict = s, kwargs...)
-    heads = [s -> HierarchicalRiskParity(; opt = hopt(s)),
+    heads = [s -> HierarchicalRiskParity(; opt = hopt(s), ser = hser),
              s -> HierarchicalRiskParity(; r = [Variance(), ConditionalValueatRisk()],
-                                         opt = hopt(s)),
-             s -> HierarchicalEqualRiskContribution(; opt = hopt(s)),
-             s -> SchurComplementHierarchicalRiskParity(; opt = hopt(s)),
+                                         opt = hopt(s), ser = hser),
+             s -> HierarchicalEqualRiskContribution(; opt = hopt(s), cle = cle),
+             s -> SchurComplementHierarchicalRiskParity(; opt = hopt(s), ser = hser),
              s -> SchurComplementHierarchicalRiskParity(;
                                                         params = [SchurComplementParams(),
                                                                   SchurComplementParams(;
                                                                                         gamma = 0.2)],
-                                                        opt = hopt(s)),
+                                                        opt = hopt(s), ser = hser),
              s -> NestedClustered(; pe = pe, cle = cle, strict = s,
                                   opti = MeanRisk(; opt = JuMPOptimiser(; slv = slv)),
                                   opto = MeanRisk(; opt = JuMPOptimiser(; slv = slv))),
@@ -1230,15 +1240,14 @@ end
     end
     # The fit again equals the problem reduced to `a` and `b` by hand.
     pr = prior(pe, rd)
-    hrp = HierarchicalRiskParity(; opt = hopt(false))
+    hrp = HierarchicalRiskParity(; opt = hopt(false), ser = hser)
     res = @test_logs refused match_mode = :any optimise(hrp, rd)
     resk = optimise(HierarchicalRiskParity(;
                                            opt = HierarchicalOptimiser(;
                                                                        pe = PO.port_opt_view(pr,
                                                                                              [1,
-                                                                                              2]),
-                                                                       cle = cle)),
-                    PO.port_opt_view(rd, [1, 2]))
+                                                                                              2])),
+                                           ser = hser), PO.port_opt_view(rd, [1, 2]))
     @test res.w[[1, 2]] == resk.w
     # A direct call has no fit to drop the asset from, so each verb refuses it and names the
     # column of `d` in the matrix that it read.
@@ -1465,7 +1474,7 @@ end
     @test_logs (:warn, r"To keep an asset with zero variance.*GerberCovariance"s) match_mode = :any optimise(HierarchicalRiskParity(),
                                                                                                              rdc)
     reg = optimise(HierarchicalRiskParity(;
-                                          opt = HierarchicalOptimiser(;
+                                          ser = HierarchicalSeriation(;
                                                                       cle = ClustersEstimator(;
                                                                                               ce = GerberCovariance()))),
                    rdc)

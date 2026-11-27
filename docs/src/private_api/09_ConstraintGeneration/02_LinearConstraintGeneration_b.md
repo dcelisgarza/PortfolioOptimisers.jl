@@ -10,8 +10,9 @@ VecLcE
 LcE_VecLcE
 VecLcE_Lc
 LcE_Lc_VecLcE_Lc
-get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets, key::Option{<:AbstractString} = nothing; datatype::DataType = Float64, strict::Bool = false, rr::Option{<:AbstractRegressionResult} = nothing)
+get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets, key::Option{<:AbstractString} = nothing; datatype::DataType = Float64, strict::Bool = false, rr::Option{<:RowBasis} = nothing)
 universe_axis
+constraint_row_universe
 constraint_row_length
 constraint_row_term
 _parse_equation

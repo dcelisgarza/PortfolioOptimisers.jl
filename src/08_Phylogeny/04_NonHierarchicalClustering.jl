@@ -168,7 +168,7 @@ The `SecondOrderDifference` and `SilhouetteScore` methods run the steps that the
   - `res::Clustering.ClusteringResult`: The partition at the selected count.
   - `k::Integer`: The selected number of clusters.
 
-The method returns the two as a tuple. The hierarchical methods of the same name in `03_Hierarchical.jl` return `k` alone, because the caller can cut the dendrogram again at any count.
+The method returns the two as a tuple. The hierarchical methods of the same name in `03_Hierarchical_a.jl` return `k` alone, because the caller can cut the dendrogram again at any count.
 
 # Related
 
@@ -283,11 +283,11 @@ end
 
 Label every asset of a [`Clusters`](@ref) result with the cluster it belongs to.
 
-The function has one method for each clustering family. The two methods differ only in the source of the labels. A dendrogram has no labels until a cut makes them, and a flat partition already holds them. `03_Hierarchical.jl` declares the method for a `Clustering.Hclust`, and this file declares the method for a `Clustering.ClusteringResult`.
+The function has one method for each clustering family. The two methods differ only in the source of the labels. A dendrogram has no labels until a cut makes them, and a flat partition already holds them. `03_Hierarchical_a.jl` declares the method for a `Clustering.Hclust`, and this file declares the method for a `Clustering.ClusteringResult`.
 
 # Algorithm
 
- 1. If `clr.res` is a `Clustering.Hclust`, it is a dendrogram with no labels. Cut it at `clr.k` with `Clustering.cutree`, which gives one label per asset.
+ 1. If `clr.res` is a `Clustering.Hclust`, it is a dendrogram with no labels. Cut it at `clr.k` with [`cut_dendrogram`](@ref), which gives one label per asset, also on a tree with an inversion.
  2. If `clr.res` is a `Clustering.ClusteringResult`, one run at one count made it, and it holds its own labels. Read `clr.res.assignments`.
 
 # Arguments

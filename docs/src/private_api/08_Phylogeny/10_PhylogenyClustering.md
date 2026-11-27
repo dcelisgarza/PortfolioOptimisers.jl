@@ -6,5 +6,5 @@ Description = "Phylogeny Clustering, private API of PortfolioOptimisers.jl: HClE
 
 ```@docs
 HClE_HCl
-_clusterise(alg::HClustAlgorithm, onc::AbstractOptimalNumberClustersEstimator, S::MatNum, D::MatNum, P::MatNum; branchorder::Symbol = :optimal)
+_clusterise(alg::HClustAlgorithm, onc::AbstractOptimalNumberClustersEstimator, S::MatNum, D::MatNum, P::MatNum)
 ```

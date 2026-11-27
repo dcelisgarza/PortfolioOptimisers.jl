@@ -14,5 +14,6 @@ PortfolioOptimisers.thread_online_folds!
 PortfolioOptimisers.online_folds
 PortfolioOptimisers.online_step_fold(::Any, ::PortfolioOptimisers.Option{<:PortfolioOptimisers.TimeDependentContext}, ::PortfolioOptimisers.Prices_RR)
 PortfolioOptimisers.one_previous_portfolio
+PortfolioOptimisers.carry_fold_state(est, pred)
 PortfolioOptimisers.step_context
 ```

@@ -85,6 +85,8 @@ The asset price series `X` is the master clock. [`port_opt_view`](@ref) selects 
 
 The Exogenous Series `E` holds level series that belong to no asset, for example a Currency Excess Index. [`price_ingestion`](@ref) aligns it by timestamp to the clock of `X`, and [`prices_to_returns`](@ref) converts it with the return rule of the assets. Its column names are the names that [`ReturnsResult`](@ref) carries in `ne`.
 
+The Exogenous Graphs `G`, one [`ExogenousGraph`](@ref) or [`ExogenousGraphSeries`](@ref) for each name of `ng`, are on the clock of `X`. An integer key of a series is a row of `X`, and a date key compares with its timestamps. [`port_opt_view`](@ref) and [`prices_to_returns`](@ref) keep the graph in force at the first kept row and the keys inside the kept rows, see [`graph_view`](@ref).
+
 The [`AssetPanel`](@ref) `pnl` and the Listing Span `span` hold no timestamps, so no timestamp aligns them. A Panel Field can be a 3-dimensional array, a static panel has no observation axis, and a span can be two integers per asset. Their axes run parallel to `X` by position instead. The asset axis follows `TimeSeries.colnames(X)`, and the observation axis of a time-varying panel follows `TimeSeries.timestamp(X)` row for row. A routine that drops an asset or an observation from `X` must drop it from `pnl` and `span` in the same step. [`port_opt_view`](@ref) does this: it views the panel with its own method, and the span with [`listing_span_view`](@ref), and [`MissingDataFilter`](@ref) and [`prices_to_returns`](@ref) do it too.
 
 # Fields
@@ -98,6 +100,8 @@ $(DocStringExtensions.FIELDS)
         F::Option{<:TimeSeries.TimeArray} = nothing,
         B::Option{<:TimeSeries.TimeArray} = nothing,
         E::Option{<:TimeSeries.TimeArray} = nothing,
+        ng::Option{<:VecStr} = nothing,
+        G::Option{<:AbstractVector} = nothing,
         iv::Option{<:TimeSeries.TimeArray} = nothing,
         ivpa::Option{<:Num_VecNum} = nothing,
         pnl::Option{<:AssetPanel} = nothing,
@@ -114,6 +118,7 @@ Keywords correspond to the struct's fields.
   - If `F` is not `nothing`: `!isempty(F)`.
   - If `B` is not `nothing`: `!isempty(B)`, and `size(values(B), 2) in (1, size(values(X), 2))`.
   - If `E` is not `nothing`: `!isempty(E)`.
+  - If `ng` or `G` is not `nothing`: the rules of [`check_exogenous_graphs`](@ref) on the rows and the timestamps of `X`.
   - If `iv` is not `nothing`: `!isempty(iv)`, `size(values(iv), 2) == size(values(X), 2)`, and every present value is finite and non-negative. An absent value is `NaN`, or `missing` on a `PricesResult` built by hand. See [`assert_nonneg_where_present`](@ref).
   - If `ivpa` is not `nothing`: `!isempty(ivpa)`, `all(isfinite, ivpa)` and `all(x -> x > 0, ivpa)`. If `ivpa` is a vector: `length(ivpa) == size(values(X), 2)`.
   - If `pnl` is not `nothing`: its asset axis has the length `size(values(X), 2)`, and the observation axis of a time-varying panel has the length `size(values(X), 1)`. See [`check_asset_panel`](@ref).
@@ -163,6 +168,14 @@ julia> size(values(pr.X))
     """
     E
     """
+    $(field_dict[:ng])
+    """
+    ng
+    """
+    $(field_dict[:G])
+    """
+    G
+    """
     Optional implied volatilities, `observations × assets`. An absent value is `NaN`, and [`ImpliedVolatility`](@ref) removes the asset from its fit.
     """
     iv
@@ -180,9 +193,10 @@ julia> size(values(pr.X))
     span
     function PricesResult(X::TimeSeries.TimeArray, F::Option{<:TimeSeries.TimeArray},
                           B::Option{<:TimeSeries.TimeArray},
-                          E::Option{<:TimeSeries.TimeArray},
-                          iv::Option{<:TimeSeries.TimeArray}, ivpa::Option{<:Num_VecNum},
-                          pnl::Option{<:AssetPanel}, span::Option{<:AbstractMatrix{Bool}})
+                          E::Option{<:TimeSeries.TimeArray}, ng::Option{<:VecStr},
+                          G::Option{<:AbstractVector}, iv::Option{<:TimeSeries.TimeArray},
+                          ivpa::Option{<:Num_VecNum}, pnl::Option{<:AssetPanel},
+                          span::Option{<:AbstractMatrix{Bool}})
         # The one entry point of integer data: every kernel downstream reads a float.
         X = float_if_integer(X)
         F = float_if_integer(F)
@@ -219,19 +233,22 @@ julia> size(values(pr.X))
             @argcheck(size(span) == size(values(X)),
                       DimensionMismatch("a Listing Span states which assets are listed at each observation of the price clock, so it is the shape of the asset prices; got size(span) = $(size(span)) and size(values(X)) = $(size(values(X)))"))
         end
-        return new{typeof(X), typeof(F), typeof(B), typeof(E), typeof(iv), typeof(ivpa),
-                   typeof(pnl), typeof(span)}(X, F, B, E, iv, ivpa, pnl, span)
+        check_exogenous_graphs(ng, G, size(values(X), 1), ts)
+        return new{typeof(X), typeof(F), typeof(B), typeof(E), typeof(ng), typeof(G),
+                   typeof(iv), typeof(ivpa), typeof(pnl), typeof(span)}(X, F, B, E, ng, G,
+                                                                        iv, ivpa, pnl, span)
     end
 end
 function PricesResult(; X::TimeSeries.TimeArray,
                       F::Option{<:TimeSeries.TimeArray} = nothing,
                       B::Option{<:TimeSeries.TimeArray} = nothing,
                       E::Option{<:TimeSeries.TimeArray} = nothing,
+                      ng::Option{<:VecStr} = nothing, G::Option{<:AbstractVector} = nothing,
                       iv::Option{<:TimeSeries.TimeArray} = nothing,
                       ivpa::Option{<:Num_VecNum} = nothing,
                       pnl::Option{<:AssetPanel} = nothing,
                       span::Option{<:AbstractMatrix{Bool}} = nothing)::PricesResult
-    return PricesResult(X, F, B, E, iv, ivpa, pnl, span)
+    return PricesResult(X, F, B, E, ng, G, iv, ivpa, pnl, span)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -329,8 +346,9 @@ function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime}
     pnl = port_opt_view(pr.pnl, rows, :, nothing)
     span = listing_span_view(pr.span, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X),
                              :)
-    return PricesResult(; X = X, F = F, B = B, E = E, iv = iv, ivpa = pr.ivpa, pnl = pnl,
-                        span = span)
+    G = graphs_clock_view(pr.G, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X))
+    return PricesResult(; X = X, F = F, B = B, E = E, ng = pr.ng, G = G, iv = iv,
+                        ivpa = pr.ivpa, pnl = pnl, span = span)
 end
 function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime},
                        j::Union{AbstractVector, Integer, AbstractString,
@@ -358,8 +376,9 @@ function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime}
     pnl = port_opt_view(pr.pnl, rows, j, nx)
     span = listing_span_view(pr.span, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X),
                              j)
-    return PricesResult(; X = X, F = F, B = B, E = E, iv = iv, ivpa = ivpa, pnl = pnl,
-                        span = span)
+    G = graphs_clock_view(pr.G, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X))
+    return PricesResult(; X = X, F = F, B = B, E = E, ng = pr.ng, G = G, iv = iv,
+                        ivpa = ivpa, pnl = pnl, span = span)
 end
 function port_opt_view(pr::PricesResult,
                        i::Union{Integer, VecInt, Colon, Dates.AbstractTime} = :,
@@ -372,6 +391,21 @@ function port_opt_view(pr::AbstractPricesResult, args...; kwargs...)
     kws = keys(kwargs)
     kwmsg = isempty(kws) ? "" : " and the keyword argument(s) " * join(kws, ", ")
     return throw(ArgumentError("port_opt_view has no method for a $(nameof(typeof(pr))) with the index argument type(s) ($(join(typeof.(args), ", ")))$(kwmsg). A PricesResult takes port_opt_view(pr, observations) or port_opt_view(pr, observations, assets), with no keyword argument. The observations are one integer, integer indices, a range, a Colon, one timestamp or a vector of timestamps, and the assets are one integer, integer indices, a range, a Colon, one asset name or a vector of asset names. A subtype of AbstractPricesResult implements these two shapes."))
+end
+# The methods below read the Exogenous Graphs of `pr`. Their docstrings are on the functions
+# of `src/03_InputData/05_ExogenousGraph/`, which load before this type exists.
+function graph_in_force(pr::PricesResult, name::Option{<:AbstractString} = nothing)
+    return graph_in_force(pr.ng, pr.G, name, size(values(pr.X), 1),
+                          TimeSeries.timestamp(pr.X))
+end
+function assert_graph_entry(est, pr::PricesResult, ::Any...)::Nothing
+    return assert_graph_entry(est, pr.ng, pr.G)
+end
+function graph_dataframe(pr::PricesResult)
+    return graph_dataframe(assert_graphs_supplied(pr.ng), pr.G)
+end
+function graph_manifest(pr::PricesResult)
+    return graph_manifest(assert_graphs_supplied(pr.ng), pr.G)
 end
 export PricesResult
 public AbstractPricesResult

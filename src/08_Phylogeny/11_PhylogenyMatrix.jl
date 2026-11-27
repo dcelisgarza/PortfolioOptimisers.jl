@@ -1,8 +1,8 @@
 """
     _phylogeny_matrix(sep::HopCount, nte::AbstractNetworkEstimator,
                       g::Graphs.AbstractGraph)
-    _phylogeny_matrix(sep::PathLength, nte::AbstractNetworkEstimator,
-                      g::Graphs.AbstractGraph)
+    _phylogeny_matrix(sep::AbstractSeparationAlgorithm, nte::AbstractNetworkEstimator,
+                      g::Gr_AVG)
 
 Select the related pairs of a structure, through the branch of the separation `sep`.
 
@@ -15,7 +15,9 @@ Select the related pairs of a structure, through the branch of the separation `s
 # The two balls
 
   - [`HopCount`](@ref): the hop ball, `sum(A^i for i in 0:n)` clamped to `0` or `1`, over `Graphs.adjacency_matrix(g)`. The matrix is binary, because [`separation_graph`](@ref) gives a hop count a binary structure, and a power of a weighted matrix sums products of distances. The function reads `sep.n` directly as a count of matrix powers, and not through [`separation_budget`](@ref).
-  - [`PathLength`](@ref): the radius ball, the matrix of [`separation_matrix`](@ref) with a threshold at [`separation_budget`](@ref). It needs no second traversal.
+  - [`PathLength`](@ref), and any other separation: the radius ball, the matrix of [`separation_matrix`](@ref) with a threshold at [`separation_budget`](@ref). It needs no second traversal.
+
+The graph of an [`ExogenousNetwork`](@ref) can have more vertices than the assets, and a sum of powers over it multiplies matrices of all its vertices. So the second method measures the separations of the assets of an [`AssetVertexGraph`](@ref) under either member, and applies the threshold. The two balls are the same ball.
 
 # Algorithm
 
@@ -25,9 +27,9 @@ Select the related pairs of a structure, through the branch of the separation `s
  2. Add up `P` as the sum of `A^i` over `i in 0:sep.n.val`. Each entry counts the walks of length at most `sep.n.val` between its pair.
  3. Clamp `P` to `0` or `1`, which changes the count of walks into the selection. Subtract the identity to set the diagonal to zero.
 
-**Under a [`PathLength`](@ref):**
+**Under any other separation, and over an [`AssetVertexGraph`](@ref):**
 
- 1. Measure the separations over `g` into `d` with [`separation_matrix`](@ref).
+ 1. Measure the separations over the structure into `d` with [`separation_matrix`](@ref).
  2. Find the budget `dmax` with [`separation_budget`](@ref).
  3. Select every pair that [`is_related`](@ref) admits at `dmax`. Subtract the identity to set the diagonal to zero. [`is_related`](@ref) tests the unreachable sentinel as well as the budget.
 
@@ -64,8 +66,8 @@ function _phylogeny_matrix(sep::HopCount, ::AbstractNetworkEstimator,
     P .= clamp!(P, 0, 1) - LinearAlgebra.I
     return P
 end
-function _phylogeny_matrix(sep::PathLength, nte::AbstractNetworkEstimator,
-                           g::Graphs.AbstractGraph)
+function _phylogeny_matrix(sep::AbstractSeparationAlgorithm, nte::AbstractNetworkEstimator,
+                           g::Gr_AVG)
     d = separation_matrix(sep, g)
     dmax = separation_budget(sep, nte, d)
     # `is_related` carries both halves of the rule -- the budget and the unreachable sentinel
@@ -78,7 +80,7 @@ end
 
 Compute the phylogeny matrix of the network that `nte` builds.
 
-The method builds the network from `X`. It returns the binary matrix of the pairs that `nte.sep` counts as related, with a zero diagonal. The separation selects the neighbourhood, through [`_phylogeny_matrix`](@ref). [`HopCount`](@ref) gives the hop ball, the clamped sum of powers `sum(A^i for i in 0:n)`. [`PathLength`](@ref) gives the radius ball, the matrix of [`separation_matrix`](@ref) with a threshold at [`separation_budget`](@ref).
+The method builds the network from `X`, or reads an [`ExogenousNetwork`](@ref) from the returns data in the `rd` keyword. It returns the binary matrix of the pairs that `nte.sep` counts as related, with a zero diagonal. The separation selects the neighbourhood, through [`_phylogeny_matrix`](@ref). [`HopCount`](@ref) gives the hop ball, the clamped sum of powers `sum(A^i for i in 0:n)`. [`PathLength`](@ref) gives the radius ball, the matrix of [`separation_matrix`](@ref) with a threshold at [`separation_budget`](@ref).
 
 # The hop ball is the range connection matrix
 
@@ -117,10 +119,11 @@ It gives cardinalities between the shells. Over the same PMFG, the hop count rel
 
 # Algorithm
 
- 1. Build the structure `g` that `nte.sep` measures over, with [`separation_graph`](@ref). The method builds one structure for each call, and the two steps below share it.
- 2. Resolve `nte.sep` against `g` with [`resolve_separation`](@ref). A budget that is a value passes through unchanged and builds nothing.
- 3. Select the related pairs with [`_phylogeny_matrix`](@ref), through the branch that the resolved separation names.
- 4. Return the selection in a [`PhylogenyResult`](@ref).
+ 1. Refuse a network that is not symmetric, with [`assert_symmetric_network`](@ref).
+ 2. Build the structure `g` that `nte.sep` measures over, with [`separation_graph`](@ref). The method builds one structure for each call, and the two steps below share it.
+ 3. Resolve `nte.sep` against `g` with [`resolve_separation`](@ref). A budget that is a value passes through unchanged and builds nothing.
+ 4. Select the related pairs with [`_phylogeny_matrix`](@ref), through the branch that the resolved separation names.
+ 5. Return the selection in a [`PhylogenyResult`](@ref).
 
 # Arguments
 
@@ -129,6 +132,10 @@ It gives cardinalities between the shells. Over the same PMFG, the hop count rel
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
 
+# Validation
+
+  - The direction of an [`ExogenousNetwork`](@ref) is symmetric, see [`assert_symmetric_network`](@ref). Raises an `ArgumentError`.
+
 # Returns
 
   - `plr::PhylogenyResult{<:Matrix{Int}}`: Phylogeny matrix of the assets. An entry is `1` for a related pair and `0` otherwise, and the diagonal is `0`.
@@ -136,6 +143,7 @@ It gives cardinalities between the shells. Over the same PMFG, the hop count rel
 # Related
 
   - [`NetworkEstimator`](@ref)
+  - [`ExogenousNetwork`](@ref)
   - [`_phylogeny_matrix`](@ref)
   - [`HopCount`](@ref)
   - [`PathLength`](@ref)
@@ -149,6 +157,7 @@ It gives cardinalities between the shells. Over the same PMFG, the hop count rel
 """
 function phylogeny_matrix(nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1,
                           kwargs...)
+    assert_symmetric_network(nte)
     # One structure per call, built here and handed to both readers below. A rule in the
     # separation's budget field is answered against that structure rather than deriving a
     # second one; a member whose budget is already a value passes through untouched.
@@ -158,8 +167,7 @@ function phylogeny_matrix(nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 
 end
 """
     phylogeny_matrix(cle::ClE_Cl,
-                     X::MatNum; branchorder::Symbol = :optimal, dims::Int = 1,
-                     kwargs...)
+                     X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the phylogeny matrix of a clustering estimator or result.
 
@@ -177,7 +185,6 @@ The method clusters the data into the number of clusters that the estimator sele
 
   - `cle`: Clustering estimator or result.
   - $(arg_dict[:X])
-  - `branchorder`: Order method for the dendrogram branches, `:optimal` by default. [`branch_ordered_hclust`](@ref) and [`DBHTs`](@ref) state what each value does.
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
 
@@ -191,9 +198,8 @@ The method clusters the data into the number of clusters that the estimator sele
   - [`AbstractClusteringResult`](@ref)
   - [`clusterise`](@ref)
 """
-function phylogeny_matrix(cle::ClE_Cl, X::MatNum; branchorder::Symbol = :optimal,
-                          dims::Int = 1, kwargs...)
-    res = clusterise(cle, X; branchorder = branchorder, dims = dims, kwargs...)
+function phylogeny_matrix(cle::ClE_Cl, X::MatNum; dims::Int = 1, kwargs...)
+    res = clusterise(cle, X; dims = dims, kwargs...)
     clusters = assignments(res)
     # One row per asset. `size(X, 2)` counts the observations when `dims = 2`.
     P = zeros(Int, length(clusters), res.k)

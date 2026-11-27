@@ -76,7 +76,8 @@ res_ew = optimise(EqualWeighted(), rd)
 res_mr = optimise(MeanRisk(; obj = MinimumRisk(),
                            opt = JuMPOptimiser(; pe = pr, slv = slv)))
 res_hrp = optimise(HierarchicalRiskParity(; r = Variance(),
-                                          opt = HierarchicalOptimiser(; pe = pr,
+                                          opt = HierarchicalOptimiser(; pe = pr),
+                                          ser = HierarchicalSeriation(;
                                                                       cle = clusterise(ClustersEstimator(),
                                                                                        pr.X))))
 

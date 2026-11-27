@@ -1,5 +1,5 @@
 ```@meta
-Description = "Cross-Sectional Exposure Diagnostics, private API of PortfolioOptimisers.jl: ExposurePairSums, exposure_weights, cs_weighted_correlation, …"
+Description = "Cross-Sectional Exposure Diagnostics, private API of PortfolioOptimisers.jl: ExposurePairSums, cs_exposure_weights, cs_weighted_correlation, …"
 ```
 
 # Cross-Sectional Exposure Diagnostics: private API
@@ -13,7 +13,7 @@ ExposurePairSums
 ## Functions
 
 ```@docs
-exposure_weights
+cs_exposure_weights
 cs_weighted_correlation
 cs_correlation_enters
 cs_ranks

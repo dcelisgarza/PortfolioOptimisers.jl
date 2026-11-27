@@ -9,56 +9,59 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
           0.028302824480310254, 0.09927818284167722, 0.05153141359201795,
           0.07783839405594621, 0.008855636176616296, 0.0632442983330085,
           0.05261979423155193, 0.02846713648266485]
-    res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
+    res = optimise(HierarchicalEqualRiskContribution(; opt = opt, cle = clr))
     @test isa(res.retcode, OptimisationSuccess)
     @test isapprox(res.w, w1)
     res = optimise(HierarchicalEqualRiskContribution(; ri = Variance(),
                                                      ro = Variance(; sigma = pr.sigma),
-                                                     opt = opt))
+                                                     opt = opt, cle = clr))
     @test isa(res.retcode, OptimisationSuccess)
     @test isapprox(res.w, w1)
-    res = optimise(HierarchicalEqualRiskContribution(; ri = [Variance()], opt = opt))
+    res = optimise(HierarchicalEqualRiskContribution(; ri = [Variance()], opt = opt,
+                                                     cle = clr))
     @test isa(res.retcode, OptimisationSuccess)
     @test isapprox(res.w, w1)
     res = optimise(HierarchicalEqualRiskContribution(; ri = [Variance()], ro = [Variance()],
-                                                     opt = opt))
+                                                     opt = opt, cle = clr))
     @test isa(res.retcode, OptimisationSuccess)
     @test isapprox(res.w, w1)
     res = optimise(HierarchicalEqualRiskContribution(; ri = [Variance()], ro = Variance(),
-                                                     opt = opt))
+                                                     opt = opt, cle = clr))
     @test isa(res.retcode, OptimisationSuccess)
     @test isapprox(res.w, w1)
     res = optimise(HierarchicalEqualRiskContribution(; ri = Variance(), ro = [Variance()],
-                                                     opt = opt))
+                                                     opt = opt, cle = clr))
     @test isa(res.retcode, OptimisationSuccess)
     @test isapprox(res.w, w1)
 
     res = optimise(HierarchicalEqualRiskContribution(; ex = FLoops.SequentialEx(),
-                                                     opt = opt))
+                                                     opt = opt, cle = clr))
     @test isa(res.retcode, OptimisationSuccess)
     @test isapprox(res.w, w1)
     res = optimise(HierarchicalEqualRiskContribution(; ri = Variance(),
                                                      ro = Variance(; sigma = pr.sigma),
-                                                     opt = opt, ex = FLoops.SequentialEx()))
+                                                     opt = opt, cle = clr,
+                                                     ex = FLoops.SequentialEx()))
     @test isa(res.retcode, OptimisationSuccess)
     @test isapprox(res.w, w1)
     res = optimise(HierarchicalEqualRiskContribution(; ex = FLoops.SequentialEx(),
-                                                     ri = [Variance()], opt = opt))
+                                                     ri = [Variance()], opt = opt,
+                                                     cle = clr))
     @test isa(res.retcode, OptimisationSuccess)
     @test isapprox(res.w, w1)
     res = optimise(HierarchicalEqualRiskContribution(; ex = FLoops.SequentialEx(),
                                                      ri = [Variance()], ro = [Variance()],
-                                                     opt = opt))
+                                                     opt = opt, cle = clr))
     @test isa(res.retcode, OptimisationSuccess)
     @test isapprox(res.w, w1)
     res = optimise(HierarchicalEqualRiskContribution(; ex = FLoops.SequentialEx(),
                                                      ri = [Variance()], ro = Variance(),
-                                                     opt = opt))
+                                                     opt = opt, cle = clr))
     @test isa(res.retcode, OptimisationSuccess)
     @test isapprox(res.w, w1)
     res = optimise(HierarchicalEqualRiskContribution(; ex = FLoops.SequentialEx(),
                                                      ri = Variance(), ro = [Variance()],
-                                                     opt = opt))
+                                                     opt = opt, cle = clr))
     @test isa(res.retcode, OptimisationSuccess)
     @test isapprox(res.w, w1)
 end
@@ -73,7 +76,7 @@ end
                                                                Variance(;
                                                                         settings = RiskMeasureSettings(;
                                                                                                        scale = 1e1))],
-                                                         opt = opt, scai = sca))
+                                                         opt = opt, cle = clr, scai = sca))
         @test isa(res.retcode, OptimisationSuccess)
         success = isapprox(res.w, df[!, i])
         if !success
@@ -86,7 +89,7 @@ end
                                                                Variance(;
                                                                         settings = RiskMeasureSettings(;
                                                                                                        scale = 1e1))],
-                                                         opt = opt, scai = sca,
+                                                         opt = opt, cle = clr, scai = sca,
                                                          ex = FLoops.SequentialEx()))
         @test isa(res.retcode, OptimisationSuccess)
         success = isapprox(res.w, df[!, i])
@@ -101,8 +104,8 @@ end
     sets = UniverseSets(; dict = Dict("nx" => rd.nx, "group1" => ["AAPL", "MSFT"]))
     eqn = WeightBoundsEstimator(; lb = ["JNJ" => 0.03, "group1" => 0.035],
                                 ub = Dict("PEP" => 0.08, "JNJ" => 0.03))
-    opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn)
-    res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
+    opt = HierarchicalOptimiser(; pe = pr, slv = slv, sets = sets, wb = eqn)
+    res = optimise(HierarchicalEqualRiskContribution(; opt = opt, cle = clr))
     @test isa(res.retcode, OptimisationSuccess)
     @test all(abs.(res.w[[findfirst(x -> x == i, sets.dict[sets.xkey])
                           for i in sets.dict["group1"]]] .- 0.035) .<= 1e-10)
@@ -110,47 +113,47 @@ end
                      for i in sets.dict["group1"]]] .>= 0.035)
     @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.xkey])] - 0.08) < 5e-10
 
-    opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
+    opt = HierarchicalOptimiser(; pe = pr, slv = slv, sets = sets, wb = eqn,
                                 wf = JuMPWeightFinaliser(; alg = ErrorWeightFinaliser(),
                                                          slv = slv))
-    res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
+    res = optimise(HierarchicalEqualRiskContribution(; opt = opt, cle = clr))
     @test isa(res.retcode, OptimisationSuccess)
     @test isapprox(res.w[findfirst(x -> x == "JNJ", sets.dict[sets.xkey])], 0.03)
     @test all(abs.(res.w[[findfirst(x -> x == i, sets.dict[sets.xkey])
                           for i in sets.dict["group1"]]] .- 0.035) .<= 1e-10)
     @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.xkey])] - 0.08) < 5e-10
 
-    opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
+    opt = HierarchicalOptimiser(; pe = pr, slv = slv, sets = sets, wb = eqn,
                                 wf = JuMPWeightFinaliser(;
                                                          alg = ErrorWeightFinaliser(;
                                                                                     alg = L2Norm()),
                                                          slv = slv))
-    res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
+    res = optimise(HierarchicalEqualRiskContribution(; opt = opt, cle = clr))
     @test isa(res.retcode, OptimisationSuccess)
     @test isapprox(res.w[findfirst(x -> x == "JNJ", sets.dict[sets.xkey])], 0.03)
     @test all(abs.(res.w[[findfirst(x -> x == i, sets.dict[sets.xkey])
                           for i in sets.dict["group1"]]] .- 0.035) .<= 1e-10)
     @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.xkey])] - 0.08) < 5e-10
 
-    opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
+    opt = HierarchicalOptimiser(; pe = pr, slv = slv, sets = sets, wb = eqn,
                                 wf = JuMPWeightFinaliser(;
                                                          alg = ErrorWeightFinaliser(;
                                                                                     dev = AbsoluteWeightDeviation()),
                                                          slv = slv))
-    res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
+    res = optimise(HierarchicalEqualRiskContribution(; opt = opt, cle = clr))
     @test isa(res.retcode, OptimisationSuccess)
     @test isapprox(res.w[findfirst(x -> x == "JNJ", sets.dict[sets.xkey])], 0.03)
     @test all(res.w[[findfirst(x -> x == i, sets.dict[sets.xkey])
                      for i in sets.dict["group1"]]] .>= 0.035)
     @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.xkey])] - 0.08) < 5e-10
 
-    opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
+    opt = HierarchicalOptimiser(; pe = pr, slv = slv, sets = sets, wb = eqn,
                                 wf = JuMPWeightFinaliser(;
                                                          alg = ErrorWeightFinaliser(;
                                                                                     alg = L2Norm(),
                                                                                     dev = AbsoluteWeightDeviation()),
                                                          slv = slv))
-    res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
+    res = optimise(HierarchicalEqualRiskContribution(; opt = opt, cle = clr))
     @test isa(res.retcode, OptimisationSuccess)
     @test isapprox(res.w[findfirst(x -> x == "JNJ", sets.dict[sets.xkey])], 0.03)
     @test all(res.w[[findfirst(x -> x == i, sets.dict[sets.xkey])
@@ -159,14 +162,14 @@ end
 end
 @testset "SchurComplementHierarchicalRiskParity" begin
     r = factory(Variance(), pr)
-    hrp = HierarchicalRiskParity(; r = r, opt = opt)
+    hrp = HierarchicalRiskParity(; r = r, opt = opt, ser = ser)
     res0 = optimise(hrp)
     rk0 = expected_risk(r, res0.w, pr)
 
     sch = SchurComplementHierarchicalRiskParity(;
                                                 params = SchurComplementParams(; gamma = 0,
                                                                                alg = NonMonotonicSchurComplement()),
-                                                opt = opt)
+                                                opt = opt, ser = ser)
     res = optimise(sch)
     rk = expected_risk(r, res.w, pr)
     @test isapprox(res0.w, res.w)
@@ -175,7 +178,7 @@ end
     sch = SchurComplementHierarchicalRiskParity(;
                                                 params = SchurComplementParams(; gamma = 1,
                                                                                alg = MonotonicSchurComplement()),
-                                                opt = opt)
+                                                opt = opt, ser = ser)
     res = optimise(sch)
     rk = expected_risk(r, res.w, pr)
     @test rk <= rk0
@@ -184,7 +187,7 @@ end
                                                 params = SchurComplementParams(;
                                                                                gamma = 0.675,
                                                                                alg = NonMonotonicSchurComplement()),
-                                                opt = opt)
+                                                opt = opt, ser = ser)
     res = optimise(sch)
     rk = expected_risk(r, res.w, pr)
     @test rk >= rk0
@@ -197,7 +200,8 @@ end
                                                                         params = SchurComplementParams(;
                                                                                                        gamma = g,
                                                                                                        alg = NonMonotonicSchurComplement()),
-                                                                        opt = opt)).w, pr)
+                                                                        opt = opt,
+                                                                        ser = ser)).w, pr)
            for g in gs]
     k = argmin(rks)
     @test k == 3
@@ -208,7 +212,7 @@ end
                                                          params = SchurComplementParams(;
                                                                                         gamma = 0.2,
                                                                                         alg = MonotonicSchurComplement()),
-                                                         opt = opt))
+                                                         opt = opt, ser = ser))
     @test gs[k - 1] < res.gamma < gs[k + 1]
     @test expected_risk(r, res.w, pr) <= minimum(rks)
 
@@ -216,14 +220,14 @@ end
                                                 params = SchurComplementParams(;
                                                                                gamma = 0.05,
                                                                                alg = NonMonotonicSchurComplement()),
-                                                opt = opt)
+                                                opt = opt, ser = ser)
     res0 = optimise(sch)
     sch = SchurComplementHierarchicalRiskParity(;
                                                 params = SchurComplementParams(;
                                                                                r = StandardDeviation(),
                                                                                gamma = 0.1,
                                                                                alg = NonMonotonicSchurComplement()),
-                                                opt = opt)
+                                                opt = opt, ser = ser)
     res1 = optimise(sch)
 
     sch = SchurComplementHierarchicalRiskParity(;
@@ -236,7 +240,7 @@ end
                                                                                                                                      scale = 2)),
                                                                                 gamma = 0.1,
                                                                                 alg = NonMonotonicSchurComplement())],
-                                                opt = opt)
+                                                opt = opt, ser = ser)
     res2 = optimise(sch)
 
     w2 = res0.w + 2 * res1.w
@@ -681,7 +685,7 @@ end
     rdx = ReturnsResult(; nx = ["A$i" for i in 1:N], X = X)
     prx = prior(EmpiricalPrior(), rdx)
     clx = clusterise(ClustersEstimator(), prx)
-    optx = HierarchicalOptimiser(; pe = prx, cle = clx)
+    optx = HierarchicalOptimiser(; pe = prx)
     S = prx.sigma
 
     # An independent oracle of the # Mathematical definition: recurse from the root, stop
@@ -730,7 +734,7 @@ end
         @test isapprox(sum(wo), 1; atol = 1e-15)
         for ex in (FLoops.SequentialEx(), FLoops.ThreadedEx())
             res = optimise(HierarchicalEqualRiskContribution(; ri = ri, ro = ro, ex = ex,
-                                                             opt = optx), rdx)
+                                                             opt = optx, cle = clx), rdx)
             @test isapprox(res.w, wo; atol = 1e-15)
             @test isapprox([sum(res.w[cl]) for cl in cls], W; atol = 1e-15)
         end
@@ -740,9 +744,8 @@ end
     cl2 = PO.Clusters(; res = clx.res, S = clx.S, D = clx.D, k = 2)
     res2 = optimise(HierarchicalEqualRiskContribution(;
                                                       opt = HierarchicalOptimiser(;
-                                                                                  pe = prx,
-                                                                                  cle = cl2)),
-                    rdx)
+                                                                                  pe = prx),
+                                                      cle = cl2), rdx)
     cls2 = [findall(==(k), assignments(cl2)) for k in 1:2]
     rk2 = map(cls2) do cl
         v = zeros(N)
@@ -764,9 +767,8 @@ end
     @test assignments(ct) == [1, 1, 2, 3]
     rest = optimise(HierarchicalEqualRiskContribution(;
                                                       opt = HierarchicalOptimiser(;
-                                                                                  pe = prt,
-                                                                                  cle = ct)),
-                    rdt)
+                                                                                  pe = prt),
+                                                      cle = ct), rdt)
     @test isa(rest.retcode, OptimisationSuccess)
     St = prt.sigma
     function vt(cl)
@@ -808,7 +810,8 @@ end
         res = optimise(HierarchicalEqualRiskContribution(;
                                                          ri = [ConditionalValueatRisk(),
                                                                Variance()], ro = Variance(),
-                                                         scai = sca, opt = optx), rdx)
+                                                         scai = sca, opt = optx, cle = clx),
+                       rdx)
         @test isapprox([sum(res.w[cl]) for cl in cls], W; atol = 1e-15)
     end
 
@@ -827,8 +830,10 @@ end
           var_r(v)
 
     # The weights do not depend on the order of the leaves.
-    for bo in (:r, :barjoseph)
-        @test isapprox(optimise(HierarchicalEqualRiskContribution(), rdx; branchorder = bo).w,
+    for bo in (ROrder(), BarJosephOrder(), nothing)
+        cle = ClustersEstimator(; alg = HClustAlgorithm(; branchorder = bo))
+        hec = HierarchicalEqualRiskContribution(; cle = cle)
+        @test isapprox(optimise(hec, rdx).w,
                        optimise(HierarchicalEqualRiskContribution(), rdx).w; atol = 1e-15)
     end
 
@@ -840,8 +845,9 @@ end
 
     # The view reads the prior's X, keeps ri and ro one object, and views each measure.
     r0 = Variance()
-    vv = PO.port_opt_view(HierarchicalEqualRiskContribution(; ri = r0, ro = r0, opt = optx),
-                          [2, 5, 7], zeros(3, N))
+    vv = PO.port_opt_view(HierarchicalEqualRiskContribution(; ri = r0, ro = r0, opt = optx,
+                                                            cle = clx), [2, 5, 7],
+                          zeros(3, N))
     @test vv.ri === vv.ro
     @test vv.opt.pe.X == prx.X[:, [2, 5, 7]]
     hs = HierarchicalEqualRiskContribution(; ri = Variance(; sigma = S), ro = Variance())

@@ -326,11 +326,12 @@ end
 """
     name_keyed(x)
     name_keyed(cl::ConcentrationLimitEstimator)
+    name_keyed(pce::PositionConstraintEstimator)
     name_keyed(x::AbstractVector)
 
 Tells whether a constraint slot holds an estimator that resolves its names over `sets`.
 
-The owner of such a slot must carry `sets`. The estimators are every [`AbstractWeightBoundsEstimator`](@ref), [`LinearConstraintEstimator`](@ref), [`ExposureConstraintEstimator`](@ref), [`ThresholdEstimator`](@ref), [`AssetSetsMatrixEstimator`](@ref) and [`TurnoverEstimator`](@ref). A [`ScoreWeightBounds`](@ref) is the exception: it is keyed by name only when its `val` or its static bounds name assets. A [`ConcentrationLimitEstimator`](@ref) is keyed by name only when its `set` is. A vector is keyed by name when one of its entries is.
+The owner of such a slot must carry `sets`. The estimators are every [`AbstractWeightBoundsEstimator`](@ref), [`LinearConstraintEstimator`](@ref), [`ExposureConstraintEstimator`](@ref), [`ThresholdEstimator`](@ref), [`AssetSetsMatrixEstimator`](@ref) and [`TurnoverEstimator`](@ref). A [`ScoreWeightBounds`](@ref) is the exception: it is keyed by name only when its `val` or its static bounds name assets. A [`ConcentrationLimitEstimator`](@ref) is keyed by name only when its `set` is, and a [`PositionConstraintEstimator`](@ref) only when its `lce` is. A vector is keyed by name when one of its entries is.
 
 # Returns
 
@@ -351,6 +352,9 @@ function name_keyed(::Union{AbstractWeightBoundsEstimator, LinearConstraintEstim
 end
 function name_keyed(cl::ConcentrationLimitEstimator)
     return name_keyed(cl.set)
+end
+function name_keyed(pce::PositionConstraintEstimator)
+    return name_keyed(pce.lce)
 end
 function name_keyed(x::AbstractVector)
     return any(name_keyed, x)
@@ -403,9 +407,11 @@ function resolve_allocation_set(set::ProgrammeAllocationSet, N::Integer, strict:
 end
 """
     exposure_keyed(x)
+    exposure_keyed(ece::ExposureConstraintEstimator)
+    exposure_keyed(pce::PositionConstraintEstimator)
     exposure_keyed(x::AbstractVector)
 
-Tells whether a linear-constraint slot holds an [`ExposureConstraintEstimator`](@ref).
+Tells whether a linear-constraint slot holds an [`ExposureConstraintEstimator`](@ref), bare or in a [`PositionConstraintEstimator`](@ref).
 
 An exposure estimator writes its rows in the basis of the factors, and the loadings of a factor prior take them to the assets. So such a slot resolves on the head's rows at every step, and not once per fold. A vector is keyed by exposure when one of its entries is.
 
@@ -423,6 +429,9 @@ function exposure_keyed(::Any)
 end
 function exposure_keyed(::ExposureConstraintEstimator)
     return true
+end
+function exposure_keyed(pce::PositionConstraintEstimator)
+    return exposure_keyed(pce.lce)
 end
 function exposure_keyed(x::AbstractVector)
     return any(exposure_keyed, x)

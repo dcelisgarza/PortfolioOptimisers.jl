@@ -139,4 +139,5 @@ DnCov
 DtCov
 PrCov
 ZeroVarianceFilter
+WalkDistance
 ```

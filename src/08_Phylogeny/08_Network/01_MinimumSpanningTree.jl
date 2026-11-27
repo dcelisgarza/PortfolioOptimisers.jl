@@ -24,7 +24,7 @@ Union of the tree algorithms and the non-negative similarity algorithms.
 
 It is the bound of the `alg` field of a [`NetworkEstimator`](@ref), and of the `alg` argument of [`calc_weighted_adjacency`](@ref). A tree algorithm selects a minimum spanning tree, and a similarity algorithm selects a PMFG.
 
-The similarity members come from [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref), and not from the wider [`AbstractSimilarityMatrixAlgorithm`](@ref). The similarity branch builds a PMFG, and the consumers of a PMFG cannot take a negative weight. [`MaximumDistanceSimilarity`](@ref), [`ExponentialSimilarity`](@ref), [`GeneralExponentialSimilarity`](@ref) and [`ComplementSimilarity`](@ref) are members, and [`AngularSimilarity`](@ref) is not.
+The similarity members come from [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref), and not from the wider [`AbstractSimilarityMatrixAlgorithm`](@ref). The similarity branch builds a PMFG, and the consumers of a PMFG cannot take a negative weight. [`MaximumDistanceSimilarity`](@ref), [`ExponentialSimilarity`](@ref), [`GeneralExponentialSimilarity`](@ref) and [`ComplementSimilarity`](@ref) are members, and [`AngularSimilarity`](@ref) and [`ChordSimilarity`](@ref) are not.
 
 # Related
 
@@ -178,6 +178,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - $(val_dict[:treeargs_nochan])
+  - `isempty(kwargs)`. `Graphs.prim_mst` takes no keyword, so a keyword fails at every call. Raises an `ArgumentError`.
 
 # Examples
 
@@ -209,6 +210,8 @@ PrimTree
     kwargs
     function PrimTree(args::Tuple, kwargs::NamedTuple)
         assert_tree_args(PrimTree, args, kwargs)
+        @argcheck(isempty(kwargs),
+                  ArgumentError("`kwargs` of a PrimTree must be empty, because `Graphs.prim_mst` takes no keyword. Got\nkwargs => $(kwargs)"))
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
 end
@@ -225,7 +228,7 @@ The type of `alg` selects one of three routines of `Graphs.jl`.
 # Algorithm
 
  1. Select the spanning tree routine of `Graphs.jl` that the type of `alg` names.
- 2. Splat `alg.args` and `alg.kwargs` into that call. The constructor of `alg` called [`assert_tree_args`](@ref), which refuses every entry that can re-weight or re-orient the search. The routine then minimises the tree over the weights that `g` carries.
+ 2. Splat `alg.args` and `alg.kwargs` into that call. A [`PrimTree`](@ref) holds no keyword, because `Graphs.prim_mst` takes none, so its call splats `alg.args` alone. The constructor of `alg` called [`assert_tree_args`](@ref), which refuses every entry that can re-weight or re-orient the search. The routine then minimises the tree over the weights that `g` carries.
  3. Return the vector of edges. `Graphs.boruvka_mst` returns a named tuple whose first field holds the vector, and the other two routines return the vector.
 
 # Arguments
@@ -255,7 +258,7 @@ function calc_mst(ct::BoruvkaTree, g::Graphs.AbstractGraph)
     return Graphs.boruvka_mst(g, ct.args...; ct.kwargs...)[1]
 end
 function calc_mst(ct::PrimTree, g::Graphs.AbstractGraph)
-    return Graphs.prim_mst(g, ct.args...; ct.kwargs...)
+    return Graphs.prim_mst(g, ct.args...)
 end
 
 export KruskalTree, BoruvkaTree, PrimTree

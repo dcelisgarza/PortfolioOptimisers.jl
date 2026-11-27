@@ -841,7 +841,7 @@ end
         # hierarchical: pe and cle both overridden
         hrp2 = PortfolioOptimisers.inject_context(HierarchicalRiskParity(), ctx)
         @test hrp2.opt.pe === pr
-        @test hrp2.opt.cle === cl
+        @test hrp2.ser.cle === cl
 
         # JuMP: pe overridden, phylogeny ignored (enters via constraint results)
         mr2 = PortfolioOptimisers.inject_context(MeanRisk(; opt = jopt()), ctx)
@@ -871,12 +871,13 @@ end
                                 slv = Solver(; name = :Clarabel,
                                              solver = Clarabel.Optimizer,
                                              settings = Dict("verbose" => false)))
-        ho(src) = HierarchicalOptimiser(; pe = pe(src),
-                                        cle = ClustersEstimator(; x_src = src))
+        hrp(src) = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pe(src)),
+                                          ser = HierarchicalSeriation(;
+                                                                      cle = ClustersEstimator(;
+                                                                                              x_src = src)))
         cases = (src -> MeanRisk(; opt = jo(src)),
                  src -> PipelineStep(; est = MeanRisk(; opt = jo(src)), reads = (:returns,),
-                                     writes = :opt),
-                 src -> HierarchicalRiskParity(; opt = ho(src)),
+                                     writes = :opt), src -> hrp(src),
                  src -> InverseVolatility(; pe = pe(src)),
                  src -> NestedClustered(; pe = pe(src),
                                         cle = ClustersEstimator(; x_src = src),
@@ -902,7 +903,7 @@ end
                                                      steps = (step(ExcessSource()),
                                                               cases[1](nothing)))
         hdata = HierarchicalRiskParity(;
-                                       opt = HierarchicalOptimiser(;
+                                       ser = HierarchicalSeriation(;
                                                                    cle = ClustersEstimator(;
                                                                                            x_src = DataSource())))
         @test_logs min_level = Logging.Warn Pipeline(;
@@ -910,11 +911,11 @@ end
         # A reader that states no source beside a step of the Excess Frame warns once, with
         # its path from the pipeline, and the pipeline builds.
         hraw = HierarchicalRiskParity(; opt = HierarchicalOptimiser())
-        @test_logs (:warn, r"^`Pipeline` holds a reader .*: `steps\[2\]\.opt\.cle`\.") Pipeline(;
+        @test_logs (:warn, r"^`Pipeline` holds a reader .*: `steps\[2\]\.ser\.cle`\.") Pipeline(;
                                                                                                 steps = (step(ExcessSource()),
                                                                                                          hraw))
         hexc = HierarchicalRiskParity(;
-                                      opt = HierarchicalOptimiser(;
+                                      ser = HierarchicalSeriation(;
                                                                   cle = ClustersEstimator(;
                                                                                           x_src = ExcessSource())))
         @test_logs (:warn, r": `steps\[1\]`\.") Pipeline(; steps = (EmpiricalPrior(), hexc))
@@ -1028,7 +1029,7 @@ end
                                                                    re = StepwiseRegression(;
                                                                                            x_src = src)))
         jo(src; kw...) = JuMPOptimiser(; pe = pe(src), slv = jopt().slv, kw...)
-        ho(src; kw...) = HierarchicalOptimiser(; pe = pe(src), kw...)
+        ho(src) = HierarchicalOptimiser(; pe = pe(src))
         # (the step, the optimiser that receives it, the optimiser with the estimator)
         cases = (src -> (PipelineStep(; est = ue(src), reads = (:returns,),
                                       writes = :uncertainty, target = :sigma),
@@ -1038,10 +1039,10 @@ end
                  src -> (PipelineStep(; est = ClustersEstimator(; x_src = src),
                                       writes = :phylogeny),
                          HierarchicalRiskParity(; opt = ho(src)),
-                         HierarchicalRiskParity(;
-                                                opt = ho(src;
-                                                         cle = ClustersEstimator(;
-                                                                                 x_src = src)))),
+                         HierarchicalRiskParity(; opt = ho(src),
+                                                ser = HierarchicalSeriation(;
+                                                                            cle = ClustersEstimator(;
+                                                                                                    x_src = src)))),
                  src -> (PipelineStep(; est = ple(src), writes = :constraints),
                          MeanRisk(; opt = jo(src)),
                          MeanRisk(; opt = jo(src; ple = ple(src)))),
@@ -1086,10 +1087,10 @@ end
         res = fit(Pipeline(; steps = (ne,)), rd)
         @test res.ctx.phylogeny.X ==
               phylogeny_matrix(NetworkEstimator(; x_src = ExcessSource()), rd; rd = rd).X
-        hexc = HierarchicalRiskParity(;
-                                      opt = ho(ExcessSource();
-                                               cle = ClustersEstimator(;
-                                                                       x_src = ExcessSource())))
+        hexc = HierarchicalRiskParity(; opt = ho(ExcessSource()),
+                                      ser = HierarchicalSeriation(;
+                                                                  cle = ClustersEstimator(;
+                                                                                          x_src = ExcessSource())))
         @test_logs min_level = Logging.Warn Pipeline(; steps = (NetworkEstimator(), hexc))
         # An optimiser with no field for `:cle` ignores a clustering, so the clustering
         # stays out of the group.
@@ -2806,7 +2807,8 @@ end
         jump = [:pe, :wb, :lcse, :cte, :ple, :lt, :st, :slt, :sst, :sglt, :sgst, :smtx,
                 :sgmtx, :conc]
         expected = Dict("JuMPOptimiser" => [jump; :mu_ucs],
-                        "HierarchicalOptimiser" => [:pe, :cle, :wb],
+                        # The clustering is in the seriation of HRP since #2174.
+                        "HierarchicalOptimiser" => [:pe, :wb],
                         "MeanRisk" => [jump; :mu_ucs; :sigma_ucs],
                         "RiskBudgeting" => [jump; :rkb; :mu_ucs; :sigma_ucs],
                         "NearOptimalCentering" => [jump; :mu_ucs; :sigma_ucs],

@@ -998,7 +998,7 @@ end
 
     @testset "the core's properties still read off the leaf" begin
         for res in (hrp, herc)
-            for p in (:w, :pr, :clr, :wb, :fees, :retcode)
+            for p in (:w, :pr, :wb, :fees, :retcode)
                 @test hasproperty(res, p)
             end
             @test isa(res.retcode, OptimisationSuccess)
@@ -1009,6 +1009,9 @@ end
             @test !hasfield(typeof(res.hr), :fb)
             @test hasfield(typeof(res), :fb)
         end
+        # HERC holds its clustering, and HRP holds it in its seriation (#2174).
+        @test isa(herc.clr, PortfolioOptimisers.AbstractClusteringResult)
+        @test isa(hrp.ser.clr, PortfolioOptimisers.AbstractClusteringResult)
     end
 
     @testset "each leaf carries its own estimator's arity" begin

@@ -485,7 +485,7 @@ end
                                                                          opto = ivo))
         # The internal check reaches every inner optimiser.
         clr = clusterise(ClustersEstimator(), X)
-        hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; cle = clr))
+        hrp = HierarchicalRiskParity(; ser = HierarchicalSeriation(; cle = clr))
         @test isnothing(PO.assert_internal_optimiser(Stacking(; opti = opti, opto = ivo)))
         @test_throws ArgumentError PO.assert_internal_optimiser(Stacking(;
                                                                          opti = [ivo, hrp],
@@ -705,10 +705,8 @@ end
                                                                               default = lc)),
                                                    opto = InverseVolatility())
         # So is a schedule of clustering results in a nested clustering optimiser.
-        hrp = HierarchicalRiskParity(;
-                                     opt = HierarchicalOptimiser(;
-                                                                 cle = TimeDependent([r.clr,
-                                                                                      r.clr])))
+        hser = HierarchicalSeriation(; cle = r.clr)
+        hrp = HierarchicalRiskParity(; ser = TimeDependent([hser, hser]))
         @test_throws ArgumentError NestedClustered(; opti = hrp, opto = InverseVolatility())
         @test_throws ArgumentError NestedClustered(; opti = InverseVolatility(),
                                                    opto = NestedClustered(;

@@ -18,8 +18,8 @@ SchurComplementHierarchicalRiskParity
 port_opt_view(sp::SchurComplementParams, i, X::MatNum, args...)
 factory(res::SchurComplementHierarchicalRiskParityResult, fb::Option{<:OptE_Opt_FbChain})
 port_opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum, args...)
-_optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any}, rd::ReturnsResult = ReturnsResult())
-_optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVector}, rd::ReturnsResult = ReturnsResult())
+_optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, <:Any}, rd::ReturnsResult = ReturnsResult())
+_optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, <:AbstractVector}, rd::ReturnsResult = ReturnsResult())
 needs_previous_weights(opt::SchurComplementHierarchicalRiskParity)
 ```
 

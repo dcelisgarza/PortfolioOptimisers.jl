@@ -11,4 +11,15 @@ PortfolioOptimisers.returns_asset_names
 PortfolioOptimisers.regression_factor_names
 PortfolioOptimisers.expand_investable_loadings
 PortfolioOptimisers.assert_producer_prior
+PortfolioOptimisers.walk_positions
+PortfolioOptimisers.walk_operator
+PortfolioOptimisers.walk_parts_of
+PortfolioOptimisers.walk_entry_parts!
+PortfolioOptimisers.walk_unwalked
+PortfolioOptimisers.walk_graph
+PortfolioOptimisers.walk_profiles
+PortfolioOptimisers.walk_starts
+PortfolioOptimisers.walk_rescale!
+PortfolioOptimisers.walk_join!
+PortfolioOptimisers.walk_field
 ```

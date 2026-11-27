@@ -110,6 +110,30 @@ Returns the one portfolio that a fold reads as its previous weights, and refuses
 function one_previous_portfolio(::Any, w_prev::VecNum)
     return w_prev
 end
+"""
+    carry_fold_state(est, pred)
+
+Write the memory of the fit of a fold into the estimator that the online arm threads.
+
+A member above the prior can keep a memory of its last fit, as a [`SpectralSeriation`](@ref) in the seriation of [`HierarchicalRiskParity`](@ref) or of [`SchurComplementHierarchicalRiskParity`](@ref) does. The fit of a fold reads the threaded estimator and returns a prediction, so the arm writes the memory back after the fit, through this function. The generic method returns `est`, because most estimators keep no memory of their fit. An ordinary walk-forward fits each fold from the configuration, so it keeps no memory, and it does not call this function.
+
+# Arguments
+
+  - `est`: The threaded estimator, before its schedules resolve.
+  - `pred`: The prediction of the fold.
+
+# Returns
+
+  - `est`: The estimator with the memory of the fit, or `est` itself.
+
+# Related
+
+  - [`thread_online_folds!`](@ref)
+  - [`SpectralSeriationState`](@ref)
+"""
+function carry_fold_state(est, ::Any)
+    return est
+end
 function one_previous_portfolio(est, w_prev::VecVecNum)
     return throw(ArgumentError("`$(typeof(est).name.name)` reads the previous fold's weights (`needs_previous_weights` is `true`), but the previous fold gave a population of $(length(w_prev)) portfolios, one per point of a frontier sweep. Each fold resolves its own frontier span from its own data, so a sweep point at one fold is not the same portfolio as the point with the same index at the next fold, and no one portfolio is the previous one. A frontier sweep and a term that reads the previous weights (a turnover, a tracking error, a fee, or a custom constraint or objective on the weights) contradict each other in a walk-forward. Optimise one portfolio per fold, or fix the previous weights of the term, for example `fixed = true` on a turnover, so that no fold reads them."))
 end
@@ -158,8 +182,9 @@ The online arm and the resumed arm of [`fold_loop`](@ref) share this body, so a 
  2. For each fold `i` in `folds`, take the last row of its training window, giving `stop`.
  3. When `stop > last_end`, build the context of the step through [`step_context`](@ref), with the weights that [`previous_weights`](@ref) reads from `prev`, giving `ctx`. Fold the rows `(last_end + 1):stop` of `rd` into `est` through [`online_step_fold`](@ref), and set `last_end` to `stop`. Otherwise the fold gained no row, which is the case of fold 1 after the warm-up, and `est` does not change.
  4. Call `fit_fold(i, prev, est, rd, nothing)`, which makes the per-fold copy as the batch arms make it, giving the prediction of fold `i`. Store it at `predictions[i - first(folds) + 1]`.
- 5. Advance `prev` past the prediction through [`advance_previous_fold`](@ref).
- 6. After the last fold, return `est`.
+ 5. Write the memory of the fit into `est` through [`carry_fold_state`](@ref). An estimator with no memory of its fit does not change.
+ 6. Advance `prev` past the prediction through [`advance_previous_fold`](@ref).
+ 7. After the last fold, return `est`.
 
 # Arguments
 
@@ -202,6 +227,7 @@ function thread_online_folds!(predictions, fit_fold, est, folds::AbstractUnitRan
             last_end = stop
         end
         predictions[i - offset] = fit_fold(i, prev, est, rd, nothing)
+        est = carry_fold_state(est, predictions[i - offset])
         prev = advance_previous_fold(pws, prev, predictions[i - offset])
     end
     return est

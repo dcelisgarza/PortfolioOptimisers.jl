@@ -1,6 +1,6 @@
 """
-    exposure_weights(B::Arr3Num, w::Nothing)
-    exposure_weights(B::Arr3Num, w::MatNum)
+    cs_exposure_weights(B::Arr3Num, w::Nothing)
+    cs_exposure_weights(B::Arr3Num, w::MatNum)
 
 Return the cross-sectional weight history an exposure diagnostic reads, checking it against the exposure history.
 
@@ -28,11 +28,11 @@ Every diagnostic of this file weights the assets of one observation, and an abse
   - [`exposure_dispersion`](@ref)
   - [`exposure_coverage`](@ref)
 """
-function exposure_weights(B::Arr3Num, ::Nothing)
+function cs_exposure_weights(B::Arr3Num, ::Nothing)
     @argcheck(!isempty(B), IsEmptyError("B cannot be empty"))
     return ones(real(eltype(B)), size(B, 3), size(B, 1))
 end
-function exposure_weights(B::Arr3Num, w::MatNum)
+function cs_exposure_weights(B::Arr3Num, w::MatNum)
     @argcheck(!isempty(B), IsEmptyError("B cannot be empty"))
     @argcheck(size(w, 1) == size(B, 3) && size(w, 2) == size(B, 1),
               DimensionMismatch("w ($(size(w, 1))×$(size(w, 2))) must match B ($(size(B, 1)) assets, $(size(B, 3)) observations)"))
@@ -378,7 +378,7 @@ Where:
 
 # Algorithm
 
- 1. Resolve the weight history with [`exposure_weights`](@ref).
+ 1. Resolve the weight history with [`cs_exposure_weights`](@ref).
  2. For each observation and each pair, accumulate the weighted sums over the assets at which both exposures are finite and the weight is finite and positive.
  3. Mark the pair as degenerate when either weighted variance falls to the tolerance of its own weighted square sum, and as insufficient when it shares fewer than three assets.
  4. Average the pairs that are neither over the observations. A pair that is degenerate at every observation it covers reads `0`, and one that is never sufficient reads `NaN`.
@@ -405,14 +405,14 @@ Where:
 
 # Related
 
-  - [`exposure_weights`](@ref)
+  - [`cs_exposure_weights`](@ref)
   - [`exposure_stability`](@ref)
   - [`exposure_vif`](@ref)
   - [`cs_diagnostic_weights`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
 """
 function exposure_correlation(B::Arr3Num, w::Option{<:MatNum} = nothing)
-    u = exposure_weights(B, w)
+    u = cs_exposure_weights(B, w)
     K = size(B, 2)
     Tf = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(u))))))
     Cm = Matrix{Tf}(undef, K, K)
@@ -665,7 +665,7 @@ Where:
   - [`CrossSectionalFactorModel`](@ref)
 """
 function exposure_stability(B::Arr3Num, w::Option{<:MatNum} = nothing; step::Integer = 21)
-    u = exposure_weights(B, w)
+    u = cs_exposure_weights(B, w)
     N, K, T = size(B)
     @argcheck(step >= 1, DomainError(step, "step must be >= 1"))
     @argcheck(T > step,
@@ -729,14 +729,14 @@ Where:
 
 # Related
 
-  - [`exposure_weights`](@ref)
+  - [`cs_exposure_weights`](@ref)
   - [`exposure_stability`](@ref)
   - [`exposure_coverage`](@ref)
   - [`cs_diagnostic_weights`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
 """
 function exposure_dispersion(B::Arr3Num, w::Option{<:MatNum} = nothing)
-    u = exposure_weights(B, w)
+    u = cs_exposure_weights(B, w)
     N, K, T = size(B)
     Tf = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(u))))))
     D = Matrix{Tf}(undef, T, K)
@@ -853,14 +853,14 @@ Where:
 
 # Related
 
-  - [`exposure_weights`](@ref)
+  - [`cs_exposure_weights`](@ref)
   - [`exposure_dispersion`](@ref)
   - [`exposure_coverage_weights`](@ref)
   - [`factor_model_summary`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
 """
 function exposure_coverage(B::Arr3Num, w::Option{<:MatNum} = nothing)
-    u = exposure_weights(B, w)
+    u = cs_exposure_weights(B, w)
     N, K, T = size(B)
     Tf = promote_type(real(eltype(B)), real(eltype(u)))
     c = zeros(Tf, K)

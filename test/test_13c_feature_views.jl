@@ -61,7 +61,12 @@ end
     slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                  check_sol = (; allow_local = true, allow_almost = true),
                  settings = Dict("verbose" => false))
-    hopt(de) = HierarchicalOptimiser(; cle = ClustersEstimator(; de = de), slv = slv)
+    function hrp_of(de)
+        return HierarchicalRiskParity(; opt = HierarchicalOptimiser(; slv = slv),
+                                      ser = HierarchicalSeriation(;
+                                                                  cle = ClustersEstimator(;
+                                                                                          de = de)))
+    end
     plain_hrp() = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; slv = slv))
 
     T, N, K = 250, 8, 3
@@ -107,8 +112,7 @@ end
         function run_nco(rd)
             ri, ro = RecordingDistance(FeatureDistance()),
                      RecordingDistance(FeatureDistance())
-            nco = NestedClustered(; cle = ClustersEstimator(; de = ro),
-                                  opti = HierarchicalRiskParity(; opt = hopt(ri)),
+            nco = NestedClustered(; cle = ClustersEstimator(; de = ro), opti = hrp_of(ri),
                                   opto = plain_hrp(), ex = seq)
             return optimise(nco, rd), ri, ro
         end
@@ -147,7 +151,7 @@ end
         =#
         @test all(PO.distance(FeatureDistance(), ri_sq.seen[i]) !=
                   PO.distance(FeatureDistance(), ri_re.seen[i]) for i in eachindex(cls))
-        @test any(res_sq.resi[i].clr.res.merges != res_re.resi[i].clr.res.merges
+        @test any(res_sq.resi[i].ser.clr.res.merges != res_re.resi[i].ser.clr.res.merges
                   for i in eachindex(cls))
         @test isapprox(sum(res_sq.w), 1)
         @test isapprox(sum(res_re.w), 1)
@@ -158,8 +162,7 @@ end
         # witnesses the whole window and the default witnesses the last row alone.
         ri_3 = RecordingDistance(FeatureDistance(; alg = StackObservations()))
         nco_3 = NestedClustered(; cle = ClustersEstimator(; de = FeatureDistance()),
-                                opti = HierarchicalRiskParity(; opt = hopt(ri_3)),
-                                opto = plain_hrp(), ex = seq)
+                                opti = hrp_of(ri_3), opto = plain_hrp(), ex = seq)
         res_3 = optimise(nco_3, rd_3d)
         idx3 = assignments(res_3.clr)
         cls3 = [findall(==(i), idx3) for i in 1:(res_3.clr.k)]
@@ -167,16 +170,15 @@ end
         @test all(ri_3.seen[i] == Z3[cls3[i], :, :] for i in eachindex(cls3))
         ri_l = RecordingDistance(FeatureDistance())
         nco_l = NestedClustered(; cle = ClustersEstimator(; de = FeatureDistance()),
-                                opti = HierarchicalRiskParity(; opt = hopt(ri_l)),
-                                opto = plain_hrp(), ex = seq)
+                                opti = hrp_of(ri_l), opto = plain_hrp(), ex = seq)
         optimise(nco_l, rd_3d)
         @test all(ri_l.seen[i] == Z3[cls3[i], :, T:T] for i in eachindex(cls3))
     end
 
     @testset "SubsetResampling subsets both axes, and so does a Stacking nested in it" begin
         ri = RecordingDistance(FeatureDistance())
-        sr = SubsetResampling(; opt = HierarchicalRiskParity(; opt = hopt(ri)),
-                              n_subsets = 4, subset_size = 4, seed = 12345, ex = seq)
+        sr = SubsetResampling(; opt = hrp_of(ri), n_subsets = 4, subset_size = 4,
+                              seed = 12345, ex = seq)
         res = optimise(sr, rd_sq)
         cols = [view(res.idx, :, i) for i in axes(res.idx, 2)]
         @test length(ri.seen) == length(cols)
@@ -187,8 +189,7 @@ end
         # `port_opt_view(::Stacking, i, X)` slices the inner optimisers, so a Stacking used
         # as the resampled optimiser inherits the subset rather than reaching past it.
         rs = RecordingDistance(FeatureDistance())
-        st = Stacking(; opti = [HierarchicalRiskParity(; opt = hopt(rs))],
-                      opto = plain_hrp(), ex = seq)
+        st = Stacking(; opti = [hrp_of(rs)], opto = plain_hrp(), ex = seq)
         sr2 = SubsetResampling(; opt = st, n_subsets = 3, subset_size = 4, seed = 999,
                                ex = seq)
         res2 = optimise(sr2, rd_sq)
@@ -200,7 +201,7 @@ end
         # Stacking's own inner optimisers all see the full universe -- it subsets nothing.
         ri = RecordingDistance(FeatureDistance())
         st = Stacking(;
-                      opti = [HierarchicalRiskParity(; opt = hopt(ri)),
+                      opti = [hrp_of(ri),
                               HierarchicalEqualRiskContribution(;
                                                                 opt = HierarchicalOptimiser(;
                                                                                             slv = slv))],
@@ -221,11 +222,9 @@ end
                                           HierarchicalEqualRiskContribution(;
                                                                             opt = HierarchicalOptimiser(;
                                                                                                         slv = slv))],
-                                  opto = HierarchicalRiskParity(; opt = hopt(de)), ex = seq),
+                                  opto = hrp_of(de), ex = seq),
                    de -> NestedClustered(; cle = ClustersEstimator(; de = FeatureDistance()),
-                                         opti = plain_hrp(),
-                                         opto = HierarchicalRiskParity(; opt = hopt(de)),
-                                         ex = seq))
+                                         opti = plain_hrp(), opto = hrp_of(de), ex = seq))
             ro = RecordingDistance(FeatureDistance())
             res = optimise(mk(ro), rd_sq)
             @test isapprox(sum(res.w), 1)
@@ -243,8 +242,7 @@ end
         for cv in (KFold(; n = 4), IndexWalkForward(80, 40),
                    CombinatorialCrossValidation(; n_folds = 5, n_test_folds = 2))
             ri = RecordingDistance(FeatureDistance(; alg = StackObservations()))
-            pred = cross_val_predict(HierarchicalRiskParity(; opt = hopt(ri)), rd_3d, cv;
-                                     ex = seq)
+            pred = cross_val_predict(hrp_of(ri), rd_3d, cv; ex = seq)
             sp = split(cv, rd_3d)
             @test length(ri.seen) == length(sp.train_idx)
             @test all(ri.seen[i] == Z3[:, :, sp.train_idx[i]]
@@ -252,12 +250,12 @@ end
             @test all(size(z, 3) == length(sp.train_idx[i]) for (i, z) in pairs(ri.seen))
             # The default collapse stacks the fold's last row alone (#1064).
             rl = RecordingDistance(FeatureDistance())
-            cross_val_predict(HierarchicalRiskParity(; opt = hopt(rl)), rd_3d, cv; ex = seq)
+            cross_val_predict(hrp_of(rl), rd_3d, cv; ex = seq)
             @test all(rl.seen[i] == Z3[:, :, sp.train_idx[i][end:end]]
                       for i in eachindex(sp.train_idx))
 
             rs = RecordingDistance(FeatureDistance())
-            cross_val_predict(HierarchicalRiskParity(; opt = hopt(rs)), rd_sq, cv; ex = seq)
+            cross_val_predict(hrp_of(rs), rd_sq, cv; ex = seq)
             @test all(z == Zsq for z in rs.seen)
         end
 
@@ -274,20 +272,20 @@ end
                                 n_subsets = 2, subset_size = 5)
         # Time-varying: rows by fold, columns by draw, feature axis untouched.
         ri = RecordingDistance(FeatureDistance(; alg = StackObservations()))
-        cross_val_predict(HierarchicalRiskParity(; opt = hopt(ri)), rd_3d, cv; ex = seq)
+        cross_val_predict(hrp_of(ri), rd_3d, cv; ex = seq)
         s3 = split(cv, rd_3d)
         @test length(ri.seen) == length(s3.train_idx)
         @test all(ri.seen[i] == Z3[s3.asset_idx[i], :, s3.train_idx[i]]
                   for i in eachindex(s3.train_idx))
         rl = RecordingDistance(FeatureDistance())
-        cross_val_predict(HierarchicalRiskParity(; opt = hopt(rl)), rd_3d, cv; ex = seq)
+        cross_val_predict(hrp_of(rl), rd_3d, cv; ex = seq)
         @test all(rl.seen[i] == Z3[s3.asset_idx[i], :, s3.train_idx[i][end:end]]
                   for i in eachindex(s3.train_idx))
 
         # Square: the replication's asset draw moves BOTH axes. This is the same
         # silent-wrongness NestedClustered exposes, one subsetting scheme over.
         rs = RecordingDistance(FeatureDistance())
-        cross_val_predict(HierarchicalRiskParity(; opt = hopt(rs)), rd_sq, cv; ex = seq)
+        cross_val_predict(hrp_of(rs), rd_sq, cv; ex = seq)
         ss = split(cv, rd_sq)
         @test all(size(z) == (cv.subset_size.val, cv.subset_size.val) for z in rs.seen)
         @test all(rs.seen[i] == Zsq[ss.asset_idx[i], ss.asset_idx[i]]
@@ -306,9 +304,7 @@ end
         # the percentage change consumes -- and `Z` must lose exactly that row too.
         prc = PricesResult(; X = TimeArray(tsp, Pv, nx), pnl = matrix_panel(nf, Z3p))
         ri = RecordingDistance(FeatureDistance(; alg = StackObservations()))
-        pipe = Pipeline(;
-                        steps = (PricesToReturns(),
-                                 HierarchicalRiskParity(; opt = hopt(ri))))
+        pipe = Pipeline(; steps = (PricesToReturns(), hrp_of(ri)))
         cv = KFold(; n = 3)
         cross_val_predict(pipe, prc, cv; ex = seq)
         sp = split(cv, prc)
@@ -317,9 +313,7 @@ end
                   for i in eachindex(sp.train_idx))
         @test all(size(z, 3) == length(sp.train_idx[i]) - 1 for (i, z) in pairs(ri.seen))
         rl = RecordingDistance(FeatureDistance())
-        pipel = Pipeline(;
-                         steps = (PricesToReturns(),
-                                  HierarchicalRiskParity(; opt = hopt(rl))))
+        pipel = Pipeline(; steps = (PricesToReturns(), hrp_of(rl)))
         cross_val_predict(pipel, prc, cv; ex = seq)
         @test all(rl.seen[i] == Z3p[:, :, sp.train_idx[i][end:end]]
                   for i in eachindex(sp.train_idx))
@@ -333,7 +327,7 @@ end
         rf = RecordingDistance(FeatureDistance())
         pipe_f = Pipeline(;
                           steps = (MissingDataFilter(; col_thr = 0.5), PricesToReturns(),
-                                   HierarchicalRiskParity(; opt = hopt(rf))))
+                                   hrp_of(rf)))
         res_f = fit(pipe_f, prm)
         @test res_f.ctx.returns.nx == nx[keep]
         @test panel_feature_matrix(res_f.ctx.returns.pnl)[2] == Zsqp[keep, keep]
@@ -356,10 +350,8 @@ end
         rg = RecordingDistance(FeatureDistance())
         mrs = MultipleRandomised(IndexWalkForward(60, 20); subset_size = 3, n_subsets = 2,
                                  seed = 42)
-        grid = ["opt" => [HierarchicalRiskParity(; opt = hopt(rg))]]
-        pipe_s = Pipeline(;
-                          steps = (PricesToReturns(),
-                                   "opt" => HierarchicalRiskParity(; opt = hopt(rg))))
+        grid = ["opt" => [hrp_of(rg)]]
+        pipe_s = Pipeline(; steps = (PricesToReturns(), "opt" => hrp_of(rg)))
         search_cross_validation(pipe_s,
                                 GridSearchCrossValidation(grid; cv = mrs,
                                                           r = ConditionalValueatRisk()),
@@ -385,9 +377,10 @@ end
                                   opti = HierarchicalRiskParity(;
                                                                 opt = HierarchicalOptimiser(;
                                                                                             pe = FactorPrior(),
+                                                                                            slv = slv),
+                                                                ser = HierarchicalSeriation(;
                                                                                             cle = ClustersEstimator(;
-                                                                                                                    de = de_i),
-                                                                                            slv = slv)),
+                                                                                                                    de = de_i))),
                                   opto = plain_hrp(), ex = seq)
             res = optimise(nco, rdx)
             idx = assignments(res.clr)

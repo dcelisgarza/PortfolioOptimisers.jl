@@ -174,6 +174,8 @@ end
                                 :matrix_processing_algorithm => "public seam, the out-of-place arm of an Open Family",
                                 # Private names that are simple and convenient.
                                 :cv_sequential_info => "the one message of the sequential fold loop, named beside the rule that sends a run there",
+                                :adjacency => "public accessor: the adjacency of an Exogenous Graph with the sources in its rows, the convention of the reader, as a lazy transpose of the stored `At` (#2165)",
+                                :graph_requirement_rule => "public interface verb of `AbstractGraphRequirement`: each requirement states its rule for the message of the entry check (#2171)",
                                 :_expr_to_lens => "the base case of the lens-building recursion of `expr_to_lens_chain`",
                                 :no_head_block => "the resolver of the block of a bare head, passed as a function value to `resolve_block_entry`, which takes `f` and its arguments and not a closure, so that no variable of the entry is boxed")
 
@@ -232,6 +234,10 @@ end
     kept_forwards = Dict{Tuple{Symbol, Symbol}, String}(#
                                                         (:performance_summary, :summarise_input) => "(interface) the shared driver of the keyword methods of the exported verb: it takes their keyword bundle, and no one method can hold its body (rule 3, the review of #2072)",
                                                         (:performance_summary, :candidate_summary) => "(interface) the shared driver of the keyword methods of the exported verb that take candidates: it takes their keyword bundle, and no one method can hold its body (rule 3, the review of #2072)",
+                                                        (:exposure_parts, :walk_parts) => "(interface) the fallback of a public interface method of `AbstractEdgeDirection`: a direction that the walk takes needs no method, and `AnyEdges`, which the walk refuses, owns its own (#2173)",
+                                                        (:reach_weights, :directed_weights) => "(interface) the method of each part of a reach: the single directions read `directed_weights`, and `AnyEdges` holds the undirected sum, because `directed_weights` takes no `AnyEdges` method, so a normalised `GraphUnion` raises its `MethodError` (#2173)",
+                                                        (:report_exposure_of, :dependency_exposure) => "(b) a dispatch problem: a pair of the keyword `dependency` holds a configuration or a tuple `(G, de)`, and the method of each spec puts it into the slots of the verb (#2173)",
+                                                        (:assert_graph_entry, :assert_graph_walk) => "public: the entry of the user verb over the names and the graphs, which the methods of `ReturnsResult` and `PricesResult` call with their own fields; the walk is a function of its own because its composites call it (#2171)",
                                                         (:set_compact_show!, :set_default!) => "public: (a) a configuration verb that a user calls (#2071)",
                                                         (:with_compact_show, :with_config) => "public: (a) a configuration verb that a user calls (#2071)",
                                                         (:mip_indicators!, :declare_mip_indicators!) => "(b) its kind methods on `mip_indicators!` would be ambiguous with the `AssetMIPSpace` arm, so the generic arm calls `declare_mip_indicators!` (#2071)",
@@ -302,6 +308,8 @@ end
     # The functions whose forward methods are interface methods, with the check that shows
     # it. #2072 adds a name after a check of each one.
     interface_functions = Dict{Symbol, String}(#
+                                               # src/08_Phylogeny (#2175).
+                                               :linkage_merges => "the interface verb of `AbstractLinkage`: its default method and the `WeightedLinkage` method each call a public seam that its `# Interfaces` section names, `generic_linkage_merges` or `nn_chain_merges`, so a linkage of a user calls the same seam (rule 3, #2175)",
                                                # src/02_Tools (#2089).
                                                :port_opt_view => "the leaf of the view traversal: 12 functions share its callee `nothing_scalar_array_view` (rule 3, #2089)",
                                                :obs_weights_index => "its mask method shares the callee `observed_weights` with `observed_sample` (rule 3, #2089)",
@@ -359,6 +367,8 @@ end
                                                :coskewness => "its Coverage Universe method of a panel shares the callee `coverage_panel_moment` with 7 other functions (rule 3, #2092)",
                                                :coverage_inner_corrected => "3 functions share its callee `partial_fit_corrected` (rule 3, #2092)",
                                                :supports_partial_fit => "its callee `folds` is a shared public verb, and a driver of the hook must call it (rule 3, #2089, #2092)",
+                                               # src/09_ConstraintGeneration (#2297).
+                                               :position_constraints => "one method for each form of a resolved constraint: the `LinearConstraint` form calls the constructor of `PositionConstraint`, and the `nothing` and vector forms give another answer (rule 3, #2297)",
                                                # src/11_UncertaintySets (#2098).
                                                :calibration_series_vec => "one method for each series marker: the drawdown forms call `absolute_drawdown_vec` and `relative_drawdown_vec`, which 3 functions share each (rule 3, #2098)",
                                                :calibration_series_matrix => "one method for each series marker: the drawdown forms call `absolute_drawdown_arr`, which 3 functions share, and `relative_drawdown_arr`, which 2 functions share (rule 3, #2098)",
@@ -465,6 +475,7 @@ end
     kept_types = Dict{Symbol, String}(#
                                       :AbstractCrossSectionalRegressionResult => "a second cross-sectional regression result, a robust or a constrained fit",
                                       :AbstractJuMPResult => "a second JuMP result carrier, one that keeps the model",
+                                      :AbstractGraphRequirement => "carries an `# Interfaces` section: an Open Family, each consumer of an Exogenous Graph states its own requirements (#2165)",
                                       :AbstractPenalisedRegressionTarget => "carries an `# Interfaces` section: an Open Family",
                                       :AbstractSearchCrossValidationResult => "carries an `# Interfaces` section: an Open Family",
                                       :AbstractShrunkExpectedReturnsEstimator => "a second shrinkage estimator beside `ShrunkExpectedReturns`, kept by default by #1859 (ADR 0222)",

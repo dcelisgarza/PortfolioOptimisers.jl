@@ -22,6 +22,7 @@ commit = "391be5e"
 "ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { lines = 180, misses = 0 }
 "ext/PortfolioOptimisersPlotsExt/13_CovarianceForecastPlots.jl" = { lines = 168, misses = 0 }
 "ext/PortfolioOptimisersPlotsExt/14_ReportFigures.jl" = { lines = 43, misses = 0 }
+"ext/PortfolioOptimisersPlotsExt/15_ExogenousGraphPlots.jl" = { lines = 139, misses = 0 }
 "ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { lines = 7, misses = 0 }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { lines = 7, misses = 0 }
 "src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { lines = 0, misses = 0 }
@@ -54,6 +55,7 @@ commit = "391be5e"
 "src/01_Base/16_CoveragePolicy.jl" = { lines = 255, misses = 0 }
 "src/01_Base/17_ReturnsSource.jl" = { lines = 60, misses = 0 }
 "src/01_Base/18_CountFraction.jl" = { lines = 17, misses = 0 }
+"src/01_Base/19_UnknownEntryRules.jl" = { lines = 6, misses = 0 }
 "src/02_Tools/01_Operators.jl" = { lines = 37, misses = 0 }
 "src/02_Tools/02_ArrayViews.jl" = { lines = 69, misses = 0 }
 "src/02_Tools/03_TypeUtilities.jl" = { lines = 30, misses = 0 }
@@ -67,7 +69,13 @@ commit = "391be5e"
 "src/03_InputData/02_AssetPanelBuilder.jl" = { lines = 255, misses = 0 }
 "src/03_InputData/03_ListingSpan.jl" = { lines = 50, misses = 0 }
 "src/03_InputData/04_Preprocessing.jl" = { lines = 8, misses = 0 }
-"src/03_InputData/05_PanelViews.jl" = { lines = 46, misses = 0 }
+"src/03_InputData/05_ExogenousGraph/01_ExogenousGraph.jl" = { lines = 101, misses = 0 }
+"src/03_InputData/05_ExogenousGraph/02_ExogenousGraphSeries.jl" = { lines = 21, misses = 0 }
+"src/03_InputData/05_ExogenousGraph/03_GraphObservations.jl" = { lines = 140, misses = 0 }
+"src/03_InputData/05_ExogenousGraph/04_GraphTables.jl" = { lines = 125, misses = 0 }
+"src/03_InputData/05_ExogenousGraph/05_GraphRequirements.jl" = { lines = 56, misses = 0 }
+"src/03_InputData/05_ExogenousGraph/06_EdgeRules.jl" = { lines = 15, misses = 0 }
+"src/03_InputData/05_ExogenousGraph/07_GraphUnion.jl" = { lines = 156, misses = 0 }
 "src/03_InputData/06_PricesResult.jl" = { lines = 68, misses = 0 }
 "src/03_InputData/07_PriceIngestion.jl" = { lines = 166, misses = 0 }
 "src/03_InputData/08_PriceGapFill.jl" = { lines = 66, misses = 0 }
@@ -79,12 +87,13 @@ commit = "391be5e"
 "src/03_InputData/14_CrossSectionalTransforms.jl" = { lines = 313, misses = 0 }
 "src/03_InputData/15_FeatureSelector.jl" = { lines = 245, misses = 0 }
 "src/03_InputData/16_PanelDataFrame.jl" = { lines = 103, misses = 0 }
-"src/03_InputData/17_ReturnsBufferState.jl" = { lines = 110, misses = 0 }
+"src/03_InputData/17_ReturnsBufferState.jl" = { lines = 120, misses = 0 }
 "src/03_InputData/18_PreprocessingPartialFit.jl" = { lines = 207, misses = 0 }
 "src/03_InputData/19_AssetPanelConcat.jl" = { lines = 130, misses = 0 }
 "src/03_InputData/20_PanelFieldValues.jl" = { lines = 38, misses = 0 }
 "src/03_InputData/21_AssetPanelSummary.jl" = { lines = 132, misses = 0 }
 "src/03_InputData/22_PanelRoundTrip.jl" = { lines = 209, misses = 0 }
+"src/03_InputData/23_PanelViews.jl" = { lines = 46, misses = 0 }
 "src/04_MatrixProcessing/01_PosdefMatrix.jl" = { lines = 112, misses = 0 }
 "src/04_MatrixProcessing/02_Denoise.jl" = { lines = 82, misses = 0 }
 "src/04_MatrixProcessing/03_Detone.jl" = { lines = 32, misses = 0 }
@@ -209,10 +218,12 @@ commit = "391be5e"
 "src/06_Distance/04_Similarity.jl" = { lines = 31, misses = 0 }
 "src/06_Distance/05_FeatureDistance.jl" = { lines = 173, misses = 0 }
 "src/06_Distance/06_FeatureDistanceActiveRows.jl" = { lines = 203, misses = 0 }
+"src/06_Distance/07_BlendDistance.jl" = { lines = 69, misses = 0 }
 "src/07_JuMPModelOptimisation.jl" = { lines = 46, misses = 0 }
 "src/08_Phylogeny/01_Base_Phylogeny.jl" = { lines = 56, misses = 0 }
 "src/08_Phylogeny/02_Clusters.jl" = { lines = 42, misses = 0 }
-"src/08_Phylogeny/03_Hierarchical.jl" = { lines = 254, misses = 1 }
+"src/08_Phylogeny/03_Hierarchical_a.jl" = { lines = 254, misses = 1 }
+"src/08_Phylogeny/03_Hierarchical_b.jl" = { lines = 229, misses = 0 }
 "src/08_Phylogeny/04_NonHierarchicalClustering.jl" = { lines = 60, misses = 0 }
 "src/08_Phylogeny/05_Phylogeny.jl" = { lines = 11, misses = 0 }
 "src/08_Phylogeny/06_DBHT/01_DBHT.jl" = { lines = 6, misses = 0 }
@@ -227,6 +238,8 @@ commit = "391be5e"
 "src/08_Phylogeny/08_Network/02_NetworkEstimator.jl" = { lines = 16, misses = 0 }
 "src/08_Phylogeny/08_Network/03_NetworkGraph.jl" = { lines = 53, misses = 0 }
 "src/08_Phylogeny/08_Network/04_Separation.jl" = { lines = 63, misses = 0 }
+"src/08_Phylogeny/08_Network/05_ExogenousNetwork.jl" = { lines = 43, misses = 0 }
+"src/08_Phylogeny/08_Network/06_ExogenousNetworkGraph.jl" = { lines = 63, misses = 0 }
 "src/08_Phylogeny/09_Centrality/01_Centrality.jl" = { lines = 62, misses = 0 }
 "src/08_Phylogeny/09_Centrality/02_CentralityPolarity.jl" = { lines = 12, misses = 0 }
 "src/08_Phylogeny/09_Centrality/03_CentralityEstimator.jl" = { lines = 10, misses = 0 }
@@ -234,6 +247,8 @@ commit = "391be5e"
 "src/08_Phylogeny/10_PhylogenyClustering.jl" = { lines = 35, misses = 0 }
 "src/08_Phylogeny/11_PhylogenyMatrix.jl" = { lines = 25, misses = 0 }
 "src/08_Phylogeny/12_AssetPhylogeny.jl" = { lines = 9, misses = 0 }
+"src/08_Phylogeny/13_Seriation.jl" = { lines = 31, misses = 0 }
+"src/08_Phylogeny/14_SpectralSeriation.jl" = { lines = 116, misses = 0 }
 "src/09_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { lines = 26, misses = 0 }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl" = { lines = 269, misses = 0 }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl" = { lines = 242, misses = 0 }
@@ -246,6 +261,7 @@ commit = "391be5e"
 "src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { lines = 43, misses = 0 }
 "src/09_ConstraintGeneration/10_LotUnitConstraintGeneration.jl" = { lines = 20, misses = 0 }
 "src/09_ConstraintGeneration/11_ConcentrationLimitGeneration.jl" = { lines = 53, misses = 0 }
+"src/09_ConstraintGeneration/12_PositionConstraintGeneration.jl" = { lines = 37, misses = 0 }
 "src/10_Prior/01_Base_Prior.jl" = { lines = 238, misses = 0 }
 "src/10_Prior/02_EmpiricalPrior.jl" = { lines = 50, misses = 0 }
 "src/10_Prior/03_FactorPrior.jl" = { lines = 68, misses = 1 }
@@ -456,4 +472,10 @@ commit = "391be5e"
 "src/24_Report/02_ReportModel.jl" = { lines = 36, misses = 0 }
 "src/24_Report/03_ReportWriters.jl" = { lines = 238, misses = 0 }
 "src/24_Report/04_PortfolioReport.jl" = { lines = 167, misses = 0 }
+"src/24_Report/05_DependencyExposureTypes.jl" = { lines = 47, misses = 0 }
+"src/24_Report/06_DependencyReach.jl" = { lines = 73, misses = 0 }
+"src/24_Report/07_DependencyExposureRows.jl" = { lines = 107, misses = 0 }
+"src/24_Report/08_DependencyExposureMethods.jl" = { lines = 92, misses = 0 }
+"src/24_Report/09_DependencyReport.jl" = { lines = 47, misses = 0 }
+"src/24_Report/10_DependencySpace.jl" = { lines = 30, misses = 0 }
 "src/PortfolioOptimisers.jl" = { lines = 0, misses = 0 }

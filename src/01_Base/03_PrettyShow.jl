@@ -13,7 +13,7 @@ The macro emits two definitions. Steps 3 to 9 are the body of the `Base.show` me
 
  2. Define `Base.show(io::IO, obj::T)`.
 
- 3. Read `fields`, the field names that [`pretty_show_fields`](@ref) resolves for `obj`. When `fields` is empty, print `T()` and return. A type with no field reaches this step, and so does a type whose every field is hidden.
+ 3. Read `fields`, the field names that [`pretty_show_fields`](@ref) resolves for `obj`. When `fields` is empty, print the wrapper name of the type and `()`, and return. A type with no field reaches this step, and so does a type whose every field is hidden. A parametric type thus prints no type parameter, so `RegressionPanel()` prints `RegressionPanel()` and not `RegressionPanel{Nothing}()`.
 
  4. When the `IO` context sets `:compact` or `:multiline`, print the type name alone and return.
 
@@ -68,7 +68,7 @@ macro define_pretty_show(T, flag::Bool = true)
                 fields = pretty_show_fields(obj)
                 tobj = typeof(obj)
                 if isempty(fields)
-                    return print(io, string(tobj, "()"), '\n')
+                    return print(io, string(Base.typename(tobj).wrapper, "()"), '\n')
                 end
                 if get(io, :compact, false) || get(io, :multiline, false)
                     return print(io, string(tobj), '\n')

@@ -1,5 +1,5 @@
 ```@meta
-Description = "Prior Returns Source, public API of PortfolioOptimisers.jl: clusterise, returns_source."
+Description = "Prior Returns Source, public API of PortfolioOptimisers.jl: clusterise, seriate, returns_source."
 ```
 
 # [Prior Returns Source](@id api-prior-returns-source)
@@ -8,5 +8,6 @@ A clustering, phylogeny or centrality estimator reads the asset returns of a pri
 
 ```@docs
 clusterise(cle::AbstractClustersEstimator, pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing, iv::Option{<:MatNum} = nothing, kwargs...)
+seriate(ser::AbstractSeriationEstimator, pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing, iv::Option{<:MatNum} = nothing, kwargs...)
 PortfolioOptimisers.returns_source(::Union{EmpiricalPrior, FactorPrior, HighOrderPriorEstimator, HighOrderFactorPriorEstimator, BlackLittermanPrior, BayesianBlackLittermanPrior, FactorBlackLittermanPrior, AugmentedBlackLittermanPrior, EntropyPoolingPrior, MeucciEntropyPoolingPrior, OpinionPoolingPrior, CrossSectionalFactorPrior, LowDimensionEnsemblePrior})
 ```

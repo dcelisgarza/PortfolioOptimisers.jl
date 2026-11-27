@@ -6,6 +6,9 @@ unique_key_dict!(arg_dict, :arg_dict,
                  # Phylogeny.
                  :cle => "`cle`: Clusters estimator.",#
                  :clr => "`clr`: Clusters result.",#
+                 :ser => "`ser`: The seriation that orders the assets for the bisection, a member of [`AbstractSeriationEstimator`](@ref) or a seriation result of [`AbstractSeriationResult`](@ref). A result is used as it is.",#
+                 :ser_res => "`ser`: The seriation result whose order the bisection split, a member of [`AbstractSeriationResult`](@ref).",#
+                 :ser_order => "`order`: The assets in their order, a permutation of the assets.",#
                  :plr => "`plr`: Phylogeny result.",#
                  :nte => "`nte`: Network estimator.",#
                  :cte => "`cte`: Centrality estimator.",#
@@ -17,7 +20,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :ctov => "`ov`: Polarity override. [`TopologyOnly`](@ref) asks for the centrality over the network's topology alone, so [`centrality_polarity`](@ref) answers `nothing` and [`centrality_graph`](@ref) builds the plain graph. `nothing` leaves the algorithm's declared polarity in force.",#
                  :treeargs => "`args`: Positional arguments for the spanning tree function. Every positional slot of those functions is a weight channel, so [`assert_tree_args`](@ref) refuses a matrix or a vector here. The weights come with the graph.",#
                  :treekwargs => "`kwargs`: Keyword arguments for the spanning tree function. [`assert_tree_args`](@ref) refuses `minimize`, because `minimize = false` inverts the minimisation that defines the tree branch.",#
-                 :ntalg => "`alg`: Tree or similarity matrix algorithm. A similarity algorithm selects the network through a PMFG, so it must come from the non-negative family. The type bound refuses [`AngularSimilarity`](@ref).",#
+                 :ntalg => "`alg`: Tree or similarity matrix algorithm. A similarity algorithm selects the network through a PMFG, so it must come from the non-negative family. The type bound refuses [`AngularSimilarity`](@ref) and [`ChordSimilarity`](@ref).",#
                  :ntsep => "`sep`: Separation algorithm. It states how to measure how far apart two assets are in the network, and the budget beyond which two assets count as unrelated.",#
                  :ntn => "`n`: Separation budget in hops. A pair whose shortest path has more than `n.val` edges is unrelated. A [`CountOf`](@ref) states the hops, and the library uses it as it is. A [`FractionOf`](@ref) states the share of the reachable pairs to relate, and [`resolve_separation`](@ref) turns it into a count of hops. A plain number is read through [`count_or_fraction`](@ref). A [`HopCountAlgorithm`](@ref) or a `Function` is a rule. [`resolve_separation`](@ref) calls it as `n(nte, X, g; dims = dims, kwargs...)`, where `g` is the structure that the consumer built, and the rule must return an `Integer`.",#
                  :sepdmax => "`dmax`: Separation budget, in the units of the separation. `nothing` means the observed diameter of the structure. A [`FractionOf`](@ref) states the share of the reachable pairs to relate, and [`resolve_separation`](@ref) turns it into a radius. A plain number is a radius, not a fraction. A [`PathLengthAlgorithm`](@ref) or a `Function` is a rule. [`resolve_separation`](@ref) calls it as `dmax(nte, X, g; dims = dims, kwargs...)`, where `g` is the structure that the consumer built, and the rule must return a `Number`.",#
@@ -38,11 +41,55 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :sdecay => "`decay`: Separation decay algorithm, the rule by which the score falls off as two assets get further apart, or `nothing` for a flat score of one. Distinct from the exponentially weighted moment estimators' `decay`, which is a smoothing constant over observations.",#
                  :sdrate => "`rate`: Rate of the exponential fall-off, `exp(-rate * d)`. A larger rate makes the score fall faster. The retention form `ratio^d` is the same function at `rate = -log(ratio)`.",#
                  :sdpower => "`power`: Exponent of the reciprocal fall-off, `inv((1 + d)^power)`. A larger power makes the score fall faster.",#
+                 ## Walk Profile
+                 :walk_ng => "`ng`: The Exogenous Graphs that the walk reads: `nothing` for the only graph of the returns data, one name, a [`GraphUnion`](@ref), or a vector whose entries are a name or a [`GraphUnion`](@ref). Each entry gives its own Panel Fields, and a union names them by its `name`.",#
+                 :walk_sep => "`sep`: The hop budget of the walk, a [`HopCount`](@ref). A walk of `h` hops counts for `h` in `1:n`. A [`FractionOf`](@ref) or a rule resolves over the graph in force, through [`resolve_separation`](@ref). A [`PathLength`](@ref) has no meaning for a walk, so the field refuses it at dispatch.",#
+                 :walk_decay => "`decay`: The weight `w(h)` of a walk of `h` hops, a separation decay algorithm of [`separation_decay`](@ref) at the separation `h` and the budget `n`, or `nothing` for a weight of one at each hop.",#
+                 :walk_dir => "`dir`: The direction of the walk, a member of [`AbstractEdgeDirection`](@ref): along the out-edges, along the in-edges, or both as two Panel Fields.",#
+                 :walk_nrm => "`nrm`: The normalisation of the edge weights before the walk, a member of [`AbstractEdgeNormalisation`](@ref), or `nothing` to walk the stored weights.",#
+                 :walk_wgt => "`wgt`: The rule that reads the edge weights, a member of [`AbstractEdgeWeightRule`](@ref), or `nothing` to read the stored weights.",#
+                 :walk_self => "`self`: Whether the profile of an asset holds the asset itself at the weight `w(0)`.",#
+                 :walk_prefix => "`prefix`: The first part of the name of each Panel Field, or `nothing` for `\"walk\"`. Each field is `\"<prefix>_<dir>_<graph>\"`.",#
+                 ## Exogenous Network
+                 :xnet_ng => "`ng`: The Exogenous Graph that the network reads: `nothing` for the only graph of the returns data, one name, or a [`GraphUnion`](@ref).",#
+                 :xnet_dir => "`dir`: The direction along which the network reads the edges, a member of [`AbstractEdgeDirection`](@ref). A consumer refuses a direction that has no meaning for it.",#
+                 :xnet_scope => "`scope`: The nodes that the network holds, a member of [`AbstractNetworkScope`](@ref): [`AllNodes`](@ref) for every node of the graph, or [`AssetNodes`](@ref) for the assets of the fit.",#
+                 :xnet_nrm => "`nrm`: The normalisation of the edge weights before their lengths, a member of [`AbstractEdgeNormalisation`](@ref), or `nothing` for the stored weights.",#
+                 :xnet_len => "`len`: The length of an edge from its weight, a member of [`AbstractEdgeLength`](@ref), or `nothing` when the stored weights are lengths.",#
+                 :xnet_strict => "`strict`: Whether an asset that is not a node of the graph in force raises an error. With `false`, one warning names the assets and the graph, and each is an isolated vertex that stays investable.",#
+                 ## Graph Union
+                 :gu_gs => "`gs`: The parts of the union, each an [`ExogenousGraph`](@ref) or an [`ExogenousGraphSeries`](@ref).",#
+                 :gu_ng => "`ng`: The names of the Exogenous Graphs of the returns data that the union sums, one part for each name.",#
+                 :gu_w => "`w`: The weight of each part, or `nothing` for a weight of one each, a plain sum. A part with the weight `0` is skipped. The union does not normalise the weights, because a raw edge weight is data.",#
+                 :gu_nrm => "`nrm`: The normalisation of each part before the sum, a member of [`AbstractEdgeNormalisation`](@ref) along the direction of the consumer, or `nothing` to sum the stored weights.",#
+                 :gu_dir => "`dir`: The single direction along which `nrm` normalises each part: [`OutEdges`](@ref) for a column sum of `At`, or [`InEdges`](@ref) for a row sum.",#
+                 :gu_unknown => "`unknown`: The rule for a part with no graph in force, a member of [`AbstractUnknownEntryRule`](@ref). [`EntrywiseUnknown`](@ref) makes the union unknown, and [`ZeroUnknown`](@ref) reads the part as an empty graph.",#
+                 :gu_name => "`name`: The name of the union in the Panel Fields and the messages of a consumer, or `nothing` for `join(ng, \"+\")`.",#
+                 ## Dependency Exposure
+                 :dexp_ng => "`ng`: The Exogenous Graph that the exposure reads: `nothing` for the only graph of the returns data, one name, or a [`GraphUnion`](@ref), built along each part of `dir`. A method that takes an explicit graph needs `nothing`.",#
+                 :dexp_reach => "`reach`: The reach of each held asset over the graph, a member of [`AbstractDependencyReach`](@ref): [`ShortestHops`](@ref) for the shortest path, or [`WalkShares`](@ref) for the shares of the walks.",#
+                 :dexp_dir => "`dir`: The direction of the reach, a member of [`AbstractEdgeDirection`](@ref): [`OutEdges`](@ref) for the nodes that an asset depends on, [`InEdges`](@ref) for the nodes that depend on the asset, [`BothEdges`](@ref) for the two directed reaches apart, or [`AnyEdges`](@ref) for the undirected reach.",#
+                 :dexp_src => "`src`: The weights that the exposure reads from a prediction, a member of [`AbstractPreviousWeightsSource`](@ref) through [`exposure_weights`](@ref): [`TargetWeights`](@ref) for one row for each fold, or [`DriftedWeights`](@ref) for one row for each observation. A method on bare weights reads the weights as given.",#
+                 :dexp_nodes => "`nodes`: The names of the nodes that the Result reports, or `nothing` for every node of the graphs in force, in the order of their first use. A path can go through a node that is not reported.",#
+                 :dexp_strict => "`strict`: Whether a held asset that is not a node of its graph, or a row before the first key of a series, raises an error. With `false`, each gives one warning: the weight of the asset goes in the row `(none)`, and the row is `NaN`.",#
+                 :dexp_sep => "`sep`: The hop budget of the reach, a [`HopCount`](@ref). A node at `h` hops counts for `h` in `1:n`. A [`FractionOf`](@ref) resolves over the hops of the pairs of a held asset and a node that the direction reaches, through [`resolve_separation`](@ref). A rule has no returns to read, so the constructor refuses it, and a [`PathLength`](@ref) fails at dispatch.",#
+                 :dexp_decay => "`decay`: The weight `f(h)` of a node at `h` hops, a separation decay algorithm of [`separation_decay`](@ref) at the separation `h` and the budget `n`, or `nothing` for a weight of one, the indicator of the reach.",#
+                 :dexp_res_nodes => "`nodes`: Names of the reported nodes (nodes × 1), with the row `(none)` last when a held asset is not a node of its graph.",#
+                 :dexp_res_nx => "`nx`: Asset names of the columns of `W` and of each reach (assets × 1), the union of the names of the rows in the order of their first use.",#
+                 :dexp_res_rows => "`rows`: Label of each row of weights (rows × 1): the timestamp or the position of its observation, or the key of a path of a population.",#
+                 :dexp_res_W => "`W`: Weights of each row (rows × assets). A failed fold gives a row of `NaN`.",#
+                 :dexp_res_L => "`L`: Long part of the exposure (rows × nodes × 3), from the positive weights: the `weight`, `direct` and `indirect` parts, in that order. A row with no graph in force, or with no weights, is `NaN`.",#
+                 :dexp_res_S => "`S`: Short part of the exposure, from the negative weights, in the layout of `L`.",#
+                 :dexp_res_R0 => "`R0`: The node of each asset in each distinct snapshot (nodes × assets each). The row `(none)` holds a one for each asset that is not a node.",#
+                 :dexp_res_Rd => "`Rd`: The part of the reach at one hop in each distinct snapshot (nodes × assets each).",#
+                 :dexp_res_Ri => "`Ri`: The part of the reach at two hops or more in each distinct snapshot (nodes × assets each).",#
+                 :dexp_res_ridx => "`ridx`: Position in `R0`, `Rd` and `Ri` of the snapshot of each row (rows × 1), or `0` for a row with no single snapshot: no graph in force, or the mean of the rows of a path.",#
                  ## DBHT
                  :dbhtpower => "`power`: The exponent of each distance in the similarity transformation.",#
                  :dbhtcoef => "`coef`: The scale factor of the distance term in the similarity transformation.",#
-                 :sim => "`sim`: Similarity matrix algorithm that maps the distance matrix to the weights of the PMFG. The PMFG cannot take a negative weight, so the field takes the non-negative family alone, and the constructor refuses [`AngularSimilarity`](@ref).",#
+                 :sim => "`sim`: Similarity matrix algorithm that maps the distance matrix to the weights of the PMFG. The PMFG cannot take a negative weight, so the field takes the non-negative family alone, and the constructor refuses [`AngularSimilarity`](@ref) and [`ChordSimilarity`](@ref).",#
                  :root => "`root`: The rule that makes one root of the clique hierarchy when the planar graph gives more than one root candidate, a member of [`DBHTRootMethod`](@ref).",#
+                 :branchorder => "`branchorder`: The rule that flips the merges of the dendrogram to order its leaves, a member of [`AbstractBranchOrder`](@ref), [`OptimalLeafOrder`](@ref) by default. `nothing` skips the flip step and gives the tree order, see [`order_branches!`](@ref).",#
                  :x_src_graph => "`x_src`: The source of the returns that the clustering, phylogeny or centrality estimator reads, `nothing` or an [`AbstractReturnsSource`](@ref). `nothing` and [`DataSource`](@ref) read the asset returns `rd.X`, and `nothing` reads the `X` of the Prior Result when the call gives no returns data. [`ExcessSource`](@ref) reads the returns in excess of the benchmark, `rd.X - rd.B`, the Excess Frame. [`PriorSource`](@ref) reads the `X` of the Prior Result, in the frame that the prior fitted in. Under a factor prior that `X` is a reconstruction of the rank of the factors, and a scenario window cuts its rows. A stated source that the call cannot give, `DataSource()` or `ExcessSource()` with no returns data, or `PriorSource()` on returns data with no Prior Result, gives a warning, and the estimator reads the matrix that the call gives. A call on a bare matrix reads that matrix under every source. An estimator inside another graph estimator keeps `nothing`, and the outer estimator states the source.",#
                  # Universe sets and the values an estimator maps onto assets.
                  :sets => "`sets`: Sets used to map estimator values to assets.",#
@@ -107,6 +154,12 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :lce_val => "`val`: Constraint equation(s) to parse.",#
                  :ece_lce => "`lce`: Wrapped linear constraint estimator, precomputed linear constraint, or vector of either, written in the names of the basis of the space. It takes every shape that `lcse` takes except this wrapper, so every such shape can take a re-basis.",#
                  :ece_space => "`space`: Basis in which the wrapped constraint is written. It has no default. A constraint over the assets needs no space, so use a bare `LinearConstraintEstimator` for it.",#
+                 :dsp_reach => "`reach`: The reach of each asset over the graph, a member of [`AbstractDependencyReach`](@ref): [`ShortestHops`](@ref) for the shortest path, or [`WalkShares`](@ref) for the shares of the walks.",#
+                 :dsp_ng => "`ng`: The Exogenous Graph of the basis: `nothing` for the only graph of the returns data, one name, or a [`GraphUnion`](@ref), built along each part of `dir`.",#
+                 :cb_M => "`M`: The change of basis (assets × names of the basis).",#
+                 :cb_nx => "`nx`: Names of the columns of `M` (names of the basis × 1).",#
+                 :cb_axis => "`axis`: Word for one name of the basis, which a message quotes, such as `\"node\"`.",#
+                 :cb_key => "`key`: Source of the names of the basis, which a message quotes, such as the name of a graph.",#
                  :fs_re => "`re`: Source of the loadings through which the rows are re-based, or `nothing` to read the `rr` of the prior. A precomputed `Regression` states the basis. An estimator fits the basis to the returns, so a factor mandate also works on a prior with no factor block. The precedence is the one of `resolve_factor_regression`. At `x_src = nothing`, a precomputed result comes first, then the `rr` of the prior, then a refit.",#
                  :asets_val => "`val`: Group name key for asset set membership matrix extraction.",#
                  :thr_val => "`val`: Minimum-holding thresholds, as a map from asset or group names to values, a scalar, a vector or an algorithmic rule.",#
@@ -120,7 +173,10 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :cnl_s => "`s`: Limit of the sum of the positions over `t`. The UCITS value is `0.40`.",#
                  :cnl_set => "`set`: The positions that the rule reads. `nothing` makes each asset its own position. An `AssetSetsMatrixEstimator` or a membership matrix makes each row of the matrix one position, such as one issuer, so two share classes of one issuer are one position.",#
                  :cnl_res_set => "`set`: Membership matrix whose rows are the positions that the rule reads, or `nothing` to make each asset its own position.",#
-                 :cnl_pos => "`pos`: Reading of a position with a short side: `GrossPosition()`, `NetPosition()` or `LongPosition()`. On a long-only book the three readings are the weights.",#
+                 :cnl_pos => "`pos`: Reading of a position with a short side: `GrossPosition()`, `NetPosition()`, `LongPosition()` or `ShortPosition()`. On a long-only book the first three readings are the weights, and the short reading is zero.",#
+                 :pce_lce => "`lce`: Wrapped linear constraint. It takes every shape that `lcse` takes except this wrapper: a [`LinearConstraintEstimator`](@ref), a precomputed [`LinearConstraint`](@ref), an [`ExposureConstraintEstimator`](@ref), or a vector that can mix them.",#
+                 :pce_pos => "`pos`: Reading of the weights that the rows apply to: `GrossPosition()`, `LongPosition()`, `ShortPosition()` or `NetPosition()`.",#
+                 :pcr_lc => "`lc`: Linear constraint over the assets. Its rows apply to the reading of the weights, and not to the weights.",#
                  :cnl_alg => "`alg`: Form of the rule: `ExactConcentration()`, the mixed-integer rule itself, or `SumLargestConcentration()`, a linear form that is stricter than the rule.",#
                  :cnm_x => "`x`: The position of each row of the rule, as `pos` and `set` read the weights.",#
                  :cnm_cap => "`cap`: The cap margin of each position, `x - c`. A margin `<= 0` passes.",#

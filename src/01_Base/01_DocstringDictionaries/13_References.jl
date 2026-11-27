@@ -7,6 +7,7 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :chan1983 => "[chan1983](@cite) T. F. Chan, G. H. Golub and R. J. LeVeque. *Algorithms for computing the sample variance: Analysis and recommendations*. The American Statistician 37, 242–247 (1983).",#
                  :chan1979 => "[chan1979](@cite) T. F. Chan, G. H. Golub and R. J. LeVeque. *Updating formulae and a pairwise algorithm for computing sample variances*. Technical report STAN-CS-79-773, Department of Computer Science, Stanford University (1979).",#
                  :pebay2008 => "[pebay2008](@cite) P. Pébay. *Formulas for robust, one-pass parallel computation of covariances and arbitrary-order statistical moments*. Technical report SAND2008-6212, Sandia National Laboratories (2008).",#
+                 :atkins1998 => "[atkins1998](@cite) J. E. Atkins, E. G. Boman and B. Hendrickson. *A spectral algorithm for seriation and the consecutive ones problem*. SIAM Journal on Computing 28, 297–310 (1998).",#
                  :barjoseph2001 => "[barjoseph2001](@cite) Z. Bar-Joseph, D. K. Gifford and T. S. Jaakkola. *Fast optimal leaf ordering for hierarchical clustering*. Bioinformatics 17, S22–S29 (2001).",#
                  :DBHTs => "[DBHTs](@cite) W.-M. Song, T. Di Matteo and T. Aste. *Hierarchical information clustering by means of topologically embedded graphs*. PloS one 7, e31929 (2012).",#
                  :drcvar => "[drcvar](@cite) P. Mohajerin Esfahani and D. Kuhn. *Data-driven distributionally robust optimization using the Wasserstein metric: performance guarantees and tractable reformulations*. Mathematical Programming 171, 115–166 (2018).",#
@@ -189,6 +190,8 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :boruvka1926 => "[boruvka1926](@cite) O. Borůvka. *O jistém problému minimálním*. Práce Moravské Přírodovědecké Společnosti 3, 37–58 (1926).",#
                  :prim1957 => "[prim1957](@cite) R. C. Prim. *Shortest connection networks and some generalizations*. The Bell System Technical Journal 36, 1389–1401 (1957).",#
                  :tumminello2005 => "[tumminello2005](@cite) M. Tumminello, T. Aste, T. Di Matteo and R. N. Mantegna. *A tool for filtering information in complex systems*. Proceedings of the National Academy of Sciences 102, 10421–10426 (2005).",#
+                 :newman2001 => "[newman2001](@cite) M. E. J. Newman. *Scientific collaboration networks. II. Shortest paths, weighted networks, and centrality*. Physical Review E 64, 016132 (2001).",#
+                 :opsahl2010 => "[opsahl2010](@cite) T. Opsahl, F. Agneessens and J. Skvoretz. *Node centrality in weighted networks: Generalizing degree and shortest paths*. Social Networks 32, 245–251 (2010).",#
                  :graphpo1 => "[graphpo1](@cite) D. Cajas. *A Graph Theory Approach to Portfolio Optimization*. Available at SSRN 4602019 (2023).",#
                  :graphpo2 => "[graphpo2](@cite) D. Cajas. *A Graph Theory Approach to Portfolio Optimization Part II*. Available at SSRN 4667426 (2023).",#
                  :riccascozzari2024 => "[riccascozzari2024](@cite) F. Ricca and A. Scozzari. *Portfolio optimization through a network approach: network assortative mixing and portfolio diversification*. European Journal of Operational Research 312, 700–717 (2024).",#

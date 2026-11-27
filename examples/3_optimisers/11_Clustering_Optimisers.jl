@@ -94,12 +94,14 @@ plot_clusters(clr, rd.nx)
 
 HRP orders the assets by the dendrogram, splits that ordered list in half again and again, and
 splits the budget between the two halves of each split in inverse proportion to their risk. We
-pass the shared prior and clustering through a [`HierarchicalOptimiser`](@ref). Variance needs
-no solver, so we pass none.
+pass the shared prior through a [`HierarchicalOptimiser`](@ref) and the clustering through the
+seriation of the optimiser, a `HierarchicalSeriation`, whose `cle` field holds it. Variance
+needs no solver, so we pass none.
 =#
 
-opt = HierarchicalOptimiser(; pe = pr, cle = clr)
-res_hrp = optimise(HierarchicalRiskParity(; opt = opt, r = Variance()))
+opt = HierarchicalOptimiser(; pe = pr)
+ser = HierarchicalSeriation(; cle = clr)
+res_hrp = optimise(HierarchicalRiskParity(; opt = opt, ser = ser, r = Variance()))
 
 #=
 ## 4. Hierarchical equal risk contribution (HERC)
@@ -107,12 +109,12 @@ res_hrp = optimise(HierarchicalRiskParity(; opt = opt, r = Variance()))
 HERC splits the budget between the clusters down the tree's branches in inverse proportion to
 their risk, which is the outer level, and splits each cluster's share between its assets in
 inverse proportion to their own risk, which is the inner level. It takes one risk measure per
-level, `ri` and `ro`, and one scalariser per level, `scai` and `scao`. We use
-[`Variance`](@ref) at both levels.
+level, `ri` and `ro`, and one scalariser per level, `scai` and `scao`. It holds its own
+clustering in the field `cle`. We use [`Variance`](@ref) at both levels.
 =#
 
-res_herc = optimise(HierarchicalEqualRiskContribution(; opt = opt, ri = Variance(),
-                                                      ro = Variance()))
+res_herc = optimise(HierarchicalEqualRiskContribution(; opt = opt, cle = clr,
+                                                      ri = Variance(), ro = Variance()))
 
 #=
 ## 5. Schur-complement HRP (SCHRP)
@@ -126,15 +128,15 @@ the largest value from 0 to `gamma` up to which the variance of the portfolio ke
 run three values so you can compare them.
 =#
 
-res_schur0 = optimise(SchurComplementHierarchicalRiskParity(; opt = opt,
+res_schur0 = optimise(SchurComplementHierarchicalRiskParity(; opt = opt, ser = ser,
                                                             params = SchurComplementParams(;
                                                                                            r = Variance(),
                                                                                            gamma = 0.0)))
-res_schur5 = optimise(SchurComplementHierarchicalRiskParity(; opt = opt,
+res_schur5 = optimise(SchurComplementHierarchicalRiskParity(; opt = opt, ser = ser,
                                                             params = SchurComplementParams(;
                                                                                            r = Variance(),
                                                                                            gamma = 0.5)))
-res_schur9 = optimise(SchurComplementHierarchicalRiskParity(; opt = opt,
+res_schur9 = optimise(SchurComplementHierarchicalRiskParity(; opt = opt, ser = ser,
                                                             params = SchurComplementParams(;
                                                                                            r = Variance(),
                                                                                            gamma = 0.9)))

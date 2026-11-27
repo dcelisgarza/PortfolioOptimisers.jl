@@ -1237,3 +1237,21 @@ static shape `assets × features` and the dispatch on `Arr3Num` do not change.
 2026-09-05 and 2026-09-06 state that the lift "indexes a leading observation axis" through
 `RepeatedLeading`, read `RepeatedObservations`: a lifted vector is `observations × assets`, and a
 lifted matrix is `assets × labels × observations`.
+
+## Amendment (2026-11-23, #2193)
+
+**The default metric of § 5 is `ChordDist`, not `AngularDist`.** [ADR
+0243](0243-the-default-feature-metric-is-the-chord-because-it-is-euclidean.md) records the change.
+The angle is not Euclidean, and the default Ward linkage needs a Euclidean distance. `AngularDist`
+and `AngularSimilarity` stay as options, with the rest of § 5 unchanged.
+
+## Amendment (2026-11-23, #2210)
+
+**A producer names its Panel Field by a resolved name.** `RegressionPanel(; name = nothing)` and
+`PhylogenyPanel(; pl, alg, name = nothing)` derive `"loadings"` and `"proximity"` on `nothing`, and
+a non-empty string replaces the derived name. `resolve_panel_field_name` gives the name, and the
+constructor refuses an empty string. Where this record names the field `"loadings"` or
+`"proximity"`, or a selector such as `"loadings" => ["MKT", "SMB"]`, read the resolved name.
+`RegressionPanel` is no longer a singleton. The decision table of #2209 records the choice. The
+selector, `feature_labels` and the refusal of a duplicate name read the resolved name, so they do
+not change.

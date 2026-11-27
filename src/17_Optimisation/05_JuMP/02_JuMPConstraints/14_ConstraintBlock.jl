@@ -39,7 +39,7 @@ $(DocStringExtensions.FIELDS)
         gbgt::TD_Option{<:Num_BgtRg} = nothing,
         lt::TD_Option{<:BtE_Bt} = nothing,
         st::TD_Option{<:BtE_Bt} = nothing,
-        lcse::TD_Option{<:Union{EcE_LcE_Lc, AbstractVector}} = nothing,
+        lcse::TD_Option{<:Union{PcE_Pc_EcE_LcE_Lc, AbstractVector}} = nothing,
         cte::TD_Option{<:Lc_CC_VecCC} = nothing,
         gcarde::TD_Option{<:LcE_Lc} = nothing,
         sgcarde::TD_Option{<:Union{LcE_Lc, AbstractVector}} = nothing,
@@ -238,7 +238,7 @@ julia> (opt.wb.ub, opt.card, opt.cbe.card)
     function ConstraintBlock(wb::TD_Option{<:WbE_Wb}, sbgt::TD_Option{<:Num_BgtRg},
                              gbgt::TD_Option{<:Num_BgtRg}, lt::TD_Option{<:BtE_Bt},
                              st::TD_Option{<:BtE_Bt},
-                             lcse::TD_Option{<:EcE_LcE_Lc_VecEcE_LcE_Lc},
+                             lcse::TD_Option{<:PcE_Pc_EcE_LcE_Lc_VecPcE_Pc_EcE_LcE_Lc},
                              cte::TD_Option{<:Lc_CC_VecCC}, gcarde::TD_Option{<:LcE_Lc},
                              sgcarde::TD_Option{<:LcE_Lc_VecLcE_Lc},
                              smtx::TD_Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE},
@@ -323,7 +323,7 @@ function ConstraintBlock(; wb::TD_Option{<:WbE_Wb} = WeightBounds(),
                          gbgt::TD_Option{<:Num_BgtRg} = nothing,
                          lt::TD_Option{<:BtE_Bt} = nothing,
                          st::TD_Option{<:BtE_Bt} = nothing,
-                         lcse::TD_Option{<:Union{EcE_LcE_Lc, AbstractVector}} = nothing,
+                         lcse::TD_Option{<:Union{PcE_Pc_EcE_LcE_Lc, AbstractVector}} = nothing,
                          cte::TD_Option{<:Lc_CC_VecCC} = nothing,
                          gcarde::TD_Option{<:LcE_Lc} = nothing,
                          sgcarde::TD_Option{<:Union{LcE_Lc, AbstractVector}} = nothing,
@@ -352,7 +352,7 @@ function ConstraintBlock(; wb::TD_Option{<:WbE_Wb} = WeightBounds(),
                          linf::TD_Option{<:Num_AmbRadCal} = nothing,
                          xbgt::Bool = false)::ConstraintBlock
     return ConstraintBlock(wb, sbgt, gbgt, lt, st,
-                           narrow_mixed_vector(lcse, EcE_LcE_Lc, :lcse), cte, gcarde,
+                           narrow_mixed_vector(lcse, PcE_Pc_EcE_LcE_Lc, :lcse), cte, gcarde,
                            narrow_mixed_vector(sgcarde, LcE_Lc, :sgcarde),
                            narrow_mixed_vector(smtx, MatNum_ASetMatE, :smtx),
                            narrow_mixed_vector(sgmtx, MatNum_ASetMatE, :sgmtx),
@@ -643,7 +643,7 @@ $(DocStringExtensions.FIELDS)
     ResolvedConstraintBlock(; pr::Option{<:AbstractPriorResult},
                             rd::Option{<:ReturnsResult}, wb::Option{<:WeightBounds},
                             lt::Option{<:Threshold}, st::Option{<:Threshold},
-                            lcsr::Option{<:Lc_VecLc}, ctr::Option{<:Lc_CC_VecCC},
+                            lcsr::Option{<:Pc_Lc_VecPc_Lc}, ctr::Option{<:Lc_CC_VecCC},
                             gcardr::Option{<:LinearConstraint},
                             sgcardr::Option{<:Lc_VecLc},
                             smtx::Option{<:MatNum_VecMatNum},
@@ -811,7 +811,8 @@ Builds the Result from the values of stage 2 and the slots of the block that sta
     function ResolvedConstraintBlock(pr::Option{<:AbstractPriorResult},
                                      rd::Option{<:ReturnsResult},
                                      wb::Option{<:WeightBounds}, lt::Option{<:Threshold},
-                                     st::Option{<:Threshold}, lcsr::Option{<:Lc_VecLc},
+                                     st::Option{<:Threshold},
+                                     lcsr::Option{<:Pc_Lc_VecPc_Lc},
                                      ctr::Option{<:Lc_CC_VecCC},
                                      gcardr::Option{<:LinearConstraint},
                                      sgcardr::Option{<:Lc_VecLc},
@@ -847,7 +848,7 @@ end
 function ResolvedConstraintBlock(; pr::Option{<:AbstractPriorResult},
                                  rd::Option{<:ReturnsResult}, wb::Option{<:WeightBounds},
                                  lt::Option{<:Threshold}, st::Option{<:Threshold},
-                                 lcsr::Option{<:Lc_VecLc}, ctr::Option{<:Lc_CC_VecCC},
+                                 lcsr::Option{<:Pc_Lc_VecPc_Lc}, ctr::Option{<:Lc_CC_VecCC},
                                  gcardr::Option{<:LinearConstraint},
                                  sgcardr::Option{<:Lc_VecLc},
                                  smtx::Option{<:MatNum_VecMatNum},
@@ -1055,7 +1056,7 @@ The method for `pr = nothing` is the method of a programme set that reads no row
 The method on a prior result runs these steps.
 
  1. Resolve the weight bounds `wb` with [`weight_bounds_constraints`](@ref), with the rows `rd` and the `N` assets of `pr.X`.
- 2. Resolve `lcse` with [`linear_constraints`](@ref), with the factor regression `pr.rr` and the rows, and `gcarde` with integer values. Check the width of both results with [`assert_investable_constraint_width`](@ref).
+ 2. Resolve `lcse` with [`linear_constraints`](@ref), with the factor regression `pr.rr` and the rows, and make one vector of the result with [`flat_linear_constraints`](@ref). Resolve `gcarde` with integer values. Check the width of both results with [`assert_investable_constraint_width`](@ref).
  3. Fit the centrality rows `ctr` with [`centrality_constraints`](@ref) and the phylogeny result `plr` with [`phylogeny_constraints`](@ref). Each reads the prior, the rows and the implied volatilities `rd.iv` and `rd.ivpa`. A reader that cannot estimate an asset raises a [`DistanceReaderRefusalError`](@ref), which the caller catches.
  4. Resolve each Calibration Rule against the prior and the solver `slv`. The norm ceilings `l2c` and `linfc` state their norm order in a [`CalibrationContext`](@ref), and `lpc` goes through [`norm_ceiling_factory`](@ref). The penalties `l1` and `linf` go through [`resolve_calibration_slot`](@ref), and `l2` and `lp` through their own `factory`.
  5. Check the four slots that hold a number, `l2c`, `linfc`, `l1` and `linf`, with [`assert_nonempty_gt0_finite_val`](@ref). A rule states no number at construction, so this is the first point that knows the number.
@@ -1093,8 +1094,8 @@ function resolve_constraint_block(cbe::ConstraintBlock, pr::AbstractPriorResult,
     datatype = eltype(pr.X)
     N = size(pr.X, 2)
     sets = cbe.sets
-    lcsr = linear_constraints(cbe.lcse, sets; datatype = datatype, strict = strict,
-                              rr = pr.rr, rd = rd)
+    lcsr = flat_linear_constraints(linear_constraints(cbe.lcse, sets; datatype = datatype,
+                                                      strict = strict, rr = pr.rr, rd = rd))
     gcardr = linear_constraints(cbe.gcarde, sets; datatype = Int, strict = strict)
     assert_investable_constraint_width(lcsr, N, "lcse")
     assert_investable_constraint_width(gcardr, N, "gcarde")
@@ -1128,7 +1129,8 @@ function resolve_constraint_block(cbe::ConstraintBlock, ::Nothing,
                                   rd::Option{<:ReturnsResult}; strict::Bool = false,
                                   kwargs...)::ResolvedConstraintBlock
     sets = cbe.sets
-    lcsr = linear_constraints(cbe.lcse, sets; strict = strict, rows_datatype(rd)...)
+    lcsr = flat_linear_constraints(linear_constraints(cbe.lcse, sets; strict = strict,
+                                                      rows_datatype(rd)...))
     gcardr = linear_constraints(cbe.gcarde, sets; datatype = Int, strict = strict)
     assert_rows_constraint_width(lcsr, gcardr, rd)
     vals = (; wb = cbe.wb, lcsr, gcardr, ctr = cbe.cte, plr = cbe.ple, l2c = cbe.l2c,
@@ -1287,7 +1289,8 @@ function set_block_constraints!(model::JuMP.Model, cbr::ResolvedConstraintBlock,
     # Before every variance of the model, the tracking errors of this phase too, so a variance
     # on the weights reads the semidefinite phylogeny of every block on them (#2126).
     mark_sdp_phylogeny!(model, plr; prefix = prefix)
-    set_linear_weight_constraints!(model, lcsr, :lcs_ineq_, :lcs_eq_; prefix = prefix)
+    set_linear_weight_constraints!(model, lcsr, :lcs_ineq_, :lcs_eq_; wb = wb,
+                                   prefix = prefix)
     set_linear_weight_constraints!(model, ctr, :cent_ineq_, :cent_eq_; prefix = prefix)
     set_mip_constraints!(model, wb, cbr.card, gcardr, plr, lt, st, fees, ss, cbr.xbgt;
                          prefix = prefix)

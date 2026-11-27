@@ -11,6 +11,7 @@ finite_symmetric_clim
 finite_columns
 factor_plot_prior
 investable_plot_view
+PortfolioOptimisers.plot_returns_data
 attribution_plot_axis
 plot_extension
 plots_extension_hint

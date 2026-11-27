@@ -43,8 +43,8 @@ keep = setdiff(1:T, gap)
     # A fit that does not read the benchmark keeps every observation.
     @test size(prior(EmpiricalPrior(), rdg).X, 1) == T
     # The optimiser drops the observation once, before every reader.
-    opt = HierarchicalRiskParity(;
-                                 opt = HierarchicalOptimiser(; pe = epx,
+    opt = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = epx),
+                                 ser = HierarchicalSeriation(;
                                                              cle = ClustersEstimator(;
                                                                                      x_src = ExcessSource())))
     @test optimise(opt, rdg).w ≈ optimise(opt, rdh).w
@@ -83,18 +83,20 @@ end
                  check_sol = (; allow_local = true, allow_almost = true),
                  settings = Dict("verbose" => false))
     epx = EmpiricalPrior(; x_src = ExcessSource())
-    ho(xs, pe) = HierarchicalOptimiser(; pe = pe, cle = ClustersEstimator(; x_src = xs))
+    ho(pe) = HierarchicalOptimiser(; pe = pe)
+    cl(xs) = ClustersEstimator(; x_src = xs)
+    sr(xs) = HierarchicalSeriation(; cle = cl(xs))
     jo(; kw...) = JuMPOptimiser(; pe = epx, slv = slv, kw...)
     heads = (("HierarchicalRiskParity, EmpiricalPrior",
-              (xs, fb) -> HierarchicalRiskParity(; opt = ho(xs, epx), fb = fb)),
+              (xs, fb) -> HierarchicalRiskParity(; opt = ho(epx), ser = sr(xs), fb = fb)),
              ("HierarchicalRiskParity, FactorPrior",
               (xs, fb) -> HierarchicalRiskParity(;
-                                                 opt = ho(xs,
-                                                          FactorPrior(;
+                                                 opt = ho(FactorPrior(;
                                                                       x_src = ExcessSource())),
-                                                 fb = fb)),
+                                                 ser = sr(xs), fb = fb)),
              ("HierarchicalEqualRiskContribution",
-              (xs, fb) -> HierarchicalEqualRiskContribution(; opt = ho(xs, epx), fb = fb)),
+              (xs, fb) -> HierarchicalEqualRiskContribution(; opt = ho(epx), cle = cl(xs),
+                                                            fb = fb)),
              ("MeanRisk, a centrality constraint",
               (xs, fb) -> MeanRisk(; opt = jo(; cte = CentralityConstraint(; x_src = xs)),
                                    fb = fb)),
@@ -152,9 +154,11 @@ end
         clx = ClustersEstimator(; x_src = ExcessSource())
         jopt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv)
         jexc = JuMPOptimiser(; pe = epx, slv = slv)
-        hexc = HierarchicalOptimiser(; pe = epx, cle = clx)
-        fams = (MeanRisk(; opt = jexc), HierarchicalRiskParity(; opt = hexc),
-                HierarchicalEqualRiskContribution(; opt = hexc),
+        hexc = HierarchicalOptimiser(; pe = epx)
+        fams = (MeanRisk(; opt = jexc),
+                HierarchicalRiskParity(; opt = hexc,
+                                       ser = HierarchicalSeriation(; cle = clx)),
+                HierarchicalEqualRiskContribution(; opt = hexc, cle = clx),
                 InverseVolatility(; pe = epx),
                 NestedClustered(; pe = epx, cle = clx, opti = MeanRisk(; opt = jopt),
                                 opto = MeanRisk(; opt = jopt)),
@@ -607,9 +611,8 @@ end
         @test PO.prior_data_rows(rdg, T, n) == (T - n + 1):T
         # A head that holds the result cuts the marked observations, as a head that fits
         # the prior does.
-        hrp(pe) = optimise(HierarchicalRiskParity(;
-                                                  opt = HierarchicalOptimiser(; pe = pe,
-                                                                              cle = clp)),
+        hrp(pe) = optimise(HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pe),
+                                                  ser = HierarchicalSeriation(; cle = clp)),
                            rdg)
         @test hrp(pr).w ≈ hrp(FactorPrior()).w
     end
@@ -736,7 +739,8 @@ struct DynamicWeights1960 <: PO.DynamicAbstractWeights end
                                                                                   r = ConditionalValueatRisk(;
                                                                                                              w = w),
                                                                                   opt = HierarchicalOptimiser(;
-                                                                                                              pe = emp_x(w),
+                                                                                                              pe = emp_x(w)),
+                                                                                  ser = HierarchicalSeriation(;
                                                                                                               cle = ClustersEstimator(;
                                                                                                                                       ce = cov_w(w),
                                                                                                                                       x_src = ExcessSource())))),

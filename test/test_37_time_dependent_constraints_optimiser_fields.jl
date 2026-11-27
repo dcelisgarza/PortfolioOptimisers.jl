@@ -603,7 +603,8 @@ end
                               IterativeWeightFinaliser(; iter = 7)])
         tdcle = TimeDependent([ClustersEstimator(),
                                ClustersEstimator(;
-                                                 alg = HClustAlgorithm(; linkage = :single))])
+                                                 alg = HClustAlgorithm(;
+                                                                       linkage = SingleLinkage()))])
         ctx2 = TimeDependentContext(; i = 2, n = 2, rd = rd, train_idx = 1:150,
                                     test_idx = 151:200)
         @testset "Widened fields, defaults and per-fold resolution" begin
@@ -617,7 +618,7 @@ end
             @test n0.wf == IterativeWeightFinaliser()
             n2 = PortfolioOptimisers.update_time_dependent_estimator(nco, ctx2)
             @test n2.pe == pe_semi
-            @test n2.cle.alg.linkage == :single
+            @test n2.cle.alg.linkage === SingleLinkage()
             @test n2.sets === setsB
             @test n2.wf.iter == 7
             st = Stacking(; pe = tdpe, sets = tdsets, wf = tdwf, opti = [mr0], opto = mr0)

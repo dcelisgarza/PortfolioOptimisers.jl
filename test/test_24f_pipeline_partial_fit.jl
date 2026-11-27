@@ -483,8 +483,8 @@ what keeps the JuMP families cheap.
         pex = EmpiricalPrior(; x_src = ExcessSource())
         pstep = PipelineStep(; est = pex, writes = :prior)
         mrb = MeanRisk(; opt = JuMPOptimiser(; pe = pex, slv = slv))
-        hrpb = HierarchicalRiskParity(;
-                                      opt = HierarchicalOptimiser(; pe = pex,
+        hrpb = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pex),
+                                      ser = HierarchicalSeriation(;
                                                                   cle = ClustersEstimator(;
                                                                                           x_src = ExcessSource())))
         for opt in (mrb, hrpb)
@@ -517,7 +517,8 @@ what keeps the JuMP families cheap.
         pd = EmpiricalPrior(; x_src = DataSource())
         pstep = PipelineStep(; est = pd, writes = :prior)
         cex = ClustersEstimator(; x_src = ExcessSource())
-        hrpg = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pd, cle = cex))
+        hrpg = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pd),
+                                      ser = HierarchicalSeriation(; cle = cex))
         # A prior owner. The step drops the gap, as the head drops it for its own prior.
         pipe = Pipeline(; steps = (pstep, hrpg))
         @test po.pipeline_gap_sources(pipe.steps) == [ExcessSource(), ExcessSource()]

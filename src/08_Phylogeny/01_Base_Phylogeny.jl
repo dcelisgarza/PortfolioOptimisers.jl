@@ -113,6 +113,10 @@ A member whose routine reports a different sentinel overrides [`is_reachable`](@
 
 The two shipped members accept a rule in the budget field, through [`HopCountValue`](@ref) and [`PathLengthValue`](@ref). A caller who cannot state the budget in advance gives the rule that calculates it. The library resolves the rule where the data is available, because a rule needs the data. For this reason [`separation_budget`](@ref) refuses an unresolved member and does not return a function.
 
+# A graph with more vertices than the assets
+
+An [`ExogenousNetwork`](@ref) can have vertices that are not assets. A member measures over it through two more methods: a method of [`separation_graph`](@ref) for the network, which [`exogenous_network_graph`](@ref) builds, and a method of [`vertex_separations`](@ref), which measures the separations from one vertex.
+
 # Separation is not decay
 
 [`AbstractSeparationDecayAlgorithm`](@ref) changes a separation into a score. This family calculates the separation and its budget. `sep` decides which pairs are related, and every consumer of a network needs that. `decay` decides how strongly a pair is related, and only the feature producer needs that number. So `sep` is a field of [`NetworkEstimator`](@ref) and `decay` is a field of [`Proximity`](@ref).
@@ -154,7 +158,7 @@ A subtype defines one method, the functor:
     (rule::MySubtype)(nte::AbstractNetworkEstimator, X::MatNum, g::Graphs.AbstractGraph;
                       dims::Int = 1, kwargs...) -> Integer
 
-`g` is the structure that [`separation_graph`](@ref) built for the separation that holds the rule. The rule reads what it needs from `g` through [`separation_matrix`](@ref), which takes `g` directly, so the rule builds no structure. It still runs the traversal of all pairs, as [`resolve_separation`](@ref) states.
+`g` is the structure that [`separation_graph`](@ref) built for the separation that holds the rule, or the whole graph of the scope over an [`ExogenousNetwork`](@ref). The rule reads what it needs from `g` through [`separation_matrix`](@ref), which takes `g` directly, so the rule builds no structure. It still runs the traversal of all pairs, as [`resolve_separation`](@ref) states.
 
 `nte` holds the separation, and `X` is the data that `g` comes from. An extension reads them to get what the graph does not hold, for example the distance estimator, the number of observations or a covariance.
 

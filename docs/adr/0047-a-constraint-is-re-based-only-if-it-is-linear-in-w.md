@@ -420,3 +420,68 @@ than through the loadings — is designed and deferred to its own effort. It rea
 carrier and carries no data of its own, which is the same decision as this one seen from the other
 side: a space carries the *source* of its basis, and `Z`'s source is already on the carrier by
 ADR 0045.
+
+## Amendment (2026-11-23): `DependencySpace`, and a basis that holds its own names
+
+`DependencySpace(; ng, reach, dir)` is a second member (#2202, row 13 of #2168). Its rows name the
+nodes of an Exogenous Graph, and a row `a` re-bases to `(Rᵀ a)ᵀ w`, with `R` the reach of the
+Dependency Exposure. The rule of this ADR decides its limit: the net exposure is a linear form in
+`w`, so a row can cap it. A gross cap needs the long and the short variables, so it stays outside
+the re-basis. The amendment *a position constraint* below states it with a wrapper.
+
+**The names are nodes, not a key of the sets.** The nodes change over time and most of them are not
+assets, so a declared axis repeats what the graph holds. `constraint_space_basis` returns a
+`ConstraintBasis`, which holds `M`, the names, and two words for the messages, and `nothing` as the
+key. The names are the nodes of every snapshot that the fit sees, so a node that left the graph has
+zero exposure and its row stays. A fold sees no later snapshot. The `key` of the wrapped estimator
+declares the names for that case, and a declared name with no column has zero exposure. A group of
+a `ConstraintBasis` keeps a member that left the Investable Mask, because that asset can still be a
+node.
+
+**A precomputed `LinearConstraint` is refused at construction.** Its columns have no names, and the
+nodes of two fits can differ in number and order.
+
+**The outer optimiser refuses the space.** The outer problem of `NestedClustered` and `Stacking`
+keeps the graphs of the returns data and replaces the asset names, so each row has zero coefficients
+and the constraint is silently absent. `assert_outer_readers` walks `opto` at construction. The space
+holds no asset index, so `port_opt_view` returns it unchanged and an inner solve takes it.
+
+**The reach marks every asset as held.** The fit does not know the weights, so a `FractionOf` budget
+takes its quantile over every asset.
+
+**The space lives in `src/24_Report/`.** It reads the reach of #2173, which loads after the walk
+kernel of the Asset Panel producers.
+
+**A pipeline step reads the slots that the space states.** `pipe_reads` of the estimator is
+`pipe_reads` of its space: `(:returns, :prior)` by default, and `(:returns,)` for `DependencySpace`.
+
+## Amendment (2026-11-25): a position constraint
+
+`PositionConstraintEstimator(; lce, pos = GrossPosition())` caps the gross, long or short position of
+any row of `lcse` (#2297, decided on #2290). It resolves to `PositionConstraint(lc, pos)`, whose rows
+apply to a reading of the weights: `A * position_reading(pos, w, lw, sw) <= k B`.
+
+**A wrapper, not a field.** The frame of a row and the reading of the weights are two choices, so one
+type takes every frame: assets, groups, factors and nodes. A field of `LinearConstraintEstimator`
+reaches `gcarde`, `sgcarde` and `rc`, where a reading has no meaning, for the reason that this ADR
+gives for the re-basis. A field of `DependencySpace` or `ExposureConstraintEstimator` cannot reach a
+row in asset names, because the family has no `AssetSpace`.
+
+**The form is the exposure of the absolute weights.** `M` applied to `abs(w)` is the gross exposure of
+the Dependency Exposure report. `abs(M w) <= b` is two net rows, which a bare estimator states.
+
+**The row reads the weights.** Over a `FactorSpace`, the gross position is `sum(F_i * abs(w_i))`, with
+the projection of this ADR. It is not `sum(abs(F_i * w_i))`.
+
+**A row that the parts do not hold is accepted.** `lw` and `sw` are upper bounds on the parts of the
+weights, so a floor, an equality or a negative coefficient does not hold without `xbgt`. The docstring
+warns, as it does for the floor of `gbgt`, and no check refuses the row.
+
+**The bounds of the block make the parts.** A block whose bounds admit a short position reads
+`weight_parts!`. Other bounds make no variable: gross, long and net give the plain row, and the short
+reading is zero. `ConcentrationLimit` gives zeros for `ShortPosition` there too.
+
+**Two aliases, two places.** `EcE_LcE_Lc` stays the bound of what the wrapper takes.
+`PcE_Pc_EcE_LcE_Lc` is the bound of `lcse` alone, and `Pc_Lc_VecPc_Lc` the bound of `lcsr`. The
+resolver of a block puts a vector inside an entry into the one vector of `lcsr`, and leaves out an
+entry whose every row dropped.

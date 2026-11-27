@@ -1225,8 +1225,8 @@ function predict_outer_returns(::Nothing, opt, u::SubPortfolioUniverse, rd::Retu
                                    sub_portfolio_view(u, fees, i))
     end
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
-                         nb = nb, B = B, ne = rd.ne, E = rd.E, ts = rd.ts, iv = iv,
-                         ivpa = ivpa, pnl = pnl)
+                         nb = nb, B = B, ne = rd.ne, E = rd.E, ng = rd.ng, G = rd.G,
+                         ts = rd.ts, iv = iv, ivpa = ivpa, pnl = pnl)
 end
 function predict_outer_returns(cv::OptCVE_Onl, opt, u::SubPortfolioUniverse,
                                rd::ReturnsResult, ::AbstractPriorResult, ::Option{<:Fees},

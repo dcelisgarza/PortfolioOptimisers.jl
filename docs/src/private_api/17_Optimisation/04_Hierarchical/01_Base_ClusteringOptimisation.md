@@ -11,7 +11,7 @@ assert_clustering_universe
 hierarchical_optimiser_td_defaults
 is_time_dependent(opt::ClusteringOptimisationEstimator)
 reset_time_dependent_estimator(opt::ClusteringOptimisationEstimator)
-assert_internal_optimiser(opt::ClusteringOptimisationEstimator)
+assert_internal_optimiser(opt::HierarchicalEqualRiskContribution)
 unitary_expected_risks(r::OptimisationRiskMeasure, X::MatNum, fees::Option{<:Fees})
 unitary_expected_risks!(wk::VecNum, rk::VecNum, r::OptimisationRiskMeasure, X::MatNum, fees::Option{<:Fees})
 PortfolioOptimisers.reader_frames(::PortfolioOptimisers.HierarchicalOptimiser, ::AbstractString, ::Bool)

@@ -50,7 +50,8 @@ clr = clusterise(ClustersEstimator(; alg = DBHT()), pr.X)
 slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
              settings = Dict("verbose" => false),
              check_sol = (; allow_local = true, allow_almost = true))
-opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv)
+opt = HierarchicalOptimiser(; pe = pr, slv = slv)
+ser = HierarchicalSeriation(; cle = clr)
 
 #=
 ## 2. HRP with mixed risk measures
@@ -70,10 +71,13 @@ other.
 
 r_mix = [ConditionalValueatRisk(),
          Variance(; settings = RiskMeasureSettings(; scale = 2e2))]
-hrp_sum = optimise(HierarchicalRiskParity(; r = r_mix, opt = opt, sca = SumScalariser()))
-hrp_max = optimise(HierarchicalRiskParity(; r = r_mix, opt = opt, sca = MaxScalariser()))
-hrp_min = optimise(HierarchicalRiskParity(; r = r_mix, opt = opt, sca = MinScalariser()))
-hrp_lse = optimise(HierarchicalRiskParity(; r = r_mix, opt = opt,
+hrp_sum = optimise(HierarchicalRiskParity(; r = r_mix, opt = opt, ser = ser,
+                                          sca = SumScalariser()))
+hrp_max = optimise(HierarchicalRiskParity(; r = r_mix, opt = opt, ser = ser,
+                                          sca = MaxScalariser()))
+hrp_min = optimise(HierarchicalRiskParity(; r = r_mix, opt = opt, ser = ser,
+                                          sca = MinScalariser()))
+hrp_lse = optimise(HierarchicalRiskParity(; r = r_mix, opt = opt, ser = ser,
                                           sca = LogSumExpScalariser(; gamma = 1e2)))
 
 pretty_table(DataFrame(; :assets => rd.nx, :Sum => hrp_sum.w, :Max => hrp_max.w,
@@ -89,16 +93,17 @@ We pass the same pair of risk measures at both levels and run the same four scal
 both levels.
 =#
 
-herc_sum = optimise(HierarchicalEqualRiskContribution(; opt = opt, ri = r_mix, ro = r_mix,
-                                                      scai = SumScalariser(),
+herc_sum = optimise(HierarchicalEqualRiskContribution(; opt = opt, cle = clr, ri = r_mix,
+                                                      ro = r_mix, scai = SumScalariser(),
                                                       scao = SumScalariser()))
-herc_max = optimise(HierarchicalEqualRiskContribution(; opt = opt, ri = r_mix, ro = r_mix,
-                                                      scai = MaxScalariser(),
+herc_max = optimise(HierarchicalEqualRiskContribution(; opt = opt, cle = clr, ri = r_mix,
+                                                      ro = r_mix, scai = MaxScalariser(),
                                                       scao = MaxScalariser()))
-herc_min = optimise(HierarchicalEqualRiskContribution(; opt = opt, ri = r_mix, ro = r_mix,
-                                                      scai = MinScalariser(),
+herc_min = optimise(HierarchicalEqualRiskContribution(; opt = opt, cle = clr, ri = r_mix,
+                                                      ro = r_mix, scai = MinScalariser(),
                                                       scao = MinScalariser()))
-herc_lse = optimise(HierarchicalEqualRiskContribution(; opt = opt, ri = r_mix, ro = r_mix,
+herc_lse = optimise(HierarchicalEqualRiskContribution(; opt = opt, cle = clr, ri = r_mix,
+                                                      ro = r_mix,
                                                       scai = LogSumExpScalariser(;
                                                                                  gamma = 1e2),
                                                       scao = LogSumExpScalariser(;
@@ -127,11 +132,12 @@ weight the unconstrained HERC gives, near 13%. Read the largest holdings of the 
 below against each other.
 =#
 
-opt_constrained = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv,
+opt_constrained = HierarchicalOptimiser(; pe = pr, slv = slv,
                                         wb = WeightBounds(; lb = 0.0, ub = 0.1),
                                         fees = Fees(; l = 0.001))
 herc_constrained = optimise(HierarchicalEqualRiskContribution(; opt = opt_constrained,
-                                                              ri = r_mix, ro = r_mix,
+                                                              cle = clr, ri = r_mix,
+                                                              ro = r_mix,
                                                               scai = SumScalariser(),
                                                               scao = SumScalariser()))
 

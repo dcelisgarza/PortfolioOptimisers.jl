@@ -10,6 +10,9 @@ ExponentialSimilarity
 GeneralExponentialSimilarity
 ComplementSimilarity
 AngularSimilarity
+ChordSimilarity
+OrthantChordSimilarity
+default_similarity
 ```
 
 ## References

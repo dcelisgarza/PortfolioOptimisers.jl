@@ -33,7 +33,9 @@ section 4 covers its settings.
     bucketing, an ESG classification, a factor exposure profile. Reach for it too when you want
     the hierarchy to hold still between rebalances. A classification does not move when the
     covariance moves, and section 9 measures what that saves in turnover. Stay with the ordinary
-    correlation distance when the structure you care about is co-movement itself.
+    correlation distance when the structure you care about is co-movement itself, or when the aim
+    is a lower risk out of sample. Section 9 also states the measurement that found no feature
+    distance with a lower risk than the returns-only distances.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
@@ -154,8 +156,9 @@ cos(i, j) = shared(i, j) / L
 ```
 
 the count of levels the two assets share, divided by the number of levels. The default metric,
-[`AngularDist`](@ref), therefore takes `L + 1` distinct values here, and it is bounded by `0.5`
-rather than `1.0`, because a non-negative row admits no negative cosine.
+[`ChordDist`](@ref), is `sqrt((1 - cos) / 2)`. It therefore takes `L + 1` distinct values here,
+and it is bounded by `1 / sqrt(2) ≈ 0.707` rather than `1.0`, because a non-negative row admits
+no negative cosine.
 
 A numeric or a tensor field carries values on its own scale, so neither the fixed row norm nor
 the bound holds for it.
@@ -173,8 +176,8 @@ pretty_table(DataFrame("Quantity" => ["Feature columns", "Classification levels 
 
 #=
 The table holds three distances, one per level of shared membership, up to the floating-point
-noise of `acos`. Two assets in the same industry are at `0.0`, two in the same sector but
-different industries at `1/3`, and two that share nothing at `0.5`.
+noise of the square root. Two assets in the same industry are at `0.0`, two in the same sector but
+different industries at `0.5`, and two that share nothing at `0.707`.
 
 ### 2.2 The clustering it produces
 
@@ -223,14 +226,12 @@ estimator takes it from there.
 =#
 
 hrp_cor = optimise(HierarchicalRiskParity(;
-                                          opt = HierarchicalOptimiser(; pe = pr,
-                                                                      cle = cle_cor,
-                                                                      slv = slv),
+                                          opt = HierarchicalOptimiser(; pe = pr, slv = slv),
+                                          ser = HierarchicalSeriation(; cle = cle_cor),
                                           r = Variance()), rd)
 hrp_fea = optimise(HierarchicalRiskParity(;
-                                          opt = HierarchicalOptimiser(; pe = pr,
-                                                                      cle = cle_fea,
-                                                                      slv = slv),
+                                          opt = HierarchicalOptimiser(; pe = pr, slv = slv),
+                                          ser = HierarchicalSeriation(; cle = cle_fea),
                                           r = Variance()), rd)
 
 pretty_table(DataFrame("Asset" => rd.nx, "HRP correlation" => hrp_cor.w,
@@ -428,14 +429,16 @@ plot(1:size(sweep, 1), sweep[!, "ARI vs correlation"]; marker = :circle, legend 
 ## 5. Metrics, and the similarity field
 
 The `metric` field of [`FeatureDistance`](@ref) takes any `Distances.SemiMetric`, including one
-you write yourself. The default is [`AngularDist`](@ref), the arc-cosine of the cosine similarity
-scaled to `[0, 1]`.
+you write yourself. The default is [`ChordDist`](@ref), half the distance between the two unit
+feature vectors, `sqrt((1 - cos) / 2)`. It is Euclidean, so the Ward linkage that
+[`ClustersEstimator`](@ref) uses by default is correct on it. [`AngularDist`](@ref), the
+arc-cosine of the cosine similarity scaled to `[0, 1]`, is a metric too, but it is not Euclidean.
 
 The choice changes the answer. Metrics differ in what they are defined on, and one of them returns
 a number on input outside its domain rather than raising, so the library checks the domain.
 =#
 
-metrics = ["AngularDist()" => AngularDist(),
+metrics = ["ChordDist()" => ChordDist(), "AngularDist()" => AngularDist(),
            "Distances.CosineDist()" => PortfolioOptimisers.Distances.CosineDist(),
            "Distances.Jaccard()" => PortfolioOptimisers.Distances.Jaccard()]
 
@@ -448,13 +451,13 @@ for (mname, metric) in metrics
                       "Maximum distance" => round(maximum(Dm); digits = 4),
                       "Distinct values" => length(unique(round.(Dm; digits = 6)))))
 end
-pretty_table(metric_rows; title = "Three metrics on the same classification panel")
+pretty_table(metric_rows; title = "Four metrics on the same classification panel")
 
 #=
-On a matrix of indicator columns each of the three metrics falls as the number of levels two
-assets share rises, so all three put the pairs in the same order and give three distinct
-distances. The values differ. [`AngularDist`](@ref) stops at `0.5`, because a non-negative matrix
-admits no negative cosine. A signed matrix is a different case, and the next cell measures one.
+On a matrix of indicator columns each of the four metrics falls as the number of levels two
+assets share rises, so all four put the pairs in the same order and give three distinct
+distances. The values differ. [`ChordDist`](@ref) stops at `0.707` and [`AngularDist`](@ref) at
+`0.5`, because a non-negative matrix admits no negative cosine. A signed matrix is a different case, and the next cell measures one.
 =#
 
 signed_metric = try
@@ -471,19 +474,20 @@ println(signed_metric)
 input it returns values up to `2` and raises nothing, and a clustering routine then takes those
 values as distances. The domain check raises the error printed above instead, and it covers
 `Distances.BrayCurtis` and `Distances.ChiSqDist` as well. A signed field, and a block of factor
-loadings above all, needs [`AngularDist`](@ref) or `Distances.CosineDist`.
+loadings above all, needs [`ChordDist`](@ref), [`AngularDist`](@ref) or `Distances.CosineDist`.
 
 ### The `sim` field
 
 A clustering estimator calls [`cor_and_dist`](@ref) rather than [`distance`](@ref), so a feature
 distance must also give a similarity matrix. The `sim` field says how to compute it, and
-[`default_similarity`](@ref) sets it from the metric. [`AngularDist`](@ref) takes
-[`AngularSimilarity`](@ref), which recovers the cosine as `cos(πD)`, and every other metric takes
+[`default_similarity`](@ref) sets it from the metric. [`ChordDist`](@ref) takes
+[`ChordSimilarity`](@ref), which recovers the cosine as `1 - 2D²`. [`AngularDist`](@ref) takes
+[`AngularSimilarity`](@ref), which recovers it as `cos(πD)`. Every other metric takes
 [`ComplementSimilarity`](@ref), which is `1 - D`. Set `sim` yourself to override that.
 =#
 
 S_fea, D_fea = cor_and_dist(FeatureDistance(), nothing, rd.X; rd = rd)
-println("S is cos(πD): ", S_fea ≈ cos.(π .* D_fea))
+println("S is 1 - 2D²: ", S_fea ≈ 1 .- 2 .* D_fea .^ 2)
 
 #=
 ## 6. Both shapes: static and time-varying
@@ -624,7 +628,7 @@ pretty_table(selector_rows; title = "Five selectors on the same panel")
 Cutting to `"sector"` alone gives two distances rather than three, because the industry level is
 what separated pairs inside one sector. Cutting to two levels of one field moves the bound as
 well. An asset in neither kept level has a feature row of zeros, so the largest distance reaches
-`1.0` rather than the `0.5` a full partition gives.
+`1.0` rather than the `0.707` a full partition gives.
 
 The selector is a field of the estimator, so you change the cut without rebuilding the panel.
 =#
@@ -745,13 +749,15 @@ group. A selector that named `"sector"` resolves unchanged on the outer panel.
 nco = NestedClustered(; pe = pr, cle = cle_fea,
                       opti = HierarchicalRiskParity(;
                                                     opt = HierarchicalOptimiser(; pe = pr,
-                                                                                cle = cle_cor,
                                                                                 slv = slv),
+                                                    ser = HierarchicalSeriation(;
+                                                                                cle = cle_cor),
                                                     r = Variance()),
                       opto = HierarchicalRiskParity(;
                                                     opt = HierarchicalOptimiser(;
-                                                                                cle = cle_fea,
                                                                                 slv = slv),
+                                                    ser = HierarchicalSeriation(;
+                                                                                cle = cle_fea),
                                                     r = Variance()))
 res_nco = optimise(nco, rd)
 println("Outer problem solved on the collapsed panel: ",
@@ -831,7 +837,7 @@ pretty_table(DataFrame("Quantity" => ["Distinct differences on the shared suppor
              title = "Bare budget against dmax = 3.0, then a rescale and a shift of the field")
 
 #=
-[`AngularDist`](@ref) does not change when an asset's whole row is rescaled, which is why the
+[`ChordDist`](@ref) does not change when an asset's whole row is rescaled, which is why the
 third row of the table is zero to machine precision. A shift changes the direction the row points,
 and the fourth row is not zero. The invariance of the metric therefore does not absorb a moving
 diameter, and the distance changes fold by fold.
@@ -861,15 +867,17 @@ walk = IndexWalkForward(252, 63)
 bt_cor = cross_val_predict(HierarchicalRiskParity(;
                                                   opt = HierarchicalOptimiser(;
                                                                               pe = EmpiricalPrior(),
-                                                                              cle = ClustersEstimator(),
                                                                               slv = slv),
+                                                  ser = HierarchicalSeriation(;
+                                                                              cle = ClustersEstimator()),
                                                   r = Variance()), rdb, walk)
 bt_fea = cross_val_predict(HierarchicalRiskParity(;
                                                   opt = HierarchicalOptimiser(;
                                                                               pe = EmpiricalPrior(),
-                                                                              cle = ClustersEstimator(;
-                                                                                                      de = FeatureDistance()),
                                                                               slv = slv),
+                                                  ser = HierarchicalSeriation(;
+                                                                              cle = ClustersEstimator(;
+                                                                                                      de = FeatureDistance())),
                                                   r = Variance()), rdbz, walk)
 
 function backtest_row(name, p)
@@ -892,13 +900,24 @@ pretty_table(DataFrame([backtest_row("Correlation", bt_cor),
 
 #=
 Return and volatility are close between the two rows, and the drawdown of the classification run
-is smaller. The last column shows that the classification hierarchy changes its weights between
+is larger. The last column shows that the classification hierarchy changes its weights between
 rebalances by less than half of what the correlation hierarchy changes. The reason is the source
 of the structure. A sector does not move when a correlation moves, so the dendrogram, the merge
 order and the recursive bisection hold still, and the risk estimate inside each cluster is the
 only thing left moving.
 
 A classification panel cannot react to a structural break that the returns show.
+
+This run is one window of one data set, and a longer measurement gives the general result. A
+walk-forward run compared four feature kinds with the returns-only distances: a sector taxonomy,
+volatility and momentum, a [`PhylogenyPanel`](@ref) and the loadings of a
+[`RegressionPanel`](@ref). The data were 20 stocks of the S&P 500 over 1990 to 2022 and 36 stocks
+of the NYSE (O) set over 1962 to 1984. The optimisers were [`HierarchicalRiskParity`](@ref),
+[`HierarchicalEqualRiskContribution`](@ref), [`SchurComplementHierarchicalRiskParity`](@ref) and
+[`NestedClustered`](@ref). No feature kind gave a lower risk or a higher Sharpe ratio out of sample
+on both data sets. The lower turnover of a fixed taxonomy held, and on the NYSE (O) set it cost
+2 to 4 % more volatility under three of the four optimisers. Use a classification for the
+structure it imposes and for its turnover, not to lower the risk.
 =#
 
 plot_portfolio_cumulative_returns(bt_fea)
@@ -926,5 +945,7 @@ plot_portfolio_cumulative_returns(bt_fea)
     square field keyed by asset is sliced on its label axis too, so measuring a subproblem and
     reading it out of the universe's distance matrix answer different questions.
   - A bare `PathLength()` ties the scale of a graph field to the sample, and the scale invariance
-    of [`AngularDist`](@ref) does not absorb a shift.
+    of [`ChordDist`](@ref) does not absorb a shift.
+  - No feature kind gave a lower risk or a higher Sharpe ratio out of sample than the returns-only
+    distances on two data sets. The gain of a fixed taxonomy is a lower turnover.
 =#

@@ -945,8 +945,8 @@ using Statistics
         @test_throws PortfolioOptimisers.IsEmptyError exposure_ic_summary(zeros(0, 0);
                                                                           mt = OverlapMeanTest())
         # A history of ones is what an absent weight history resolves to.
-        @test PortfolioOptimisers.exposure_weights(B, nothing) == ones(3, 4)
-        @test PortfolioOptimisers.exposure_weights(B, ones(3, 4)) == ones(3, 4)
+        @test PortfolioOptimisers.cs_exposure_weights(B, nothing) == ones(3, 4)
+        @test PortfolioOptimisers.cs_exposure_weights(B, ones(3, 4)) == ones(3, 4)
     end
 
     @testset "the correlation kernels" begin

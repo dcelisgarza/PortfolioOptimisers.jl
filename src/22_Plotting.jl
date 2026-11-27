@@ -778,9 +778,11 @@ function plot_histogram end
         nx::AbstractVector = 1:size(X, 2),
         w::Option{<:VecNum} = nothing;
         threshold::Number = 0,
+        pr = nothing,
+        rd::Option{<:ReturnsResult} = nothing,
         kwargs...
     ) -> Plot
-    plot_network(pl, pr::Pr_RR, w::Option{<:VecNum} = nothing; nx = 1:size(pr.X, 2), threshold, kwargs...) -> Plot
+    plot_network(pl, pr::Pr_RR, w::Option{<:VecNum} = nothing; nx = 1:size(pr.X, 2), rd::Option{<:ReturnsResult} = nothing, threshold, kwargs...) -> Plot
     plot_network(pl, res::OptimisationResult; rd::Option{<:Pr_RR} = nothing, nx = 1:length(res.w), threshold, kwargs...) -> Plot
 
 Plot the network of the assets as a graph, with `GraphRecipes.graphplot`.
@@ -798,7 +800,7 @@ A non-investable asset is **not drawn**. The figure fits a phylogeny matrix on `
   - `threshold`: Largest magnitude of an entry that draws no edge.
   - `pr`: Prior result or [`ReturnsResult`](@ref). The figure reads its `X`.
   - `res`: Optimisation result. The figure reads its weights, which size the nodes, on its investable universe.
-  - `rd`: Prior result or returns result, or `nothing` for the prior that `res` was fitted on.
+  - `rd`: With `res`, a prior result or a returns result, or `nothing` for the prior that `res` was fitted on. In the other methods, the returns data that `pl` reads beside `X`, such as the graph of an [`ExogenousNetwork`](@ref). A returns result in `pr`, or with `res`, gives it.
 
 # Validation
 
@@ -813,6 +815,48 @@ A non-investable asset is **not drawn**. The figure fits a phylogeny matrix on `
   - [`phylogeny_matrix`](@ref)
 """
 function plot_network end
+"""
+    plot_exogenous_graph(
+        g::ExogenousGraph;
+        groups::Option{<:AbstractDict} = nothing,
+        max_nodes::Integer = 500,
+        max_edges::Integer = 5000,
+        kwargs...
+    ) -> Plot
+    plot_exogenous_graph(rd::ReturnsResult, name::Option{<:Union{AbstractString, GraphUnion}} = nothing; groups, kwargs...) -> Plot
+
+Plot an [`ExogenousGraph`](@ref) in layers, with an arrow for each edge.
+
+A node sits one layer or more to the right of each node that points to it, so the figure reads from the left to the right as a chain of dependencies does. In a cycle, one edge or more points back. Each weakly connected component has a layout of its own, and one graph always gives one figure. The width of an edge shows the magnitude of its weight relative to the largest one, in four steps, and the colour of an edge shows its sign. A reciprocal pair draws as two bowed edges, and a self-loop draws as a ring above its node.
+
+The [`ReturnsResult`](@ref) method draws the graph in force at the last row, as [`graph_in_force`](@ref) reads it, or the union that a [`GraphUnion`](@ref) states there. Draw the graph of an earlier row from a view of the data, `plot_exogenous_graph(port_opt_view(rd, 1:t, :))`. [`plot_network`](@ref) draws the network that a phylogeny estimator fits to the returns. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads after `using StatsPlots`.
+
+# Arguments
+
+  - `g`: The graph.
+  - $(arg_dict[:rd])
+  - `name`: The name of the graph, a [`GraphUnion`](@ref), or `nothing` for the only graph of `rd`.
+  - `groups`: The label of the group of each node, by its name. Each group takes a colour and an entry of the legend, and a node with no label is in the group `"Ungrouped"`. `nothing` draws every node in one colour. The default of the first method is `nothing`, and the default of the second one groups the nodes as the assets and the other nodes.
+  - `max_nodes`: Largest number of nodes that the figure draws.
+  - `max_edges`: Largest number of edges that the figure draws.
+  - `kwargs...`: Keywords of the figure, such as `title` and `size`.
+
+# Validation
+
+  - The graph has at most `max_nodes` nodes and `max_edges` edges. An `ArgumentError` is thrown otherwise.
+  - The rules of [`graph_in_force`](@ref) for the [`ReturnsResult`](@ref) method.
+
+# Returns
+
+  - `plt::Plots.Plot`: A graph plot.
+
+# Related
+
+  - [`ExogenousGraph`](@ref)
+  - [`graph_union`](@ref)
+  - [`plot_network`](@ref)
+"""
+function plot_exogenous_graph end
 
 ## ──────────────────────────────────────────────────────────────────────────────
 ## Centrality
@@ -824,9 +868,11 @@ function plot_network end
         nx::AbstractVector = 1:size(X, 2);
         N::Option{<:Number} = nothing,
         percentage::Bool = true,
+        pr = nothing,
+        rd::Option{<:ReturnsResult} = nothing,
         kwargs...
     ) -> Plot
-    plot_centrality(cte, pr::AbstractPriorResult, nx = 1:size(pr.X, 2); N, percentage, kwargs...) -> Plot
+    plot_centrality(cte, pr::AbstractPriorResult, nx = 1:size(pr.X, 2); N, percentage, rd::Option{<:ReturnsResult} = nothing, kwargs...) -> Plot
     plot_centrality(cte, rd::ReturnsResult; N, percentage, kwargs...) -> Plot
     plot_centrality(cte, res::OptimisationResult, rd::ReturnsResult; N, percentage, kwargs...) -> Plot
 
@@ -844,7 +890,7 @@ A non-investable asset is **not drawn**. The figure fits a centrality vector on 
   - `N`: The count or the share of the bars to draw, or `nothing` for the effective number of the scores. [`relevant_assets`](@ref) states the rule.
   - `percentage`: Divide the scores by their sum over all assets when `true`.
   - `pr`: Prior result. The figure reads its `X`.
-  - `rd`: Returns result. The figure reads its `X` and its `nx`.
+  - `rd`: Returns result. The figure reads its `X` and its `nx`. As a keyword, the returns data that the source of `cte` reads beside `X`, such as the graph of an [`ExogenousNetwork`](@ref).
   - `res`: Optimisation result.
 
 # Validation
@@ -3228,6 +3274,47 @@ function investable_plot_view(pr::AbstractPriorResult,
 end
 
 """
+    plot_returns_data(pr::ReturnsResult, rd) -> ReturnsResult
+    plot_returns_data(pr::AbstractPriorResult, rd::Nothing) -> Nothing
+    plot_returns_data(pr::AbstractPriorResult, rd::ReturnsResult) -> ReturnsResult
+
+Return the returns data that a figure passes to its network, on the investable universe of the figure.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `pr` is a [`ReturnsResult`](@ref): return `pr`.
+ 2. `pr` is a prior result and `rd` is `nothing`: return `nothing`.
+ 3. `pr` is a prior result and `rd` is a [`ReturnsResult`](@ref): return the view of `rd` at the Investable Mask of `pr`, or `rd` when `pr` has no mask.
+
+# Arguments
+
+  - `pr`: Prior result or [`ReturnsResult`](@ref), before its view.
+  - `rd`: The returns data of the caller, or `nothing`.
+
+# Returns
+
+  - `rd::Option{<:ReturnsResult}`: The returns data.
+
+# Related
+
+  - [`investable_plot_view`](@ref)
+  - [`plot_network`](@ref)
+  - [`plot_centrality`](@ref)
+"""
+function plot_returns_data(pr::ReturnsResult, ::Any)
+    return pr
+end
+function plot_returns_data(::AbstractPriorResult, ::Nothing)
+    return nothing
+end
+function plot_returns_data(pr::AbstractPriorResult, rd::ReturnsResult)
+    imsk = investable_mask(pr)
+    return isnothing(imsk) ? rd : port_opt_view(rd, findall(imsk))
+end
+
+"""
     plot_factor_model_summary(
         fs::FactorSummaryResult;
         nf::Option{<:AbstractVector} = nothing,
@@ -4417,19 +4504,20 @@ end
 export plot_portfolio_cumulative_returns, plot_asset_cumulative_returns, plot_composition,
        plot_stacked_bar_composition, plot_stacked_area_composition, plot_dendrogram,
        plot_clusters, plot_drawdowns, plot_risk_contribution, plot_factor_risk_contribution,
-       plot_measures, plot_histogram, plot_network, plot_centrality, plot_correlation,
-       plot_mu, plot_sigma, plot_factor_loadings, plot_factor_sigma, plot_eigenspectrum,
-       plot_rolling_measure, plot_weight_stability, plot_cv_scores, plot_turnover,
-       plot_prior, plot_factor_mu, plot_benchmark, plot_coskewness, plot_cokurtosis,
-       plot_portfolio_dashboard, plot_cv_dashboard, plot_efficient_frontier,
-       plot_performance_summary, plot_rolling_drawdowns, plot_cs_regression_r2,
-       plot_cs_regression_adjusted_r2, plot_cs_regression_aic, plot_cs_regression_bic,
-       plot_cs_regression_t_stats, plot_cs_regression_t_stat_exceedance_rate,
-       plot_attribution_vol_contrib, plot_attribution_mu_contrib, plot_attribution_exposure,
-       plot_attribution_mu_vs_vol, plot_exposure_vif, plot_exposure_condition_number,
-       plot_exposure_correlation, plot_cumulative_exposure_ic, plot_exposure_distribution,
-       plot_exposure_dispersion, plot_exposure_stability, plot_idio_calibration,
-       plot_idio_tail_rate, plot_idio_kurtosis, plot_idio_skewness, plot_idio_vol_ic,
+       plot_measures, plot_histogram, plot_network, plot_exogenous_graph, plot_centrality,
+       plot_correlation, plot_mu, plot_sigma, plot_factor_loadings, plot_factor_sigma,
+       plot_eigenspectrum, plot_rolling_measure, plot_weight_stability, plot_cv_scores,
+       plot_turnover, plot_prior, plot_factor_mu, plot_benchmark, plot_coskewness,
+       plot_cokurtosis, plot_portfolio_dashboard, plot_cv_dashboard,
+       plot_efficient_frontier, plot_performance_summary, plot_rolling_drawdowns,
+       plot_cs_regression_r2, plot_cs_regression_adjusted_r2, plot_cs_regression_aic,
+       plot_cs_regression_bic, plot_cs_regression_t_stats,
+       plot_cs_regression_t_stat_exceedance_rate, plot_attribution_vol_contrib,
+       plot_attribution_mu_contrib, plot_attribution_exposure, plot_attribution_mu_vs_vol,
+       plot_exposure_vif, plot_exposure_condition_number, plot_exposure_correlation,
+       plot_cumulative_exposure_ic, plot_exposure_distribution, plot_exposure_dispersion,
+       plot_exposure_stability, plot_idio_calibration, plot_idio_tail_rate,
+       plot_idio_kurtosis, plot_idio_skewness, plot_idio_vol_ic,
        plot_idio_vol_residual_dependence, plot_factor_model_summary,
        plot_factor_forecast_correlation, plot_factor_forecast_volatilities,
        plot_factor_cumulative_returns, plot_forecast_cumulative_ic,

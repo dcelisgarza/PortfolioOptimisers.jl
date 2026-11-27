@@ -82,3 +82,11 @@ in a grilling session on 2026-11-23 (#2147).
 - The section `# Interfaces` of `AbstractConcentrationAlgorithm` tells an implementer to call
   `state_set!`, `mip_key` and `declare_mip_gate!` on a `ConcentrationMIPSpace`, so the four names
   are `public` (ADR 0154).
+
+## Amendment (2026-11-25): the short reading
+
+The family gains `ShortPosition()`, the size of the short part, `sw`, with the sign of `sbgt` (#2297,
+decided on #2290). A long-only model has no short part, so the gross, net and long readings are the
+weights there and the short reading is zero. The builder calls `long_only_reading` for that case. A
+reading of a user gets the weights as the long part and zeros as the short part, where it got the
+weights before. `PositionConstraint` reads the same family, see the amendment of ADR 0047.

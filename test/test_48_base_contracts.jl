@@ -40,6 +40,11 @@ struct PSAllNothing
     a::Nothing
     b::Nothing
 end
+# A parametric type whose every field is hidden prints its wrapper name, with no parameter.
+struct PSParamNothing{T}
+    a::T
+end
+@define_pretty_show(PSParamNothing)
 struct PSParent
     child::PSAllNothing
 end
@@ -208,6 +213,8 @@ end
     # A type whose every field is `nothing` still renders its name, with no empty body. As
     # the last field of a parent it prints on one line, so the parent's connector is `┴`.
     @test shown(PSAllNothing(nothing, nothing)) == "$(ALL)()\n"
+    @test shown(PSParamNothing(nothing)) == "$(string(PSParamNothing))()\n"
+    @test !occursin("{", shown(PSParamNothing(nothing)))
     @test shown(PSParent(PSAllNothing(nothing, nothing))) ==
           join(["$(PARENT)", "  child ┴ $(ALL)()", ""], '\n')
     pe.with_show_nothing_fields(true) do

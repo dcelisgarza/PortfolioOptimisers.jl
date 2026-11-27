@@ -134,8 +134,10 @@ end
 function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator, X::MatNum,
                                              nx::AbstractVector = 1:size(X, 2);
                                              N::Option{<:Number} = nothing,
-                                             percentage::Bool = true, kwargs...)
-    plr = centrality_vector(cte, X)
+                                             percentage::Bool = true, pr = nothing,
+                                             rd::Option{<:ReturnsResult} = nothing,
+                                             kwargs...)
+    plr = centrality_vector(cte, X; pr = pr, rd = rd)
     scores = plr.X
     M = length(scores)
     N, idx = relevant_assets(scores, M, N)
@@ -152,10 +154,13 @@ function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator,
                                              pr::PortfolioOptimisers.AbstractPriorResult,
                                              nx::AbstractVector = 1:size(pr.X, 2);
                                              N::Option{<:Number} = nothing,
-                                             percentage::Bool = true, kwargs...)
+                                             percentage::Bool = true,
+                                             rd::Option{<:ReturnsResult} = nothing,
+                                             kwargs...)
     pr_i, nx_i = investable_plot_view(pr, nx)
     return PortfolioOptimisers.plot_centrality(cte, pr_i.X, nx_i; N = N,
-                                               percentage = percentage, kwargs...)
+                                               percentage = percentage, pr = pr_i,
+                                               rd = plot_returns_data(pr, rd), kwargs...)
 end
 function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator,
                                              rd::ReturnsResult;
@@ -163,7 +168,8 @@ function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator,
                                              percentage::Bool = true, kwargs...)
     nx = isnothing(rd.nx) ? (1:size(rd.X, 2)) : rd.nx
     return PortfolioOptimisers.plot_centrality(cte, rd.X, nx; N = N,
-                                               percentage = percentage, kwargs...)
+                                               percentage = percentage, pr = rd, rd = rd,
+                                               kwargs...)
 end
 function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator,
                                              res::OptimisationResult, rd::ReturnsResult;
@@ -171,5 +177,6 @@ function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator,
                                              percentage::Bool = true, kwargs...)
     nx = isnothing(rd.nx) ? (1:length(res.w)) : rd.nx
     return PortfolioOptimisers.plot_centrality(cte, rd.X, nx; N = N,
-                                               percentage = percentage, kwargs...)
+                                               percentage = percentage, pr = rd, rd = rd,
+                                               kwargs...)
 end

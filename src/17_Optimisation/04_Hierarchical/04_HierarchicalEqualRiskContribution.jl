@@ -12,7 +12,8 @@ The constructor's substitution check and [`time_dependent_field_defaults`](@ref)
   - [`assert_time_dependent_substitution`](@ref)
 """
 function herc_td_defaults()::NamedTuple
-    return (; ri = Variance(), ro = Variance(), scai = nothing, scao = nothing)
+    return (; cle = ClustersEstimator(), ri = Variance(), ro = Variance(), scai = nothing,
+            scao = nothing)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -64,6 +65,7 @@ $(DocStringExtensions.FIELDS)
 
     HierarchicalEqualRiskContribution(;
         opt::HierarchicalOptimiser = HierarchicalOptimiser(),
+        cle::TD{<:HClE_HCl} = ClustersEstimator(),
         ri::TD{<:OptRM_VecOptRM} = Variance(),
         ro::TD{<:OptRM_VecOptRM} = ri,
         scai::TD_Option{<:Scalariser} = nothing,
@@ -72,7 +74,7 @@ $(DocStringExtensions.FIELDS)
         fb::TDO_Option{<:OptE_Opt} = nothing
     ) -> HierarchicalEqualRiskContribution
 
-Keywords correspond to the struct's fields. Fields typed [`TD`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value. The inner and outer risk measures, their scalarisers and the fallback are problem definition, so a cross-validation fold loop resolves them per fold. A fold-less `optimise` runs with each at its static default, which is `nothing` for `fb`. The executor `ex` is execution control and stays static.
+Keywords correspond to the struct's fields. Fields typed [`TD`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value. The clustering, the inner and outer risk measures, their scalarisers and the fallback are problem definition, so a cross-validation fold loop resolves them per fold. A fold-less `optimise` runs with each at its static default, which is `nothing` for `fb`. The executor `ex` is execution control and stays static.
 
 ## Validation
 
@@ -100,7 +102,13 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref) or [`TDO_O
   - `ri`, `ro` and `opt` recurse through [`port_opt_view`](@ref) with that matrix.
   - When `ri` and `ro` are the same object, the method views it once and gives the view to both fields, so the two fields stay one object on the subset.
   - `fb` recurses through [`view_child`](@ref) with that matrix.
-  - `scai`, `scao` and `ex` stay unchanged.
+  - `cle`, `scai`, `scao` and `ex` stay unchanged. A clustering estimator fits again on the view, and a precomputed clustering is used as it is.
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `cle`: Recursively indexed through [`obs_weights_view`](@ref).
 
 # Examples
 
@@ -131,39 +139,6 @@ HierarchicalEqualRiskContribution
        │          │      horizon ┼ nothing
        │          │   fill_limit ┼ nothing
        │          │        x_src ┴ nothing
-       │      cle ┼ ClustersEstimator
-       │          │      ce ┼ PortfolioOptimisersCovariance
-       │          │         │   ce ┼ Covariance
-       │          │         │      │    me ┼ SimpleExpectedReturns
-       │          │         │      │       │   w ┴ nothing
-       │          │         │      │    ce ┼ GeneralCovariance
-       │          │         │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-       │          │         │      │       │    w ┴ nothing
-       │          │         │      │   alg ┼ FullMoment()
-       │          │         │      │     w ┴ nothing
-       │          │         │   mp ┼ MatrixProcessing
-       │          │         │      │     pdm ┼ Posdef
-       │          │         │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-       │          │         │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-       │          │         │      │      dn ┼ nothing
-       │          │         │      │      dt ┼ nothing
-       │          │         │      │     alg ┼ nothing
-       │          │         │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-       │          │      de ┼ Distance
-       │          │         │   power ┼ nothing
-       │          │         │     alg ┴ CanonicalDistance()
-       │          │     alg ┼ HClustAlgorithm
-       │          │         │   linkage ┴ Symbol: :ward
-       │          │     onc ┼ OptimalNumberClusters
-       │          │         │   max_k ┼ nothing
-       │          │         │     alg ┼ SecondOrderDifference
-       │          │         │         │   alg ┼ StandardisedValue
-       │          │         │         │       │   mv ┼ MeanValue
-       │          │         │         │       │      │   w ┴ nothing
-       │          │         │         │       │   sv ┼ StdValue
-       │          │         │         │       │      │           w ┼ nothing
-       │          │         │         │       │      │   corrected ┴ Bool: true
-       │          │   x_src ┴ nothing
        │      slv ┼ nothing
        │       wb ┼ WeightBounds
        │          │   lb ┼ Float64: 0.0
@@ -173,6 +148,41 @@ HierarchicalEqualRiskContribution
        │       wf ┼ IterativeWeightFinaliser
        │          │   iter ┴ Int64: 100
        │   strict ┴ Bool: false
+   cle ┼ ClustersEstimator
+       │      ce ┼ PortfolioOptimisersCovariance
+       │         │   ce ┼ Covariance
+       │         │      │    me ┼ SimpleExpectedReturns
+       │         │      │       │   w ┴ nothing
+       │         │      │    ce ┼ GeneralCovariance
+       │         │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+       │         │      │       │    w ┴ nothing
+       │         │      │   alg ┼ FullMoment()
+       │         │      │     w ┴ nothing
+       │         │   mp ┼ MatrixProcessing
+       │         │      │     pdm ┼ Posdef
+       │         │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+       │         │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+       │         │      │      dn ┼ nothing
+       │         │      │      dt ┼ nothing
+       │         │      │     alg ┼ nothing
+       │         │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+       │      de ┼ Distance
+       │         │   power ┼ nothing
+       │         │     alg ┴ CanonicalDistance()
+       │     alg ┼ HClustAlgorithm
+       │         │       linkage ┼ WardLinkage
+       │         │               │   presquared ┴ Bool: false
+       │         │   branchorder ┴ OptimalLeafOrder()
+       │     onc ┼ OptimalNumberClusters
+       │         │   max_k ┼ nothing
+       │         │     alg ┼ SecondOrderDifference
+       │         │         │   alg ┼ StandardisedValue
+       │         │         │       │   mv ┼ MeanValue
+       │         │         │       │      │   w ┴ nothing
+       │         │         │       │   sv ┼ StdValue
+       │         │         │       │      │           w ┼ nothing
+       │         │         │       │      │   corrected ┴ Bool: true
+       │   x_src ┴ nothing
     ri ┼ Variance
        │    settings ┼ RiskMeasureSettings
        │             │   scale ┼ Float64: 1.0
@@ -229,6 +239,10 @@ HierarchicalEqualRiskContribution
     """
     @fprop opt
     """
+    $(field_dict[:cle])
+    """
+    @oprop cle
+    """
     $(field_dict[:ri])
     """
     @fprop ri
@@ -253,6 +267,7 @@ HierarchicalEqualRiskContribution
     """
     @fprop fb
     function HierarchicalEqualRiskContribution(opt::HierarchicalOptimiser,
+                                               cle::TD{<:HClE_HCl},
                                                ri::TD{<:OptRM_VecOptRM},
                                                ro::TD{<:OptRM_VecOptRM},
                                                scai::TD_Option{<:Scalariser},
@@ -270,27 +285,29 @@ HierarchicalEqualRiskContribution
         assert_risk_measure_required(ri, :HierarchicalEqualRiskContribution)
         assert_risk_measure_required(ro, :HierarchicalEqualRiskContribution)
         assert_time_dependent_substitution(HierarchicalEqualRiskContribution,
-                                           (; opt, ri, ro, scai, scao, ex, fb),
+                                           (; opt, cle, ri, ro, scai, scao, ex, fb),
                                            herc_td_defaults())
         assert_data_benchmark_prior(ri, opt.pe, :ri, :HierarchicalEqualRiskContribution,
                                     "opt.pe")
         assert_data_benchmark_prior(ro, opt.pe, :ro, :HierarchicalEqualRiskContribution,
                                     "opt.pe")
-        est = new{typeof(opt), typeof(ri), typeof(ro), typeof(scai), typeof(scao),
-                  typeof(ex), typeof(fb)}(opt, ri, ro, scai, scao, ex, fb)
+        est = new{typeof(opt), typeof(cle), typeof(ri), typeof(ro), typeof(scai),
+                  typeof(scao), typeof(ex), typeof(fb)}(opt, cle, ri, ro, scai, scao, ex,
+                                                        fb)
         warn_raw_readers(est)
         return est
     end
 end
 function HierarchicalEqualRiskContribution(;
                                            opt::HierarchicalOptimiser = HierarchicalOptimiser(),
+                                           cle::TD{<:HClE_HCl} = ClustersEstimator(),
                                            ri::TD{<:OptRM_VecOptRM} = Variance(),
                                            ro::TD{<:OptRM_VecOptRM} = ri,
                                            scai::TD_Option{<:Scalariser} = nothing,
                                            scao::TD_Option{<:Scalariser} = scai,
                                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                                            fb::TDO_Option{<:OptE_Opt} = nothing)::HierarchicalEqualRiskContribution
-    return HierarchicalEqualRiskContribution(opt, ri, ro, scai, scao, ex, fb)
+    return HierarchicalEqualRiskContribution(opt, cle, ri, ro, scai, scao, ex, fb)
 end
 function time_dependent_field_defaults(::HierarchicalEqualRiskContribution)::NamedTuple
     return herc_td_defaults()
@@ -339,8 +356,8 @@ function port_opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum,
         ro = port_opt_view(ro, i, X)
     end
     opt = port_opt_view(hec.opt, i, X)
-    return HierarchicalEqualRiskContribution(; ri = ri, ro = ro, opt = opt, scai = hec.scai,
-                                             scao = hec.scao, ex = hec.ex,
+    return HierarchicalEqualRiskContribution(; ri = ri, ro = ro, opt = opt, cle = hec.cle,
+                                             scai = hec.scai, scao = hec.scao, ex = hec.ex,
                                              fb = view_child(hec.fb, i, X))
 end
 """
@@ -614,9 +631,9 @@ Run the Hierarchical Equal Risk Contribution optimisation.
  3. Find the Investable Mask `imsk` of `pr`. Resolve the fees `fees` on the full universe, and place them on the assets of `imsk`.
  4. Remove the two liquidation charges, `lq` and `flq`, from `fees`, giving `cfees`, the fees that the risks read.
  5. Reduce `pr`, `hec` and `rd` to the assets of `imsk`, with [`investable_reduction`](@ref). `X` is the returns matrix of the reduced `pr`, and `N` its number of assets.
- 6. Cluster the assets with `opt.cle`, giving `clr`, and cut its dendrogram into `clr.k` clusters, giving `cls`, the asset indices of each cluster.
+ 6. Cluster the assets with `cle`, giving `clr`, and cut its dendrogram into `clr.k` clusters, giving `cls`, the asset indices of each cluster.
  7. Compute the shares `w` and the cluster risks `rkcl` with [`herc_risk`](@ref).
- 8. Build the nodes `nd` of the dendrogram with [`to_tree`](@ref). The cut does the first `N - clr.k` merges in the order of their heights, as `Clustering.cutree` does, so the other `clr.k - 1` merges are the nodes above the cut.
+ 8. Build the nodes `nd` of the dendrogram with [`to_tree`](@ref). The cut does the first `N - clr.k` merges of [`cophenetic_order`](@ref), as [`cut_dendrogram`](@ref) does, so the other `clr.k - 1` merges are the nodes above the cut, also on a tree with an inversion.
  9. For each node above the cut, read the assets `ln` and `rn` of its two branches, and the clusters `lc` and `rc` inside them.
 10. Form the split factor `alpha` from the risks of `lc` and `rc`. Multiply `w[ln]` by `alpha` and `w[rn]` by `1 - alpha`.
 11. Resolve the weight bounds `wb` from `opt.wb` and `opt.sets`. Divide `w` by its sum, and apply the weight finaliser `opt.wf` with [`finalise_weight_bounds`](@ref), giving `retcode` and the final `w`.
@@ -626,7 +643,6 @@ Run the Hierarchical Equal Risk Contribution optimisation.
 
   - `hec`: The hierarchical equal risk contribution optimiser to use.
   - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, a standalone optimisation does not need `rd`, but a fallback or the clustering can need it.
-  - `branchorder`: The branch order of the clustering. The weights do not depend on the order of the leaves, so a faster order that is not optimal gives the same weights. When `opt.cle` holds a clustering result, the order has no effect.
   - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
   - `kwargs`: Keyword arguments that the method accepts and does not read.
 
@@ -637,8 +653,8 @@ Run the Hierarchical Equal Risk Contribution optimisation.
   - [`optimise`](@ref)
 """
 function _optimise(hec::HierarchicalEqualRiskContribution,
-                   rd::ReturnsResult = ReturnsResult(); branchorder::Symbol = :optimal,
-                   rmsk::Option{BitVector} = nothing, kwargs...)
+                   rd::ReturnsResult = ReturnsResult(); rmsk::Option{BitVector} = nothing,
+                   kwargs...)
     hec = reset_time_dependent_estimator(hec)
     pr = prior(hec.opt.pe, rd)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
@@ -653,7 +669,7 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     # A fit again after a refusal of the distance reader passes its mask as `rmsk`.
-    imsk = distance_reader_entry_mask(hec.opt.cle, pr, rd, hec.opt.strict; rmsk = rmsk)
+    imsk = distance_reader_entry_mask(hec.cle, pr, rd, hec.opt.strict; rmsk = rmsk)
     fees = investable_fees_view(fees_constraints(hec.opt.fees, hec.opt.sets;
                                                  strict = hec.opt.strict, datatype = T),
                                 imsk, pr.X)
@@ -673,12 +689,11 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     N = size(X, 2)
     # A distance reader that refuses an asset the prior kept raises before it clusters. Fit
     # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
-    clr = distance_reader_call(clusterise, hec.opt.cle, pr; rd = rd, iv = rd.iv,
-                               ivpa = rd.ivpa, branchorder = branchorder)
+    clr = distance_reader_call(clusterise, hec.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa)
     if clr isa DistanceReaderRefusalError
         return _optimise(rebuild_struct(hec0,
                                         (; opt = rebuild_struct(hec0.opt, (; pe = pr0)))),
-                         rd0; branchorder = branchorder,
+                         rd0;
                          rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
                                                              hec0.opt.strict), kwargs...)
     end
@@ -687,13 +702,13 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     w, rkcl, ri, ro = herc_risk(hec, pr, cls, cfees)
     nd = to_tree(clr.res)[2]
-    # `Clustering.cutree` does the first `N - k` merges in the order of `sortperm` of the
-    # heights, so the last `k - 1` merges of that order are the nodes above the cut. A sort
-    # of the nodes by height alone picks a node inside a cluster when two heights tie at
-    # the cut, and the split factor of that node is `0 / 0`.
+    # `cut_dendrogram` does the first `N - k` merges of `cophenetic_order`, so the last
+    # `k - 1` merges of that order are the nodes above the cut. A sort of the nodes by height
+    # alone picks a node inside a cluster when two heights tie at the cut, or below an
+    # inversion, and the split factor of that node is `0 / 0`.
     lc = Vector{Int}(undef, 0)
     rc = Vector{Int}(undef, 0)
-    for j in view(sortperm(clr.res.heights), (N - clr.k + 1):(N - 1))
+    for j in view(cophenetic_order(clr.res), (N - clr.k + 1):(N - 1))
         node = nd[N + j]
         ln = pre_order(node.left)
         rn = pre_order(node.right)
@@ -717,14 +732,14 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     retcode, w = finalise_weight_bounds(hec.opt.wf, wb, w / sum(w))
     return HierarchicalEqualRiskContributionResult(;
                                                    hr = HierarchicalResult(; pr = pr,
-                                                                           clr = clr,
                                                                            wb = wb,
                                                                            fees = fees,
                                                                            retcode = retcode,
                                                                            w = w,
                                                                            imsk = imsk),
-                                                   ri = ri, ro = ro, scai = hec.scai,
-                                                   scao = hec.scao, fb = nothing)
+                                                   clr = clr, ri = ri, ro = ro,
+                                                   scai = hec.scai, scao = hec.scao,
+                                                   fb = nothing)
 end
 
 export HierarchicalEqualRiskContribution

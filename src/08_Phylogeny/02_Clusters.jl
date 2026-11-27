@@ -297,7 +297,7 @@ The three definitions can select three different counts. On the sample `randn(St
 
 # Algorithm
 
-[`optimal_number_clusters`](@ref) does these steps on both branches. Its methods are in `03_Hierarchical.jl` and in `04_NonHierarchicalClustering.jl`.
+[`optimal_number_clusters`](@ref) does these steps on both branches. Its methods are in `03_Hierarchical_a.jl` and in `04_NonHierarchicalClustering.jl`.
 
  1. Take the ceiling `min(floor(Int, sqrt(N)), max_k)` from the [`OptimalNumberClusters`](@ref) that holds the score. Add ``2`` to it and cap the sum at ``N``. The result is `c1`, the number of candidate counts. The difference at ``c`` also reads the dispersions at ``c + 1`` and ``c + 2``, so the method builds two more counts.
  2. Cluster the universe at every count from ``1`` to `c1`. The cuts are `cluster_lvls`.
@@ -409,7 +409,7 @@ The reduction runs over one vector of length ``N``, not over one cluster at a ti
 
 # Algorithm
 
-[`optimal_number_clusters`](@ref) does these steps on both branches. Its methods are in `03_Hierarchical.jl` and in `04_NonHierarchicalClustering.jl`.
+[`optimal_number_clusters`](@ref) does these steps on both branches. Its methods are in `03_Hierarchical_a.jl` and in `04_NonHierarchicalClustering.jl`.
 
  1. Take the ceiling `min(floor(Int, sqrt(N)), max_k)` from the [`OptimalNumberClusters`](@ref) that holds the score. The result is `c1`, the largest candidate count. The score at ``c`` reads only the cut at ``c``, so the method builds no count above the ceiling.
  2. Cluster the universe at every count from ``1`` to `c1`. The cuts are `cluster_lvls`.
@@ -576,21 +576,449 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for all rules that flip the merges of a dendrogram to order its leaves.
+
+A flip of the two children of a merge keeps the tree and reverses the leaves below that merge. So one tree permits ``2^{N-1}`` leaf orders, and a member of this family picks one of them. The `branchorder` field of [`HClustAlgorithm`](@ref) and of [`DBHT`](@ref) holds a member. `nothing` in that field skips the flip step and gives the tree order, see [`order_branches!`](@ref).
+
+The leaf order is an input of recursive bisection, so it changes the weights of [`HierarchicalRiskParity`](@ref) and [`SchurComplementHierarchicalRiskParity`](@ref). The weights of [`HierarchicalEqualRiskContribution`](@ref) and of [`NestedClustered`](@ref) do not read it, so for them the branch order is a dial of cost alone.
+
+# Interfaces
+
+To add a rule, subtype `AbstractBranchOrder` and implement this method:
+
+## `order_branches!`
+
+  - `order_branches!(hmer::Clustering.HclustMerges, D::MatNum, bo::MyBranchOrder) -> Clustering.HclustMerges`: Flip the merges of `hmer` in place. The method can also reorder the merges, if it renumbers the children that point to them. The clustering of [`HClustAlgorithm`](@ref) and of [`DBHT`](@ref) then reads the leaf order from the merges.
+
+### Arguments
+
+  - `hmer`: The merges, in the form of `Clustering.HclustMerges`. An entry `-i` is the leaf `i`, a positive entry `v` is the merge `v`, and a merge comes after its children.
+  - `D`: The distance matrix of the leaves.
+  - `bo`: The instance of the subtype.
+
+### Returns
+
+  - `hmer::Clustering.HclustMerges`: The same merges, flipped.
+
+# Related
+
+  - [`OptimalLeafOrder`](@ref)
+  - [`BarJosephOrder`](@ref)
+  - [`ROrder`](@ref)
+  - [`order_branches!`](@ref)
+  - [`HClustAlgorithm`](@ref)
+  - [`DBHT`](@ref)
+"""
+abstract type AbstractBranchOrder <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Orders the leaves of a dendrogram so that the sum of the distances between adjacent leaves is the least that the tree permits.
+
+[`order_branches!`](@ref) solves the problem exactly with [`optimal_leaf_order!`](@ref), in ``O(N^3)`` time. This is the default branch order of [`HClustAlgorithm`](@ref) and [`DBHT`](@ref).
+
+# Related
+
+  - [`AbstractBranchOrder`](@ref)
+  - [`BarJosephOrder`](@ref)
+  - [`ROrder`](@ref)
+  - [`optimal_leaf_order!`](@ref)
+
+# References
+
+  - $(ref_dict[:barjoseph2001]) Sections "Problem definition" and "Algorithm".
+"""
+struct OptimalLeafOrder <: AbstractBranchOrder end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Orders the leaves of a dendrogram with the heuristic `Clustering.orderbranches_barjoseph!`.
+
+The heuristic decides each merge once, from the four outermost leaves of its two children. It is faster than [`OptimalLeafOrder`](@ref), and it can miss the least sum of the distances between adjacent leaves. Under the linkage `:ward`, `Clustering.hclust` runs the heuristic on the squares of the distances.
+
+# Related
+
+  - [`AbstractBranchOrder`](@ref)
+  - [`OptimalLeafOrder`](@ref)
+  - [`ROrder`](@ref)
+
+# References
+
+  - $(ref_dict[:barjoseph2001]) Section "Algorithm".
+"""
+struct BarJosephOrder <: AbstractBranchOrder end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Orders the merges of a dendrogram by their cophenetic height, and flips each merge to the order of the R function `hclust`.
+
+The flip rule puts a leaf before a merge. Of two leaves, the lower index comes first, and of two merges, the lower one comes first. This is the rule of the tree order, `nothing`, of [`HClustAlgorithm`](@ref), so for that algorithm the two give the same leaf order. [`tree_order!`](@ref) flips the merges of `Clustering.hclust` by this rule. The kernel of [`AbstractLinkage`](@ref) makes its merges in the order of their cophenetic heights, so its older child is the lower child.
+
+For [`DBHT`](@ref), the two can give different leaf orders. The tree order keeps the order and the orientation of the merges that [`HierarchyConstruct4s`](@ref) built. That function can build a merge before a lower merge. When the two are the children of one merge, this type puts the lower one first, and the tree order can put it second.
+
+This type also sorts the merges by their [`cophenetic_heights`](@ref), with the earlier merge first in a tie, and the tree order keeps the merges in the order that the tree builder made them. On a tree with no inversion, the cophenetic height is the raw height, and the result is the result of `Clustering.orderbranches_r!`. That function sorts by the raw heights, so on an inversion of [`CentroidLinkage`](@ref) or [`MedianLinkage`](@ref) it would put a parent before its child.
+
+# Related
+
+  - [`AbstractBranchOrder`](@ref)
+  - [`OptimalLeafOrder`](@ref)
+  - [`BarJosephOrder`](@ref)
+"""
+struct ROrder <: AbstractBranchOrder end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype of the linkage criteria of a dendrogram.
+
+A linkage sets the distance between two clusters from the distances between their members. A member of the family goes in the `linkage` field of a [`HClustAlgorithm`](@ref). [`branch_ordered_hclust`](@ref) dispatches on it.
+
+The library has seven members. Four of them run in `Clustering.hclust`, and the member converts to the `Symbol` of that function at the call. Three of them run in the Lance-Williams kernel of the library, because `Clustering.hclust` does not have them.
+
+| Member                    | Other name | Algorithm                                           | Inversion |
+|:------------------------- |:---------- |:--------------------------------------------------- |:--------- |
+| [`SingleLinkage`](@ref)   |            | `Clustering.hclust`                                 | no        |
+| [`CompleteLinkage`](@ref) |            | `Clustering.hclust`                                 | no        |
+| [`AverageLinkage`](@ref)  | UPGMA      | `Clustering.hclust`                                 | no        |
+| [`WardLinkage`](@ref)     |            | `Clustering.hclust`                                 | no        |
+| [`WeightedLinkage`](@ref) | WPGMA      | nearest-neighbour chain, [`nn_chain_merges`](@ref)  | no        |
+| [`CentroidLinkage`](@ref) | UPGMC      | generic algorithm, [`generic_linkage_merges`](@ref) | yes       |
+| [`MedianLinkage`](@ref)   | WPGMC      | generic algorithm, [`generic_linkage_merges`](@ref) | yes       |
+
+# Inversions
+
+A merge has an inversion when its height is less than the height of a merge below it. Section 2.4 of [mullner2011](@cite) shows that only the centroid and the median linkages can make one. On correlation distances of random returns, the centroid tree has an inversion in 97 % or more of the cases at 7 assets, and in all the cases at 10 assets or more. So an inversion is the normal case for these two linkages.
+
+`res.heights` keeps the raw merge heights, as SciPy gives them, so a dendrogram plot shows each inversion. [`cophenetic_heights`](@ref) gives the monotone form. [`cut_dendrogram`](@ref) cuts the tree in the cophenetic order, so a cut into `k` clusters always gives `k` clusters. `Clustering.cutree` replays the merges in the order of the raw heights, and it throws a `BoundsError` on an inversion.
+
+# Interfaces
+
+To implement a new linkage, subtype `AbstractLinkage` and implement the methods below. A [`HClustAlgorithm`](@ref) then clusters with the new member in [`clusterise`](@ref), and every branch order works.
+
+## linkage_symbol
+
+  - `linkage_symbol(linkage::MyLinkage) -> Symbol`: The label that the `linkage` field of the `Clustering.Hclust` holds.
+
+## linkage_merges
+
+  - `linkage_merges(linkage::MyLinkage, D::MatNum) -> Clustering.HclustMerges`: The merges of the dendrogram in the order in which they happen, with the raw heights. A merge comes after its two children, and each row puts its older child first: a leaf before a merge, the lower leaf first, and the earlier merge first.
+
+A member of the Lance-Williams family does not need this method. The default method runs [`generic_linkage_merges`](@ref), which is correct for every update rule. Such a member implements the update rule alone. A reducible member, whose tree has no inversion, can also implement `linkage_merges(linkage::MyLinkage, D::MatNum) = nn_chain_merges(linkage, D)`, which is faster and gives the same tree. [`WeightedLinkage`](@ref) does.
+
+## lance_williams_update
+
+  - `lance_williams_update(linkage::MyLinkage, dxi, dyi, dxy, nx::Integer, ny::Integer, ni::Integer)`: The distance between the cluster `i` and the merge of the clusters `x` and `y`.
+
+### Arguments
+
+  - `dxi`, `dyi`: The distances from `i` to `x` and from `i` to `y`.
+  - `dxy`: The distance between `x` and `y`, which is the height of the merge.
+  - `nx`, `ny`, `ni`: The sizes of the three clusters.
+
+### Returns
+
+  - The new distance, of the type of the distances.
+
+### Examples
+
+```jldoctest
+julia> struct MinimumLinkage <: PortfolioOptimisers.AbstractLinkage end
+
+julia> PortfolioOptimisers.linkage_symbol(::MinimumLinkage) = :minimum;
+
+julia> function PortfolioOptimisers.lance_williams_update(::MinimumLinkage, dxi, dyi, args...)
+           return min(dxi, dyi)
+       end;
+
+julia> D = [0.0 1.0 4.0; 1.0 0.0 2.0; 4.0 2.0 0.0];
+
+julia> PortfolioOptimisers.branch_ordered_hclust(D, MinimumLinkage(), nothing).heights
+2-element Vector{Float64}:
+ 1.0
+ 2.0
+```
+
+# Related
+
+  - [`HClustAlgorithm`](@ref)
+  - [`SingleLinkage`](@ref)
+  - [`CompleteLinkage`](@ref)
+  - [`AverageLinkage`](@ref)
+  - [`WeightedLinkage`](@ref)
+  - [`CentroidLinkage`](@ref)
+  - [`MedianLinkage`](@ref)
+  - [`WardLinkage`](@ref)
+  - [`cophenetic_heights`](@ref)
+  - [`cut_dendrogram`](@ref)
+
+# References
+
+  - $(ref_dict[:mullner2011]) Figure 2 for the update rules, Sections 2.3 and 2.4 for the inversions. $(ref_dict[:no_original_source])
+"""
+abstract type AbstractLinkage <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The distance between two clusters is the smallest distance between a member of one and a member of the other.
+
+It runs in `Clustering.hclust` under `:single`. Its tree has no inversion.
+
+# Related
+
+  - [`AbstractLinkage`](@ref)
+  - [`HClustAlgorithm`](@ref)
+"""
+struct SingleLinkage <: AbstractLinkage end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The distance between two clusters is the largest distance between a member of one and a member of the other.
+
+It runs in `Clustering.hclust` under `:complete`. Its tree has no inversion.
+
+# Related
+
+  - [`AbstractLinkage`](@ref)
+  - [`HClustAlgorithm`](@ref)
+"""
+struct CompleteLinkage <: AbstractLinkage end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The distance between two clusters is the mean distance over all the pairs with one member in each cluster. Its other name is UPGMA.
+
+It runs in `Clustering.hclust` under `:average`. Its tree has no inversion.
+
+# Related
+
+  - [`AbstractLinkage`](@ref)
+  - [`WeightedLinkage`](@ref)
+  - [`HClustAlgorithm`](@ref)
+"""
+struct AverageLinkage <: AbstractLinkage end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The distance from a cluster to a merge is the mean of its distances to the two clusters of the merge. Its other name is WPGMA.
+
+Each of the two clusters gets the weight one half, whatever its size, so the distance depends on the order of the merges. [`AverageLinkage`](@ref) weights each cluster by its size.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+d(I \\cup J, K) &= \\frac{d(I, K) + d(J, K)}{2}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``I``, ``J``: the two clusters of the merge.
+  - ``K``: any other cluster.
+
+# Algorithm
+
+The linkage is reducible, so [`nn_chain_merges`](@ref) builds the tree in ``O(N^2)`` time. The tree has no inversion. The kernel is a port of the `weighted` method of `scipy.cluster.hierarchy.linkage`, so the merges, their order and the rule for a tie are those of SciPy.
+
+# Related
+
+  - [`AbstractLinkage`](@ref)
+  - [`AverageLinkage`](@ref)
+  - [`HClustAlgorithm`](@ref)
+  - [`nn_chain_merges`](@ref)
+
+# References
+
+  - $(ref_dict[:mullner2011]) Figure 2 for the update rule, Figure 4 for the algorithm. $(ref_dict[:no_original_source])
+  - $(ref_dict[:virtanen2020]) The kernel ports the `weighted` method of `scipy.cluster.hierarchy.linkage`, which that work names and does not describe.
+"""
+struct WeightedLinkage <: AbstractLinkage end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The distance between two clusters is the distance between their centroids. Its other name is UPGMC.
+
+The update rule holds for a Euclidean distance between points. The library does not check that the distance is Euclidean, as SciPy does not. The distances of the library from a correlation, such as `sqrt((1 - ρ) / 2)`, are Euclidean.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+d^2(I \\cup J, K) &= \\frac{n_I d^2(I, K) + n_J d^2(J, K)}{n_I + n_J} - \\frac{n_I n_J d^2(I, J)}{(n_I + n_J)^2}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``I``, ``J``: the two clusters of the merge.
+  - ``K``: any other cluster.
+  - ``n_I``, ``n_J``: the sizes of ``I`` and ``J``.
+
+The kernel squares the distances inside the rule and takes the root of the result. A negative result, which only a distance that is not Euclidean can give, becomes zero. SciPy gives a `NaN` there.
+
+# Algorithm
+
+The linkage is not reducible, so [`generic_linkage_merges`](@ref) builds the tree. The tree can have an inversion, see [`AbstractLinkage`](@ref). The kernel is a port of the `centroid` method of `scipy.cluster.hierarchy.linkage`, so the merges, their order and the rule for a tie are those of SciPy.
+
+# Related
+
+  - [`AbstractLinkage`](@ref)
+  - [`MedianLinkage`](@ref)
+  - [`HClustAlgorithm`](@ref)
+  - [`generic_linkage_merges`](@ref)
+  - [`cophenetic_heights`](@ref)
+
+# References
+
+  - $(ref_dict[:mullner2011]) Figure 2 for the update rule, Figure 3 for the algorithm. $(ref_dict[:no_original_source])
+  - $(ref_dict[:virtanen2020]) The kernel ports the `centroid` method of `scipy.cluster.hierarchy.linkage`, which that work names and does not describe.
+"""
+struct CentroidLinkage <: AbstractLinkage end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The distance between two clusters is the distance between their medians. The median of a merge is the midpoint of the medians of its two clusters. Its other name is WPGMC.
+
+The update rule holds for a Euclidean distance between points. The library does not check that the distance is Euclidean, as SciPy does not.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+d^2(I \\cup J, K) &= \\frac{d^2(I, K) + d^2(J, K)}{2} - \\frac{d^2(I, J)}{4}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``I``, ``J``: the two clusters of the merge.
+  - ``K``: any other cluster.
+
+The kernel squares the distances inside the rule and takes the root of the result. A negative result, which only a distance that is not Euclidean can give, becomes zero. SciPy gives a `NaN` there.
+
+# Algorithm
+
+The linkage is not reducible, so [`generic_linkage_merges`](@ref) builds the tree. The tree can have an inversion, see [`AbstractLinkage`](@ref). The kernel is a port of the `median` method of `scipy.cluster.hierarchy.linkage`, so the merges, their order and the rule for a tie are those of SciPy.
+
+# Related
+
+  - [`AbstractLinkage`](@ref)
+  - [`CentroidLinkage`](@ref)
+  - [`HClustAlgorithm`](@ref)
+  - [`generic_linkage_merges`](@ref)
+  - [`cophenetic_heights`](@ref)
+
+# References
+
+  - $(ref_dict[:mullner2011]) Figure 2 for the update rule, Figure 3 for the algorithm. $(ref_dict[:no_original_source])
+  - $(ref_dict[:virtanen2020]) The kernel ports the `median` method of `scipy.cluster.hierarchy.linkage`, which that work names and does not describe.
+"""
+struct MedianLinkage <: AbstractLinkage end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Merges the pair of clusters that increases the total within-cluster variance least.
+
+It runs in `Clustering.hclust`. The formulas hold for Euclidean distances between points. `Clustering.hclust` squares the distances, applies the update to the squares, and takes the square root of the merge heights. This is the form of Figure 2 of [mullner2011](@cite). Equation 12.12 of [cajas2025](@cite) prints the same update without the squares. Its tree has no inversion.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    WardLinkage(;
+        presquared::Bool = false
+    ) -> WardLinkage
+
+Keywords correspond to the struct's fields.
+
+# Examples
+
+```jldoctest
+julia> WardLinkage()
+WardLinkage
+  presquared ┴ Bool: false
+```
+
+# Related
+
+  - [`AbstractLinkage`](@ref)
+  - [`HClustAlgorithm`](@ref)
+
+# References
+
+  - $(ref_dict[:mullner2011]) Figure 2. $(ref_dict[:no_original_source])
+"""
+@concrete struct WardLinkage <: AbstractLinkage
+    """
+    `true` when the distance matrix already holds squared distances. Then `Clustering.hclust` runs `:ward_presquared`, which applies the update to the matrix as it is and takes no root of the heights. `false` runs `:ward`.
+    """
+    presquared
+    function WardLinkage(presquared::Bool)
+        return new{typeof(presquared)}(presquared)
+    end
+end
+function WardLinkage(; presquared::Bool = false)::WardLinkage
+    return WardLinkage(presquared)
+end
+"""
+    linkage_symbol(linkage::AbstractLinkage)
+
+Give the label of a linkage, which the `linkage` field of a `Clustering.Hclust` holds.
+
+For the members that run in `Clustering.hclust`, the label is the `Symbol` of that function. For the members of the kernel of the library, it is the name of the method of SciPy.
+
+# Arguments
+
+  - `linkage`: The linkage.
+
+# Returns
+
+  - `label::Symbol`: `:single`, `:complete`, `:average`, `:ward`, `:ward_presquared`, `:weighted`, `:centroid` or `:median`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.linkage_symbol(WardLinkage(; presquared = true))
+:ward_presquared
+```
+
+# Related
+
+  - [`AbstractLinkage`](@ref)
+  - [`branch_ordered_hclust`](@ref)
+"""
+linkage_symbol(::SingleLinkage) = :single
+linkage_symbol(::CompleteLinkage) = :complete
+linkage_symbol(::AverageLinkage) = :average
+linkage_symbol(l::WardLinkage) = l.presquared ? :ward_presquared : :ward
+linkage_symbol(::WeightedLinkage) = :weighted
+linkage_symbol(::CentroidLinkage) = :centroid
+linkage_symbol(::MedianLinkage) = :median
+"""
+    const ClusteringLinkage = Union{SingleLinkage, CompleteLinkage, AverageLinkage,
+                                    WardLinkage}
+
+Alias for the members of [`AbstractLinkage`](@ref) that run in `Clustering.hclust`.
+
+[`branch_ordered_hclust`](@ref) has one method for it, which gives the label of [`linkage_symbol`](@ref) to `Clustering.hclust`. The other members run in the kernel of the library.
+
+# Related
+
+  - [`AbstractLinkage`](@ref)
+  - [`linkage_symbol`](@ref)
+"""
+const ClusteringLinkage = Union{SingleLinkage, CompleteLinkage, AverageLinkage, WardLinkage}
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Builds a dendrogram that merges the two nearest clusters at each step, until one cluster remains.
 
-`linkage` is the criterion for the distance between two clusters that have more than one asset.
+`linkage` is the criterion for the distance between two clusters that have more than one asset. It is a member of [`AbstractLinkage`](@ref), whose docstring lists the seven members and the algorithm of each.
 
-  - `:single` takes the smallest distance between the members of the two clusters.
-  - `:complete` takes the largest distance between the members of the two clusters.
-  - `:average` takes the mean distance over all pairs with one member in each cluster.
-  - `:ward` merges the pair of clusters that increases the total within-cluster variance least.
-  - `:ward_presquared` is `:ward` for a matrix that holds squared distances.
+Figure 2 of [mullner2011](@cite) states each criterion in two forms. One form updates the distance after a merge, and the other is a closed form over the members.
 
-[`clusterise`](@ref) gives the symbol to `Clustering.hclust` unchanged, so every criterion of that function is available.
-
-Figure 2 of [mullner2011](@cite) states each criterion in two forms. One form updates the distance after a merge, and the other is a closed form over the members. The formulas of `:ward` hold for Euclidean distances between points. `Clustering.hclust` squares the distances for `:ward`, applies the update to the squares, and takes the square root of the merge heights. This is the form of that figure. Equation 12.12 of [cajas2025](@cite) prints the same update without the squares.
-
-[mullner2011](@cite) is a survey. No copy is available of the works that first state the four criteria, or of the work that first states the update that they share.
+[mullner2011](@cite) is a survey. No copy is available of the works that first state the criteria, or of the work that first states the update that they share.
 
 # Fields
 
@@ -599,7 +1027,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     HClustAlgorithm(;
-        linkage::Symbol = :ward
+        linkage::AbstractLinkage = WardLinkage(),
+        branchorder::Option{<:AbstractBranchOrder} = OptimalLeafOrder()
     ) -> HClustAlgorithm
 
 Keywords correspond to the struct's fields.
@@ -607,14 +1036,17 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> HClustAlgorithm(; linkage = :average)
+julia> HClustAlgorithm(; linkage = AverageLinkage())
 HClustAlgorithm
-  linkage ┴ Symbol: :average
+      linkage ┼ AverageLinkage()
+  branchorder ┴ OptimalLeafOrder()
 ```
 
 # Related
 
   - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
+  - [`AbstractLinkage`](@ref)
+  - [`AbstractBranchOrder`](@ref)
   - [`ClustersEstimator`](@ref)
   - [`DBHT`](@ref)
   - [`clusterise`](@ref)
@@ -625,15 +1057,21 @@ HClustAlgorithm
 """
 @concrete struct HClustAlgorithm <: AbstractHierarchicalClusteringAlgorithm
     """
-    Linkage criterion of `Clustering.hclust`, see [`Clustering.jl`](https://juliastats.org/Clustering.jl/stable/hclust.html). The constructor accepts any `Symbol` and checks none, because `Clustering.hclust` owns the set of criteria. `HClustAlgorithm(; linkage = :nonsense)` builds. [`clusterise`](@ref) then throws `ArgumentError: Unsupported cluster linkage nonsense` from `Clustering.hclust`.
+    Linkage criterion, a member of [`AbstractLinkage`](@ref). Its type selects the method of [`branch_ordered_hclust`](@ref), so the keyword constructor refuses a value of another type.
     """
     linkage
-    function HClustAlgorithm(linkage::Symbol)
-        return new{typeof(linkage)}(linkage)
+    """
+    $(field_dict[:branchorder])
+    """
+    branchorder
+    function HClustAlgorithm(linkage::AbstractLinkage,
+                             branchorder::Option{<:AbstractBranchOrder})
+        return new{typeof(linkage), typeof(branchorder)}(linkage, branchorder)
     end
 end
-function HClustAlgorithm(; linkage::Symbol = :ward)::HClustAlgorithm
-    return HClustAlgorithm(linkage)
+function HClustAlgorithm(; linkage::AbstractLinkage = WardLinkage(),
+                         branchorder::Option{<:AbstractBranchOrder} = OptimalLeafOrder())::HClustAlgorithm
+    return HClustAlgorithm(linkage, branchorder)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -707,7 +1145,9 @@ ClustersEstimator
         │   power ┼ nothing
         │     alg ┴ CanonicalDistance()
     alg ┼ HClustAlgorithm
-        │   linkage ┴ Symbol: :ward
+        │       linkage ┼ WardLinkage
+        │               │   presquared ┴ Bool: false
+        │   branchorder ┴ OptimalLeafOrder()
     onc ┼ OptimalNumberClusters
         │   max_k ┼ nothing
         │     alg ┼ SecondOrderDifference
@@ -794,4 +1234,11 @@ Matches an [`AbstractClustersEstimator`](@ref) or an [`AbstractClusteringResult`
 const ClE_Cl = Union{AbstractClustersEstimator, AbstractClusteringResult}
 
 export Clusters, clusterise, SecondOrderDifference, SilhouetteScore, OptimalNumberClusters,
-       HClustAlgorithm, ClustersEstimator
+       HClustAlgorithm, ClustersEstimator, OptimalLeafOrder, BarJosephOrder, ROrder,
+       SingleLinkage, CompleteLinkage, AverageLinkage, WeightedLinkage, CentroidLinkage,
+       MedianLinkage, WardLinkage
+# The abstract type of an Open Family. The verb of its interface is `order_branches!`.
+public AbstractBranchOrder
+# The abstract type and the verbs that its `# Interfaces` section names (ADR 0154).
+public AbstractLinkage, linkage_symbol, linkage_merges, lance_williams_update,
+       generic_linkage_merges, nn_chain_merges

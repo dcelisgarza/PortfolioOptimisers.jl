@@ -808,31 +808,45 @@ end
             @test_throws TypeError JuMPOptimiser(; slv = slv, ret = nothing)
             # `sca` is `TD_Option`: `nothing` is its default and gives the sum (#2069).
             @test isnothing(JuMPOptimiser(; slv = slv).sca)
-            @test_throws TypeError HierarchicalOptimiser(; cle = nothing)
+            @test_throws TypeError HierarchicalRiskParity(; ser = nothing)
+            @test_throws TypeError HierarchicalEqualRiskContribution(; cle = nothing)
             @test_throws TypeError HierarchicalOptimiser(; wf = nothing)
             # The constructor test-substitutes each entry, so a wrongly-typed one throws
             # here rather than mid-backtest.
             @test_throws TypeError JuMPOptimiser(; slv = slv,
                                                  pe = TimeDependent([EmpiricalPrior(), 1.0]))
             hopt = HierarchicalOptimiser(; slv = slv, pe = tdpe, sets = tdsets,
-                                         cle = TimeDependent([ClustersEstimator(),
-                                                              ClustersEstimator(;
-                                                                                alg = HClustAlgorithm(;
-                                                                                                      linkage = :single))]),
                                          wf = TimeDependent([IterativeWeightFinaliser(),
                                                              IterativeWeightFinaliser(;
                                                                                       iter = 7)]))
-            @test PortfolioOptimisers.time_dependent_fields(hopt) == (:pe, :cle, :sets, :wf)
+            @test PortfolioOptimisers.time_dependent_fields(hopt) == (:pe, :sets, :wf)
             h0 = PortfolioOptimisers.reset_time_dependent_estimator(hopt)
             @test h0.pe == EmpiricalPrior()
-            @test h0.cle == ClustersEstimator()
             @test h0.wf == IterativeWeightFinaliser()
             @test isnothing(h0.sets)
             h2 = PortfolioOptimisers.update_time_dependent_estimator(hopt, ctx2)
             @test h2.pe == pe_semi
-            @test h2.cle.alg.linkage == :single
             @test h2.wf.iter == 7
             @test h2.sets === setsB
+            # The seriation of HRP and the clustering of HERC take a schedule too (#2174).
+            single = ClustersEstimator(; alg = HClustAlgorithm(; linkage = SingleLinkage()))
+            hrp = HierarchicalRiskParity(;
+                                         ser = TimeDependent([HierarchicalSeriation(),
+                                                              HierarchicalSeriation(;
+                                                                                    cle = single)]))
+            @test PortfolioOptimisers.time_dependent_fields(hrp) == (:ser,)
+            @test PortfolioOptimisers.reset_time_dependent_estimator(hrp).ser ==
+                  HierarchicalSeriation()
+            @test PortfolioOptimisers.update_time_dependent_estimator(hrp, ctx2).ser.cle.alg.linkage ==
+                  SingleLinkage()
+            hec = HierarchicalEqualRiskContribution(;
+                                                    cle = TimeDependent([ClustersEstimator(),
+                                                                         single]))
+            @test PortfolioOptimisers.time_dependent_fields(hec) == (:cle,)
+            @test PortfolioOptimisers.reset_time_dependent_estimator(hec).cle ==
+                  ClustersEstimator()
+            @test PortfolioOptimisers.update_time_dependent_estimator(hec, ctx2).cle.alg.linkage ==
+                  SingleLinkage()
         end
         @testset "Per-fold prior estimator" begin
             p = cross_val_predict(MeanRisk(; opt = JuMPOptimiser(; slv = slv, pe = tdpe)),
@@ -893,21 +907,23 @@ end
         end
         @testset "Per-fold clustering estimator" begin
             # Under the exact leaf order every linkage gives the same order on fold 1, so the
-            # two estimators are told apart on fold 2, where `:single` and Ward differ by 0.029.
-            single = ClustersEstimator(; alg = HClustAlgorithm(; linkage = :single))
-            tdcle = TimeDependent([ClustersEstimator(), single])
+            # two estimators are told apart on fold 2, where single linkage and Ward differ by
+            # 0.029.
+            single = ClustersEstimator(; alg = HClustAlgorithm(; linkage = SingleLinkage()))
+            tdser = TimeDependent([HierarchicalSeriation(),
+                                   HierarchicalSeriation(; cle = single)])
             p = cross_val_predict(HierarchicalRiskParity(;
                                                          opt = HierarchicalOptimiser(;
-                                                                                     slv = slv,
-                                                                                     cle = tdcle)),
-                                  rd, cvw)
+                                                                                     slv = slv),
+                                                         ser = tdser), rd, cvw)
             p0 = cross_val_predict(HierarchicalRiskParity(;
                                                           opt = HierarchicalOptimiser(;
                                                                                       slv = slv)),
                                    rd, cvw)
             p1 = cross_val_predict(HierarchicalRiskParity(;
                                                           opt = HierarchicalOptimiser(;
-                                                                                      slv = slv,
+                                                                                      slv = slv),
+                                                          ser = HierarchicalSeriation(;
                                                                                       cle = single)),
                                    rd, cvw)
             @test isapprox(p.pred[1].res.w, p0.pred[1].res.w)

@@ -7,7 +7,7 @@
                      allocs::Option{<:AbstractVector} = nothing,
                      sets::Union{Nothing, UniverseSets, AbstractVector} = nothing,
                      taxonomy::AbstractVector{<:AbstractString} = String[],
-                     overview_figures = (), entry_figures = (),
+                     dependency = (), overview_figures = (), entry_figures = (),
                      weight_threshold::Real = 1e-6, kwargs...) -> Report
     portfolio_report(pred::AbstractPredictionResult; name::AbstractString = "Portfolio",
                      group::Option{<:AbstractString} = nothing,
@@ -27,8 +27,9 @@ The overview holds the table of [`DataFrames.DataFrame(ps::PerformanceSummaryRes
  1. **Statistics.** A candidate with one row of the overview gives a table of two columns, the figure and its value. A candidate with many rows gives its rows as a sortable table. A population also gives the distribution of each figure over its paths: the count of finite values, the minimum, the 25 % quantile, the median, the 75 % quantile and the maximum. The distribution describes the columns of the summary, and it adds no statistic.
  2. **Weights.** One table for each member, from [`prediction_weights`](@ref). A single fold gives one column of weights. A path gives one column for each fold, and a population one column for each path, after a `mean` column. The rows are sorted by the absolute value of the first column of weights. A row whose largest absolute weight is less than `weight_threshold` is not shown, and the caption gives the count of such rows.
  3. **Exposure**, when the entry has a [`UniverseSets`](@ref) and `taxonomy` names at least one taxonomy column: the sums of the weights of each group, as `# The Exposure section` states.
- 4. **Allocation**, when the entry has a finite allocation result: the shares, the cost and the realised weight of each asset, with the cash that is left and the fees in the caption. A finite allocation is the allocation of one portfolio. For a path, it is the allocation of the target of the last fold, the portfolio to hold now.
- 5. **Figures**, when `entry_figures` gives one: one figure for each of its pairs, from the prediction.
+ 4. **Dependency exposure**, when `dependency` gives one pair or more: the exposure of the weights to each node of an Exogenous Graph, as `# The Dependency exposure section` states.
+ 5. **Allocation**, when the entry has a finite allocation result: the shares, the cost and the realised weight of each asset, with the cash that is left and the fees in the caption. A finite allocation is the allocation of one portfolio. For a path, it is the allocation of the target of the last fold, the portfolio to hold now.
+ 6. **Figures**, when `entry_figures` gives one: one figure for each of its pairs, from the prediction.
 
 # The Exposure section
 
@@ -38,6 +39,17 @@ A taxonomy column is a key of `sets.dict`, such as `"nx_sector"`, that holds one
   - **Many rows of weights**, a path or a population: one row for each fold of the path or each path of the population, with the column `portfolio` that holds the label of the row, one column of net exposure for each group, and the column `gross`. A group whose label is `portfolio` or `gross` takes the column name of its label with the first suffix `_k`, from `_1` up, that no other column name holds. With a finite allocation of a path, the last row `allocation` sums the realised weights of the allocation.
 
 The allocation is the allocation of the first member, as in the Allocation section. A `NaN` weight gives a `NaN` sum for its group, on both sides.
+
+The section is a case of the Dependency Exposure: the `net` of a group equals `direct` of a [`DependencyExposure`](@ref) with `ShortestHops(; sep = HopCount(1))` on the bipartite graph from each asset to its label. The section stays apart, because it reads a column of the [`UniverseSets`](@ref) that the caller holds.
+
+# The Dependency exposure section
+
+`dependency` is a collection of pairs `title => de` and `title => (G, de)`, with `de` a [`DependencyExposure`](@ref). A pair with a configuration reads the graphs of the folds of the prediction, and a pair with a tuple reads the explicit graph `G`, as the methods of [`dependency_exposure`](@ref) do. The same pairs apply to each entry. Each pair gives one subsection, and each member of the prediction one table in it. Each number comes from [`dependency_exposure`](@ref), so the section computes no statistic other than the distribution.
+
+  - **One row of weights**, a single fold under [`TargetWeights`](@ref): one row for each node with `weight`, `direct`, `indirect`, `total`, `long`, `short` and `gross`, sorted by the absolute value of `total`.
+  - **Many rows of weights**, a path, a population, or [`DriftedWeights`](@ref): one row for each node with `last`, the exposure of the portfolio to hold now, then the count of the finite values, the minimum, the 25 % quantile, the median, the 75 % quantile and the maximum of the net `total` over the rows, sorted by the absolute value of `last`. This is the distribution table of the Statistics section. A population holds no single portfolio, so its table has no `last`, and it is sorted by the absolute value of the median.
+
+A node whose largest absolute `total` and largest `gross` are less than `weight_threshold` is not shown, and the caption gives the count. The full data stays in the [`DependencyExposureResult`](@ref).
 
 # Figures
 
@@ -55,8 +67,9 @@ The allocation is the allocation of the first member, as in the Allocation secti
   - `allocs`, `alloc`: The finite allocation result of each prediction, a [`FiniteAllocationOptimisationResult`](@ref) or `nothing`, or `nothing` for none.
   - `sets`: The [`UniverseSets`](@ref) of every prediction, or the sets of each prediction, a `UniverseSets` or `nothing`, or `nothing` for no Exposure section.
   - `taxonomy`: The names of the taxonomy columns of `sets`, as stated in `# The Exposure section`. An empty vector gives no Exposure section.
+  - `dependency`: The pairs of the section "Dependency exposure", as stated in `# The Dependency exposure section`. An empty collection gives no section.
   - `overview_figures`, `entry_figures`: The figures, as stated in `# Figures`.
-  - `weight_threshold`: The least absolute weight that a row of a weights table shows.
+  - `weight_threshold`: The least absolute weight that a row of a weights table shows, and the least exposure that a node of a table of the section "Dependency exposure" shows.
   - `kwargs...`: The keywords of [`performance_summary`](@ref).
 
 # Validation
@@ -67,10 +80,11 @@ The allocation is the allocation of the first member, as in the Allocation secti
   - A taxonomy column has the length of `sets.dict[sets.xkey]`. Otherwise the function raises a `DimensionMismatch`.
   - The names are unique. Otherwise the function raises an `ArgumentError`.
   - Each element of `overview_figures` and `entry_figures` is a pair whose first part is an `AbstractString`. Otherwise the function raises an `ArgumentError`.
+  - Each element of `dependency` is a pair `title => de` or `title => (G, de)`, with an `AbstractString` title, a [`DependencyExposure`](@ref) `de`, and an [`ExogenousGraph`](@ref) or an [`ExogenousGraphSeries`](@ref) `G`. Otherwise the function raises an `ArgumentError`, through [`report_dependency_pairs`](@ref).
   - `weight_threshold` is finite and not negative. Otherwise the function raises a `DomainError`.
   - The length of the shares of an allocation is the number of assets of the portfolio that it allocates. Otherwise the function raises a `DimensionMismatch`.
   - A population has no allocation, because it holds no single portfolio. Otherwise the function raises an `ArgumentError`.
-  - The rules of [`performance_summary`](@ref).
+  - The rules of [`performance_summary`](@ref), and of [`dependency_exposure`](@ref) for each pair of `dependency`.
 
 # Returns
 
@@ -84,6 +98,7 @@ The allocation is the allocation of the first member, as in the Allocation secti
   - [`prediction_weights`](@ref)
   - [`default_report_figures`](@ref)
   - [`UniverseSets`](@ref)
+  - [`dependency_exposure`](@ref)
 """
 function portfolio_report(preds::AbstractVector{<:AbstractPredictionResult};
                           names::Option{<:AbstractVector{<:AbstractString}} = nothing,
@@ -93,7 +108,7 @@ function portfolio_report(preds::AbstractVector{<:AbstractPredictionResult};
                           allocs::Option{<:AbstractVector} = nothing,
                           sets::Union{Nothing, UniverseSets, AbstractVector} = nothing,
                           taxonomy::AbstractVector{<:AbstractString} = String[],
-                          overview_figures = (), entry_figures = (),
+                          dependency = (), overview_figures = (), entry_figures = (),
                           weight_threshold::Real = 1e-6, kwargs...)::Report
     @argcheck(!isempty(preds),
               IsEmptyError("a report needs at least one prediction, and the vector is empty"))
@@ -112,11 +127,12 @@ function portfolio_report(preds::AbstractVector{<:AbstractPredictionResult};
               ArgumentError("the names of the predictions of a report must be unique, and these names repeat: $(join(repr.(rep), ", "))"))
     ofigs = report_figure_pairs(overview_figures, :overview_figures)
     efigs = report_figure_pairs(entry_figures, :entry_figures)
+    deps = report_dependency_pairs(dependency)
     df = DataFrames.DataFrame(performance_summary(ps; names = nm, kwargs...))
     entries = [ReportEntry(nm[k],
                            entry_sections(ps[k], df[df.name .== nm[k], :],
                                           report_item(allocs, k), weight_threshold, efigs,
-                                          report_item(sets, k), taxonomy);
+                                          report_item(sets, k), taxonomy, deps);
                            group = report_item(groups, k), meta = report_item(meta, k))
                for k in 1:n]
     overview = AbstractReportBlock[ReportTable(overview_table(df, nm, groups);
@@ -277,7 +293,8 @@ end
     entry_sections(pred::AbstractPredictionResult, rows::DataFrames.AbstractDataFrame,
                    alloc, threshold::Real, figs::AbstractVector,
                    sets::Option{<:UniverseSets},
-                   taxonomy::AbstractVector{<:AbstractString}) -> Vector{ReportSection}
+                   taxonomy::AbstractVector{<:AbstractString},
+                   deps::AbstractVector) -> Vector{ReportSection}
 
 The sections of the entry of one prediction, in the order that [`portfolio_report`](@ref) states.
 
@@ -292,28 +309,34 @@ The Allocation section is built before the Exposure section, so the checks of th
   - `figs`: The figures of an entry, from [`report_figure_pairs`](@ref).
   - `sets`: The [`UniverseSets`](@ref) of the prediction, or `nothing`.
   - `taxonomy`: The names of the taxonomy columns of `sets`.
+  - `deps`: The pairs of the section "Dependency exposure", from [`report_dependency_pairs`](@ref).
 
 # Returns
 
-  - `sections::Vector{ReportSection}`: Statistics, Weights, then Exposure, Allocation and Figures when the entry has them.
+  - `sections::Vector{ReportSection}`: Statistics, Weights, then Exposure, Dependency exposure, Allocation and Figures when the entry has them.
 
 # Related
 
   - [`report_statistics`](@ref)
   - [`report_weights`](@ref)
   - [`report_exposure`](@ref)
+  - [`report_dependency`](@ref)
   - [`report_allocation`](@ref)
   - [`report_figures`](@ref)
 """
 function entry_sections(pred::AbstractPredictionResult, rows::DataFrames.AbstractDataFrame,
                         alloc, threshold::Real, figs::AbstractVector,
                         sets::Option{<:UniverseSets},
-                        taxonomy::AbstractVector{<:AbstractString})
+                        taxonomy::AbstractVector{<:AbstractString}, deps::AbstractVector)
     sections = [report_statistics(pred, rows), report_weights(pred, threshold)]
     a = report_allocation(pred, alloc)
     x = report_exposure(pred, sets, taxonomy, alloc)
     if !(isnothing(x))
         push!(sections, x)
+    end
+    d = report_dependency(pred, deps, threshold)
+    if !(isnothing(d))
+        push!(sections, d)
     end
     if !(isnothing(a))
         push!(sections, a)

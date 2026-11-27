@@ -53,7 +53,7 @@ end
     rows(r, i) = po.port_opt_view(r, i, :)
     step(opt, r, t) = foldl((o, i) -> partial_fit!(o, rows(r, i:i)), 1:t; init = opt)
     same_fields(a, b) = all(f -> isequal(getfield(a, f), getfield(b, f)),
-                            (:nx, :X, :nf, :F, :nb, :B, :ts, :iv, :ivpa))
+                            (:nx, :X, :nf, :F, :nb, :B, :ng, :ts, :iv, :ivpa))
 
     @testset "The reconstitution is exact, field by field" begin
         for r in (rd, rdf, rdv), t in (12, 40, 80)
@@ -84,7 +84,7 @@ end
         @test po.returns_result(o).X == X[1:40, :]
         # A single-column benchmark beside a prior: the context counts by the benchmark.
         o = step(InverseVolatility(), rdv, 10)
-        @test po.context_count(o.cache) == 10
+        @test o.cache.n == 10
         @test same_fields(po.returns_result(o), rows(rdv, 1:10))
     end
 
@@ -148,9 +148,11 @@ end
         clx = ClustersEstimator(; x_src = ExcessSource())
         jopt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv)
         jexc = JuMPOptimiser(; pe = epx, slv = slv)
-        hexc = HierarchicalOptimiser(; pe = epx, cle = clx)
-        fams = (MeanRisk(; opt = jexc), HierarchicalRiskParity(; opt = hexc),
-                HierarchicalEqualRiskContribution(; opt = hexc),
+        hexc = HierarchicalOptimiser(; pe = epx)
+        fams = (MeanRisk(; opt = jexc),
+                HierarchicalRiskParity(; opt = hexc,
+                                       ser = HierarchicalSeriation(; cle = clx)),
+                HierarchicalEqualRiskContribution(; opt = hexc, cle = clx),
                 InverseVolatility(; pe = epx),
                 NestedClustered(; pe = epx, cle = clx, opti = MeanRisk(; opt = jopt),
                                 opto = MeanRisk(; opt = jopt)),
@@ -636,7 +638,7 @@ end
         m = po.merge_states(fold_head(rdv, 1:4; max_history = w),
                             fold_head(rdv, 5:8; max_history = w))
         @test (m.X.n, length(m.ts), length(m.B)) == (w, w, w)
-        @test po.context_count(m) == w
+        @test m.n == w
         @test same_fields(po.returns_result(m, m.X), rows(rdv, 4:8))
         @test same_fields(po.returns_result(m, m.X),
                           po.returns_result(fold_head(rdv, 1:8; max_history = w),
@@ -666,7 +668,7 @@ end
 
         # The first step fixes the presence of a column even when the state keeps none.
         s = partial_fit!(RBS(), r1)
-        @test po.context_count(s) == 0
+        @test s.n == 1
         @test_throws ArgumentError partial_fit!(s, rows(rdn, 2:2))
         @test_throws ArgumentError partial_fit!(partial_fit!(InverseVolatility(), r1),
                                                 rows(rdn, 2:2))
@@ -739,6 +741,70 @@ end
         @test po.fold_column(buf, 4:6, 4) === buf
         @test buf == [3, 4, 5, 6]
         @test po.fold_column(nothing, 1:3, nothing) == [1, 2, 3]
+    end
+
+    @testset "Exogenous Graphs travel the step with the returns (#2286)" begin
+        RBS = po.ReturnsBufferState
+        edge(v) = ExogenousGraph(; edges = [("A1", "S", v)])
+        g1, g2, g3 = edge(0.4), edge(0.5), edge(0.6)
+        pos = ExogenousGraphSeries(; ts = [4, 8, 11], graphs = [g1, nothing, g2])
+        dated = ExogenousGraphSeries(; ts = ts[[4, 8, 11]], graphs = [g1, nothing, g2])
+        # The graph in force at each row, `nothing` where none is.
+        function in_force(G, n, t)
+            return [begin
+                        v = po.graph_view(G, i:i, t)
+                        v isa ExogenousGraph ? v : last(v.graphs)
+                    end
+                    for i in 1:n]
+        end
+        fold(r, is; kw...) = foldl((s, i) -> partial_fit!(s, rows(r, i); own_returns = true),
+                                   is; init = RBS(; kw...))
+        for (G, t) in ((g1, nothing), (pos, nothing), (dated, ts))
+            rdg = ReturnsResult(; nx = nx, X = X, ts = t, ng = ["g"], G = [G])
+            for is in ([1:20], [i:i for i in 1:20], [1:5, 6:9, 10:20]), w in (nothing, 12)
+                st = fold(rdg, is; max_history = w)
+                r = po.returns_result(st, st.X)
+                keep = isnothing(w) ? (1:20) : (9:20)
+                b = rows(rdg, keep)
+                @test st.n == length(keep)
+                @test r.ng == ["g"]
+                @test isequal(in_force(r.G[1], st.n, r.ts), in_force(b.G[1], st.n, b.ts))
+            end
+            # A merge of two blocks is the fold of both, and the inputs stay as they were.
+            for w in (nothing, 12)
+                a = fold(rdg, [1:9]; max_history = w)
+                b = fold(rdg, [10:20]; max_history = w)
+                m = po.merge_states(a, b)
+                st = fold(rdg, [1:20]; max_history = w)
+                @test m.n == st.n && (a.n, b.n) == (9, 11)
+                @test isequal(in_force(m.G[1], m.n, m.ts), in_force(st.G[1], st.n, st.ts))
+            end
+            # No step writes into a graph, so a copy and a slice share it.
+            st = fold(rdg, [1:10])
+            @test copy(st).G === st.G && copy(st).n == 10
+            @test po.port_opt_view(st, [2, 1]).G === st.G
+            @test po.port_opt_view(st, [2, 1]).n == 10
+        end
+        # The first step pins the names, and a step that states another graph for a row that
+        # holds one is refused.
+        rdg = ReturnsResult(; nx = nx, X = X, ng = ["g"], G = [g1])
+        st = fold(rdg, [1:10])
+        for r in (ReturnsResult(; nx = nx, X = X, ng = ["h"], G = [g1]),
+                  ReturnsResult(; nx = nx, X = X),
+                  ReturnsResult(; nx = nx, X = X, ng = ["g"], G = [g3]),
+                  ReturnsResult(; nx = nx, X = X, ng = ["g"], G = [pos]))
+            @test_throws ArgumentError partial_fit!(copy(st), rows(r, 11:11);
+                                                    own_returns = true)
+        end
+        @test_throws ArgumentError po.merge_states(st,
+                                                   fold(ReturnsResult(; nx = nx, X = X),
+                                                        [11:12]))
+        @test_throws DomainError RBS(; n = -1)
+        # The rows of an online portfolio selection head carry the graphs too.
+        @test po.buffer_returns_result(st).G === st.G
+        # A step with no graph holds none.
+        st = fold(ReturnsResult(; nx = nx, X = X), [1:3])
+        @test isnothing(st.ng) && isnothing(st.G) && st.n == 3
     end
     @testset "An uncertainty set on the seam: own `pe` refits from the buffer, `pe = nothing` reads the folded prior (#1015)" begin
         # ADR 0138. No set takes a step. A set with its own `pe` is refitted over the

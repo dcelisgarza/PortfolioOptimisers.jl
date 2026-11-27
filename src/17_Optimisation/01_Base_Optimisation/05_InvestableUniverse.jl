@@ -165,6 +165,12 @@ end
 function feature_readable_mask(x::NetworkClustersEstimator, imsk::Option{<:BitVector}, rd)
     return feature_readable_mask(x.nte, imsk, rd)
 end
+function feature_readable_mask(x::HierarchicalSeriation, imsk::Option{<:BitVector}, rd)
+    return feature_readable_mask(x.cle, imsk, rd)
+end
+function feature_readable_mask(x::SpectralSeriation, imsk::Option{<:BitVector}, rd)
+    return feature_readable_mask(x.de, imsk, rd)
+end
 function feature_readable_mask(x::Union{CentralityEstimator, SemiDefinitePhylogenyEstimator,
                                         IntegerPhylogenyEstimator},
                                imsk::Option{<:BitVector}, rd)
@@ -513,6 +519,7 @@ It is a batch fit, so [`assert_batch_entry`](@ref) refuses an [`Online`](@ref) a
 """
 function optimise(opt::OptimisationEstimator, args...; kwargs...)
     assert_batch_entry(opt, "`optimise`")
+    assert_graph_entry(opt, args...)
     current_opt = reset_time_dependent_estimator(opt)
     res = shared_series_solve(current_opt, args...; kwargs...)
     # A solve that succeeds, or an estimator with no fallback, is the answer. It returns

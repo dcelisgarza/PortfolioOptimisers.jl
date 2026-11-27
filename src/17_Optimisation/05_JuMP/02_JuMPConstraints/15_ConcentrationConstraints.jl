@@ -5,7 +5,7 @@ MIP space of the positions of one concentration rule.
 
 [`mip_wx!`](@ref) gives the positions ``\\boldsymbol{x}`` of the rule, and [`mip_key`](@ref) writes each key as `conc_<name>_i` under `prefix`, so two rules and two blocks do not collide. [`declare_mip_gate!`](@ref) declares the binary "the position is over `t`" in this space. The binary is not the held bit of [`HeldIndicators`](@ref), because "held" and "over `t`" are two facts, so the space registers no bundle in Model State and [`mip_indicators`](@ref) still returns the asset bundle. The space has no method of [`mip_bounds`](@ref), because the rule states its cap on the positions.
 
-The positions are the rows of `cl.set` times the reading `cl.pos` of the weights, see [`concentration_positions`](@ref) and [`position_reading`](@ref). The first block that admits a short position makes the shared parts `lw` and `sw`, see [`set_weight_parts!`](@ref), and a [`RiskBudgeting`](@ref) head declares them itself. When the model has no shared short part, a block on the weights is long-only, and the library reads the weights as their own long part. So every reading is `w` there. A block after a long-only block can make parts of its own for its budgets, see [`weight_parts!`](@ref). The rule does not read them, because the long-only block already gives the reading `w`.
+The positions are the rows of `cl.set` times the reading `cl.pos` of the weights, see [`concentration_positions`](@ref), [`position_reading`](@ref) and [`long_only_reading`](@ref). The first block that admits a short position makes the shared parts `lw` and `sw`, see [`set_weight_parts!`](@ref), and a [`RiskBudgeting`](@ref) head declares them itself. When the model has no shared short part, a block on the weights is long-only, and the library reads the weights as their own long part. So the gross, net and long readings are `w` there, and the short reading is zero. A block after a long-only block can make parts of its own for its budgets, see [`weight_parts!`](@ref). The rule does not read them, because the long-only block already gives the reading.
 
 # Fields
 
@@ -38,7 +38,7 @@ function mip_wx!(model::JuMP.Model, sp::ConcentrationMIPSpace)
     v = if shared_has(model, :sw)
         position_reading(pos, w, shared_get(model, :lw), shared_get(model, :sw))
     else
-        w
+        long_only_reading(pos, w)
     end
     return state_set!(model, Symbol(""), mip_key(sp, :x),
                       JuMP.@expression(model, concentration_positions(set, v)))

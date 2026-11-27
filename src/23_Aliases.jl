@@ -949,6 +949,42 @@ function ZeroVarianceFilter(; tol::Number = 1e-12)::ScoreSelector
               DomainError(tol, "the tolerance of a ZeroVarianceFilter must be >= 0"))
     return ScoreSelector(; score = SCM(), rule = ThresholdRule(; lo = tol))
 end
+
+# ── Distances ──────────────────────────────────────
+"""
+    WalkDistance(;
+        ng::Option{<:Union{AbstractString, GraphUnion, AbstractVector}} = nothing,
+        sep::HopCount = HopCount(; n = CountOf(2)),
+        decay::Option{<:AbstractSeparationDecayAlgorithm} = ExponentialDecay(; rate = log(2)),
+        dir::AbstractEdgeDirection = OutEdges(),
+        nrm::Option{<:AbstractEdgeNormalisation} = WeightShare(),
+        wgt::Option{<:AbstractEdgeWeightRule} = nothing,
+        self::Bool = false,
+        metric::Distances.SemiMetric = OrthantChordDist()
+    ) -> FeatureDistance
+
+Alias for the distance between the Walk Profiles of the assets over an Exogenous Graph, a [`FeatureDistance`](@ref) that holds a [`WalkProfilePanel`](@ref).
+
+It returns `FeatureDistance(; ape = WalkProfilePanel(; ng, sep, decay, dir, nrm, wgt, self), metric)`, and [`default_similarity`](@ref) gives the similarity of `metric`. The keywords of the walk are the fields of [`WalkProfilePanel`](@ref), so `ng` takes a [`GraphUnion`](@ref) too. The default [`OrthantChordDist`](@ref) is the chord on the non-negative orthant, where each cosine of two profiles lies. A user who needs `sel`, `strict` or the `prefix` of the fields writes the full form.
+
+# Validation
+
+  - The rules of [`WalkProfilePanel`](@ref).
+"""
+function WalkDistance(;
+                      ng::Option{<:Union{AbstractString, GraphUnion, AbstractVector}} = nothing,
+                      sep::HopCount = HopCount(; n = CountOf(2)),
+                      decay::Option{<:AbstractSeparationDecayAlgorithm} = ExponentialDecay(;
+                                                                                           rate = log(2)),
+                      dir::AbstractEdgeDirection = OutEdges(),
+                      nrm::Option{<:AbstractEdgeNormalisation} = WeightShare(),
+                      wgt::Option{<:AbstractEdgeWeightRule} = nothing, self::Bool = false,
+                      metric::Distances.SemiMetric = OrthantChordDist())::FeatureDistance
+    return FeatureDistance(;
+                           ape = WalkProfilePanel(; ng = ng, sep = sep, decay = decay,
+                                                  dir = dir, nrm = nrm, wgt = wgt,
+                                                  self = self), metric = metric)
+end
 """
     TTS
 
@@ -1037,5 +1073,5 @@ export HRP, HERC, SCHRP, NCO, STO, SSR, MR, RB, RRB, FRC, NOC, DAO, GAO, FAI, SD
        OWA_CVaR_RG, OWA_TG_RG, OWA_LMoment, SmER, GCov, FMoment, SMoment, Cov, SVar, G0, G1,
        G2, GerberCov, SBCov, SB0, SB1, SB2, SBG0, SBG1, SBG2, SBC0, SBC1, SBC2, DCov,
        LTDCov, KCov, SCov, MICov, DnCov, DtCov, PrCov, POCov, ShER, GM, VW, MSE, JS, BS,
-       BOP, EqER, ExER, CoSk, CoKt, LinMod, GLinMod, ZeroVarianceFilter, TTS, LCE, ECE, WBE,
-       RkSet, HRkSet, JuMPOpt, HOpt, MinRk, MaxRt, MaxUt, MaxRa, L2Reg, LpReg
+       BOP, EqER, ExER, CoSk, CoKt, LinMod, GLinMod, ZeroVarianceFilter, WalkDistance, TTS,
+       LCE, ECE, WBE, RkSet, HRkSet, JuMPOpt, HOpt, MinRk, MaxRt, MaxUt, MaxRa, L2Reg, LpReg

@@ -128,6 +128,7 @@ Keywords correspond to the struct's fields. The default `p = 0.05` is the penalt
   - `p >= 0`.
   - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). Otherwise the constructor raises an `ArgumentError`.
   - `returns_source(pl) === nothing`, see [`assert_inner_reader`](@ref). The network or clustering estimator reads the matrix that this estimator selects, so it states no source of its own. Otherwise the constructor raises an `ArgumentError`.
+  - The direction of an [`ExogenousNetwork`](@ref) in `pl` is symmetric, see [`assert_symmetric_network`](@ref). Otherwise the constructor raises an `ArgumentError`.
   - The type bound [`NwE_ClE`](@ref) of `pl` refuses a precomputed [`PhylogenyResult`](@ref) or [`Clusters`](@ref). So the keyword constructor raises a `TypeError` at once, and not later in a solve. To use a precomputed structure, build the [`SemiDefinitePhylogeny`](@ref) that `phylogeny_constraints(estimator, X)` returns.
 
 # Examples
@@ -198,6 +199,7 @@ SemiDefinitePhylogenyEstimator
         assert_nonneg(p, :p)
         assert_returns_source(x_src, ALL_RETURNS_SOURCES, :SemiDefinitePhylogenyEstimator)
         assert_inner_reader(pl, :pl, :SemiDefinitePhylogenyEstimator)
+        assert_symmetric_network(pl)
         return new{typeof(pl), typeof(p), typeof(x_src)}(pl, p, x_src)
     end
 end
@@ -452,6 +454,8 @@ Keywords correspond to the struct's fields.
 
   - `returns_source(pl) === nothing`, see [`assert_inner_reader`](@ref). The network or clustering estimator reads the matrix that this estimator selects, so it states no source of its own. Otherwise the constructor raises an `ArgumentError`.
 
+  - The direction of an [`ExogenousNetwork`](@ref) in `pl` is symmetric, see [`assert_symmetric_network`](@ref). Otherwise the constructor raises an `ArgumentError`.
+
   - The type bound [`NwE_ClE`](@ref) of `pl` refuses a precomputed [`PhylogenyResult`](@ref) or [`Clusters`](@ref). So the keyword constructor raises a `TypeError` at once, and not later in a solve. To use a precomputed structure, build the [`IntegerPhylogeny`](@ref) that `phylogeny_constraints(estimator, X)` returns.
 
 # Examples
@@ -526,6 +530,7 @@ IntegerPhylogenyEstimator
         end
         assert_returns_source(x_src, ALL_RETURNS_SOURCES, :IntegerPhylogenyEstimator)
         assert_inner_reader(pl, :pl, :IntegerPhylogenyEstimator)
+        assert_symmetric_network(pl)
         return new{typeof(pl), typeof(B), typeof(x_src)}(pl, B, x_src)
     end
 end
@@ -538,7 +543,7 @@ function returns_source(x::Union{SemiDefinitePhylogenyEstimator, IntegerPhylogen
 end
 function reader_frames(x::Union{SemiDefinitePhylogenyEstimator, IntegerPhylogenyEstimator},
                        path::AbstractString, ::Bool)
-    return source_frames(x.x_src, path, true)
+    return source_frames(x.x_src, path, reads_network_returns(x.pl))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -893,7 +898,7 @@ function returns_source(cc::CentralityConstraint)
     return cc.x_src
 end
 function reader_frames(cc::CentralityConstraint, path::AbstractString, ::Bool)
-    return source_frames(cc.x_src, path, true)
+    return source_frames(cc.x_src, path, reads_network_returns(cc.A.pl))
 end
 """
     obs_weights_view(cc::CentralityConstraint, i) -> CentralityConstraint

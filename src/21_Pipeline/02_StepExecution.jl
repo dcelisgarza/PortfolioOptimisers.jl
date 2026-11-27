@@ -458,15 +458,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute an [`ExposureConstraintEstimator`](@ref) step's value: re-base its rows through the loadings of the *pipeline's* prior into an asset-space [`LinearConstraint`](@ref).
+Compute an [`ExposureConstraintEstimator`](@ref) step's value: re-base its rows through the basis of its space into an asset-space [`LinearConstraint`](@ref). A [`PositionConstraintEstimator`](@ref) step resolves the constraint that it wraps in the same way, and its value is a [`PositionConstraint`](@ref).
 
-This is the one constraint step that reads a computed slot other than `:returns`. The basis is `ctx.prior.rr`, so a prior step must come earlier; a prior that carries no regression makes [`constraint_space_basis`](@ref) throw, which is the intended failure — see [`ExposureConstraintEstimator`](@ref).
+This is the one constraint step that can read a computed slot other than `:returns`. [`pipe_reads`](@ref) of the space gives them. For a [`FactorSpace`](@ref) the basis is `ctx.prior.rr`, so a prior step must come earlier; a prior that carries no regression makes [`constraint_space_basis`](@ref) throw, which is the intended failure — see [`ExposureConstraintEstimator`](@ref).
 
-`ctx.returns` is passed as well, so a space that names a regression **estimator** refits the loadings here rather than throwing. That is the one arrangement in which a prior carrying no factor block still admits a factor mandate — see [`FactorSpace`](@ref). The refit reads the returns from the source that the regression of the space states, as it does in the `lcse` field of an optimiser.
+`ctx.returns` is passed as well, so a space that names a regression **estimator** refits the loadings here rather than throwing. That is the one arrangement in which a prior carrying no factor block still admits a factor mandate — see [`FactorSpace`](@ref). The refit reads the returns from the source that the regression of the space states, as it does in the `lcse` field of an optimiser. A [`DependencySpace`](@ref) reads the Exogenous Graph of `ctx.returns`, and it needs no prior step.
 
 !!! warning
 
-    The constraint is **pinned to the pipeline's prior**. Its rows were projected through the loadings this step saw, and a downstream optimiser that refits its own prior does not re-project them. Passing the estimator to the optimiser's `lcse` field instead recomputes the projection with the optimiser's own prior, per fold, which is what a cross-validated factor mandate needs.
+    Under a [`FactorSpace`](@ref) the constraint is **pinned to the pipeline's prior**. Its rows were projected through the loadings this step saw, and a downstream optimiser that refits its own prior does not re-project them. Passing the estimator to the optimiser's `lcse` field instead recomputes the projection with the optimiser's own prior, per fold, which is what a cross-validated factor mandate needs.
 
 # Related
 
@@ -475,10 +475,11 @@ This is the one constraint step that reads a computed slot other than `:returns`
   - [`linear_constraints`](@ref)
   - [`pipeline_asset_sets`](@ref)
 """
-function constraint_step_value(ce::ExposureConstraintEstimator, ctx::PipelineContext)
-    require_slot(ctx, :prior, ce)
-    return linear_constraints(ce, pipeline_asset_sets(ctx, ce); rr = ctx.prior.rr,
-                              rd = ctx.returns)
+function constraint_step_value(ce::Union{ExposureConstraintEstimator,
+                                         PositionConstraintEstimator}, ctx::PipelineContext)
+    foreach(s -> require_slot(ctx, s, ce), pipe_reads(ce))
+    rr = isnothing(ctx.prior) ? nothing : ctx.prior.rr
+    return linear_constraints(ce, pipeline_asset_sets(ctx, ce); rr = rr, rd = ctx.returns)
 end
 function constraint_step_value(ce::AbstractPhylogenyConstraintEstimator,
                                ctx::PipelineContext)
@@ -638,8 +639,9 @@ Internal machinery — not part of the user-facing API.
 # Algorithm
 
  1. `:sigma_ucs`: the path `"r.ucs"`, or `"r[i].ucs"` for each element `i` of a vector that is an `UncertaintySetVariance`. Only an optimiser that [`@pipe_route_sigma_ucs`](@ref) declares accepts this target, and each one has a field `r`.
- 2. A target with a field of the same name in `x`: the name of the field.
- 3. Otherwise the paths in the configuration of `x`, after its field name, see [`pipe_config_paths`](@ref).
+ 2. `:cle` in [`HierarchicalRiskParity`](@ref) or [`SchurComplementHierarchicalRiskParity`](@ref): the paths in the seriation `ser`, after `"ser"`, such as `"ser.cle"`, because [`pipe_route`](@ref) puts the clustering there.
+ 3. A target with a field of the same name in `x`: the name of the field.
+ 4. Otherwise the paths in the configuration of `x`, after its field name, see [`pipe_config_paths`](@ref).
 
 # Arguments
 
@@ -661,6 +663,12 @@ function pipe_target_paths(x, t::Val{target})::Vector{String} where {target}
 end
 function pipe_target_paths(::JuMPOptimiser, ::Val{:mu_ucs})::Vector{String}
     return ["ret.ucs"]
+end
+function pipe_target_paths(x::Union{HierarchicalRiskParity,
+                                    SchurComplementHierarchicalRiskParity},
+                           t::Val{:cle})::Vector{String}
+    # `pipe_route` puts a clustering into the seriation `ser` of HRP and Schur (#2174).
+    return [join_path("ser", p) for p in pipe_target_paths(x.ser, t)]
 end
 function pipe_target_paths(x, t::Val{:sigma_ucs})::Vector{String}
     # Only an optimiser that `@pipe_route_sigma_ucs` declares accepts the target, and each

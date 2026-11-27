@@ -206,6 +206,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
     `settings.rke = false` on every measure are the two ways to get such a model.
   - If `r` holds a [`DataBenchmarkTracking`](@ref): `opt.pe` must not state `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
   - Each estimator of `frc_ple` states no source, because it reads the factor returns that the head picks, see [`assert_inner_reader`](@ref).
+  - `frc_ple` holds no [`ExogenousNetwork`](@ref) and no [`WalkProfilePanel`](@ref), at any depth, see [`holds_node_reader`](@ref). A factor is not a node of the graph.
   - `opt.ple` holds no [`SemiDefinitePhylogeny`](@ref) and no [`SemiDefinitePhylogenyEstimator`](@ref), directly, in a vector or in a schedule, see [`holds_precomputed`](@ref). The head writes no lift of the asset weights, so the phylogeny would add no rows. A phylogeny of the factors goes in `frc_ple`. An [`IntegerPhylogeny`](@ref) in `opt.ple` applies.
   - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
 
@@ -324,6 +325,8 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
         # estimators is an inner reader.
         foreach(x -> assert_inner_reader(x, :frc_ple, :FactorRiskContribution),
                 vcat(frc_ple))
+        @argcheck(!holds_node_reader(frc_ple),
+                  ArgumentError("`frc_ple` of `FactorRiskContribution` holds an `ExogenousNetwork` or a `WalkProfilePanel`, which finds the assets among the nodes of an Exogenous Graph. The factor phylogeny reads factors, which are not nodes of the graph. Put a phylogeny of the assets in `opt.ple`."))
         est = new{typeof(opt), typeof(re), typeof(r), typeof(obj), typeof(frc_ple),
                   typeof(sets), typeof(wi), typeof(flag), typeof(fb)}(opt, re, r, obj,
                                                                       frc_ple, sets, wi,

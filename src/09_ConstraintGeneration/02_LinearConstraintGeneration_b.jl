@@ -536,6 +536,47 @@ function universe_axis(sets::UniverseSets, key::AbstractString)::String
     return startswith(key, sets.tfkey) || startswith(key, sets.cfkey) ? "factor" : "asset"
 end
 """
+    constraint_row_universe(rr::Option{<:AbstractLoadingsRegressionResult}, sets::UniverseSets,
+                            key::Option{<:AbstractString}) -> Tuple
+    constraint_row_universe(rr::ConstraintBasis, sets::UniverseSets,
+                            key::Option{<:AbstractString}) -> Tuple
+
+Return the universe that the names of a constraint row resolve against.
+
+# Algorithm
+
+The method that Julia selects is the algorithm, and the re-basis selects it.
+
+ 1. When `rr` is `nothing` or a regression result, read the universe from `sets.dict` under `key`, or under `sets.xkey` when `key` is `nothing`. Name its axis with [`universe_axis`](@ref), and read its counterpart axis with [`counterpart_axis_names`](@ref).
+ 2. When `rr` is a [`ConstraintBasis`](@ref), return the names that it holds, with no counterpart axis. The method reads neither `sets` nor `key`.
+
+# Arguments
+
+  - `rr`: Loadings or basis to re-base through, or `nothing` for an ordinary asset-space row.
+  - `sets`: The declared universe.
+  - `key`: The key of `sets.dict`, or `nothing`.
+
+# Returns
+
+  - `(key, nx, axis, other)`: The key that a message quotes, the names, the word for one name, and the names of the counterpart axis.
+
+# Related
+
+  - [`get_linear_constraints`](@ref)
+  - [`universe_axis`](@ref)
+  - [`counterpart_axis_names`](@ref)
+  - [`ConstraintBasis`](@ref)
+"""
+function constraint_row_universe(::Option{<:AbstractLoadingsRegressionResult},
+                                 sets::UniverseSets, key::Option{<:AbstractString})
+    k = something(key, sets.xkey)
+    return k, sets.dict[k], universe_axis(sets, k), counterpart_axis_names(sets, k)
+end
+function constraint_row_universe(rr::ConstraintBasis, ::UniverseSets,
+                                 ::Option{<:AbstractString})
+    return rr.key, rr.nx, rr.axis, String[]
+end
+"""
     constraint_row_length(rr, nx::VecStr) -> Int
 
 Return the length of an assembled constraint row.
@@ -547,7 +588,7 @@ Without a re-basis, the length is the size of the universe that the names resolv
 The method that Julia selects is the algorithm, and the re-basis selects it.
 
  1. When `rr` is `nothing`, return the length of `nx`, the universe the names resolve against.
- 2. When `rr` is a regression result, return the number of rows of `rr.M`, which is the number of assets the loadings project onto.
+ 2. When `rr` is a [`RowBasis`](@ref), return the number of rows of `rr.M`, which is the number of assets the basis projects onto.
 
 # Arguments
 
@@ -566,12 +607,12 @@ The method that Julia selects is the algorithm, and the re-basis selects it.
 function constraint_row_length(::Nothing, nx::VecStr)::Int
     return length(nx)
 end
-function constraint_row_length(rr::AbstractLoadingsRegressionResult, ::VecStr)::Int
+function constraint_row_length(rr::RowBasis, ::VecStr)::Int
     return size(rr.M, 1)
 end
 """
     constraint_row_term(::Nothing, Ai, c)
-    constraint_row_term(rr::AbstractLoadingsRegressionResult, Ai, c)
+    constraint_row_term(rr::RowBasis, Ai, c)
 
 Return the contribution of one matched variable to a constraint row.
 
@@ -601,7 +642,7 @@ The identity lets a row written in factor names bind the asset weights with no c
 The method that Julia selects is the algorithm, and the re-basis selects it.
 
  1. When `rr` is `nothing`, return `Ai` times `c`, one entry per name of the universe.
- 2. When `rr` is a regression result, sum the columns of `rr.M` that `Ai` selects, multiply the sum by `c`, and return it. The value has one entry per asset, whatever names the row uses.
+ 2. When `rr` is a [`RowBasis`](@ref), sum the columns of `rr.M` that `Ai` selects, multiply the sum by `c`, and return it. The value has one entry per asset, whatever names the row uses.
 
 # Arguments
 
@@ -622,14 +663,14 @@ The method that Julia selects is the algorithm, and the re-basis selects it.
 function constraint_row_term(::Nothing, Ai, c)
     return Ai * c
 end
-function constraint_row_term(rr::AbstractLoadingsRegressionResult, Ai, c)
+function constraint_row_term(rr::RowBasis, Ai, c)
     return vec(sum(view(rr.M, :, Ai); dims = 2)) * c
 end
 """
     get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
                            key::Option{<:AbstractString} = nothing;
                            datatype::DataType = Float64, strict::Bool = false,
-                           rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
+                           rr::Option{<:RowBasis} = nothing,
                            ledger::Option{<:AbstractVector} = nothing)
 
 Convert parsed linear constraint equations into a `LinearConstraint` object.
@@ -642,7 +683,7 @@ The function drops whole rows and never single terms. A row is one statement ove
 
 # Algorithm
 
- 1. Take `k` as `key`, or `sets.xkey` when `key` is `nothing`, read the universe `nx` from `sets.dict` under it, name the axis with [`universe_axis`](@ref), and read the counterpart axis with [`counterpart_axis_names`](@ref).
+ 1. Read the key `k`, the universe `nx`, the name of its axis and its counterpart axis with [`constraint_row_universe`](@ref).
  2. Take `N`, the row length, from [`constraint_row_length`](@ref), and allocate the working row `At` of that length.
  3. Zero `At` for each parsing result, and start that result not dropped.
  4. Build the indicator of each variable name of the result over `nx`. A name that matches no entry marks the row dropped, and is reported through [`strict_diagnostic`](@ref) unless it names the counterpart axis. Every name of the row is still visited, so a row carrying two typos names both.
@@ -661,7 +702,7 @@ The function drops whole rows and never single terms. A row is one statement ove
   - `key`: Key naming the universe the variables resolve against. Defaults to `sets.xkey`; a re-based constraint passes the factor axis key that [`factor_axis_key`](@ref) reads off the loadings.
   - `datatype`: Numeric type for coefficients and right-hand side.
   - `strict`: If `true`, a variable name that the universe does not hold throws. If `false`, it warns.
-  - `rr`: Loadings to re-base through, or `nothing` for an ordinary asset-space constraint. Callers do not pass it directly, and [`ExposureConstraintEstimator`](@ref) passes it.
+  - `rr`: Loadings or a [`ConstraintBasis`](@ref) to re-base through, or `nothing` for an ordinary asset-space constraint. Callers do not pass it directly, and [`ExposureConstraintEstimator`](@ref) passes it.
   - $(arg_dict[:ledger]) A row dropped for a name on the counterpart axis is recorded into it through [`record_non_investable_drop!`](@ref).
 
 # Validation
@@ -684,7 +725,7 @@ The function drops whole rows and never single terms. A row is one statement ove
   - [`replace_group_by_assets`](@ref)
   - [`constraint_row_term`](@ref)
   - [`constraint_row_length`](@ref)
-  - [`universe_axis`](@ref)
+  - [`constraint_row_universe`](@ref)
   - [`comparison_sign_ineq_flag`](@ref)
   - [`counterpart_axis_names`](@ref)
   - [`shed_departed_members`](@ref)
@@ -692,7 +733,7 @@ The function drops whole rows and never single terms. A row is one statement ove
 function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
                                 key::Option{<:AbstractString} = nothing;
                                 datatype::DataType = Float64, strict::Bool = false,
-                                rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
+                                rr::Option{<:RowBasis} = nothing,
                                 ledger::Option{<:AbstractVector} = nothing)
     if isa(lcs, AbstractVector)
         @argcheck(!isempty(lcs), IsEmptyError)
@@ -701,10 +742,7 @@ function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
     B_ineq = Vector{datatype}(undef, 0)
     A_eq = Vector{datatype}(undef, 0)
     B_eq = Vector{datatype}(undef, 0)
-    k = ifelse(isnothing(key), sets.xkey, key)
-    nx = sets.dict[k]
-    axis = universe_axis(sets, k)
-    other = counterpart_axis_names(sets, k)
+    k, nx, axis, other = constraint_row_universe(rr, sets, key)
     N = constraint_row_length(rr, nx)
     At = Vector{datatype}(undef, N)
     for lc in lcs
@@ -742,7 +780,7 @@ function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
             # loadings annihilated it, or its own coefficients cancelled. Reporting a typo
             # for either would send a user hunting for one that is not there.
             msg = if !isnothing(rr)
-                empty_projected_row_msg(lc.eqn, nx, k, N)
+                empty_projected_row_msg(lc.eqn, nx, k, N; axis = axis)
             else
                 empty_row_msg(lc.eqn, nx, k; axis = axis)
             end
@@ -920,7 +958,7 @@ One [`LinearConstraintEstimator`](@ref), or a vector of them. The group excludes
 const LcE_VecLcE = Union{LinearConstraintEstimator, VecLcE}
 """
     linear_constraints(lcs::Option{<:LinearConstraint}, args...; kwargs...)
-    linear_constraints(lcs::AbstractVector{<:LinearConstraint}, ::Nothing, args...; kwargs...)
+    linear_constraints(lcs::AbstractVector{<:LinearConstraint}, ::Nothing; kwargs...)
 
 Return an assembled `LinearConstraint`, `nothing`, or a vector of assembled constraints unchanged.
 
@@ -988,7 +1026,10 @@ end
     assert_investable_constraint_width(lcs::Nothing, N::Integer, slot::AbstractString)
     assert_investable_constraint_width(lc::LinearConstraint, N::Integer,
                                        slot::AbstractString)
-    assert_investable_constraint_width(lcs::VecLc, N::Integer, slot::AbstractString)
+    assert_investable_constraint_width(pc::PositionConstraint, N::Integer,
+                                       slot::AbstractString)
+    assert_investable_constraint_width(lcs::AbstractVector, N::Integer,
+                                       slot::AbstractString)
 
 Refuse a precomputed [`LinearConstraint`](@ref) whose rows are wider than the investable universe, with a message that states why.
 
@@ -1000,7 +1041,7 @@ The repair is always the same. State the constraint as a [`LinearConstraintEstim
 
 # Algorithm
 
- 1. Return when there is nothing to check, which is a `nothing` slot or a `nothing` half of a [`LinearConstraint`](@ref).
+ 1. Return when there is nothing to check, which is a `nothing` slot or a `nothing` half of a [`LinearConstraint`](@ref). Check the wrapped constraint of a [`PositionConstraint`](@ref), and each element of a vector.
  2. Otherwise compare `size(A, 2)` of each half against `N` and throw a `DimensionMismatch` naming the slot, the two widths and the repair when they disagree.
 
 # Arguments
@@ -1038,14 +1079,14 @@ function assert_investable_constraint_width(lc::LinearConstraint, N::Integer,
     end
     return nothing
 end
-function assert_investable_constraint_width(lcs::VecLc, N::Integer,
+function assert_investable_constraint_width(lcs::AbstractVector, N::Integer,
                                             slot::AbstractString)::Nothing
     for lc in lcs
         assert_investable_constraint_width(lc, N, slot)
     end
     return nothing
 end
-function linear_constraints(lcs::AbstractVector{<:LinearConstraint}, ::Nothing, args...;
+function linear_constraints(lcs::AbstractVector{<:LinearConstraint}, ::Nothing;
                             kwargs...)::AbstractVector{<:LinearConstraint}
     return lcs
 end
@@ -1055,7 +1096,7 @@ end
                        ops1::Tuple = ("==", "<=", ">="),
                        ops2::Tuple = (:call, :(==), :(<=), :(>=)), datatype::DataType = Float64,
                        strict::Bool = false, bl_flag::Bool = false,
-                       rr::Option{<:AbstractLoadingsRegressionResult} = nothing)
+                       rr::Option{<:RowBasis} = nothing)
 
 Parse and convert one or more linear constraint equations into a [`LinearConstraint`](@ref) object.
 
@@ -1080,7 +1121,7 @@ This method is the whole pipeline, and each step names the stage that owns it.
   - `strict`: If `true`, a variable name that the universe does not hold throws. If `false`, it warns.
   - `bl_flag`: If `true`, a group expands to the mean over its members, as the Black-Litterman views need. If `false`, it expands to the sum.
   - `key`: Key naming the universe the variables resolve against. Defaults to `sets.xkey`.
-  - `rr`: Loadings to re-base through, or `nothing` for an ordinary asset-space constraint.
+  - `rr`: Loadings or a [`ConstraintBasis`](@ref) to re-base through, or `nothing` for an ordinary asset-space constraint.
 
 # Validation
 
@@ -1120,7 +1161,7 @@ function linear_constraints(eqn::EqnType, sets::UniverseSets,
                             ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                             datatype::DataType = Float64, strict::Bool = false,
                             bl_flag::Bool = false,
-                            rr::Option{<:AbstractLoadingsRegressionResult} = nothing)::Option{<:LinearConstraint}
+                            rr::Option{<:RowBasis} = nothing)::Option{<:LinearConstraint}
     lcs = parse_equation(eqn; ops1 = ops1, ops2 = ops2, datatype = datatype)
     lcs = replace_group_by_assets(lcs, sets, bl_flag)
     return get_linear_constraints(lcs, sets, key; datatype = datatype, strict = strict,

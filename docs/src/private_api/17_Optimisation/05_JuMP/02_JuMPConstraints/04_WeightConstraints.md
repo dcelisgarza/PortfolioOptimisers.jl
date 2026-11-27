@@ -16,4 +16,6 @@ gross_exposure_bound
 set_gross_exposure_bound!
 non_zero_real_or_vec
 set_linear_weight_constraints!
+linear_row_reading!
+block_position_reading!
 ```

@@ -369,7 +369,7 @@ end
                                             REFP_ORDER[tag][i], clr.res.linkage), clr.S,
                           clr.D, clr.P, clr.k)
         w = optimise(HierarchicalRiskParity(; r = Variance(),
-                                            opt = HierarchicalOptimiser(; cle = pinned)),
+                                            ser = HierarchicalSeriation(; cle = pinned)),
                      ReturnsResult(; nx = refp_rd(tag).nx[keep], X = Xtr)).w
         @test parity_compare(w, REFP_HRP[tag][i]; rtol = 1e-14,
                              name = "$(tag) fold $(i) HRP").ok

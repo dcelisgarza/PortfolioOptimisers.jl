@@ -703,7 +703,7 @@ end
 
 Reads the rows buffer out as the Returns Result that the Online Update gets.
 
-The result is a [`ReturnsResult`](@ref) of the buffer's rows verbatim, under the pinned names, with every other field that the folded rows carried: the factor returns, the benchmark, the Exogenous Series, the timestamps and the implied volatilities of the rows, and the pinned names and `ivpa`. So a leader whose prior states `x_src = ExcessSource()` subtracts the benchmark that the rows carry, as it does in batch. When the buffer records active masks, [`buffer_panel`](@ref) makes them a time-varying Asset Panel on that Returns Result. Otherwise the result carries the static panel that the buffer pinned. The method returns `nothing` when the tree keeps no rows.
+The result is a [`ReturnsResult`](@ref) of the buffer's rows verbatim, under the pinned names, with every other field that the folded rows carried: the factor returns, the benchmark, the Exogenous Series, the Exogenous Graphs, the timestamps and the implied volatilities of the rows, and the pinned names and `ivpa`. So a leader whose prior states `x_src = ExcessSource()` subtracts the benchmark that the rows carry, as it does in batch. When the buffer records active masks, [`buffer_panel`](@ref) makes them a time-varying Asset Panel on that Returns Result. Otherwise the result carries the static panel that the buffer pinned. The method returns `nothing` when the tree keeps no rows.
 
 Every statistic over the rows reads this Returns Result, and the batch verbs read the same type. So `prior(pe, rd)`, `mean(me, rd.X, rd.pnl)` and `optimise(opt, rd)` reduce to the Coverage Universe of the window exactly as they do on a Returns Result that the ingestion layer built. The method takes no copy, because every array of the Returns Result views the valid region of its buffer. A Returns Result that carries rows carries their names by its own contract, so the refusal of a buffer with no pinned names never meets the head.
 
@@ -730,7 +730,7 @@ function buffer_returns_result(X::ReturnsBufferState)
     return ReturnsResult(; nx = X.nx, X = sample_buffer(rows), nf = X.nf,
                          F = buffer_column_view(X.F), nb = X.nb,
                          B = buffer_column_view(X.B), ne = X.ne,
-                         E = buffer_column_view(X.E), ts = X.ts,
+                         E = buffer_column_view(X.E), ng = X.ng, G = X.G, ts = X.ts,
                          iv = get(vols, :iv, nothing), ivpa = get(vols, :ivpa, nothing),
                          pnl = something(buffer_panel(rows), Some(X.pnl)))
 end

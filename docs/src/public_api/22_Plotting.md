@@ -18,6 +18,7 @@ plot_drawdowns
 plot_measures
 plot_histogram
 plot_network
+plot_exogenous_graph
 plot_centrality
 plot_correlation
 plot_mu

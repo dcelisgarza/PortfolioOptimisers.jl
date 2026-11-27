@@ -160,7 +160,8 @@ slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
              check_sol = (; allow_local = false, allow_almost = false))
 mr = MeanRisk(; opt = JuMPOptimiser(; pe = pe, slv = slv))
 cle = ClustersEstimator(; ce = pe.ce)
-hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pe, cle = cle))
+hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pe),
+                             ser = HierarchicalSeriation(; cle = cle))
 
 #=
 ## 2. The online run against the batch expanding run, fold by fold
@@ -287,7 +288,8 @@ rolling = IndexWalkForward(w + p, t; purged_size = p)
 stepped = OnlineIndexWalkForward(w + p, t; purged_size = p)
 cap(pe) = Online(pe; max_history = w)
 
-hrp_cap = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = cap(pe), cle = cle))
+hrp_cap = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = cap(pe)),
+                                 ser = HierarchicalSeriation(; cle = cle))
 b_roll = cross_val_predict(hrp, rd, rolling)
 o_roll = cross_val_predict(hrp_cap, rd, stepped)
 

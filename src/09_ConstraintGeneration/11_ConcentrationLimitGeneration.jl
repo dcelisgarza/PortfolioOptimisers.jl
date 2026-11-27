@@ -1,15 +1,16 @@
 """
     abstract type AbstractPositionReading <: AbstractAlgorithm end
 
-Abstract supertype of the readings of a position of a [`ConcentrationLimit`](@ref).
+Abstract supertype of the readings of a position of a [`ConcentrationLimit`](@ref) or of a [`PositionConstraint`](@ref).
 
-A reading tells the rule how a short position counts. A long-only book has no short position, so every reading gives the weights there. The name avoids the word "exposure", because the factor exposures use it.
+A reading tells the rule how a short position counts. A long-only book has no short position, so [`GrossPosition`](@ref), [`NetPosition`](@ref) and [`LongPosition`](@ref) give the weights there, and [`ShortPosition`](@ref) gives zeros. The name avoids the word "exposure", because the factor exposures use it.
 
-| reading                 | gated expression | a short of -30 % of X | A1 +8 %, A2 -8 % of one issuer |
-|:----------------------- |:---------------- |:--------------------- |:------------------------------ |
-| [`GrossPosition`](@ref) | `lw + sw`        | counts as 30 %        | 16 %                           |
-| [`NetPosition`](@ref)   | `w`              | not seen by the rule  | 0 %                            |
-| [`LongPosition`](@ref)  | `lw`             | not seen by the rule  | 8 %                            |
+| reading                 | expression | a short of -30 % of X          | A1 +8 %, A2 -8 % of one issuer |
+|:----------------------- |:---------- |:------------------------------ |:------------------------------ |
+| [`GrossPosition`](@ref) | `lw + sw`  | counts as 30 %                 | 16 %                           |
+| [`NetPosition`](@ref)   | `w`        | below every concentration rule | 0 %                            |
+| [`LongPosition`](@ref)  | `lw`       | not seen by the rule           | 8 %                            |
+| [`ShortPosition`](@ref) | `sw`       | counts as 30 %                 | 8 %                            |
 
 # Interfaces
 
@@ -19,14 +20,16 @@ To make a new reading, subtype `AbstractPositionReading` and implement the metho
 
   - `PortfolioOptimisers.position_reading(pos::AbstractPositionReading, w::AbstractVector, lw::AbstractVector, sw::AbstractVector) -> AbstractVector`: The reading of each asset, from the weights `w` and their long and short parts `lw` and `sw`.
 
-One method serves both callers. The model gives the variables of its parts. [`concentration_margins`](@ref) gives the parts of a weight vector, `max.(w, 0)` and `max.(-w, 0)`. There is no fallback.
+One method serves every caller. The model gives the variables of its parts. A long-only model has no parts, and the library passes the weights as `lw` and zeros as `sw`. [`concentration_margins`](@ref) gives the parts of a weight vector, `max.(w, 0)` and `max.(-w, 0)`. There is no fallback.
 
 # Related
 
   - [`GrossPosition`](@ref)
   - [`NetPosition`](@ref)
   - [`LongPosition`](@ref)
+  - [`ShortPosition`](@ref)
   - [`ConcentrationLimit`](@ref)
+  - [`PositionConstraint`](@ref)
 """
 abstract type AbstractPositionReading <: AbstractAlgorithm end
 """
@@ -34,7 +37,7 @@ abstract type AbstractPositionReading <: AbstractAlgorithm end
 
 Reads a position as the sum of its long and its short part, so a short position counts at its size.
 
-This is the default reading of a [`ConcentrationLimit`](@ref), and the safe one: a short position cannot hide a long position of the same issuer. The model reads the parts `lw` and `sw` of the weights. They give `lw + sw >= |w|`, so the reading is never below the gross position. When the short budget `sbgt` pins the sum of the parts and `xbgt` is off, the parts can be larger than `|w|`, and then the rule is stricter than the gross position.
+This is the default reading of a [`ConcentrationLimit`](@ref) and of a [`PositionConstraintEstimator`](@ref), and the safe one for a cap: a short position cannot hide a long position of the same issuer. The model reads the parts `lw` and `sw` of the weights. They give `lw + sw >= |w|`, so the reading is never below the gross position. When the short budget `sbgt` pins the sum of the parts and `xbgt` is off, the parts can be larger than `|w|`, and then the rule is stricter than the gross position.
 
 A [`RiskBudgeting`](@ref) head declares its own parts of the weights, and the reading uses them.
 
@@ -73,6 +76,20 @@ The model reads the long part `lw` of the weights. It gives `lw >= max(w, 0)`, s
   - [`NetPosition`](@ref)
 """
 struct LongPosition <: AbstractPositionReading end
+"""
+    struct ShortPosition <: AbstractPositionReading end
+
+Reads a position as the size of its short part, so the rule does not see a long position.
+
+The reading is non-negative, with the sign of the short budget `sbgt`: a weight of -30 % reads as 30 %. The model reads the short part `sw` of the weights. It gives `sw >= max(-w, 0)`, so the reading is never below the short position. When the budgets pin the sum of the short part and `xbgt` is off, `sw` can be larger than `max(-w, 0)`, and then a cap is stricter than the short position. A long-only model has no short part, so the reading is zero there.
+
+# Related
+
+  - [`AbstractPositionReading`](@ref)
+  - [`GrossPosition`](@ref)
+  - [`LongPosition`](@ref)
+"""
+struct ShortPosition <: AbstractPositionReading end
 """
     abstract type AbstractConcentrationAlgorithm <: AbstractAlgorithm end
 
@@ -647,7 +664,7 @@ end
 
 Return the reading of each asset that `pos` gives, from the weights and their long and short parts.
 
-The builder [`mip_wx!`](@ref) gives the variables of the parts of the model. [`concentration_margins`](@ref) gives the smallest parts of a weight vector, `max.(w, 0)` and `max.(-w, 0)`. Then the gross reading is `|w|`, and the long reading is the positive part of `w`.
+The builders [`mip_wx!`](@ref) and [`linear_row_reading!`](@ref) give the variables of the parts of the model. [`concentration_margins`](@ref) gives the smallest parts of a weight vector, `max.(w, 0)` and `max.(-w, 0)`. Then the gross reading is `|w|`, and the long reading is the positive part of `w`.
 
 # Algorithm
 
@@ -656,6 +673,7 @@ The method that Julia selects is the algorithm:
   - [`GrossPosition`](@ref): `lw + sw`.
   - [`NetPosition`](@ref): `w`.
   - [`LongPosition`](@ref): `lw`.
+  - [`ShortPosition`](@ref): `sw`.
 
 # Arguments
 
@@ -671,6 +689,8 @@ The method that Julia selects is the algorithm:
 
   - [`concentration_margins`](@ref)
   - [`ConcentrationMIPSpace`](@ref)
+  - [`linear_row_reading!`](@ref)
+  - [`long_only_reading`](@ref)
   - [`AbstractPositionReading`](@ref)
 """
 function position_reading(::GrossPosition, ::AbstractVector, lw::AbstractVector,
@@ -684,6 +704,45 @@ end
 function position_reading(::LongPosition, ::AbstractVector, lw::AbstractVector,
                           ::AbstractVector)
     return lw
+end
+function position_reading(::ShortPosition, ::AbstractVector, ::AbstractVector,
+                          sw::AbstractVector)
+    return sw
+end
+"""
+    long_only_reading(pos::AbstractPositionReading, w::AbstractVector)
+    long_only_reading(pos::Union{GrossPosition, NetPosition, LongPosition}, w::AbstractVector)
+
+Return the reading of weights that have no short part.
+
+# Algorithm
+
+The method that Julia selects is the algorithm:
+
+  - A [`GrossPosition`](@ref), a [`NetPosition`](@ref) or a [`LongPosition`](@ref): the weights `w`.
+  - Any other reading: [`position_reading`](@ref) with `w` as the long part and zeros as the short part. The zero of a variable is an affine expression, so a row of zeros is a row of the model.
+
+# Arguments
+
+  - `pos`: The reading.
+  - `w`: The weights.
+
+# Returns
+
+  - `v::AbstractVector`: The reading of each asset.
+
+# Related
+
+  - [`position_reading`](@ref)
+  - [`block_position_reading!`](@ref)
+  - [`mip_wx!`](@ref)
+"""
+function long_only_reading(pos::AbstractPositionReading, w::AbstractVector)
+    return position_reading(pos, w, w, zero.(w))
+end
+function long_only_reading(::Union{GrossPosition, NetPosition, LongPosition},
+                           w::AbstractVector)
+    return w
 end
 """
     concentration_positions(set::Option{<:MatNum}, v::AbstractVector)
@@ -804,7 +863,7 @@ function concentration_margins(cl::VecCnlE_Cnl, w::VecNum; kwargs...)
     return [concentration_margins(cli, w; kwargs...) for cli in cl]
 end
 
-export GrossPosition, NetPosition, LongPosition, ExactConcentration,
+export GrossPosition, NetPosition, LongPosition, ShortPosition, ExactConcentration,
        SumLargestConcentration, ConcentrationLimitEstimator, ConcentrationLimit,
        ConcentrationMargins, concentration_limit_constraints, concentration_margins
 public AbstractPositionReading, AbstractConcentrationAlgorithm, position_reading

@@ -8,7 +8,7 @@ jet = "0.13.3"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "666cfa9753"
+commit = "2d8943aeb5"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -29,6 +29,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt/13_CovarianceForecastPlots.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt/14_ReportFigures.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/15_ExogenousGraphPlots.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { raw = 0, reviewed = 0 }
@@ -61,6 +62,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/01_Base/16_CoveragePolicy.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/17_ReturnsSource.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/18_CountFraction.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/19_UnknownEntryRules.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/01_Operators.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/02_ArrayViews.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/03_TypeUtilities.jl" = { raw = 0, reviewed = 0 }
@@ -74,7 +76,13 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/03_InputData/02_AssetPanelBuilder.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/03_ListingSpan.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/04_Preprocessing.jl" = { raw = 0, reviewed = 0 }
-"src/03_InputData/05_PanelViews.jl" = { raw = 1, reviewed = 1 }
+"src/03_InputData/05_ExogenousGraph/01_ExogenousGraph.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/05_ExogenousGraph/02_ExogenousGraphSeries.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/05_ExogenousGraph/03_GraphObservations.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/05_ExogenousGraph/04_GraphTables.jl" = { raw = 4, reviewed = 0 }
+"src/03_InputData/05_ExogenousGraph/05_GraphRequirements.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/05_ExogenousGraph/06_EdgeRules.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/05_ExogenousGraph/07_GraphUnion.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/06_PricesResult.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/07_PriceIngestion.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/08_PriceGapFill.jl" = { raw = 0, reviewed = 0 }
@@ -92,6 +100,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/03_InputData/20_PanelFieldValues.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/21_AssetPanelSummary.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/22_PanelRoundTrip.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/23_PanelViews.jl" = { raw = 1, reviewed = 1 }
 "src/04_MatrixProcessing/01_PosdefMatrix.jl" = { raw = 2, reviewed = 2 }
 "src/04_MatrixProcessing/02_Denoise.jl" = { raw = 1, reviewed = 1 }
 "src/04_MatrixProcessing/03_Detone.jl" = { raw = 0, reviewed = 0 }
@@ -216,17 +225,19 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/06_Distance/04_Similarity.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/05_FeatureDistance.jl" = { raw = 3, reviewed = 3 }
 "src/06_Distance/06_FeatureDistanceActiveRows.jl" = { raw = 0, reviewed = 0 }
+"src/06_Distance/07_BlendDistance.jl" = { raw = 0, reviewed = 0 }
 "src/07_JuMPModelOptimisation.jl" = { raw = 5, reviewed = 5 }
 "src/08_Phylogeny/01_Base_Phylogeny.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/02_Clusters.jl" = { raw = 0, reviewed = 0 }
-"src/08_Phylogeny/03_Hierarchical.jl" = { raw = 2, reviewed = 2 }
+"src/08_Phylogeny/03_Hierarchical_a.jl" = { raw = 2, reviewed = 2 }
+"src/08_Phylogeny/03_Hierarchical_b.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/04_NonHierarchicalClustering.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/05_Phylogeny.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/06_DBHT/01_DBHT.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/06_DBHT/02_PMFG.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/06_DBHT/03_GraphTraversal.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/06_DBHT/04_CliqueHierarchy.jl" = { raw = 0, reviewed = 0 }
-"src/08_Phylogeny/06_DBHT/05_BubbleTree.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/06_DBHT/05_BubbleTree.jl" = { raw = 1, reviewed = 1 }
 "src/08_Phylogeny/06_DBHT/06_DBHTDendrogram.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/06_DBHT/07_DBHTClustering.jl" = { raw = 1, reviewed = 1 }
 "src/08_Phylogeny/07_LoGo.jl" = { raw = 4, reviewed = 4 }
@@ -234,6 +245,8 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/08_Phylogeny/08_Network/02_NetworkEstimator.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/08_Network/03_NetworkGraph.jl" = { raw = 2, reviewed = 2 }
 "src/08_Phylogeny/08_Network/04_Separation.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/08_Network/05_ExogenousNetwork.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/08_Network/06_ExogenousNetworkGraph.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/09_Centrality/01_Centrality.jl" = { raw = 16, reviewed = 16 }
 "src/08_Phylogeny/09_Centrality/02_CentralityPolarity.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/09_Centrality/03_CentralityEstimator.jl" = { raw = 0, reviewed = 0 }
@@ -241,6 +254,8 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/08_Phylogeny/10_PhylogenyClustering.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/11_PhylogenyMatrix.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/12_AssetPhylogeny.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/13_Seriation.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/14_SpectralSeriation.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl" = { raw = 1, reviewed = 1 }
@@ -253,6 +268,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/10_LotUnitConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/11_ConcentrationLimitGeneration.jl" = { raw = 0, reviewed = 0 }
+"src/09_ConstraintGeneration/12_PositionConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/01_Base_Prior.jl" = { raw = 1, reviewed = 1 }
 "src/10_Prior/02_EmpiricalPrior.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/03_FactorPrior.jl" = { raw = 0, reviewed = 0 }
@@ -463,6 +479,12 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/24_Report/02_ReportModel.jl" = { raw = 0, reviewed = 0 }
 "src/24_Report/03_ReportWriters.jl" = { raw = 0, reviewed = 0 }
 "src/24_Report/04_PortfolioReport.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/05_DependencyExposureTypes.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/06_DependencyReach.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/07_DependencyExposureRows.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/08_DependencyExposureMethods.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/09_DependencyReport.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/10_DependencySpace.jl" = { raw = 0, reviewed = 0 }
 "src/PortfolioOptimisers.jl" = { raw = 0, reviewed = 0 }
 
 [run.plots_ext]
@@ -484,6 +506,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt/13_CovarianceForecastPlots.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt/14_ReportFigures.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/15_ExogenousGraphPlots.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { raw = 0, reviewed = 0 }
@@ -516,6 +539,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/01_Base/16_CoveragePolicy.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/17_ReturnsSource.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/18_CountFraction.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/19_UnknownEntryRules.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/01_Operators.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/02_ArrayViews.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/03_TypeUtilities.jl" = { raw = 0, reviewed = 0 }
@@ -529,7 +553,13 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/03_InputData/02_AssetPanelBuilder.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/03_ListingSpan.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/04_Preprocessing.jl" = { raw = 0, reviewed = 0 }
-"src/03_InputData/05_PanelViews.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/05_ExogenousGraph/01_ExogenousGraph.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/05_ExogenousGraph/02_ExogenousGraphSeries.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/05_ExogenousGraph/03_GraphObservations.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/05_ExogenousGraph/04_GraphTables.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/05_ExogenousGraph/05_GraphRequirements.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/05_ExogenousGraph/06_EdgeRules.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/05_ExogenousGraph/07_GraphUnion.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/06_PricesResult.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/07_PriceIngestion.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/08_PriceGapFill.jl" = { raw = 0, reviewed = 0 }
@@ -547,6 +577,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/03_InputData/20_PanelFieldValues.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/21_AssetPanelSummary.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/22_PanelRoundTrip.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/23_PanelViews.jl" = { raw = 0, reviewed = 0 }
 "src/04_MatrixProcessing/01_PosdefMatrix.jl" = { raw = 0, reviewed = 0 }
 "src/04_MatrixProcessing/02_Denoise.jl" = { raw = 0, reviewed = 0 }
 "src/04_MatrixProcessing/03_Detone.jl" = { raw = 0, reviewed = 0 }
@@ -671,10 +702,12 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/06_Distance/04_Similarity.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/05_FeatureDistance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/06_FeatureDistanceActiveRows.jl" = { raw = 0, reviewed = 0 }
+"src/06_Distance/07_BlendDistance.jl" = { raw = 0, reviewed = 0 }
 "src/07_JuMPModelOptimisation.jl" = { raw = 5, reviewed = 5 }
 "src/08_Phylogeny/01_Base_Phylogeny.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/02_Clusters.jl" = { raw = 0, reviewed = 0 }
-"src/08_Phylogeny/03_Hierarchical.jl" = { raw = 1, reviewed = 1 }
+"src/08_Phylogeny/03_Hierarchical_a.jl" = { raw = 1, reviewed = 1 }
+"src/08_Phylogeny/03_Hierarchical_b.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/04_NonHierarchicalClustering.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/05_Phylogeny.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/06_DBHT/01_DBHT.jl" = { raw = 0, reviewed = 0 }
@@ -689,6 +722,8 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/08_Phylogeny/08_Network/02_NetworkEstimator.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/08_Network/03_NetworkGraph.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/08_Network/04_Separation.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/08_Network/05_ExogenousNetwork.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/08_Network/06_ExogenousNetworkGraph.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/09_Centrality/01_Centrality.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/09_Centrality/02_CentralityPolarity.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/09_Centrality/03_CentralityEstimator.jl" = { raw = 0, reviewed = 0 }
@@ -696,6 +731,8 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/08_Phylogeny/10_PhylogenyClustering.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/11_PhylogenyMatrix.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/12_AssetPhylogeny.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/13_Seriation.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/14_SpectralSeriation.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl" = { raw = 0, reviewed = 0 }
@@ -708,6 +745,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/10_LotUnitConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/11_ConcentrationLimitGeneration.jl" = { raw = 0, reviewed = 0 }
+"src/09_ConstraintGeneration/12_PositionConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/01_Base_Prior.jl" = { raw = 2, reviewed = 2 }
 "src/10_Prior/02_EmpiricalPrior.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/03_FactorPrior.jl" = { raw = 0, reviewed = 0 }
@@ -918,6 +956,12 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/24_Report/02_ReportModel.jl" = { raw = 0, reviewed = 0 }
 "src/24_Report/03_ReportWriters.jl" = { raw = 0, reviewed = 0 }
 "src/24_Report/04_PortfolioReport.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/05_DependencyExposureTypes.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/06_DependencyReach.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/07_DependencyExposureRows.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/08_DependencyExposureMethods.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/09_DependencyReport.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/10_DependencySpace.jl" = { raw = 0, reviewed = 0 }
 "src/PortfolioOptimisers.jl" = { raw = 0, reviewed = 0 }
 
 [run.graph_ext]
@@ -939,6 +983,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt/13_CovarianceForecastPlots.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt/14_ReportFigures.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/15_ExogenousGraphPlots.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { raw = 0, reviewed = 0 }
@@ -971,6 +1016,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/01_Base/16_CoveragePolicy.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/17_ReturnsSource.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/18_CountFraction.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/19_UnknownEntryRules.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/01_Operators.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/02_ArrayViews.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/03_TypeUtilities.jl" = { raw = 0, reviewed = 0 }
@@ -984,7 +1030,13 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/03_InputData/02_AssetPanelBuilder.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/03_ListingSpan.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/04_Preprocessing.jl" = { raw = 0, reviewed = 0 }
-"src/03_InputData/05_PanelViews.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/05_ExogenousGraph/01_ExogenousGraph.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/05_ExogenousGraph/02_ExogenousGraphSeries.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/05_ExogenousGraph/03_GraphObservations.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/05_ExogenousGraph/04_GraphTables.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/05_ExogenousGraph/05_GraphRequirements.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/05_ExogenousGraph/06_EdgeRules.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/05_ExogenousGraph/07_GraphUnion.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/06_PricesResult.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/07_PriceIngestion.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/08_PriceGapFill.jl" = { raw = 0, reviewed = 0 }
@@ -1002,6 +1054,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/03_InputData/20_PanelFieldValues.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/21_AssetPanelSummary.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/22_PanelRoundTrip.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/23_PanelViews.jl" = { raw = 0, reviewed = 0 }
 "src/04_MatrixProcessing/01_PosdefMatrix.jl" = { raw = 0, reviewed = 0 }
 "src/04_MatrixProcessing/02_Denoise.jl" = { raw = 0, reviewed = 0 }
 "src/04_MatrixProcessing/03_Detone.jl" = { raw = 0, reviewed = 0 }
@@ -1126,10 +1179,12 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/06_Distance/04_Similarity.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/05_FeatureDistance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/06_FeatureDistanceActiveRows.jl" = { raw = 0, reviewed = 0 }
+"src/06_Distance/07_BlendDistance.jl" = { raw = 0, reviewed = 0 }
 "src/07_JuMPModelOptimisation.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/01_Base_Phylogeny.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/02_Clusters.jl" = { raw = 0, reviewed = 0 }
-"src/08_Phylogeny/03_Hierarchical.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/03_Hierarchical_a.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/03_Hierarchical_b.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/04_NonHierarchicalClustering.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/05_Phylogeny.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/06_DBHT/01_DBHT.jl" = { raw = 0, reviewed = 0 }
@@ -1144,6 +1199,8 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/08_Phylogeny/08_Network/02_NetworkEstimator.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/08_Network/03_NetworkGraph.jl" = { raw = 2, reviewed = 2 }
 "src/08_Phylogeny/08_Network/04_Separation.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/08_Network/05_ExogenousNetwork.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/08_Network/06_ExogenousNetworkGraph.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/09_Centrality/01_Centrality.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/09_Centrality/02_CentralityPolarity.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/09_Centrality/03_CentralityEstimator.jl" = { raw = 0, reviewed = 0 }
@@ -1151,6 +1208,8 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/08_Phylogeny/10_PhylogenyClustering.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/11_PhylogenyMatrix.jl" = { raw = 2, reviewed = 2 }
 "src/08_Phylogeny/12_AssetPhylogeny.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/13_Seriation.jl" = { raw = 0, reviewed = 0 }
+"src/08_Phylogeny/14_SpectralSeriation.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl" = { raw = 0, reviewed = 0 }
@@ -1163,6 +1222,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/10_LotUnitConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/11_ConcentrationLimitGeneration.jl" = { raw = 0, reviewed = 0 }
+"src/09_ConstraintGeneration/12_PositionConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/01_Base_Prior.jl" = { raw = 2, reviewed = 2 }
 "src/10_Prior/02_EmpiricalPrior.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/03_FactorPrior.jl" = { raw = 0, reviewed = 0 }
@@ -1373,4 +1433,10 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/24_Report/02_ReportModel.jl" = { raw = 0, reviewed = 0 }
 "src/24_Report/03_ReportWriters.jl" = { raw = 0, reviewed = 0 }
 "src/24_Report/04_PortfolioReport.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/05_DependencyExposureTypes.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/06_DependencyReach.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/07_DependencyExposureRows.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/08_DependencyExposureMethods.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/09_DependencyReport.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/10_DependencySpace.jl" = { raw = 0, reviewed = 0 }
 "src/PortfolioOptimisers.jl" = { raw = 0, reviewed = 0 }

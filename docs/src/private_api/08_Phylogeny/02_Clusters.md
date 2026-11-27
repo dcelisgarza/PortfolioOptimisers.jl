@@ -15,4 +15,5 @@ AbstractClusteringResult
 Int_ONC
 ClTypes
 ClE_Cl
+ClusteringLinkage
 ```

@@ -2072,12 +2072,12 @@ end
     hrp = HierarchicalRiskParity(;
                                  opt = HierarchicalOptimiser(;
                                                              pe = EmpiricalPrior(;
-                                                                                 max_scenarios = n),
-                                                             cle = clp))
+                                                                                 max_scenarios = n)),
+                                 ser = HierarchicalSeriation(; cle = clp))
     res = optimise(hrp, rdi)
-    @test res.clr.res.order == clt.res.order
+    @test res.ser.order == clt.res.order
     @test isapprox(sum(res.w), 1)
-    @test optimise(hrp, rdc).clr.res.order == clt.res.order
+    @test optimise(hrp, rdc).ser.order == clt.res.order
 end
 
 @testset "The prior carrier's `w` is documented as observation weights" begin
@@ -3897,6 +3897,8 @@ end
               () -> benchmark_relative_returns(rds, true),
               () -> clusterise(ClustersEstimator(), rds; brt = true),
               () -> clusterise(ClustersEstimator(), pr; rd = rds, x_src = :prior),
+              # The branch order is a field of the algorithm since #2174.
+              () -> clusterise(ClustersEstimator(), pr; rd = rds, branchorder = :optimal),
               () -> phylogeny_matrix(NetworkEstimator(), pr; rd = rds, brt = true),
               () -> phylogeny_constraints(SemiDefinitePhylogenyEstimator(), pr; brt = true),
               () -> centrality_vector(CentralityEstimator(), pr; rd = rds, brt = true),
@@ -3907,8 +3909,8 @@ end
         @test_throws MethodError f()
     end
     # The keywords that the library forwards still reach the graph verbs.
-    @test isa(clusterise(ClustersEstimator(), pr; rd = rds, dims = 1,
-                         branchorder = :optimal), PO.AbstractClusteringResult)
+    @test isa(clusterise(ClustersEstimator(), pr; rd = rds, dims = 1),
+              PO.AbstractClusteringResult)
 end
 
 @testset "The claims that the /unslop pass of the base prior corrected (#531)" begin

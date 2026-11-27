@@ -116,7 +116,7 @@ const PO = PortfolioOptimisers
                                                                             omsk = o,
                                                                             pmsk = .!o)]))
             hrp = HierarchicalRiskParity(;
-                                         opt = HierarchicalOptimiser(;
+                                         ser = HierarchicalSeriation(;
                                                                      cle = NetworkClustersEstimator(;
                                                                                                     nte = nte)))
             res_hole = optimise(hrp, rd_hole)
@@ -249,31 +249,45 @@ const PO = PortfolioOptimisers
     end
 
     @testset "The producer slot drives a full optimisation" begin
-        hopt_d = HierarchicalOptimiser(; cle = ClustersEstimator(; de = fde), slv = slv)
-        hopt_p = HierarchicalOptimiser(; pe = FactorPrior(),
-                                       cle = ClustersEstimator(; de = pde), slv = slv)
-        hopt_c = HierarchicalOptimiser(; cle = ClustersEstimator(; de = cde), slv = slv)
+        hopt_d = HierarchicalOptimiser(; slv = slv)
+        hopt_p = HierarchicalOptimiser(; pe = FactorPrior(), slv = slv)
+        hopt_c = HierarchicalOptimiser(; slv = slv)
+        cle_d = ClustersEstimator(; de = fde)
+        cle_p = ClustersEstimator(; de = pde)
+        cle_c = ClustersEstimator(; de = cde)
+        # The clustering is the seriation's of an HRP or a Schur, and the HERC's own.
+        hier(oe, opt, cle) =
+            if oe === HierarchicalRiskParity
+                oe(; opt = opt, ser = HierarchicalSeriation(; cle = cle))
+            else
+                oe(; opt = opt, cle = cle)
+            end
+        # The clusters sit in `res.ser.clr` of an HRP and in `res.clr` of a HERC.
+        clr_of(res) = hasproperty(res, :ser) ? res.ser.clr : res.clr
         # The source selector is gone: there is one carrier and one producer slot.
         @test !hasproperty(hopt_d, :z_src)
 
         for oe in (HierarchicalRiskParity, HierarchicalEqualRiskContribution)
-            wd = optimise(oe(; opt = hopt_d), rd)
-            wp = optimise(oe(; opt = hopt_p), rd)
-            wc = optimise(oe(; opt = hopt_c), rd)
+            wd = optimise(hier(oe, hopt_d, cle_d), rd)
+            wp = optimise(hier(oe, hopt_p, cle_p), rd)
+            wc = optimise(hier(oe, hopt_c, cle_c), rd)
             for res in (wd, wp, wc)
                 @test isapprox(sum(res.w), 1)
                 @test all(isfinite, res.w)
             end
             # The clusters — hence the weights — actually come from the panel.
-            @test wd.clr.D == distance(fde, Zd)
-            @test wp.clr.D == distance(fde, Zp)
+            @test clr_of(wd).D == distance(fde, Zd)
+            @test clr_of(wp).D == distance(fde, Zp)
             @test wd.w != wc.w
             @test wp.w != wd.w
         end
 
         # `SchurComplementHierarchicalRiskParity` forwards the field too.
-        ws = optimise(SchurComplementHierarchicalRiskParity(; opt = hopt_d), rd)
-        @test ws.clr.D == distance(fde, Zd)
+        ws = optimise(SchurComplementHierarchicalRiskParity(; opt = hopt_d,
+                                                            ser = HierarchicalSeriation(;
+                                                                                        cle = cle_d)),
+                      rd)
+        @test ws.ser.clr.D == distance(fde, Zd)
 
         jopt = JuMPOptimiser(; slv = slv)
         @test !hasproperty(jopt, :z_src)
@@ -287,7 +301,8 @@ const PO = PortfolioOptimisers
         # The producer survives the constructor round trip through `port_opt_view`, which is
         # what keeps it stable across NCO clusters and cross-validation folds.
         i = [1, 3, 5, 7]
-        @test PortfolioOptimisers.port_opt_view(hopt_p, i, rd.X).cle.de.ape === ape
+        @test PortfolioOptimisers.port_opt_view(hier(HierarchicalRiskParity, hopt_p, cle_p),
+                                                i, rd.X).ser.cle.de.ape === ape
     end
 
     @testset "A constraint-generating JuMPOptimiser routes the panel too" begin
@@ -778,7 +793,7 @@ end
         # The call that `feature_labels` recommends, on a real optimisation result.
         fde = FeatureDistance(; sel = ["f3", "f1"])
         res = optimise(HierarchicalRiskParity(;
-                                              opt = HierarchicalOptimiser(;
+                                              ser = HierarchicalSeriation(;
                                                                           cle = ClustersEstimator(;
                                                                                                   de = fde))),
                        rd)

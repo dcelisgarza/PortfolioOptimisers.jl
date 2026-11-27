@@ -204,31 +204,37 @@ under each of the four scalarisers. The negative skewness has a scale of 0.1.
 r = [Variance(), NegativeSkewness(; settings = RiskMeasureSettings(; scale = 0.1))]
 
 results = [optimise(HierarchicalEqualRiskContribution(; ri = r[1], ro = r[1],
-                                                      opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  cle = clr))),
+                                                      opt = HierarchicalOptimiser(;
+                                                                                  pe = pr),
+                                                      cle = clr)),
            optimise(HierarchicalEqualRiskContribution(; ri = r[2], ro = r[2],
-                                                      opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  cle = clr))),
+                                                      opt = HierarchicalOptimiser(;
+                                                                                  pe = pr),
+                                                      cle = clr)),
            optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
                                                       scai = SumScalariser(),
                                                       scao = SumScalariser(),
-                                                      opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  cle = clr))),
+                                                      opt = HierarchicalOptimiser(;
+                                                                                  pe = pr),
+                                                      cle = clr)),
            optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
                                                       scai = MaxScalariser(),
                                                       scao = MaxScalariser(),
-                                                      opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  cle = clr))),
+                                                      opt = HierarchicalOptimiser(;
+                                                                                  pe = pr),
+                                                      cle = clr)),
            optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
                                                       scai = MinScalariser(),
                                                       scao = MinScalariser(),
-                                                      opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  cle = clr))),
+                                                      opt = HierarchicalOptimiser(;
+                                                                                  pe = pr),
+                                                      cle = clr)),
            optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
                                                       scai = LogSumExpScalariser(),
                                                       scao = LogSumExpScalariser(),
-                                                      opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  cle = clr)))]
+                                                      opt = HierarchicalOptimiser(;
+                                                                                  pe = pr),
+                                                      cle = clr))]
 
 pretty_table(DataFrame(:assets => rd.nx, :variance => results[1].w,
                        :neg_skew => results[2].w, :sum_sca => results[3].w,
@@ -250,31 +256,37 @@ single measure.
 r = [Variance(), NegativeSkewness()]
 
 results = [optimise(HierarchicalEqualRiskContribution(; ri = r[1], ro = r[1],
-                                                      opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  cle = clr))),
+                                                      opt = HierarchicalOptimiser(;
+                                                                                  pe = pr),
+                                                      cle = clr)),
            optimise(HierarchicalEqualRiskContribution(; ri = r[2], ro = r[2],
-                                                      opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  cle = clr))),
+                                                      opt = HierarchicalOptimiser(;
+                                                                                  pe = pr),
+                                                      cle = clr)),
            optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
                                                       scai = SumScalariser(),
                                                       scao = SumScalariser(),
-                                                      opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  cle = clr))),
+                                                      opt = HierarchicalOptimiser(;
+                                                                                  pe = pr),
+                                                      cle = clr)),
            optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
                                                       scai = MaxScalariser(),
                                                       scao = MaxScalariser(),
-                                                      opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  cle = clr))),
+                                                      opt = HierarchicalOptimiser(;
+                                                                                  pe = pr),
+                                                      cle = clr)),
            optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
                                                       scai = MinScalariser(),
                                                       scao = MinScalariser(),
-                                                      opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  cle = clr))),
+                                                      opt = HierarchicalOptimiser(;
+                                                                                  pe = pr),
+                                                      cle = clr)),
            optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
                                                       scai = LogSumExpScalariser(),
                                                       scao = LogSumExpScalariser(),
-                                                      opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  cle = clr)))]
+                                                      opt = HierarchicalOptimiser(;
+                                                                                  pe = pr),
+                                                      cle = clr))]
 
 pretty_table(DataFrame(:assets => rd.nx, :variance => results[1].w,
                        :neg_skew => results[2].w, :sum_sca => results[3].w,

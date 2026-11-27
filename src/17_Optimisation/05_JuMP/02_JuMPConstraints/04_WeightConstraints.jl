@@ -211,7 +211,7 @@ end
 
 Return the long and short parts of the weights that the budgets of a block read.
 
-A block reads the shared parts of the weights when they exist, see [`set_weight_parts!`](@ref). When a long-only block came first, the weights have the long part `lw = w` and no short part. Then the first budget of the block that reads the parts makes parts of its own under `prefix`, with their rows, and a later budget of the block reads them. So a block that states no short or gross budget makes no parts.
+A block reads the shared parts of the weights when they exist, see [`set_weight_parts!`](@ref). When a long-only block came first, the weights have the long part `lw = w` and no short part. Then the first budget or [`PositionConstraint`](@ref) of the block that reads the parts makes parts of its own under `prefix`, with their rows, and a later one reads them. So a block that states none of them makes no parts.
 
 # JuMP formulation
 
@@ -244,6 +244,7 @@ Where:
   - [`set_weight_parts!`](@ref)
   - [`set_long_short_budget_constraints!`](@ref)
   - [`set_gross_budget_constraints!`](@ref)
+  - [`block_position_reading!`](@ref)
 """
 function weight_parts!(model::JuMP.Model, prefix::Symbol)::Tuple
     if shared_has(model, :sw)
@@ -437,20 +438,20 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add linear inequality and equality weight constraints to the JuMP optimisation model.
 
-The method on `lcms = nothing` adds no row. Any other type or arity is a `MethodError`. The method on a [`Lc_VecLc`](@ref) iterates over the collection of [`LinearConstraint`](@ref) objects `lcms` and adds `A * w ≤ k * B` (inequality) and `A * w = k * B` (equality) constraints for each entry.
+The method on `lcms = nothing` adds no row. Any other type or arity is a `MethodError`. The method on a [`Pc_Lc_VecPc_Lc`](@ref) iterates over the collection `lcms` and adds `A * u ≤ k * B` (inequality) and `A * u = k * B` (equality) constraints for each entry. [`linear_row_reading!`](@ref) gives `u`: the weights for a [`LinearConstraint`](@ref), and the reading of the weights for a [`PositionConstraint`](@ref).
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathbf{A}_{\\mathrm{ineq}} \\boldsymbol{w} \\leq k \\boldsymbol{B}_{\\mathrm{ineq}}\\,, \\\\
-\\mathbf{A}_{\\mathrm{eq}} \\boldsymbol{w} &= k \\boldsymbol{B}_{\\mathrm{eq}}\\,.
+\\mathbf{A}_{\\mathrm{ineq}} \\boldsymbol{u} &\\leq k \\boldsymbol{B}_{\\mathrm{ineq}}\\,, \\\\
+\\mathbf{A}_{\\mathrm{eq}} \\boldsymbol{u} &= k \\boldsymbol{B}_{\\mathrm{eq}}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - $(math_dict[:w_port])
+  - ``\\boldsymbol{u}``: ``N \\times 1`` vector of the weights, or of their reading.
   - $(math_dict[:k_budget])
   - ``\\mathbf{A}_{\\mathrm{ineq}}``, ``\\mathbf{A}_{\\mathrm{eq}}``: Constraint coefficient matrices for inequality and equality constraints.
   - ``\\boldsymbol{B}_{\\mathrm{ineq}}``, ``\\boldsymbol{B}_{\\mathrm{eq}}``: Constraint response vectors for inequality and equality constraints.
@@ -458,11 +459,12 @@ Where:
 # Arguments
 
   - $(arg_dict[:model])
-  - `lcms`: Collection of [`LinearConstraint`](@ref) objects defining the linear constraints.
+  - `lcms`: One [`LinearConstraint`](@ref) or [`PositionConstraint`](@ref), or a vector of them.
   - `name_ineq::Symbol`: Bare Model State entry name seeding the indexed inequality
     constraint entries.
   - `name_eq::Symbol`: Bare Model State entry name seeding the indexed equality constraint
     entries.
+  - `wb`: The weight bounds of the block. A [`PositionConstraint`](@ref) reads the parts of the weights when they admit a short position.
   - $(arg_dict[:prefix_kw])
 
 # Returns
@@ -472,32 +474,127 @@ Where:
 # Related
 
   - [`non_zero_real_or_vec`](@ref)
+  - [`linear_row_reading!`](@ref)
   - [`LinearConstraint`](@ref)
+  - [`PositionConstraint`](@ref)
   - [`set_weight_constraints!`](@ref)
 """
-function set_linear_weight_constraints!(model::JuMP.Model, lcms::Lc_VecLc,
+function set_linear_weight_constraints!(model::JuMP.Model, lcms::Pc_Lc_VecPc_Lc,
                                         name_ineq::Symbol, name_eq::Symbol;
+                                        wb::Option{<:WeightBounds} = nothing,
                                         prefix::Symbol = Symbol(""))
     w = get_w(model, prefix)
     k = get_k(model)
     sc = get_constraint_scale(model)
     for (i, lcm) in enumerate(lcms)
-        if !isnothing(lcm.ineq)
-            A = lcm.ineq.A
-            B = lcm.ineq.B
+        u, lc = linear_row_reading!(model, lcm, i, w, wb, prefix)
+        if !isnothing(lc.ineq)
+            A = lc.ineq.A
+            B = lc.ineq.B
             state_set!(model, prefix, name_ineq, i,
-                       JuMP.@constraint(model, sc * (A * w - k * B) <= 0))
+                       JuMP.@constraint(model, sc * (A * u - k * B) <= 0))
         end
-        if !isnothing(lcm.eq)
-            A = lcm.eq.A
-            B = lcm.eq.B
+        if !isnothing(lc.eq)
+            A = lc.eq.A
+            B = lc.eq.B
             state_set!(model, prefix, name_eq, i,
-                       JuMP.@constraint(model, sc * (A * w - k * B) == 0))
+                       JuMP.@constraint(model, sc * (A * u - k * B) == 0))
         end
     end
     return nothing
 end
 function set_linear_weight_constraints!(::JuMP.Model, ::Nothing, ::Symbol, ::Symbol;
-                                        prefix::Symbol = Symbol(""))
+                                        kwargs...)
     return nothing
+end
+"""
+    linear_row_reading!(model::JuMP.Model, lc::LinearConstraint, i::Integer,
+                        w::AbstractVector, wb::Option{<:WeightBounds},
+                        prefix::Symbol) -> (w, lc)
+    linear_row_reading!(model::JuMP.Model, pc::PositionConstraint{<:Any, <:NetPosition},
+                        i::Integer, w::AbstractVector, wb::Option{<:WeightBounds},
+                        prefix::Symbol) -> (w, lc)
+    linear_row_reading!(model::JuMP.Model, pc::PositionConstraint, i::Integer,
+                        w::AbstractVector, wb::Option{<:WeightBounds},
+                        prefix::Symbol) -> (u, lc)
+
+Return the vector that the rows of entry `i` of a linear slot apply to, and the constraint that holds the rows.
+
+# Algorithm
+
+The method that Julia selects is the algorithm:
+
+  - A [`LinearConstraint`](@ref): the weights and the constraint itself.
+  - A [`PositionConstraint`](@ref) with a [`NetPosition`](@ref): the weights, which no part of the model adds to, and the constraint `pc.lc`.
+  - Any other [`PositionConstraint`](@ref): the reading of the weights from [`block_position_reading!`](@ref), registered as `lcs_pos_i` under `prefix`, and the constraint `pc.lc`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `lc`, `pc`: The entry of the slot.
+  - `i`: The index of the entry.
+  - `w`: The weights registered under `prefix`.
+  - `wb`: The weight bounds of the block, or `nothing`.
+  - `prefix`: The Model State namespace of the block.
+
+# Returns
+
+  - `(u, lc)::Tuple`: The vector of the rows, and the [`LinearConstraint`](@ref).
+
+# Related
+
+  - [`set_linear_weight_constraints!`](@ref)
+  - [`block_position_reading!`](@ref)
+"""
+function linear_row_reading!(::JuMP.Model, lc::LinearConstraint, ::Integer, w, ::Any,
+                             ::Symbol)
+    # No type of `w` in the signature: the call compiles in line and allocates nothing.
+    return w, lc
+end
+function linear_row_reading!(::JuMP.Model, pc::PositionConstraint{<:Any, <:NetPosition},
+                             ::Integer, w, ::Any, ::Symbol)
+    return w, pc.lc
+end
+function linear_row_reading!(model::JuMP.Model, pc::PositionConstraint, i::Integer, w, wb,
+                             prefix::Symbol)
+    v = block_position_reading!(model, pc.pos, w, wb, prefix)
+    u = state_set!(model, prefix, :lcs_pos_, i, JuMP.@expression(model, v))
+    return u, pc.lc
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the reading of the weights of a block that needs their parts, see [`position_reading`](@ref).
+
+# Algorithm
+
+ 1. When the bounds admit a short position, return the reading of the weights and of the parts that [`weight_parts!`](@ref) gives the block.
+ 2. Otherwise return the reading of long-only weights with [`long_only_reading`](@ref), with no new variable.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `pos`: The reading.
+  - `w`: The weights registered under `prefix`.
+  - `wb`: The resolved weight bounds of the block. The resolver fills a side that states no bound, so each side is a vector.
+  - `prefix`: The Model State namespace of the block.
+
+# Returns
+
+  - `u::AbstractVector`: The reading of each asset.
+
+# Related
+
+  - [`linear_row_reading!`](@ref)
+  - [`position_reading`](@ref)
+  - [`long_only_reading`](@ref)
+  - [`weight_parts!`](@ref)
+"""
+function block_position_reading!(model::JuMP.Model, pos::AbstractPositionReading,
+                                 w::AbstractVector, wb::WeightBounds, prefix::Symbol)
+    if !(w_neg_flag(wb.lb) || w_neg_flag(wb.ub))
+        return long_only_reading(pos, w)
+    end
+    lw, sw = weight_parts!(model, prefix)
+    return position_reading(pos, w, lw, sw)
 end

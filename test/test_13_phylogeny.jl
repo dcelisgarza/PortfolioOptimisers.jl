@@ -208,7 +208,7 @@
                                                   Distance(), AngularSimilarity(),
                                                   HopCount(), nothing)
         # The admitted members build by either route.
-        @test DBHT(MaximumDistanceSimilarity(), UniqueRoot()) isa DBHT
+        @test DBHT(MaximumDistanceSimilarity(), UniqueRoot(), OptimalLeafOrder()) isa DBHT
         @test LoGo(Distance(), ComplementSimilarity(), Posdef()) isa LoGo
         @test NetworkEstimator(PortfolioOptimisersCovariance(), Distance(), KruskalTree(),
                                HopCount(), nothing) isa NetworkEstimator
@@ -476,27 +476,127 @@
                 @test eltype(distance(FeatureDistance(; alg = alg), Z3)) === Float32
             end
         end
+        @testset "ChordDist, the default metric, and ChordSimilarity (#2193)" begin
+            cdm = ChordDist()
+            @test cdm isa DS.Metric
+            @test FeatureDistance().metric === cdm
+            @test PortfolioOptimisers.default_similarity(cdm) === ChordSimilarity()
+            # The kernel is the closed form sqrt((1 - cos) / 2) = ‖â - b̂‖ / 2. The diagonal is
+            # left out: the docstring states the residual of a vector against itself there.
+            Z = randn(rng, 9, 4)
+            for i in 1:9, j in 1:9
+                i == j && continue
+                a = Z[i, :]
+                b = Z[j, :]
+                c = dot(a, b) / (norm(a) * norm(b))
+                @test isapprox(cdm(a, b), sqrt((1 - c) / 2); atol = 1e-8)
+                @test isapprox(cdm(a, b), norm(a / norm(a) - b / norm(b)) / 2; atol = 1e-8)
+            end
+            # The zero-vector rule of `AngularDist`: 0 between two zero vectors, 1 against
+            # a non-zero one, on both paths.
+            @test iszero(cdm(zeros(3), zeros(3)))
+            @test isone(cdm(zeros(3), [1.0, 2.0, 0.0]))
+            @test isone(cdm([1.0, 2.0, 0.0], zeros(3)))
+            # The clamp: a cosine that rounds above 1 or below -1 gives no `NaN` and no
+            # distance outside [0, 1].
+            @test cdm([1.0, 0.0], [-1.0, 0.0]) == 1.0
+            for _ in 1:200
+                a = randn(rng, 5)
+                for b in (3.7 .* a, -0.3 .* a)
+                    d = cdm(a, b)
+                    @test !isnan(d) && 0 <= d <= 1
+                end
+            end
+            # `_pairwise!` against the scalar call, with zero rows and on either `dims`.
+            for N in (2, 5, 50), K in (1, 3, 30)
+                Zp = randn(rng, N, K)
+                @test isapprox(DS.pairwise(cdm, Zp; dims = 1),
+                               elementwise_pairwise(cdm, Zp); atol = 1e-8)
+            end
+            Zz = randn(rng, 8, 4)
+            Zz[2, :] .= 0
+            Zz[5, :] .= 0
+            Dz = DS.pairwise(cdm, Zz; dims = 1)
+            @test isapprox(Dz, elementwise_pairwise(cdm, Zz); atol = 1e-8)
+            @test isapprox(Dz, DS.pairwise(cdm, permutedims(Zz); dims = 2))
+            @test all(iszero, Dz[[2, 5], [2, 5]])
+            @test all(isone, Dz[[2, 5], [1, 3, 4, 6, 7, 8]])
+            @test all(iszero, diag(Dz))
+            # The type follows `sqrt`: an integer widens and a float keeps its type.
+            for (Ti, To) in ((Int, Float64), (Rational{Int}, Float64), (Float32, Float32),
+                             (BigFloat, BigFloat))
+                @test DS.result_type(cdm, Ti, Ti) === To
+                @test typeof(cdm(Ti[1, 2, 0], Ti[2, 1, 1])) === To
+                @test typeof(cdm(zeros(Ti, 3), zeros(Ti, 3))) === To
+                @test eltype(DS.pairwise(cdm, Ti[1 2; 2 1; 3 3; 0 0]; dims = 1)) === To
+            end
+            # `ChordSimilarity` is the exact inverse: it recovers the cosine, and the
+            # zero-vector convention gives +1 and -1.
+            Zc = randn(rng, 40, 7)
+            Dc = DS.pairwise(cdm, Zc; dims = 1)
+            Sc = PortfolioOptimisers.distance_to_similarity(ChordSimilarity(); D = Dc)
+            @test isapprox(Sc,
+                           one(eltype(Zc)) .- DS.pairwise(DS.CosineDist(), Zc; dims = 1);
+                           atol = 1e-12)
+            @test PortfolioOptimisers.distance_to_similarity(ChordSimilarity();
+                                                             D = [0.0 1.0; 1.0 0.0]) ==
+                  [1.0 -1.0; -1.0 1.0]
+            @test eltype(PortfolioOptimisers.distance_to_similarity(ChordSimilarity();
+                                                                    D = Float32.(Dc))) ===
+                  Float32
+            # The chord is Euclidean: the doubly centred -D²/2 has no negative eigenvalue.
+            n = size(Dc, 1)
+            Jc = I - fill(1 / n, n, n)
+            @test minimum(eigvals(Symmetric(-Jc * (Dc .^ 2) * Jc / 2))) > -1e-12
+            # The angle is not, on the four points of the `AngularDist` docstring: the sides
+            # squared less the diagonals squared is ‖a - b + c - d‖² >= 0 in a Euclidean space.
+            Zq = [1.0 0.0; 0.0 1.0; -1.0 0.0; 0.0 -1.0]
+            quad(D) = D[1, 2]^2 + D[2, 3]^2 + D[3, 4]^2 + D[4, 1]^2 - D[1, 3]^2 - D[2, 4]^2
+            @test isapprox(quad(DS.pairwise(AngularDist(), Zq; dims = 1)), -1.0)
+            @test isapprox(quad(DS.pairwise(cdm, Zq; dims = 1)), 0.0; atol = 1e-12)
+            # The wrong pair of the warning: an angular 0.5 reads as a cosine of 0.5, not 0.
+            @test PortfolioOptimisers.distance_to_similarity(ChordSimilarity();
+                                                             D = fill(0.5, 1, 1))[1] == 0.5
+            # A ratio metric: `StackObservations` rescales nothing.
+            @test PortfolioOptimisers.stack_rescale(cdm, 0.3, 1:2, 5) == 0.3
+            # It goes negative, so the PMFG path refuses it at construction.
+            @test_throws TypeError NetworkEstimator(; alg = ChordSimilarity())
+            @test_throws TypeError DBHT(; sim = ChordSimilarity())
+            @test_throws TypeError LoGo(; sim = ChordSimilarity())
+        end
         @testset "2-D feature matrices" begin
             Z = [1.0 0.0; 0.0 1.0; 1.0 1.0]
             de = FeatureDistance()
-            @test de.metric === AngularDist()
+            @test de.metric === ChordDist()
             @test de.alg === LastRow()
-            # `sim` is defaulted from the metric, and `AngularDist` gets the exact inverse.
-            @test de.sim === AngularSimilarity()
+            # `sim` is defaulted from the metric, and each of the two direction metrics gets
+            # its exact inverse.
+            @test de.sim === ChordSimilarity()
+            @test FeatureDistance(; metric = AngularDist()).sim === AngularSimilarity()
             @test FeatureDistance(; metric = DS.CosineDist()).sim === ComplementSimilarity()
             D = distance(de, Z)
             @test issymmetric(D)
             @test all(iszero, diag(D))
-            @test isapprox(D, [0.0 0.5 0.25; 0.5 0.0 0.25; 0.25 0.25 0.0])
+            dc = sqrt((1 - 1 / sqrt(2)) / 2)
+            @test isapprox(D, [0.0 sqrt(0.5) dc; sqrt(0.5) 0.0 dc; dc dc 0.0])
             # `cor_and_dist`'s first slot is the similarity, derived from this very `D`.
             S, D2 = cor_and_dist(de, Z)
             @test D2 == D
-            @test isapprox(S, cos.(pi .* D))
-            # `AngularSimilarity` recovers the cosine similarity exactly, with no `Z`.
+            @test isapprox(S, 1 .- 2 .* D .^ 2)
+            # Under `AngularDist`, the same matrix takes the angles, and `cos(πD)` inverts it.
+            dea = FeatureDistance(; metric = AngularDist())
+            Da = distance(dea, Z)
+            @test isapprox(Da, [0.0 0.5 0.25; 0.5 0.0 0.25; 0.25 0.25 0.0])
+            Sa, _ = cor_and_dist(dea, Z)
+            @test isapprox(Sa, cos.(pi .* Da))
+            # Each inverse recovers the cosine similarity exactly, with no `Z`.
             Zc = randn(rng, 40, 7)
-            Sc, _ = cor_and_dist(de, Zc)
-            @test isapprox(Sc,
-                           one(eltype(Zc)) .- DS.pairwise(DS.CosineDist(), Zc; dims = 1))
+            for dex in (de, dea)
+                Sc, _ = cor_and_dist(dex, Zc)
+                @test isapprox(Sc,
+                               one(eltype(Zc)) .-
+                               DS.pairwise(DS.CosineDist(), Zc; dims = 1))
+            end
             # Every `SemiMetric` yields a similarity; nothing throws.
             Se, De = cor_and_dist(FeatureDistance(; metric = DS.Euclidean()), Zc)
             @test isapprox(Se, one(eltype(De)) .- De)
@@ -513,7 +613,7 @@
         end
         @testset "Degenerate 2-D inputs" begin
             de = FeatureDistance()
-            # A single feature: every asset is on one ray, so the angular distance is 0.
+            # A single feature: every asset is on one ray, so the chord distance is 0.
             # `CorrDist` is NaN against any constant row, hence unusable here (#162).
             Z1 = reshape([1.0, 2.0, 3.0], 3, 1)
             @test all(iszero, distance(de, Z1))
@@ -522,7 +622,8 @@
             # Zero rows: valid input the metric cannot measure. The patch rewrites only the
             # entries the metric left as NaN.
             Zz = [1.0 0.0; 0.0 0.0; 0.0 0.0; 1.0 1.0]
-            for metric in (AngularDist(), DS.CosineDist(), DS.Jaccard(), DS.BrayCurtis())
+            for metric in (ChordDist(), AngularDist(), DS.CosineDist(), DS.Jaccard(),
+                           DS.BrayCurtis())
                 D = distance(FeatureDistance(; metric = metric), Zz)
                 @test !any(isnan, D)
                 @test iszero(D[2, 3])
@@ -599,8 +700,8 @@
             # closes the chain, so `factory` installs threaded weights.
             fd = factory(FeatureDistance(; alg = AggregateFeatures()), w)
             @test fd.alg.w === w
-            @test fd.metric === AngularDist()
-            @test fd.sim === AngularSimilarity()
+            @test fd.metric === ChordDist()
+            @test fd.sim === ChordSimilarity()
             # The rules with no observation axis to weight ignore threaded weights.
             @test factory(FeatureDistance(), w).alg === LastRow()
             # `FeatureDistance` must be `@propagatable`, or `ClustersEstimator`'s `@fprop de`
@@ -774,8 +875,8 @@
                     fde = FeatureDistance(; alg = alg)
                     S, D = cor_and_dist(fde, Zin)
                     @test D == distance(fde, Zin)
-                    # `AngularSimilarity` is the exact inverse of `AngularDist`.
-                    @test isapprox(S, cos.(pi .* D))
+                    # `ChordSimilarity` is the exact inverse of `ChordDist`.
+                    @test isapprox(S, 1 .- 2 .* D .^ 2)
                 end
             end
         end
@@ -1463,7 +1564,7 @@
         S1 = PortfolioOptimisers.distance_to_similarity(MaximumDistanceSimilarity();
                                                         D = dist)
         _, _, _, _, _, Z1, dbht1d = PortfolioOptimisers.DBHTs(dist, S1;
-                                                              branchorder = :default,
+                                                              branchorder = nothing,
                                                               root = UniqueRoot())
         A1, tri1, separators1, cliques1, cliqueTree1 = PortfolioOptimisers.PMFG_T2s(S1, 5)
         # The five shapes the planar maximal filtered graph must have.
@@ -1541,7 +1642,7 @@
         # The second configuration: `ExponentialSimilarity` and an `EqualRoot`.
         S2 = PortfolioOptimisers.distance_to_similarity(ExponentialSimilarity(); D = dist)
         _, _, _, _, _, Z2, dbht2d = PortfolioOptimisers.DBHTs(dist, S2;
-                                                              branchorder = :default,
+                                                              branchorder = nothing,
                                                               root = EqualRoot())
         A2, tri2, separators2, cliques2, cliqueTree2 = PortfolioOptimisers.PMFG_T2s(S2, 5)
         @test SparseArrays.nnz(A2) == 2 * (3 * N - 6)
@@ -1612,15 +1713,17 @@
         # all three orderings return the same `Z`. The block this testset replaces pinned
         # `Z` once per `branchorder`, so none of its three assertions could see the keyword
         # it varied. The assertion that can see it is the one on the seventh return value.
-        _, _, _, _, _, Z1r, dbht1r = PortfolioOptimisers.DBHTs(dist, S1; branchorder = :r,
+        _, _, _, _, _, Z1r, dbht1r = PortfolioOptimisers.DBHTs(dist, S1;
+                                                               branchorder = ROrder(),
                                                                root = UniqueRoot())
         _, _, _, _, _, Z1o, dbht1o = PortfolioOptimisers.DBHTs(dist, S1;
-                                                               branchorder = :optimal,
+                                                               branchorder = OptimalLeafOrder(),
                                                                root = UniqueRoot())
-        _, _, _, _, _, Z2r, dbht2r = PortfolioOptimisers.DBHTs(dist, S2; branchorder = :r,
+        _, _, _, _, _, Z2r, dbht2r = PortfolioOptimisers.DBHTs(dist, S2;
+                                                               branchorder = ROrder(),
                                                                root = EqualRoot())
         _, _, _, _, _, Z2o, dbht2o = PortfolioOptimisers.DBHTs(dist, S2;
-                                                               branchorder = :optimal,
+                                                               branchorder = OptimalLeafOrder(),
                                                                root = EqualRoot())
         @test Z1r == Z1
         @test Z1o == Z1
@@ -1857,7 +1960,7 @@
         Known and NOT specific to these two types: `@concrete` emits a fully generic
         positional constructor (`ConcreteStructs.jl:146`) that is more specific than
         nothing and shadows the annotated one, so every type bound in the package is
-        bypassable positionally. `PhylogenyPanel(vector_shaped_result, alg)` does the
+        bypassable positionally. `PhylogenyPanel(vector_shaped_result, alg, nothing)` does the
         same thing, and so does every other `@concrete` type with a bound. Pinned here so
         the limit of the guarantee is on the record: the keyword constructor is the
         enforced API.
@@ -2502,6 +2605,8 @@ struct UndeclaredCentrality <: PortfolioOptimisers.AbstractCentralityAlgorithm e
             @test isa(T(), T)
             @test isa(T(; args = (), kwargs = (;)), T)
         end
+        # `Graphs.prim_mst` takes no keyword, so a keyword of a PrimTree fails at every call.
+        @test_throws ArgumentError PrimTree(; kwargs = (; foo = 1))
     end
 
     @testset "kwargs needs no guard on the centrality family" begin
@@ -3206,16 +3311,20 @@ end
             @test all(isone, assignments(clr))
         end
     end
-    @testset "`linkage` is unchecked at construction and raises at use" begin
-        # The set of criteria belongs to `Clustering.hclust`, so the constructor takes any
-        # `Symbol` and the raise lands inside `clusterise`.
-        alg = HClustAlgorithm(; linkage = :nonsense)
-        @test alg.linkage === :nonsense
+    @testset "`linkage` is a member of `AbstractLinkage`, checked by type at construction" begin
+        # A `Symbol` built before #2175, and `clusterise` raised. It now fails at once.
+        @test_throws TypeError HClustAlgorithm(; linkage = :nonsense)
         X = randn(StableRNG(987654321), 200, 10)
-        @test_throws ArgumentError clusterise(ClustersEstimator(; alg = alg), X)
-        # A criterion the package does accept clusters without a raise.
-        @test clusterise(ClustersEstimator(; alg = HClustAlgorithm(; linkage = :average)),
-                         X) isa Clusters
+        for l in (SingleLinkage(), CompleteLinkage(), AverageLinkage(), WeightedLinkage(),
+                  CentroidLinkage(), MedianLinkage(), WardLinkage(),
+                  WardLinkage(; presquared = true))
+            clr = clusterise(ClustersEstimator(; alg = HClustAlgorithm(; linkage = l)), X)
+            @test clr isa Clusters
+            # A dynamic call, because a direct call folds the constant and runs no line of it.
+            @test clr.res.linkage ===
+                  Base.invokelatest(PortfolioOptimisers.linkage_symbol, l)
+            @test maximum(assignments(clr)) == clr.k
+        end
     end
     @testset "Every `Clusters` validation arm throws" begin
         res = clusterise(ClustersEstimator(), randn(StableRNG(1), 50, 3)).res
@@ -3240,7 +3349,7 @@ end
     end
     @testset "`factory` is the identity on a clustering algorithm" begin
         w = pweights(fill(1 / 400, 400))
-        alg = HClustAlgorithm(; linkage = :average)
+        alg = HClustAlgorithm(; linkage = AverageLinkage())
         # An algorithm carries no prior-dependent field, so the same object comes back.
         @test factory(alg, w) === alg
         dbht = DBHT()
@@ -3267,7 +3376,7 @@ function PortfolioOptimisers.get_node_property(::PreorderTreeByLabel,
                                                a::PortfolioOptimisers.ClusterNode)
     return string("asset_", a.id)
 end
-# The claims `src/08_Phylogeny/03_Hierarchical.jl` and
+# The claims `src/08_Phylogeny/03_Hierarchical_a.jl` and
 # `src/08_Phylogeny/04_NonHierarchicalClustering.jl` make about the tree, about the search
 # that replaces an invalid cut, and about the flat partition. Defined at top level because a
 # `@testset` body becomes a function, and the sweep of #468 reads these numbers.
@@ -3478,7 +3587,8 @@ end
         Xg[:, 4] = Xg[:, 3] + 0.02 * randn(rng, 200)
         cle = ClustersEstimator(; alg = HClustAlgorithm())
         Sg, Dg = cor_and_dist(cle.de, cle.ce, Xg)
-        rg = hclust(Dg; linkage = cle.alg.linkage, branchorder = :optimal)
+        rg = hclust(Dg; linkage = PortfolioOptimisers.linkage_symbol(cle.alg.linkage),
+                    branchorder = :optimal)
         algk = KMeansAlgorithm(; rng = StableRNG(987654321), seed = 987654321)
         kh = PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
                                                                                alg = SecondOrderDifference()),
@@ -3509,13 +3619,14 @@ end
         @test round.(cut_dispersion.(2:6); digits = 2) ==
               [11.27, 26.04, 47.89, 112.96, 114.11]
         @test round.(cost_dispersion.(2:6); digits = 2) == [6.58, 2.83, 2.57, 2.17, 2.06]
-        # `Clustering.kmeans` refuses a `weights` vector of the wrong length when it runs, and
-        # `Clustering.hclust` refuses a branch order it does not know.
+        # `Clustering.kmeans` refuses a `weights` vector of the wrong length when it runs. A
+        # branch order is a member of `AbstractBranchOrder` or `nothing`, so the constructor
+        # refuses a Symbol (#2174).
         alg_w = KMeansAlgorithm(; kwargs = (; weights = ones(5)))
         @test_throws DimensionMismatch PortfolioOptimisers.get_k_clusters_from_alg(alg_w,
                                                                                    Dg, 3)
-        @test_throws ArgumentError PortfolioOptimisers.branch_ordered_hclust(Dg, :ward,
-                                                                             Val(:x))
+        @test_throws TypeError HClustAlgorithm(; branchorder = :x)
+        @test_throws TypeError DBHT(; branchorder = :optimal)
         # The hierarchical method answers a bare `k`; the flat one answers `(res, k)`.
         @test kh isa Integer
         @test pk isa Clustering.ClusteringResult
@@ -3756,8 +3867,8 @@ end
             S = PO470.distance_to_similarity(sim470; S = rho470[idx, idx],
                                              D = dist470[idx, idx])
             D = dist470[idx, idx]
-            ru = PO470.DBHTs(D, S; branchorder = :default, root = UniqueRoot())
-            re = PO470.DBHTs(D, S; branchorder = :default, root = EqualRoot())
+            ru = PO470.DBHTs(D, S; branchorder = nothing, root = UniqueRoot())
+            re = PO470.DBHTs(D, S; branchorder = nothing, root = EqualRoot())
             @test ru[1] == re[1]          # T8, the discrete clusters
             @test ru[2] == re[2]          # Rpm, the weighted graph
             @test ru[3] == re[3]          # Adjv, the converging-bubble membership
@@ -3768,7 +3879,7 @@ end
 
         # More than one root is the precondition the difference rests on. Assert it, so a
         # regression names its cause rather than the symptom.
-        Rpm = PO470.DBHTs(dist470, S470; branchorder = :default)[2]
+        Rpm = PO470.DBHTs(dist470, S470; branchorder = nothing)[2]
         A = Rpm .!= 0
         cl = PO470.clique3(A)[3]
         M = SparseArrays.spzeros(Int, size(Rpm, 1), size(cl, 1))
@@ -3789,7 +3900,7 @@ end
         cluster membership that `BubbleCluster8s` produced, asset by asset. The assertion is
         equality and not a bijection of the labels, because the two agree label for label.
         =#
-        T8, _, _, _, _, Z, hcl = PO470.DBHTs(dist470, S470; branchorder = :default)
+        T8, _, _, _, _, Z, hcl = PO470.DBHTs(dist470, S470; branchorder = nothing)
         k = maximum(T8)
         @test k == 2
         ct = Clustering.cutree(hcl; k = k)
@@ -3812,7 +3923,7 @@ end
         and it returns `A = W ⊙ mask`, so every stored weight of `Rpm` is one of `W`'s own
         non-negative entries. A negative mass cannot enter `DirectHb` through `DBHTs`.
         =#
-        Rpm = PO470.DBHTs(dist470, S470; branchorder = :default)[2]
+        Rpm = PO470.DBHTs(dist470, S470; branchorder = nothing)[2]
         @test all(>=(0), SparseArrays.nonzeros(Rpm))
         Wneg = Matrix(copy(S470))
         Wneg[2, 3] = -0.5
@@ -4029,20 +4140,20 @@ end
         @test all(>(0), Tc)
         @test size(Adjv) == (length(cols), 2)
         # The full route agrees with the kernel, so the loop is on the shipped path.
-        @test PO470b.DBHTs(D, S; branchorder = :default)[1] == Tc
+        @test PO470b.DBHTs(D, S; branchorder = nothing)[1] == Tc
     end
 
-    @testset "The three `branchorder` values each take their own arm" begin
+    @testset "The three branch orders and `nothing` each take their own arm" begin
         #=
-        `:optimal` calls `optimal_leaf_order!`, `:barjoseph` calls `orderbranches_barjoseph!`,
-        `:r` calls `orderbranches_r!`, and anything else leaves the merge order as
-        `HierarchyConstruct4s` wrote it. The reordering permutes the leaves and leaves the
-        clustering alone, so the cut is the invariant across all four.
+        `OptimalLeafOrder` calls `optimal_leaf_order!`, `BarJosephOrder` calls
+        `orderbranches_barjoseph!`, `ROrder` calls `orderbranches_r!`, and `nothing` leaves
+        the merge order as `HierarchyConstruct4s` wrote it. The reordering permutes the
+        leaves and leaves the clustering alone, so the cut is the invariant across all four.
         =#
         S = PO470b.distance_to_similarity(sim; S = rho, D = dist)
-        res = Dict(b => PO470b.DBHTs(dist, S; branchorder = b)
-                   for b in (:optimal, :barjoseph, :r, :default))
-        for b in (:optimal, :barjoseph, :r, :default)
+        bos = (OptimalLeafOrder(), BarJosephOrder(), ROrder(), nothing)
+        res = Dict(b => PO470b.DBHTs(dist, S; branchorder = b) for b in bos)
+        for b in bos
             hcl = res[b][7]
             @test hcl isa Clustering.Hclust
             @test Clustering.cutree(hcl; k = 2) == res[b][1]
@@ -4052,10 +4163,10 @@ end
             @test sort(hcl.merges[hcl.merges .> 0]) == collect(1:(size(dist, 1) - 2))
         end
         # The two flip the same merges, each child pair in an order of its own.
-        @test sort.(eachrow(res[:optimal][7].merges)) ==
-              sort.(eachrow(res[:barjoseph][7].merges))
-        @test res[:r][7].merges != res[:default][7].merges
-        @test res[:optimal][7].heights == res[:default][7].heights
+        @test sort.(eachrow(res[OptimalLeafOrder()][7].merges)) ==
+              sort.(eachrow(res[BarJosephOrder()][7].merges))
+        @test res[ROrder()][7].merges != res[nothing][7].merges
+        @test res[OptimalLeafOrder()][7].heights == res[nothing][7].heights
     end
 end
 
@@ -4756,7 +4867,7 @@ end
     cle = ClustersEstimator(; alg = DBHT())
     S469, D469 = cor_and_dist(cle.de, cle.ce, X469)
     S469 = PortfolioOptimisers.distance_to_similarity(cle.alg.sim; S = S469, D = D469)
-    _, Rpm, _, _, Mv, Z, hcl = PortfolioOptimisers.DBHTs(D469, S469; branchorder = :default)
+    _, Rpm, _, _, Mv, Z, hcl = PortfolioOptimisers.DBHTs(D469, S469; branchorder = nothing)
     @test size(Z) == (19, 4)
     @test hcl.merges == Int.(Z[:, 1:2])
     @test hcl.heights == Z[:, 3]
@@ -4831,4 +4942,68 @@ end
     doc471 = string(@doc PhylogenyResult)
     @test !occursin("`..", doc471)
     @test occursin("If `X` is a `MatNum`, `LinearAlgebra.issymmetric(X)`", doc471)
+end
+
+@testset "The branch order is a field of the clustering algorithm (#2174)" begin
+    using PortfolioOptimisers, Test, Clustering, StableRNGs, LinearAlgebra
+    PO = PortfolioOptimisers
+    adj(D, o) = sum(D[o[i], o[i + 1]] for i in 1:(length(o) - 1))
+    cle0 = ClustersEstimator()
+    X = randn(StableRNG(2174), 150, 11) * randn(StableRNG(2175), 11, 11)
+    _, D = cor_and_dist(cle0.de, cle0.ce, X)
+    @test HClustAlgorithm().branchorder === OptimalLeafOrder()
+    @test DBHT().branchorder === OptimalLeafOrder()
+    for linkage in (SingleLinkage(), CompleteLinkage(), AverageLinkage(), WardLinkage())
+        # The tree order is the order of R: a leaf before a merge, the lower leaf first, and
+        # the lower merge first in the order of the heights.
+        rr = hclust(D; linkage = PO.linkage_symbol(linkage), branchorder = :r)
+        rt = PO.branch_ordered_hclust(D, linkage, nothing)
+        @test rt.order == rr.order
+        @test PO.branch_ordered_hclust(D, linkage, ROrder()).order == rr.order
+        rank = invperm(sortperm(rt.heights))
+        key(m) = m < 0 ? (0, -m) : (1, rank[m])
+        @test all(key(rt.merges[v, 1]) < key(rt.merges[v, 2]) for v in axes(rt.merges, 1))
+        # Every order flips the merges of one tree. The exact order costs no more than the
+        # heuristic or the tree order.
+        ro = PO.branch_ordered_hclust(D, linkage, OptimalLeafOrder())
+        rb = PO.branch_ordered_hclust(D, linkage, BarJosephOrder())
+        @test sort.(eachrow(ro.merges)) == sort.(eachrow(rt.merges))
+        @test adj(D, ro.order) <= adj(D, rb.order) + 1e-12
+        @test adj(D, ro.order) <= adj(D, rt.order) + 1e-12
+        # `clusterise` reads the field of the algorithm.
+        for (bo, r) in ((nothing, rt), (OptimalLeafOrder(), ro), (BarJosephOrder(), rb))
+            cle = ClustersEstimator(;
+                                    alg = HClustAlgorithm(; linkage = linkage,
+                                                          branchorder = bo))
+            @test clusterise(cle, X).res.order == r.order
+        end
+    end
+    # The tree order of a DBHT keeps the merges that its hierarchy built.
+    S = PO.distance_to_similarity(MaximumDistanceSimilarity(); D = D)
+    Z, h0 = PO.DBHTs(D, S; branchorder = nothing)[6:7]
+    @test h0.merges == Int.(Z[:, 1:2])
+    @test clusterise(ClustersEstimator(; alg = DBHT(; branchorder = nothing)), X).res.order ==
+          h0.order
+end
+@testset "ROrder and the tree order agree for HClustAlgorithm, not always for DBHT (#2245)" begin
+    using PortfolioOptimisers, Test, Clustering, StableRNGs
+    PO = PortfolioOptimisers
+    cle0 = ClustersEstimator()
+    X = randn(StableRNG(2245), 150, 13) * randn(StableRNG(2246), 13, 13)
+    _, D = cor_and_dist(cle0.de, cle0.ce, X)
+    # The four linkages of Clustering.jl and the three of the kernel.
+    for linkage in (SingleLinkage(), CompleteLinkage(), AverageLinkage(), WardLinkage(),
+                    WeightedLinkage(), CentroidLinkage(), MedianLinkage())
+        @test PO.branch_ordered_hclust(D, linkage, ROrder()).order ==
+              PO.branch_ordered_hclust(D, linkage, nothing).order
+    end
+    # A builder that makes a merge before a lower merge, as `HierarchyConstruct4s` can. The
+    # root joins merge 1, at the height 3, and merge 2, at the height 2.
+    hm() = PO.hclust_merges([-1, -3, 1], [-2, -4, 2], [3.0, 2.0, 5.0])
+    D4 = zeros(4, 4)
+    @test Clustering.Hclust(PO.order_branches!(hm(), D4, nothing), :DBHT).order ==
+          [1, 2, 3, 4]
+    @test Clustering.Hclust(PO.order_branches!(hm(), D4, ROrder()), :DBHT).order ==
+          [3, 4, 1, 2]
+    @test Clustering.Hclust(PO.tree_order!(hm()), :DBHT).order == [3, 4, 1, 2]
 end

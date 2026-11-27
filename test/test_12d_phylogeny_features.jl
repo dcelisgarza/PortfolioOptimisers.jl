@@ -67,7 +67,7 @@ end
     de = FeatureDistance()
     Dopen = distance(de, A)
     @test Dopen[1, 3] == 0.0                     # two hops apart, yet identical
-    @test Dopen[1, 2] == 0.5                     # adjacent, yet maximally distant
+    @test isapprox(Dopen[1, 2], sqrt(0.5))       # adjacent, yet maximally distant
     @test Dopen[1, 3] < Dopen[1, 2]
 
     # `+ I` is exactly what every kernel does to the graph it builds; applying it here lets
@@ -79,7 +79,7 @@ end
 
     # The fold argument: an asset view of a spanning tree routinely isolates the selected
     # vertices from each other. A zero diagonal makes those rows zero rows, and
-    # `AngularDist`'s zero-vector convention then declares all of them identical.
+    # `ChordDist`'s zero-vector convention then declares all of them identical.
     A1 = Matrix{Float64}(phylogeny_matrix(NetworkEstimator(; sep = HopCount(; n = 1)),
                                           rd.X).X)
     j = first(k
@@ -89,7 +89,7 @@ end
     @test all(iszero, distance(de, sub))         # every isolated asset "identical"
     Dsub = distance(de, sub + I)
     @test all(iszero, diag(Dsub))
-    @test all(==(0.5), Dsub[i, k] for i in 1:3, k in 1:3 if i != k)
+    @test all(d -> isapprox(d, sqrt(0.5)), Dsub[i, k] for i in 1:3, k in 1:3 if i != k)
 end
 
 @testset "A clustering source is admitted, and what it costs" begin
@@ -110,6 +110,8 @@ end
     @test length(unique(round.(D; digits = 10))) == 3
     @test D[4, 5] == D[1, 4]                     # same cluster, yet as far as a different one
     @test D[4, 5] == maximum(D)
+    # The three values that the `PhylogenyPanel` docstring quotes for this matrix.
+    @test sort(unique(round.(D; digits = 3))) == [0.0, 0.5, 0.707]
 end
 
 @testset "PhylogenyPanel constructs, validates and produces a square matrix" begin
@@ -186,7 +188,7 @@ end
 
 @testset "A square feature matrix drives an optimisation end to end" begin
     mk(ape) = HierarchicalRiskParity(;
-                                     opt = HierarchicalOptimiser(;
+                                     ser = HierarchicalSeriation(;
                                                                  cle = ClustersEstimator(;
                                                                                          de = FeatureDistance(;
                                                                                                               ape = ape))))
@@ -855,14 +857,15 @@ end
     Z1 = PO._proximity_features(Proximity(), HopCount(), d3, 1, Float64)
     @test Z1 == Float64[2 1 0; 1 2 1; 0 1 2]
     D1 = distance(de, Z1)
-    @test round(D1[1, 3]; digits = 3) == 0.436
-    @test round(D1[1, 2]; digits = 3) == 0.239
+    @test round(D1[1, 3]; digits = 3) == 0.632
+    @test round(D1[1, 2]; digits = 3) == 0.367
     Zn = PO._proximity_features(Proximity(; decay = nothing), HopCount(), d3, 1, Float64)
     @test Zn == Float64[0 1 0; 1 0 1; 0 1 0] + I
     Dn = distance(de, Zn)
-    @test round(Dn[1, 3]; digits = 3) == 0.333
-    @test round(Dn[1, 2]; digits = 3) == 0.196
+    @test round(Dn[1, 3]; digits = 3) == 0.5
+    @test round(Dn[1, 2]; digits = 3) == 0.303
     @test distance(de, Zn - I)[1, 3] == 0.0
+    @test round(distance(de, Zn - I)[1, 2]; digits = 3) == 0.707
 
     # `expand_investable_loadings`: the rows on the mask are `L`, the rows off it are zero,
     # and the observed mask is the mask, row for row.

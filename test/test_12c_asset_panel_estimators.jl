@@ -184,15 +184,16 @@ end
     # producer never meets the unreduced block, and no weight lands outside the mask.
     opt = HierarchicalOptimiser(;
                                 pe = CrossSectionalFactorPrior(; lambda = 1,
-                                                               factors = factors),
+                                                               factors = factors))
+    ser = HierarchicalSeriation(;
                                 cle = ClustersEstimator(;
                                                         de = FeatureDistance(;
                                                                              ape = RegressionPanel())))
-    res = optimise(HierarchicalRiskParity(; opt = opt), rdp)
+    res = optimise(HierarchicalRiskParity(; opt = opt, ser = ser), rdp)
     @test isa(res.retcode, OptimisationSuccess)
     @test isapprox(sum(res.w), 1)
     @test all(iszero, res.w[.!msk])
-    @test feature_labels(opt.cle.de, res.pr, rdr, rdr.X) ==
+    @test feature_labels(ser.cle.de, res.pr, rdr, rdr.X) ==
           ["loadings" => n for n in prr.rr.nf]
 end
 @testset "PhylogenyPanel grades a graph, and its labels are the assets" begin
@@ -275,6 +276,72 @@ end
     des = FeatureDistance(; ape = RegressionPanel(), sel = ["loadings" => "mkt"])
     @test size(feature_matrix(des, pr, rd, X)) == (N, 1)
     @test feature_matrix(des, pr, rd, X) == reshape(pr.rr.L[:, 1], N, 1)
+end
+
+@testset "A producer names its Panel Field by the resolved name" begin
+    PO = PortfolioOptimisers
+    rng = StableRNG(20261123)
+    T, N, K = 80, 5, 3
+    X = randn(rng, T, N) / 100
+    F = randn(rng, T, K) / 100
+    nx = ["A", "B", "C", "D", "E"]
+    rd = ReturnsResult(; nx = nx, X = X, nf = ["mkt", "size", "value"], F = F)
+    pr = prior(FactorPrior(), rd)
+
+    # `nothing` derives the name, and a string replaces it.
+    @test isnothing(RegressionPanel().name)
+    @test isnothing(PhylogenyPanel().name)
+    @test PO.resolve_panel_field_name(nothing, "loadings") == "loadings"
+    @test PO.resolve_panel_field_name("beta", "loadings") == "beta"
+    for (ape, ape0, name) in ((RegressionPanel(), RegressionPanel(), "loadings"),
+                              (RegressionPanel(; name = "beta"), RegressionPanel(), "beta"),
+                              (PhylogenyPanel(), PhylogenyPanel(), "proximity"),
+                              (PhylogenyPanel(; name = "near"), PhylogenyPanel(), "near"))
+        f = only(PO.asset_panel(ape, pr, rd, X).pf)
+        @test f.name == name
+        # The values, the axis and the labels do not depend on the name.
+        f0 = only(PO.asset_panel(ape0, pr, rd, X).pf)
+        @test (f.vals, f.axis, f.labels) == (f0.vals, f0.axis, f0.labels)
+    end
+
+    # `sel` and `feature_labels` read the resolved name.
+    de = FeatureDistance(; ape = RegressionPanel(; name = "beta"))
+    @test feature_labels(de, pr, rd, X) ==
+          ["beta" => "mkt", "beta" => "size", "beta" => "value"]
+    des = FeatureDistance(; ape = RegressionPanel(; name = "beta"), sel = ["beta" => "mkt"])
+    @test feature_matrix(des, pr, rd, X) == reshape(pr.rr.L[:, 1], N, 1)
+    dep = FeatureDistance(; ape = PhylogenyPanel(; name = "near"), sel = ["near"])
+    @test feature_matrix(dep, nothing, rd, X) ==
+          feature_matrix(FeatureDistance(; ape = PhylogenyPanel()), nothing, rd, X)
+    # A `sel` that names the derived name after an override gets the existing diagnostic,
+    # which lists the fields of the panel.
+    dex = FeatureDistance(; ape = RegressionPanel(; name = "beta"), sel = ["loadings"])
+    @test_logs (:warn, r"`loadings`.*It holds 1: beta") match_mode = :any @test_throws PO.IsEmptyError feature_matrix(dex,
+                                                                                                                      pr,
+                                                                                                                      rd,
+                                                                                                                      X)
+
+    # `RegressionPanel` is no longer a singleton, and its printout names its type alone.
+    @test RegressionPanel() === RegressionPanel()
+    RP = string(RegressionPanel)
+    @test sprint(show, RegressionPanel()) == "$(RP)()\n"
+    @test PO.with_show_nothing_fields(() -> sprint(show, RegressionPanel()), true) ==
+          "$(RP)\n  name ┴ nothing\n"
+
+    # The constructor refuses an empty name, and admits the derived name.
+    @test_throws PO.IsEmptyError RegressionPanel(; name = "")
+    @test_throws PO.IsEmptyError PhylogenyPanel(; name = "")
+    @test RegressionPanel(; name = "loadings").name == "loadings"
+    @test PhylogenyPanel(; name = "proximity").name == "proximity"
+    # The user's string type is kept.
+    @test isa(RegressionPanel(; name = SubString("xbeta", 2)).name, SubString{String})
+
+    # The existing refusals catch a collision that an override makes, as they are.
+    fr = only(PO.asset_panel(RegressionPanel(; name = "beta"), pr, rd, X).pf)
+    fn = NumericPanelField(; name = "beta=size", vals = randn(rng, N))
+    @test_throws ArgumentError AssetPanel(; pf = [fr, fn])
+    fp = only(PO.asset_panel(PhylogenyPanel(; name = "beta"), nothing, rd, X).pf)
+    @test_throws ArgumentError AssetPanel(; pf = [fr, fp])
 end
 
 #=

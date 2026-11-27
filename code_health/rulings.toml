@@ -370,7 +370,7 @@ rationale = "keyword-constructor-arity"
 
 # Two Partial Fit States check their values in their inner constructors by the same rule (#2197),
 # so that a fold, a rebuild and a lens write run the checks. Each constructor takes one argument
-# for each field: 13 for `SampleBufferState`, 11 for `ReturnsBufferState`.
+# for each field: 13 for `SampleBufferState`, 14 for `ReturnsBufferState`.
 [[exemption]]
 path = "src/01_Base/15_Online_a.jl"
 definition = "SampleBufferState"
@@ -914,10 +914,19 @@ rationale = "a-definition-a-file-split-moved-unchanged"
 # the test. ADR 0082, issue #411.
 
 [[coverage_exemption]]
-path = "src/08_Phylogeny/03_Hierarchical.jl"
+path = "src/08_Phylogeny/03_Hierarchical_a.jl"
 definition = "optimal_number_clusters"
 misses = 1
 rationale = "a-cut-into-one-cluster-is-always-valid"
+
+# The coverage run of #2175: six one-line methods of `linkage_symbol` that return a constant read 0,
+# and the `WardLinkage` method beside them, which reads a field, carries hits. Each is reached:
+# `test_13_phylogeny.jl` and `test_13g_linkage_parity.jl` assert the label of every member.
+[[coverage_exemption]]
+path = "src/08_Phylogeny/02_Clusters.jl"
+definition = "linkage_symbol"
+misses = 6
+rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
 
 # Run 41046186365 (#1912): the `function` line of this method reads 0 while every line of its body
 # carries hits, and the body is reached by each fold of a price-level statistic.
@@ -1061,6 +1070,25 @@ rationale = "a-form-its-package-recommends"
 
 [[dismissal]]
 file = "src/03_InputData/11_PricesToReturns.jl"
+kind = "UndefVarErrorReport"
+message = "local variable `racy` may be undefined"
+count = 1
+rationale = "a-form-its-package-recommends"
+
+# The keyword constructor `DataFrames.DataFrame(; graph = String[], key = K[], …)`, the
+# documented constructor of a table, takes the key and weight columns in the types that the
+# graphs state, which JET sees as abstract, and it reaches `@sync` of Base (`base/task.jl`),
+# whose locals `c_ex` and `racy` JET reads as maybe undefined. The edge table and the manifest of
+# the Exogenous Graphs (#2171) write their columns this way, as `panel_manifest` does.
+[[dismissal]]
+file = "src/03_InputData/05_ExogenousGraph/04_GraphTables.jl"
+kind = "UndefVarErrorReport"
+message = "local variable `c_ex` may be undefined"
+count = 3
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/03_InputData/05_ExogenousGraph/04_GraphTables.jl"
 kind = "UndefVarErrorReport"
 message = "local variable `racy` may be undefined"
 count = 1
