@@ -1155,3 +1155,13 @@ A `ConstraintBlock` holds concentration rules, such as the UCITS 5/10/40 rule, i
 - **`StepwiseRegression` and `DimensionReductionRegression` fit each asset on the observations where its return is finite**, and, through a `ReturnsResult` whose asset panel carries an active mask, where the mask is `true`. An asset that lists late gets the loadings of its own history, and no other asset changes. `DimensionReductionRegression` keeps one reduction of the factors over every observation. A column with no gap gives the same loadings as before. `factor_risk_contribution` of a `ReturnsResult` with a gap, and `plot_factor_risk_contribution`, raised a `BoundsError` under the default `StepwiseRegression`, and now they give the figures. An asset with no finite, active return raises an `IsNonFiniteError` that names it.
 - **A cell that the active mask turns off is out of the fit of a regression also when its return is finite**, so the loadings of such an asset move. The loadings that `factor_risk_contribution`, a `FactorRiskContribution` optimisation and the exposure constraints fit from a `ReturnsResult` move with them.
 - **A p-value search of `StepwiseRegression` that finds no p-value at any factor**, as for a return with no variance, gives the asset a model with the intercept alone, and a warning. The previous release raised a `BoundsError`.
+
+## From v0.34.12 to v0.34.13
+
+### [A `Frontier` on one tail of a range](@id migration-next-frontier-range-tail)
+
+- **A `Frontier` in the `ub` of one tail of a `GenericValueatRiskRange`** takes its levels from the value of that tail at the two corner portfolios, in `MeanRisk` and in `NearOptimalCentering`. Before this change it took them from the value of the whole range, so the levels were too high and most points of the sweep were one portfolio. A range of your own, a subtype of `RangeRiskMeasure` that the generic builder builds, takes the same levels.
+
+#### [If you extend the library](@id migration-next-frontier-range-tail-extending)
+
+- **A `Frontier` on the gain tail of a range of your own** raises an `ArgumentError` when that tail reads the weights, the returns and the fees, a `WeightsReturnsFeesInput` measure, except a `ValueatRisk` with `DistributionValueatRisk`. Such a tail has no value on the negated portfolio, so the sweep cannot value its corners. Before this change the sweep took the span of the whole range.

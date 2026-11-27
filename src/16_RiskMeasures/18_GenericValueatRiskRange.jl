@@ -63,7 +63,9 @@ Keywords correspond to the struct's fields.
 
 The constructor strips the `rke` flag from both `loss` and `gain` via
 [`no_risk_expr_risk_measure`](@ref), since their risk expressions are combined into the
-outer `settings`-controlled expression.
+outer `settings`-controlled expression. Each tail keeps its `ub`, which bounds that tail
+alone. A [`Frontier`](@ref) in the `ub` of a tail takes its span from the value of that tail
+at the two corner portfolios.
 
 ## Propagated parameters
 
@@ -140,6 +142,7 @@ GenericValueatRiskRange
   - [`range_tails`](@ref)
   - [`range_tail_risk`](@ref)
   - [`gain_tail_measure`](@ref)
+  - [`GainTail`](@ref)
   - [`gain_tail_distribution`](@ref)
   - [`no_risk_expr_risk_measure`](@ref)
   - [`factory`](@ref)
@@ -208,16 +211,19 @@ function (r::GenericValueatRiskRange)(x::VecNum)
     return loss + gain
 end
 """
-    range_tail_risk(r::ValueatRiskRMs, w::VecNum, x::VecNum)
+    range_tail_risk(r::RiskMeasure, w::VecNum, x::VecNum,
+                    kind::RiskInputKind = risk_input_kind(r))
     range_tail_risk(r::ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk},
                     w::VecNum, x::VecNum)
 
-Evaluate one tail of a [`GenericValueatRiskRange`](@ref) on the input that the tail reads.
+Evaluate one tail of a range on the input that the tail reads.
 
-The functor of the range on the weights calls this function once for each tail. It passes `w` and the net returns `x` for the loss tail, and [`gain_tail_measure`](@ref) of the gain tail, `-w` and `-x` for the gain tail.
+The functor of a [`GenericValueatRiskRange`](@ref) on the weights calls this function once for each tail. It passes `w` and the net returns `x` for the loss tail, and [`gain_tail_measure`](@ref) of the gain tail, `-w` and `-x` for the gain tail. A [`GainTail`](@ref) calls it for the gain tail of any [`RangeRiskMeasure`](@ref).
 
   - A tail that reads a return series, [`NetReturnsInput`](@ref), returns `r(x)`.
+  - A tail that reads the weights alone, [`WeightsInput`](@ref), returns `r(w)`.
   - A [`ValueatRisk`](@ref) tail with [`DistributionValueatRisk`](@ref), [`WeightsReturnsFeesInput`](@ref), returns `r(w)`. It reads the moments of the prior against the weights.
+  - Any other [`WeightsReturnsFeesInput`](@ref) tail throws an `ArgumentError`. Its functor reads the asset returns and the fees, which this function does not take, so the value of a gain tail on the negated portfolio is not defined. The tails of a [`GenericValueatRiskRange`](@ref) never meet this method. A [`GainTail`](@ref) of a range of a user meets it when [`rebuild_risk_frontier`](@ref) values the corners of a [`Frontier`](@ref) on the gain tail.
 
 The gain tail of a returns measure reads `-x`, not the net returns of `-w`. A fee does not change sign with the weights, so the two series are different when the portfolio pays a fee.
 
@@ -226,6 +232,11 @@ The gain tail of a returns measure reads `-x`, not the net returns of `-w`. A fe
   - `r`: Tail measure.
   - `w::VecNum`: Portfolio weights vector `assets × 1`, negated for the gain tail.
   - `x::VecNum`: Net portfolio returns vector `observations × 1`, negated for the gain tail.
+  - `kind::RiskInputKind`: Input kind of the tail, which selects the method.
+
+# Validation
+
+  - A [`WeightsReturnsFeesInput`](@ref) tail that is not a [`ValueatRisk`](@ref) with [`DistributionValueatRisk`](@ref) throws an `ArgumentError`.
 
 # Returns
 
@@ -234,23 +245,32 @@ The gain tail of a returns measure reads `-x`, not the net returns of `-w`. A fe
 # Related
 
   - [`GenericValueatRiskRange`](@ref)
-  - [`ValueatRiskRMs`](@ref)
+  - [`GainTail`](@ref)
   - [`gain_tail_measure`](@ref)
   - [`risk_input_kind`](@ref)
   - [`DistributionValueatRisk`](@ref)
 """
-range_tail_risk(r::ValueatRiskRMs, ::VecNum, x::VecNum) = r(x)
+function range_tail_risk(r::RiskMeasure, ::VecNum, ::VecNum,
+                         ::WeightsReturnsFeesInput = risk_input_kind(r))
+    return throw(ArgumentError("`$(typeof(r))` is a `WeightsReturnsFeesInput` risk measure, so a range cannot value it as a tail. Its functor reads the asset returns and the fees, and the gain tail of a range reads the negated weights and the negated net returns. Use a tail that reads the net returns or the weights alone, or a `ValueatRisk` with `DistributionValueatRisk`."))
+end
+function range_tail_risk(r::RiskMeasure, ::VecNum, x::VecNum, ::NetReturnsInput)
+    return r(x)
+end
+function range_tail_risk(r::RiskMeasure, w::VecNum, ::VecNum, ::WeightsInput)
+    return r(w)
+end
 function range_tail_risk(r::ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk},
                          w::VecNum, ::VecNum)
     return r(w)
 end
 """
-    gain_tail_measure(r::ValueatRiskRMs)
+    gain_tail_measure(r::RiskMeasure)
     gain_tail_measure(r::ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk})
 
-Return the measure that the gain tail of a [`GenericValueatRiskRange`](@ref) evaluates on the negated portfolio.
+Return the measure that the gain tail of a range evaluates on the negated portfolio.
 
-  - A tail that reads a return series returns `r` unchanged. It reads the negated returns, which are the returns of the negated portfolio.
+  - The method for a [`RiskMeasure`](@ref) returns `r` unchanged. A tail that reads a return series reads the negated returns, and a tail that reads the weights alone reads the negated weights.
   - A [`ValueatRisk`](@ref) tail with [`DistributionValueatRisk`](@ref) is rebuilt with the law that [`gain_tail_distribution`](@ref) gives, the law of the standardised loss of `-w`. On `-w`, the rebuilt tail then equals the gain tail of a [`ValueatRiskRange`](@ref) with the same `dist`, also for a `Normal` with a nonzero mean. A law that is symmetric about zero is its own reflection, so the method returns `r` itself.
 
 # Arguments
@@ -264,14 +284,114 @@ Return the measure that the gain tail of a [`GenericValueatRiskRange`](@ref) eva
 # Related
 
   - [`GenericValueatRiskRange`](@ref)
+  - [`GainTail`](@ref)
   - [`range_tail_risk`](@ref)
   - [`gain_tail_distribution`](@ref)
   - [`DistributionValueatRisk`](@ref)
 """
-gain_tail_measure(r::ValueatRiskRMs) = r
+gain_tail_measure(r::RiskMeasure) = r
 function gain_tail_measure(r::ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk})
     alg = rebuild_with_slots(r.alg, (; dist = gain_tail_distribution(r.alg.dist)))
     return rebuild_with_slots(r, (; alg = alg))
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Measures the gain tail of a range alone: the tail measure `r` on the negated portfolio.
+
+The builders of a [`RangeRiskMeasure`](@ref) record a `GainTail` as the owner of the [`Frontier`](@ref) that the gain tail holds, as [`set_risk_frontier_owner!`](@ref) states. The tail measure itself is no owner, because on the portfolio it gives the value of a loss tail. The loss tail reads the portfolio, so it is its own owner.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{GainTail}(\\boldsymbol{x}) &= \\rho_{\\mathrm{gain}}(-\\boldsymbol{x})\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{GainTail}(\\boldsymbol{x})``: Value of the gain tail.
+  - ``\\rho_{\\mathrm{gain}}``: Tail measure of the gains, the field `r`.
+  - $(math_dict[:xret])
+
+$(math_dict[:negated_upper_tail])
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    GainTail(r::RiskMeasure) -> GainTail
+    GainTail(; r::RiskMeasure) -> GainTail
+
+Keywords correspond to the struct's fields.
+
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `r`: Recursively updated through [`factory`](@ref).
+
+## View parameters
+
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
+
+  - `r`: Recursively viewed through [`port_opt_view`](@ref).
+
+# Functor
+
+    (r::GainTail)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
+
+Computes the net returns `x` of `w`, and evaluates [`gain_tail_measure`](@ref) of the tail on `-w` and `-x` with [`range_tail_risk`](@ref). The value of the range is the sum of the value of the loss tail and of this value. A [`WeightsReturnsFeesInput`](@ref) tail that is not a [`ValueatRisk`](@ref) with [`DistributionValueatRisk`](@ref) throws an `ArgumentError`, as [`range_tail_risk`](@ref) states.
+
+## Arguments
+
+  - `w::VecNum`: Portfolio weights vector `assets × 1`.
+  - `X::MatNum`: Returns matrix `observations × assets`.
+  - `fees::Option{<:Fees}`: Optional [`Fees`](@ref) structure.
+
+# Examples
+
+```jldoctest
+julia> r = PortfolioOptimisers.GainTail(WorstRealisation());
+
+julia> r([1.0], [-0.1; 0.25; 0.5;;])
+0.5
+```
+
+# Related
+
+  - [`NonOptimisationRiskMeasure`](@ref)
+  - [`RangeRiskMeasure`](@ref)
+  - [`RangeTails`](@ref)
+  - [`GenericValueatRiskRange`](@ref)
+  - [`set_risk_frontier_owner!`](@ref)
+  - [`gain_tail_measure`](@ref)
+  - [`range_tail_risk`](@ref)
+"""
+@propagatable @concrete struct GainTail <: NonOptimisationRiskMeasure
+    """
+    The point measure of the gains, the `gain` of a [`RangeTails`](@ref).
+    """
+    @fprop @vprop r
+    function GainTail(r::RiskMeasure)
+        return new{typeof(r)}(r)
+    end
+end
+function GainTail(; r::RiskMeasure)::GainTail
+    return GainTail(r)
+end
+# Deferrable and calibration slots — see `deferred_slots` and `calibration_slots`. The functor
+# calls the tail directly, so these declarations are the only route to the slots of the tail.
+deferred_slots(r::GainTail) = (; r = r.r)
+calibration_slots(r::GainTail) = (; r = r.r)
+# Evaluation entry points. The value reads the weights and the returns, and never a series alone.
+risk_input_kind(::GainTail) = WeightsReturnsFeesInput()
+supports_precomputed_returns(::GainTail)::Bool = false
+function (r::GainTail)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
+    return range_tail_risk(gain_tail_measure(r.r), -w, -calc_net_returns(w, X, fees))
 end
 # A range with a tail that reads the weights reads the weights, the returns and the fees. The
 # loss tail reads `w` and `x`, and the gain tail reads `-w` and `-x`, as the model builds them.
