@@ -689,7 +689,7 @@ Implement the two methods below. The method of [`set_risk_constraints!`](@ref) f
 
 ## A formulation that fuses
 
-Implement a method of [`set_risk_constraints!`](@ref) for the formulation, and declare no `range_tails`. Its method is more specific than the method for a `RangeRiskMeasure`. `range_tails` then throws an `ArgumentError` that names the type. A formulation that can be the gain tail of a range declares [`supports_gain_tail`](@ref) too.
+Implement a method of [`set_risk_constraints!`](@ref) for the formulation, and declare no `range_tails`. Its method is more specific than the method for a `RangeRiskMeasure`. `range_tails` then throws an `ArgumentError` that names the type. A formulation that can be the gain tail of a range declares [`supports_gain_tail`](@ref) too. When its [`risk_input_kind`](@ref) is [`WeightsReturnsFeesInput`](@ref), it also declares a method of [`gain_tail_risk`](@ref), which gives its value on the negated portfolio. A fee keeps its sign when the weights change sign, so the library has no generic value of such a range as a gain tail. [`rebuild_risk_frontier`](@ref) reads that value at the corners of a [`Frontier`](@ref) on the gain tail.
 
 # Related
 
@@ -697,6 +697,7 @@ Implement a method of [`set_risk_constraints!`](@ref) for the formulation, and d
   - [`range_tails`](@ref)
   - [`RangeTails`](@ref)
   - [`supports_gain_tail`](@ref)
+  - [`gain_tail_risk`](@ref)
   - [`range_risk_key`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
@@ -736,7 +737,7 @@ There is no default. A range that fuses throws rather than returning a decomposi
   - [`RiskMeasureSettings`](@ref)
 """
 function range_tails(r::RangeRiskMeasure)
-    return throw(ArgumentError("`range_tails` is not defined for `$(typeof(r))`. Only a range risk measure that is the sum of two point measures decomposes; a measure that fuses its two tails into one formulation declares none. To use such a range as the gain tail of a range, declare `PortfolioOptimisers.supports_gain_tail(::$(nameof(typeof(r)))) = true`."))
+    return throw(ArgumentError("`range_tails` is not defined for `$(typeof(r))`. Only a range risk measure that is the sum of two point measures decomposes; a measure that fuses its two tails into one formulation declares none. To use such a range as the gain tail of a range, declare `PortfolioOptimisers.supports_gain_tail(::$(nameof(typeof(r)))) = true`. A range that reads the weights, the returns and the fees also declares a method `PortfolioOptimisers.gain_tail_risk(r::$(nameof(typeof(r))), w, X, fees, ::PortfolioOptimisers.WeightsReturnsFeesInput)` that gives its value on the negated portfolio."))
 end
 """
 $(DocStringExtensions.TYPEDEF)

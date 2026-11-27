@@ -225,6 +225,7 @@ The functor of a [`GenericValueatRiskRange`](@ref) on the weights calls this fun
   - A tail that reads a return series, [`NetReturnsInput`](@ref), returns `r(x)`.
   - A tail that reads the weights alone, [`WeightsInput`](@ref), returns `r(w)`.
   - A [`ValueatRisk`](@ref) tail with [`DistributionValueatRisk`](@ref), [`WeightsReturnsFeesInput`](@ref), returns `r(w)`. It reads the moments of the prior against the weights. A [`ValueatRiskRange`](@ref) tail with that formulation does the same.
+  - Any other [`WeightsReturnsFeesInput`](@ref) tail throws an `ArgumentError`. Its functor reads the asset returns and the fees, which this function does not take, so the value of a gain tail on the negated portfolio is not defined. The tails of a [`GenericValueatRiskRange`](@ref) never meet this method. [`gain_tail_risk`](@ref) values a [`SymmetricLowOrderMoment`](@ref) and a range that reads the weights before this method, so a [`GainTail`](@ref) meets it only for a measure of a user that declares [`supports_gain_tail`](@ref) and no method of [`gain_tail_risk`](@ref).
 
 The gain tail of a returns measure reads `-x`, not the net returns of `-w`. A fee does not change sign with the weights, so the two series are different when the portfolio pays a fee.
 
@@ -234,6 +235,10 @@ The gain tail of a returns measure reads `-x`, not the net returns of `-w`. A fe
   - `w::VecNum`: Portfolio weights vector `assets × 1`, negated for the gain tail.
   - `x::VecNum`: Net portfolio returns vector `observations × 1`, negated for the gain tail.
   - `kind::RiskInputKind`: Input kind of the tail, which selects the method.
+
+# Validation
+
+  - A [`WeightsReturnsFeesInput`](@ref) tail that is not a [`ValueatRisk`](@ref) or a [`ValueatRiskRange`](@ref) with [`DistributionValueatRisk`](@ref) throws an `ArgumentError`.
 
 # Returns
 
@@ -247,8 +252,11 @@ The gain tail of a returns measure reads `-x`, not the net returns of `-w`. A fe
   - [`risk_input_kind`](@ref)
   - [`DistributionValueatRisk`](@ref)
 """
-function range_tail_risk(r::RiskMeasure, ::VecNum, x::VecNum,
-                         ::RiskInputKind = risk_input_kind(r))
+function range_tail_risk(r::RiskMeasure, ::VecNum, ::VecNum,
+                         ::WeightsReturnsFeesInput = risk_input_kind(r))
+    return throw(ArgumentError("`$(typeof(r))` is a `WeightsReturnsFeesInput` risk measure, so a range cannot value it as a tail. Its functor reads the asset returns and the fees, and the gain tail of a range reads the negated weights and the negated net returns. Use a tail that reads the net returns or the weights alone, a `ValueatRisk` or a `ValueatRiskRange` with `DistributionValueatRisk`, a `LowOrderMoment` that is symmetric, or a range that reads the weights. For a measure of your own, declare a method of `PortfolioOptimisers.gain_tail_risk` that gives its value on the negated portfolio."))
+end
+function range_tail_risk(r::RiskMeasure, ::VecNum, x::VecNum, ::NetReturnsInput)
     return r(x)
 end
 function range_tail_risk(r::RiskMeasure, w::VecNum, ::VecNum, ::WeightsInput)
@@ -339,6 +347,8 @@ Evaluate the measure `r` as the gain tail of a range, on the portfolio `w`.
   - A range that reads the weights exchanges the sides of its tails, as the builder of a [`RangeRiskMeasure`](@ref) does. The method returns the sum of the value of its loss tail as a gain tail and of the value of its gain tail on the portfolio.
   - A [`ValueatRiskRange`](@ref) with [`DistributionValueatRisk`](@ref) declares no tails, so the method evaluates [`gain_tail_measure`](@ref) of `r` on `-w`.
 
+A measure of your own that reads the weights, the returns and the fees, and that declares [`supports_gain_tail`](@ref), also declares a method of this function with `kind::WeightsReturnsFeesInput`. A fee keeps its sign when the weights change sign, so no generic value of such a measure on the negated portfolio exists. A range of your own with a formulation that fuses and declares no [`range_tails`](@ref) is such a measure, as the `# Interfaces` section of [`RangeRiskMeasure`](@ref) states.
+
 # Arguments
 
   - $(arg_dict[:r])
@@ -428,7 +438,7 @@ Keywords correspond to the struct's fields.
 
     (r::GainTail)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
 
-Evaluates the tail on the negated portfolio with [`gain_tail_risk`](@ref). The value of the range is the sum of the value of the loss tail and of this value.
+Evaluates the tail on the negated portfolio with [`gain_tail_risk`](@ref). The value of the range is the sum of the value of the loss tail and of this value. A [`WeightsReturnsFeesInput`](@ref) tail that no method of [`gain_tail_risk`](@ref) values throws an `ArgumentError`, as [`range_tail_risk`](@ref) states.
 
 ## Arguments
 
@@ -559,5 +569,5 @@ function supports_precomputed_returns(r::GenericValueatRiskRange)
 end
 
 export GenericValueatRiskRange
-# The verb the `# Interfaces` sections of `RiskMeasure` and `RangeRiskMeasure` name (ADR 0154).
-public supports_gain_tail
+# The verbs the `# Interfaces` sections of `RiskMeasure` and `RangeRiskMeasure` name (ADR 0154).
+public supports_gain_tail, gain_tail_risk

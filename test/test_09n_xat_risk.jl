@@ -420,6 +420,15 @@ rel_dd(x) = cumprod(1 .+ x) ./ accumulate(max, cumprod(1 .+ x); init = one(eltyp
         # A tail of a range of a user can read the weights alone.
         @test isapprox(expected_risk(PO.GainTail(StandardDeviation()), w, pr),
                        expected_risk(StandardDeviation(), w, pr))
+        # A tail that reads the asset returns and the fees has no value on the negated
+        # portfolio. It raised a `MethodError` deep in the functor, or an error about a
+        # precomputed series that the caller did not give.
+        nw = length(w)
+        for t in (LowOrderMoment(; mu = fill(0.001, nw)),
+                  TrackingRiskMeasure(; tr = WeightsTracking(; w = fill(inv(nw), nw))))
+            @test_throws "so a range cannot value it as a tail" expected_risk(PO.GainTail(t),
+                                                                              w, pr)
+        end
         # The model builds the same gain tail, so its risk equals the functor and the range.
         cslv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                       settings = Dict("verbose" => false))

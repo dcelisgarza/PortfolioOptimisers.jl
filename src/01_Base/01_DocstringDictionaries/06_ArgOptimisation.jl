@@ -217,7 +217,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :cash_alloc => "`cash`: Remaining uninvested cash after allocation, from the third method of the collateral algorithm of the input. It includes the cash that no side received, and it is negative when the book borrows.",#
                  :fees_alloc => "`fees`: Fee the allocation paid over the whole horizon. It is the sum of the two sides' charges, and it is never signed.",#
                  :unit => "`unit`: Lot unit of each asset, the number of shares that one purchase buys. A [`LotUnit`](@ref) states it, and a [`LotUnitEstimator`](@ref) resolves it against `sets`. A share count is a non-negative integer multiple of the lot unit of its asset. The default `LotUnit(1)` buys whole shares.",#
-                 :sets_alloc => "`sets`: Universe sets that a [`LotUnitEstimator`](@ref) in `unit` resolves against, or `nothing`. The universe must name the assets of the input in the order of `w`.",#
+                 :sets_alloc => "`sets`: Universe sets that a [`LotUnitEstimator`](@ref) in `unit` resolves against, or `nothing`. The universe must name the assets of the input in the order of `w`, unless `idx` selects the assets of the input from it.",#
+                 :idx_alloc => "`idx`: Positions, in the universe of `sets`, of the assets of the input in the order of `w`, a mask of that universe, or `nothing` when the input holds the whole universe. [`port_opt_view`](@ref) writes it, so that a [`LotUnitEstimator`](@ref) in `unit` resolves on the whole universe before the cut.",#
                  # Hierarchical and Schur complement optimisers.
                  :ri => "`ri`: Inner risk measure.",#
                  :ri_res => "`ri`: The intra-cluster risk measure the optimisation ran under, or a vector of them, stored resolved.",#
@@ -284,6 +285,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :ps_ppy => "`ppy`: Periods per year, the annualisation factor. 252 for daily, 52 for weekly, 12 for monthly returns, and 1 states each figure per period.",#
                  :ps_alpha => "`alpha`: Tail probability of the CVaR, ``\\alpha \\in (0, 1)``.",#
                  :ps_compound => "`compound`: `true` when the drawdown statistics read a compounded wealth path, and `false` when they read the cumulative sum of the returns.",#
+                 :strict_held_gap => "`strict`: Whether a Held Gap of the returns raises an `ArgumentError`. With `false`, it warns and contributes zero. Only the methods that take weights, or an [`OptimisationResult`](@ref), read it.",#
                  :ps_ann_return => "`ann_return`: Annualised arithmetic mean return.",#
                  :ps_ann_volatility => "`ann_volatility`: Annualised sample standard deviation.",#
                  :ps_sharpe => "`sharpe`: Annualised Sharpe ratio, the excess of the mean return over the risk-free rate `rf`, divided by the volatility. It is `NaN` when the volatility is zero.",#

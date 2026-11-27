@@ -114,14 +114,14 @@ Where:
   - ``K``: Number of opinions.
   - $(math_dict[:T])
 
-One ``\\log 0`` makes the exponent ``-\\infty``. So ``p_t^{*} = 0`` when **one** opinion of positive probability gives scenario ``t`` a zero weight. The product ``\\alpha_k \\log p_{tk}`` has no value when both factors are zero, and the form above does not cover that case. The source defines the pool only for opinions that give every scenario a positive weight. The library also accepts a zero weight, with the result above.
+One ``\\log 0`` makes the exponent ``-\\infty``. So ``p_t^{*} = 0`` when **one** opinion of positive probability gives scenario ``t`` a zero weight. The product ``\\alpha_k \\log p_{tk}`` is zero when ``\\alpha_k = 0``, for a zero ``p_{tk}`` too, so an opinion of zero probability does not change the pool. The source defines the pool only for opinions that give every scenario a positive weight. The library also accepts a zero weight, with the result above.
 
 # Related
 
   - [`OpinionPoolingAlgorithm`](@ref)
   - [`LinearOpinionPooling`](@ref): the sibling rule, under which the pooled weight of a scenario is zero only when every opinion gives it a zero weight.
   - [`OpinionPoolingPrior`](@ref)
-  - [`compute_pooling`](@ref): its `# Validation` section states what the code does when both factors of the product are zero.
+  - [`compute_pooling`](@ref): its `# Validation` section states the case where the opinions share no scenario.
 
 # References
 
@@ -163,7 +163,7 @@ Keywords correspond to the struct's fields. All arguments are validated for type
   - `pes` must be a non-empty vector of prior estimators.
   - If `w` is not `nothing`, `!isempty(w)`, `length(w) == length(pes)`, `all(x -> 0 <= x <= 1, w)`, and `sum(w) <= 1`.
   - The last is an inequality on purpose. When `sum(w) < 1`, [`prior`](@ref) gives the remaining weight to a uniform prior over the observations. That prior is one more opinion. It takes a column of `pw`, and the pool penalises and pools it with the other opinions.
-  - If `p` is not `nothing`, `p > 0`. The bound is strict, so `p = 0` raises an error. Set `p = nothing` for no penalty.
+  - If `p` is not `nothing`, `p > 0` and `isfinite(p)`. The bound is strict, so `p = 0` raises an error. Set `p = nothing` for no penalty.
   - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
   - The `x_src` of `pes`, `pe1`, `pe2` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
 
@@ -311,7 +311,9 @@ This prior has no exact incremental recursion, so it takes the online step by **
         assert_inner_reader(pe2, :pe2, :OpinionPoolingPrior)
         @argcheck(!isempty(pes), IsEmptyError("pes cannot be empty"))
         if !isnothing(p)
-            @argcheck(p > zero(p), DomainError(p, "p must be > 0"))
+            @argcheck(isfinite(p) && p > zero(p),
+                      DomainError(p,
+                                  "`OpinionPoolingPrior.p` is $p, and the penalty of robust pooling is above zero and finite. State `p = nothing` for no penalty."))
         end
         if !isnothing(w)
             @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
@@ -388,6 +390,8 @@ Where:
 
 The consensus ``\\boldsymbol{c}`` is always the **linear** pool, whatever [`OpinionPoolingAlgorithm`](@ref) the caller selected. The divergence has a direction. It is ``D_k = \\mathrm{KL}(\\boldsymbol{p}_k \\,\\|\\, \\boldsymbol{c})``, from each opinion to the consensus. The `kld` field of the result of [`prior`](@ref) has the other direction, from the consensus to each opinion, so the two vectors hold different numbers.
 
+An opinion whose probability ``\\alpha_k`` is zero keeps the probability zero, also when it gives a positive weight to a scenario that the consensus gives none.
+
 ``\\exp(-\\rho D_k)`` decreases in ``D_k``, so a larger ``\\rho`` moves the mass to the opinions nearest the consensus. As ``\\rho`` increases without bound, all the mass goes to the opinion of smallest divergence.
 
 # Algorithm
@@ -396,14 +400,14 @@ The steps below are those of the three-argument method. The `args...` method tak
 
  1. Pool the opinions linearly into the consensus `c`.
  2. Compute `kldivs`, the Kullback-Leibler divergence of each column of `pw` from `c`.
- 3. Multiply each entry of `ow` by `exp(-p * kldivs)`, into a **new** vector.
- 4. Divide that vector by its sum, and return it.
+ 3. Compute the logarithm of each penalised probability, `log(ow) - p * kldivs`, into a **new** vector `lw`.
+ 4. Subtract `LogExpFunctions.logsumexp(lw)` from `lw`, and return the exponential of the difference. A large `p` underflows `exp(-p * kldivs)` for every opinion, and the logarithms keep the ratios of the opinions.
 
 # Arguments
 
   - `ow`: Opinion probabilities, one entry per opinion.
   - `pw`: Scenario weights of the opinions, `observations × opinions`, one column per opinion.
-  - `p`: Penalty, above zero.
+  - `p`: Penalty, above zero and finite.
 
 # Returns
 
@@ -419,15 +423,18 @@ function robust_probabilities(ow::VecNum, args...)
 end
 function robust_probabilities(ow::VecNum, pw::MatNum, p::Number)
     c = pw * ow
-    kldivs = [sum(StatsBase.kldivergence(view(pw, :, i), c)) for i in axes(pw, 2)]
+    kldivs = [StatsBase.kldivergence(view(pw, :, i), c) for i in axes(pw, 2)]
     # Build a new vector rather than writing into `ow`. `ow` is the caller's, and when the
     # opinion weights already sum to one it *is* `pe.w`, the estimator's own stored field: an
     # in-place `.*=` there left the estimator holding penalised weights that no longer sum to
     # one, so a second `prior` call pooled a uniform-prior remainder nobody asked for. The
     # uniform-weight branch of `prior` also hands in an immutable `range`, which `.*=` cannot
     # write to at all.
-    ow = ow .* exp.(-p * kldivs)
-    return ow / sum(ow)
+    #
+    # The normalisation is in log space. A large `p` underflows `exp(-p * kldivs)` for every
+    # opinion, and the quotient by the sum is then `0 / 0`.
+    lw = log.(ow) .- p .* kldivs
+    return exp.(lw .- LogExpFunctions.logsumexp(lw))
 end
 """
     compute_pooling(::LinearOpinionPooling, ow::VecNum, pw::MatNum)
@@ -473,7 +480,7 @@ Under [`LinearOpinionPooling`](@ref):
 
 Under [`LogarithmicOpinionPooling`](@ref):
 
- 1. Multiply the elementwise logarithm of `pw` by `ow` to get the exponent vector `u`.
+ 1. Sum `LogExpFunctions.xlogy.(transpose(ow), pw)` over the opinions to get the exponent vector `u`. A term is zero for an opinion probability of zero, for a zero scenario weight too.
  2. Compute `lse = LogExpFunctions.logsumexp(u)`. The function subtracts the maximum of `u` before it exponentiates, so a very negative exponent does not underflow to a vector of zeros.
  3. Exponentiate `u .- lse` to get the consensus weights `w`.
 
@@ -485,7 +492,8 @@ Under [`LogarithmicOpinionPooling`](@ref):
 
 # Validation
 
-  - `StatsBase.aweights` checks that the result carries no `Inf` and no `NaN`. Under [`LogarithmicOpinionPooling`](@ref), an opinion probability of exactly `0` against a scenario weight of exactly `0` makes the product `0 * log(0)`, which is `NaN`, and the call raises `ArgumentError`. A zero scenario weight alone is safe. It gives `-Inf`, which exponentiates to a consensus weight of `0`.
+  - Under [`LogarithmicOpinionPooling`](@ref), at least one scenario has a positive weight under every opinion of positive probability. Otherwise every entry of `u` is `-Inf`, no pool exists, and the call raises an `ArgumentError`.
+  - `StatsBase.aweights` checks that the result holds no `Inf` and no `NaN`.
 
 # Returns
 
@@ -501,9 +509,13 @@ function compute_pooling(::LinearOpinionPooling, ow::VecNum, pw::MatNum)
     return StatsBase.aweights(pw * ow)
 end
 function compute_pooling(::LogarithmicOpinionPooling, ow::VecNum, pw::MatNum)
-    u = log.(pw) * ow
+    # `0 * log(0)` is `NaN`, and `xlogy` gives its limit `0`, so an opinion of zero
+    # probability does not change the pool.
+    u = vec(sum(LogExpFunctions.xlogy.(transpose(ow), pw); dims = 2))
+    @argcheck(any(isfinite, u),
+              ArgumentError("The logarithmic pool gives a scenario a positive weight only when every opinion of positive probability does, and none of the $(length(u)) scenarios has one under all of them. Pool with `LinearOpinionPooling()`, or give the opinions prior probabilities that share a scenario."))
     lse = LogExpFunctions.logsumexp(u)
-    return StatsBase.aweights(vec(exp.(u .- lse)))
+    return StatsBase.aweights(exp.(u .- lse))
 end
 """
     prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing,

@@ -593,6 +593,32 @@ end
 struct MrsFusedRange{T1} <: PO.RangeRiskMeasure
     settings::T1
 end
+PO.risk_input_kind(::MrsFusedRange) = PO.WeightsReturnsFeesInput()
+# A range of a user's own that fuses its tails into one standard deviation, and reads the
+# weights, the returns and the fees. It declares the trait and its value on the negated
+# portfolio, so it can be a gain tail with a `Frontier`.
+struct MrsFusedWeightRange{T1, T2} <: PO.RangeRiskMeasure
+    settings::T1
+    sd::T2
+end
+PO.risk_input_kind(::MrsFusedWeightRange) = PO.WeightsReturnsFeesInput()
+PO.supports_gain_tail(::MrsFusedWeightRange) = true
+function PO.factory(r::MrsFusedWeightRange, args...; kwargs...)
+    return MrsFusedWeightRange(r.settings, factory(r.sd, args...; kwargs...))
+end
+(r::MrsFusedWeightRange)(w::PO.VecNum, X::PO.MatNum, fees = nothing) = r.sd(w)
+function PO.gain_tail_risk(r::MrsFusedWeightRange, w::PO.VecNum, X::PO.MatNum, fees,
+                           ::PO.WeightsReturnsFeesInput)
+    return r.sd(-w)
+end
+function PO.set_risk_constraints!(model::JuMP.Model, i::Any, r::MrsFusedWeightRange,
+                                  opt::PO.RiskConstraintOwner, pr::PO.AbstractPriorResult,
+                                  args...; prefix::Symbol = Symbol(""), kwargs...)
+    sd_risk, _ = PO.set_risk!(model, i, r.sd, opt, pr, args...; prefix = prefix, kwargs...)
+    PO.set_risk_bounds_and_expression!(model, opt, sd_risk, r.settings,
+                                       :mrs_fused_weight_range_risk_, i; prefix = prefix)
+    return sd_risk
+end
 
 @testset "MeanRisk sweep: a Frontier on a tail of a range spans that tail" begin
     # The sweep took the span of the whole range, so the levels were too high and most points
@@ -770,6 +796,21 @@ end
                        loss_value(w) + cvar(0.2)(calc_net_returns(w, pr.X, fees));
                        rtol = 1e-10)
     end
+    # A range that fuses its tails and reads the weights, the returns and the fees is a gain
+    # tail with a `Frontier` through its own method of `gain_tail_risk`. The error for a range
+    # with no such method named only `supports_gain_tail`, which the range declared (#2393).
+    fused(s) = MrsRange(RiskMeasureSettings(), cvar(0.1),
+                        MrsFusedWeightRange(s, StandardDeviation(; settings = off)))
+    res = optimise(MeanRisk(; r = [fused(bnd)], opt = opt, obj = MaximumReturn()))
+    owner = only(res.model[:risk_frontier]).second[4]
+    @test isa(owner, PO.GainTail) && isa(owner.r, MrsFusedWeightRange)
+    ends = [sd(optimise(MeanRisk(; r = [fused(off)], opt = opt, obj = obj)).w)
+            for obj in (MinimumRisk(), MaximumReturn())]
+    @test isapprox([sd(w) for w in res.w], sort(ends); rtol = 1e-4)
+    no_method = PO.GainTail(MrsFusedRange(off))
+    @test_throws "PortfolioOptimisers.gain_tail_risk(r::MrsFusedRange" no_method(fill(0.2,
+                                                                                      5),
+                                                                                 pr.X)
     # A full moment about the mean is the same on both sides, with a fee too.
     mad = factory(LowOrderMoment(; settings = off, alg = MeanAbsoluteDeviation()), pr)
     w = fill(0.2, 5)
