@@ -1580,7 +1580,7 @@ end
     failed_hold_weights(X::Nothing)
     failed_hold_weights(X::MatNum)
 
-Return the weights of a [`PreviousWeights`](@ref) that has nothing to hold.
+Return the weights of a failed result that has no solve: a [`PreviousWeights`](@ref) that has nothing to hold, or the outer problem of a meta-optimiser that has no asset, see [`failed_outer_result`](@ref).
 
 The weights are `NaN` at every column of `X`, or `nothing` when `X` is `nothing`. They take the element type of `X`, which must hold `NaN`.
 
@@ -1588,6 +1588,7 @@ The weights are `NaN` at every column of `X`, or `nothing` when `X` is `nothing`
 
   - [`PreviousWeights`](@ref)
   - [`_optimise(pw::PreviousWeights, rd::ReturnsResult = ReturnsResult(); kwargs...)`](@ref)
+  - [`failed_outer_result`](@ref)
 """
 function failed_hold_weights(::Nothing)
     return nothing
