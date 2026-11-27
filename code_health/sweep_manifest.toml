@@ -255,6 +255,9 @@
 "src/05_Moments/40_RobustCovariance/08_TylerShrinkage.jl" = { map = 3, units = 11, swept = false }
 "src/05_Moments/40_RobustCovariance/09_TylerCovariance.jl" = { map = 3, units = 11, swept = false }
 "src/05_Moments/40_RobustCovariance/10_RobustExpectedReturns.jl" = { map = 3, units = 2, swept = false }
+"src/05_Moments/40_RobustCovariance/11_SRho.jl" = { map = 3, units = 9, swept = false }
+"src/05_Moments/40_RobustCovariance/12_SCovariance.jl" = { map = 3, units = 14, swept = false }
+"src/05_Moments/40_RobustCovariance/13_MMCovariance.jl" = { map = 3, units = 7, swept = false }
 "src/06_Distance/01_Base_Distance.jl" = { map = 2, units = 9, algorithm = 2, swept = true, bindings = ["AbstractDistanceAlgorithm", "AbstractDistanceEstimator", "CanonicalDistance", "CorrelationDistance", "LogDistance", "SimpleAbsoluteDistance", "SimpleDistance", "VariationInfoDistance", "reads_sample_values"] }
 "src/06_Distance/02_Distance.jl" = { map = 2, units = 14, algorithm = 9, swept = true, bindings = ["AllInternalMutualInfoCov", "DistCov_AllInternalDistCov", "Distance", "LTDCov_AllInternalLTDCov", "RhoDistanceAlgorithm", "_absguard", "_as_correlation", "_dist_from_cor", "cor_and_dist", "distance", "distance", "distance", "distance", "reads_sample_values"] }
 "src/06_Distance/03_DistanceDistance.jl" = { map = 2, units = 4, algorithm = 3, swept = true, bindings = ["DistanceDistance", "cor_and_dist", "distance", "distance"] }

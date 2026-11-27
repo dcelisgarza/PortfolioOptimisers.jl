@@ -172,6 +172,9 @@ end
                                 # `# Interfaces` section of `matrix_processing_algorithm!`
                                 # names it for a subtype to answer.
                                 :matrix_processing_algorithm => "public seam, the out-of-place arm of an Open Family",
+                                # The default arm of a public seam: the `# Interfaces` section
+                                # of `AbstractSAlgorithm` names it for a search with many starts.
+                                :s_refine => "public seam, the default arm of an Open Family",
                                 # Private names that are simple and convenient.
                                 :cv_sequential_info => "the one message of the sequential fold loop, named beside the rule that sends a run there",
                                 :_expr_to_lens => "the base case of the lens-building recursion of `expr_to_lens_chain`",

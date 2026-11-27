@@ -249,6 +249,8 @@
         :AbstractRobustCovarianceEstimator,
         :AbstractRobustReweighting,
         :AbstractRobustShrinkageIntensity,
+        :AbstractSAlgorithm,
+        :AbstractSRho,
         :AbstractSampleSelector,
         :AbstractSearchCrossValidationResult,
         :AbstractSearchReduction,
