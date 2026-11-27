@@ -55,8 +55,12 @@ because a Returns Result refuses a zero there. No reader uses either value.
 ## Consequences
 
 - The default changes no released answer. Calls that raised now give a failed result, and their
-  fallback runs: a failed inner solve with `iv` in the data, a combinatorial candidate with no
-  solved path, and a meta-optimiser whose every inner solve fails.
+  fallback runs: a failed inner solve with `iv` in the data, and a meta-optimiser whose every inner
+  solve fails.
+- A combinatorial candidate with no solved path raised too. Now the outer problem drops it, as it
+  drops a candidate whose every fold failed under another scheme. The return code reads the
+  full-sample solve of the candidate alone. When that solve succeeds, the result is a success with
+  no payload and no warning, under every `min_solved`.
 - An outer prior whose every synthetic asset has a gap in a part of its series still raises its own
   `IsEmptyError`, as it does for a universe of real assets. The coverage policy of that prior is the
   remedy.

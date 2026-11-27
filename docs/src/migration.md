@@ -1102,7 +1102,7 @@ A static `TensorPanelField` and a static feature matrix keep `assets × labels` 
 | Call | v0.34.5 | v0.34.6 |
 | --- | --- | --- |
 | A fold of a cross-validation whose optimiser failed, or a `NestedClustered` or a `Stacking` with a failed inner solve, when the returns data has `iv` | `DomainError` | A failed fold with a zero `iv`, or a failed result whose fallback runs. |
-| A `NestedClustered` or a `Stacking` under `CombinatorialCrossValidation`, when a candidate has a failed fold in every path | `ArgumentError` that named an empty data vector | The outer problem drops the candidate. |
+| A `NestedClustered` or a `Stacking` under `CombinatorialCrossValidation`, when a candidate has a failed fold in every path | `ArgumentError` that named an empty data vector | The outer problem drops the candidate. The return code reads its full-sample solve alone, so a candidate whose full-sample solve succeeds gives a success with no warning. |
 | A `NestedClustered` or a `Stacking` whose every inner solve fails | `IsEmptyError` from the prior of the outer optimiser | A failed result whose fallback runs. |
 | A portfolio with no position, when the returns data has a vector `ivpa` | `DomainError` | Its collapsed `ivpa` is the mean of the vector. |
 
