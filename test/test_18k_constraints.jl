@@ -1363,7 +1363,12 @@ end
                                            w = zeros(4))) == 0.03
     # A book with a small budget, a small cap, a budget that pays costs, and a
     # return term with a small vector have a `k` that the constant of a fully invested book of
-    # the prior refused (#2309). A stated constant far above `k` gives the same book.
+    # the prior refused (#2309). A stated constant far above `k` gives a book of the same
+    # shape. A budget that pays costs is a ceiling, and the ratio of a book with `rf = 0` is
+    # the same at each scale, so the scale of that book is free: the solver can return the
+    # book where a cap binds, or the smaller book where the gate rows hold `k` at the
+    # constant. Each optimal book has a `k` above the constant of the cap.
+    shape(w) = w / sum(w)
     function solve_small(; kw...)
         res = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(),
                                 opt = JuMPOptimiser(; pe = prm, slv = slvm, card = 3,
@@ -1378,8 +1383,8 @@ end
                 wb = cap(0.01)), (; ret = ArithmeticReturn(; mu = prm.mu / 1e4), wb = cap(0.5)))
         res = solve_small(; kw...)
         ref = solve_small(; kw..., ss = 1e5)
-        @test 1000 * maximum(res.wb.ub) < value(ref.model[:k]) < res.model[:ss]
-        @test isapprox(res.w, ref.w; rtol = 1e-3)
+        @test 1000 * maximum(res.wb.ub) < value(ref.model[:k])
+        @test isapprox(shape(res.w), shape(ref.w); rtol = 1e-3)
     end
     # Any other objective has a constant `k`, so it records no ceiling, and a small bound
     # is its constant.

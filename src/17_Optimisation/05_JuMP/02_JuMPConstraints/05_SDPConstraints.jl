@@ -368,6 +368,7 @@ Where:
   - [`set_sdp_objective_lift!`](@ref)
   - [`SquareRootRatio`](@ref)
   - [`set_maximum_ratio_normalisation!`](@ref)
+  - [`maximum_ratio_normalisation`](@ref)
 """
 function set_sdp_lift_corner!(::JuMP.Model, ::ObjectiveFunction, ::AbstractPriorResult)
     return nothing
@@ -376,8 +377,7 @@ function set_sdp_lift_corner!(model::JuMP.Model, obj::MaximumRatio, pr::Abstract
     c = if isnothing(obj.ohf)
         one(eltype(pr.mu))
     else
-        m = Statistics.mean(abs, pr.mu)
-        obj.ohf / clamp(m, inv(oftype(m, 1000)), oftype(m, 1000))
+        obj.ohf / maximum_ratio_normalisation(nothing, pr.mu)
     end
     shared_set!(model, :sdp_corner, c)
     return nothing

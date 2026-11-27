@@ -245,8 +245,10 @@ end
 @testset "RiskBudgeting sweep: the default big-M is the bound of the gated terms (#2373)" begin
     # With no budget, no row fixes `k`, so the solver moves it up toward the big-M. The old
     # constant, 1000 times the largest bound, left the rows of a long-short bundle so far
-    # above the gated terms that the solve failed. The ceiling 10 N / 1 = 50 times the bound
-    # 10 is the constant now.
+    # above the gated terms that the solve failed with Pajarito (ADR 0021). The ceiling
+    # 10 N / 1 = 50 times the bound 10 is the constant now. The model with the old constant
+    # is feasible, so another solver or version can solve it, and the test does not pin
+    # that failure.
     th = Threshold(; val = 0.01)
     kw = (; slv = RBS_MIP, so = 10_000, bgt = nothing, sbgt = nothing, card = 5, lt = th,
           st = th)
@@ -257,8 +259,6 @@ end
     @test res.model[:ss] == 500
     @test value(res.model[:k]) < 500
     @test isapprox(rbs_share(res.w), RBS_B; atol = 5e-5)
-    @test !isa(rbs_solve(MixedIntegerRiskBudgeting(); kw..., wb = wb, ss = 1e4).retcode,
-               OptimisationSuccess)
     # The bounds do not bind, so the book takes the orthant of the book with no bound, where
     # an infinite bound keeps the fallback constant.
     free = rbs_solve(MixedIntegerRiskBudgeting(); kw...,
