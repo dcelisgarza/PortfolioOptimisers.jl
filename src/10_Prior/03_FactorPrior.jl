@@ -719,8 +719,10 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} 
     @argcheck(isnothing(ts) || length(ts) == T,
               DimensionMismatch("ts ($(length(ts))) must have one entry for each of the $T observations of X"))
     # The regression is a per-asset fit, so it takes the Coverage Universe before it runs
-    # rather than a frame after it: a stepwise search over a gapped column has no answer, and
-    # `chol` is the factorisation of the block, not of the frame. Every block the result
+    # rather than a frame after it: the lift reads the residual of each asset over the whole
+    # window, which a gapped column does not have, although the regression alone fits such a
+    # column on its own rows (#2370), and `chol` is the factorisation of the block, not of
+    # the frame. Every block the result
     # carries is expanded at the end, the regression result included, because a Prior Result
     # has no mask field and every block it carries lives on the full asset universe.
     cmsk, Xc = coverage_reduction(X, pnl; dims = 1,

@@ -26,6 +26,7 @@ factory(re::GeneralisedLinearModel, w::ObsWeights)
 StatsAPI.fit(tgt::GeneralisedLinearModel, X::MatNum, y::VecNum)
 regression(re::Regression, args...)
 regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult)
+asset_fit_rows
 port_opt_view(re::Regression, i, args...)
 obs_weights_view(tgt::Union{LinearModel, GeneralisedLinearModel}, i)
 ```

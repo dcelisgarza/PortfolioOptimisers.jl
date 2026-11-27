@@ -14,6 +14,7 @@ import PortfolioOptimisers: ArrNum, VecNum, MatNum, Arr3Num, Option, VecNum_VecV
                             factor_plot_prior, investable_plot_view, result_investable_mask,
                             investable_weights_view, fold_factor_returns, fold_fees,
                             result_investable_view, strip_liquidation_charges,
+                            filter_held_gaps, investable_reduction,
                             AbstractPredictionResult, PredRes_MultiPredRes, regret_series,
                             member_vector, prediction_weights, DocStringExtensions,
                             @concrete
@@ -38,6 +39,19 @@ end
 function result_prior_view(res::OptimisationResult, nx::Option{<:AbstractVector} = nothing)
     imsk, _, pr, _, nx = result_investable_view(res, nothing, nothing, nx)
     return pr, result_axis_names(imsk, pr, nx)
+end
+# The data of a contribution figure, and the default names of its asset axis. A value-level
+# verb filters the gaps of a returns result and reduces a prior itself, and it reads a matrix
+# as it is, so a matrix is filtered here.
+function contribution_figure_data(w::VecNum, X::MatNum, strict::Bool)
+    return filter_held_gaps(w, X, strict), 1:length(w)
+end
+function contribution_figure_data(::VecNum, rd::ReturnsResult, ::Bool)
+    return rd, rd.nx
+end
+function contribution_figure_data(w::VecNum, pr::PortfolioOptimisers.AbstractPriorResult,
+                                  ::Bool)
+    return pr, 1:length(w)
 end
 
 include("01_CumulativeReturnsPlots.jl")
