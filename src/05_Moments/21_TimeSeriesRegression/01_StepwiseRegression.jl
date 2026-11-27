@@ -80,6 +80,8 @@ Shrinks the factor set from full, removing the factor whose removal most improve
 
 At each step the algorithm fits one model per included factor, each model without that factor, and removes the factor whose reduced model scores best. It stops when no removal improves on the score of the set that it holds. The starting score is the score of the full model, not [`regression_threshold`](@ref). Under [`PValue`](@ref) the step removes the factor with the largest p-value while a p-value exceeds `t`.
 
+When the full model and every model of one removal leave no residual, as on an asset with no more observations than factors, every candidate ties at the worst score, and no score ranks a removal. The asset then takes the factor set of [`ForwardSelection`](@ref) under the same criterion and target, and [`stepwise_search`](@ref) warns and names the asset.
+
 Under a [`MinMaxValStepwiseRegressionCriterion`](@ref) the selection can be empty. When each removal improves the score, the search removes every factor. The asset then gets an intercept-only model, and its row of the loadings matrix is all zeros. [`stepwise_factor_set`](@ref) warns and names the asset when the search selects no factor. The two methods that run the steps state them: `_regression(::StepwiseRegression{<:PValue, <:BackwardElimination}, ::VecNum, ::MatNum)` and `_regression(::StepwiseRegression{<:MinMaxValStepwiseRegressionCriterion, <:BackwardElimination}, ::VecNum, ::MatNum)`.
 
 # Related
@@ -619,7 +621,7 @@ A Saturated Fit has no p-value, so the p-values of the full set cannot name the 
 
 # Returns
 
-  - `removed::Int`: The factor whose removal leaves the best set that leaves a residual, or `0` when every set of one removal is a Saturated Fit.
+  - `removed::Int`: The factor whose removal leaves the best set that leaves a residual, or `0` when every set of one removal is a Saturated Fit. On `0` the backward search has no admissible start, and [`stepwise_search`](@ref) runs a forward search instead.
 
 # Related
 
@@ -657,12 +659,12 @@ end
 
 Shrinks a factor set from full, and removes the factor of largest p-value while a p-value exceeds the threshold.
 
-A Saturated Fit, which [`is_saturated_fit`](@ref) flags, has no p-value. So when the full set leaves no residual, the method takes its first removal from [`saturated_set_pval_removal`](@ref), which ranks the sets of one removal that leave a residual. When no such set exists, no p-value can rank a removal, and the method returns the full set. [`asset_fit_coefficients`](@ref) then fits the intercept alone and warns.
+A Saturated Fit, which [`is_saturated_fit`](@ref) flags, has no p-value. So when the full set leaves no residual, the method takes its first removal from [`saturated_set_pval_removal`](@ref), which ranks the sets of one removal that leave a residual. When no such set exists, no p-value can rank a removal, and the method returns `nothing`. [`stepwise_search`](@ref) then runs the forward search of the same criterion and warns.
 
 # Algorithm
 
  1. Set `included` to every factor index and `excluded` empty. Fit `re.tgt` to an intercept column and every column of `F`.
- 2. When step 1 gives a Saturated Fit, take the factor of [`saturated_set_pval_removal`](@ref). Return `included` when it names no factor. Otherwise push it onto `excluded`, set `included` to the other factors, and fit `re.tgt` to an intercept column and the columns `included`.
+ 2. When step 1 gives a Saturated Fit, take the factor of [`saturated_set_pval_removal`](@ref). Return `nothing` when it names no factor. Otherwise push it onto `excluded`, set `included` to the other factors, and fit `re.tgt` to an intercept column and the columns `included`.
  3. Read the p-values of the factor coefficients of the last fit, and set `val` to the largest of them, or to zero when `included` is empty. While `val` exceeds `re.crit.t`, do steps 4 to 6.
  4. Set `included` to the factors that `excluded` does not hold. Stop the loop when `included` is empty.
  5. Fit `re.tgt` to an intercept column and the columns `included`, and read the p-values of the factor coefficients. Call them `pvals`.
@@ -677,7 +679,7 @@ A Saturated Fit, which [`is_saturated_fit`](@ref) flags, has no p-value. So when
 
 # Returns
 
-  - `included::VecInt`: Indices of the selected factors, in ascending order. It holds at least one index, unless no factor has a p-value, as [`add_best_factor_after_pval_failure!`](@ref) states. It is the `1:size(F, 2)` range itself when the full model already passes the threshold, or when the full model and every model of one removal are Saturated Fits, and a `Vector{Int}` otherwise.
+  - `included::Option{<:VecInt}`: Indices of the selected factors, in ascending order. It holds at least one index, unless no factor has a p-value, as [`add_best_factor_after_pval_failure!`](@ref) states. It is the `1:size(F, 2)` range itself when the full model already passes the threshold, and a `Vector{Int}` otherwise. It is `nothing` when the full model and every model of one removal are Saturated Fits, because the search has no admissible start.
 
 # Related
 
@@ -698,7 +700,7 @@ function _regression(re::StepwiseRegression{<:PValue, <:BackwardElimination}, x:
     if is_saturated_fit(fri, f1)
         removed = saturated_set_pval_removal(re.tgt, x, F)
         if iszero(removed)
-            return included
+            return nothing
         end
         push!(excluded, removed)
         included = setdiff(indices, excluded)
@@ -774,18 +776,19 @@ Shrinks a factor set from full, removing the factor whose reduced model scores b
 
 `value[j]` is the score of the model that omits `j`. So "best" has the same meaning as in the forward direction, and not the inverse meaning. Under a minimised criterion the method removes the factor of lowest value, and under a maximised criterion it removes the factor of highest value.
 
-A Saturated Fit, which [`is_saturated_fit`](@ref) flags, scores the worst value that the criterion can take. So when the full set leaves no residual, as on an asset with no more observations than the factors plus one, the first removal that leaves a residual always happens. When no set of one removal leaves a residual either, no score can rank a removal, and the search returns the full set. [`asset_fit_coefficients`](@ref) then fits the intercept alone and warns.
+A Saturated Fit, which [`is_saturated_fit`](@ref) flags, scores the worst value that the criterion can take. So when the full set leaves no residual, as on an asset with no more observations than the factors plus one, the first removal that leaves a residual always happens. When no set of one removal leaves a residual either, every candidate ties at the worst score, no score can rank a removal, and the method returns `nothing`. [`stepwise_search`](@ref) then runs the forward search of the same criterion and warns.
 
 # Algorithm
 
  1. Set `included` to every factor index, in ascending order. Name the first column of each design, the column of ones, to the target with `factory(re.tgt, InterceptColumn(1))`, and call the result `tgt`.
  2. Read the criterion from `re.crit` and `re.tgt` with [`regression_criterion_func`](@ref), and call it `criterion_func`. Read the worst score from [`regression_polarity`](@ref), and call it `worst`.
- 3. Fit `tgt` to an intercept column and every column of `F`, and set `t` to `criterion_func` of that full model, or to `worst` when it is a Saturated Fit.
+ 3. Fit `tgt` to an intercept column and every column of `F`, and set `t` to `criterion_func` of that full model, or to `worst` when it is a Saturated Fit. Call the flag of [`is_saturated_fit`](@ref) for that fit `saturated`.
  4. Fill `value` with `worst`, one entry per factor.
  5. Do steps 6 to 8 at most once per observation.
  6. For each factor of `included`, fit `tgt` to an intercept column and the other columns of `included`, and write the score of that fit into that factor's entry of `value`: `worst` for a Saturated Fit, and `criterion_func` of the fit otherwise. Fit the intercept column alone when `included` holds one factor.
  7. Call [`get_backward_reg_incl!`](@ref), which removes the best factor and returns the new `t`.
  8. Stop when step 7 removed no factor.
+ 9. Return `nothing` when `saturated` is `true` and `included` still holds every factor. Otherwise return `included`.
 
 # Arguments
 
@@ -795,7 +798,7 @@ A Saturated Fit, which [`is_saturated_fit`](@ref) flags, scores the worst value 
 
 # Returns
 
-  - `included::Vector{Int}`: Indices of the selected factors, in ascending order. It can be empty. When each removal improves the score, the search removes every factor. This happens often under an information criterion on a response that the factors do not explain. [`stepwise_factor_set`](@ref) warns and names the asset on an empty return, and [`regression`](@ref) then fits the intercept column alone.
+  - `included::Option{Vector{Int}}`: Indices of the selected factors, in ascending order, or `nothing` when the search has no admissible start, as step 9 states. It can be empty. When each removal improves the score, the search removes every factor. This happens often under an information criterion on a response that the factors do not explain. [`stepwise_factor_set`](@ref) warns and names the asset on an empty return, and [`regression`](@ref) then fits the intercept column alone.
 
 # Related
 
@@ -818,6 +821,7 @@ function _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriteri
     fri = StatsAPI.fit(tgt, f1, x)
     criterion_func = regression_criterion_func(re.crit, re.tgt)
     worst = regression_polarity(re.crit).worst(promote_type(eltype(F), eltype(x)))
+    saturated = is_saturated_fit(fri, f1)
     t = stepwise_score(criterion_func, fri, f1, worst)
     value = fill(worst, N)
     for _ in eachindex(x)
@@ -838,7 +842,7 @@ function _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriteri
             break
         end
     end
-    return included
+    return saturated && length(included) == N ? nothing : included
 end
 """
     assert_stepwise_included(included::Nothing)
@@ -895,6 +899,47 @@ function assert_stepwise_included(included::AbstractVector, X::MatNum, F::MatNum
     return nothing
 end
 """
+    stepwise_search(re::StepwiseRegression, x::VecNum, F::MatNum, i::Integer)
+
+Runs the stepwise search of `re` on one asset, and gives a backward search with no admissible start the set of a forward search.
+
+A [`BackwardElimination`](@ref) search starts from the full factor set. When the full set and every set of one removal are Saturated Fits, every candidate ties at the worst score, and no score ranks a removal. Only the fit of a set that leaves a residual ranks the factors. So the two backward methods of `_regression` return `nothing`, and this function runs the [`ForwardSelection`](@ref) search of the same criterion and target. Under an unpenalised target this happens when the asset has no more observations than factors.
+
+# Algorithm
+
+ 1. Run the search of `re` on `x` and `F`, and call the result `included`. Return it when it is not `nothing`.
+ 2. Warn, and name the asset `i`.
+ 3. Rebuild `re` with a [`ForwardSelection`](@ref) algorithm, and return the result of its search on `x` and `F`.
+
+# Arguments
+
+  - `re`: Stepwise regression estimator.
+  - `x`: Returns of asset `i`, `observations × 1`.
+  - $(arg_dict[:F])
+  - `i`: Index of the asset, which names it in the warning.
+
+# Returns
+
+  - `included::AbstractVector{<:Integer}`: Indices of the factors that the search selected. It can be empty, as the methods of `_regression` state.
+
+# Related
+
+  - [`StepwiseRegression`](@ref)
+  - [`BackwardElimination`](@ref)
+  - [`ForwardSelection`](@ref)
+  - [`stepwise_factor_set`](@ref)
+  - [`pin_regression_choice`](@ref)
+"""
+function stepwise_search(re::StepwiseRegression, x::VecNum, F::MatNum, i::Integer)
+    included = _regression(re, x, F)
+    if !isnothing(included)
+        return included
+    end
+    @warn("Asset $i: the full factor set and every set of one removal leave no residual, so no score ranks a removal. The backward search takes the factor set of a forward search of the same criterion.",
+          maxlog = log_limit(:warn), _id = @log_id())
+    return _regression(rebuild_struct(re, (; alg = ForwardSelection())), x, F)
+end
+"""
     stepwise_factor_set(re::StepwiseRegression, x::VecNum, F::MatNum, i::Integer)
 
 Returns the factor set of one asset, which `re.included` fixes or the stepwise search selects.
@@ -902,7 +947,7 @@ Returns the factor set of one asset, which `re.included` fixes or the stepwise s
 # Algorithm
 
  1. Take entry `i` of `re.included`. Return it when it is not `nothing`.
- 2. Otherwise run the stepwise search of `re` on `x`, and call the result `included`. The method also takes this step when `re.included` is `nothing`.
+ 2. Otherwise run the stepwise search of `re` on `x` with [`stepwise_search`](@ref), and call the result `included`. The method also takes this step when `re.included` is `nothing`.
  3. Warn, and name the asset, when `included` is empty. The asset then gets an intercept-only model, and its row of the loadings matrix is all zeros.
  4. Return `included`.
 
@@ -927,7 +972,7 @@ function stepwise_factor_set(re::StepwiseRegression, x::VecNum, F::MatNum, i::In
     if !isnothing(pinned)
         return pinned
     end
-    included = _regression(re, x, F)
+    included = stepwise_search(re, x, F, i)
     if isempty(included)
         @warn("Asset $i: the stepwise search selected no factor. The asset gets an intercept-only model, and its row of the loadings matrix is all zeros.",
               maxlog = log_limit(:warn), _id = @log_id())
@@ -942,7 +987,7 @@ Runs one stepwise search per asset and assembles the loadings matrix from the fi
 
 Each asset has its own search. The search of one asset reads only the column of that asset and `F`, so one asset cannot change the factor set of another. An asset whose entry of `re.included` holds a factor set takes that set, and no search runs for it.
 
-An asset fits on the observations where its return is finite and `active_mask` is `true`, as [`asset_fit_rows`](@ref) states. So an asset that lists late gets the loadings of its own history, and a gap changes no other asset. An asset whose factor set leaves less than one residual degree of freedom on those observations is a Saturated Fit. The search admits only a factor set that leaves a residual, so it stops at the largest such set that its criterion selects. A factor set that a caller pins, and a backward search with no admissible start, can still saturate. That asset gets the model with the intercept alone and a warning, as [`asset_fit_coefficients`](@ref) states.
+An asset fits on the observations where its return is finite and `active_mask` is `true`, as [`asset_fit_rows`](@ref) states. So an asset that lists late gets the loadings of its own history, and a gap changes no other asset. An asset whose factor set leaves less than one residual degree of freedom on those observations is a Saturated Fit. The search admits only a factor set that leaves a residual, so it stops at the largest such set that its criterion selects. A backward search with no admissible start takes the set of a forward search, as [`stepwise_search`](@ref) states. Only a factor set that a caller pins can still saturate. That asset gets the model with the intercept alone and a warning, as [`asset_fit_coefficients`](@ref) states.
 
 # Algorithm
 
@@ -1071,7 +1116,7 @@ The online step of a prior calls it after the fold, over the rows of the buffer 
 
  1. Return `re` when `F` holds fewer than two rows. The regression refuses one row, so no fit happens yet.
  2. Check `re.included` with [`assert_stepwise_included`](@ref). Copy it into a vector with one entry per column of `X`, and call it `included`. A field of `nothing` gives a vector of `nothing`.
- 3. For each asset `j` whose entry is `nothing` and whose column of `X` is finite, run the stepwise search of `re` on that column, and write the result into entry `j`. When `w` is not `nothing`, the search is the search of `factory(re, w)`.
+ 3. For each asset `j` whose entry is `nothing` and whose column of `X` is finite, run the stepwise search of `re` on that column with [`stepwise_search`](@ref), and write the result into entry `j`. When `w` is not `nothing`, the search is the search of `factory(re, w)`.
  4. Return `re` rebuilt with `included`.
 
 # Arguments
@@ -1109,7 +1154,7 @@ function pin_regression_choice(re::StepwiseRegression{<:Any, <:Any, <:Any, <:Pin
     for j in axes(X, 2)
         x = view(X, :, j)
         if isnothing(included[j]) && all(isfinite, x)
-            included[j] = _regression(rw, x, F)
+            included[j] = stepwise_search(rw, x, F, j)
         end
     end
     return rebuild_struct(re, (; included = included))

@@ -2215,7 +2215,7 @@ Fits the model of one asset of a time-series regression, and refits a Saturated 
 
 A Saturated Fit leaves less than one residual degree of freedom: an asset with fewer cells in the fit than the parameters of its model plus one. Its coefficients interpolate the returns and are not an estimate, and its residual variance is zero, so a factor prior reads the asset as a pure factor bet. The function tests the fit with [`is_saturated_fit`](@ref). On a Saturated Fit, it warns, names the asset, and fits the intercept column alone. Each factor column then gets a coefficient of zero, as a column that the pivot of `GLM` drops. A fit that leaves a residual does not change. A penalised target states its own count, so a penalised fit on more columns than rows keeps its coefficients while its count is at least one.
 
-[`asset_fit_rows`](@ref) gives each asset at least two cells, so the fit of the intercept alone leaves a residual. The stepwise search admits only a factor set that leaves a residual, so for [`StepwiseRegression`](@ref) the refit is the last guard: for a factor set that a caller pins, and for a backward search whose full set has no admissible one-removal set.
+[`asset_fit_rows`](@ref) gives each asset at least two cells, so the fit of the intercept alone leaves a residual. The stepwise search admits only a factor set that leaves a residual, so for [`StepwiseRegression`](@ref) the refit guards only a factor set that a caller pins. A backward search whose full set has no admissible set of one removal takes the set of a forward search, as [`stepwise_search`](@ref) states.
 
 # Algorithm
 

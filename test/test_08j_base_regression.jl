@@ -1067,38 +1067,58 @@ end
 
         # On 3 and 4 rows every search selects a set that leaves a residual, and the asset
         # keeps the loadings of that set. A backward search on 3 rows has no set of one
-        # removal that leaves a residual, so it returns the full set, and the regression
-        # fits the intercept alone and warns.
+        # removal that leaves a residual, so no score ranks a removal. It takes the set of
+        # the forward search of the same criterion, and warns.
+        nostart = r"Asset 2: the full factor set and every set of one removal leave no"
         for n in (3, 4), crit in crits, alg in (ForwardSelection(), BackwardElimination())
             Xg = copy(Xr)
             Xg[1:(Ts - n), 2] .= NaN
             rows = (Ts - n + 1):Ts
             re = StepwiseRegression(; crit = crit, alg = alg)
-            inc = PO._regression(re, Xr[rows, 2], Fs[rows, :])
+            xs, Fr = Xr[rows, 2], Fs[rows, :]
             if alg isa BackwardElimination && n == 3
-                @test sort(collect(inc)) == 1:3
-                rr = @test_logs((:warn, r"Asset 2: the fit spends every one of its 3"),
-                                match_mode = :any, regression(re, Xg, Fs))
-                @test iszero(rr.M[2, :]) && rr.edof[2] == 2
+                @test isnothing(PO._regression(re, xs, Fr))
+                inc = @test_logs((:warn, nostart), match_mode = :any,
+                                 PO.stepwise_search(re, xs, Fr, 2))
+                @test inc == PO._regression(StepwiseRegression(; crit = crit), xs, Fr)
+                rr = @test_logs((:warn, nostart), match_mode = :any, regression(re, Xg, Fs))
             else
-                f1 = [ones(n) Fs[rows, inc]]
-                @test !isempty(inc) &&
-                      !PO.is_saturated_fit(StatsAPI.fit(tgt, f1, Xr[rows, 2]), f1)
+                inc = PO._regression(re, xs, Fr)
                 rr = regression(re, Xg, Fs)
-                @test rr.M[2, inc] ≈ (f1 \ Xr[rows, 2])[2:end]
-                @test rr.edof[2] == n - 1 - length(inc) >= 1
             end
+            f1 = [ones(n) Fs[rows, inc]]
+            @test !isempty(inc) && !PO.is_saturated_fit(StatsAPI.fit(tgt, f1, xs), f1)
+            @test rr.M[2, inc] ≈ (f1 \ xs)[2:end]
+            @test rr.edof[2] == n - 1 - length(inc) >= 1
+        end
+
+        # A sample with no more rows than factors: 8 factors on 8 rows. No set of one removal
+        # leaves a residual, so each backward search takes the set of the forward search of
+        # its criterion. It kept no factor of any asset before.
+        rq = StableRNG(2)
+        Fq = randn(rq, 8, 8) ./ 100
+        Xq = Fq * randn(rq, 8, 4) .+ randn(rq, 8, 4) ./ 1000
+        for crit in crits
+            rf = regression(StepwiseRegression(; crit = crit), Xq, Fq)
+            rb = @test_logs((:warn, r"Asset 1: the full factor set and every set of one"),
+                            match_mode = :any,
+                            regression(StepwiseRegression(; crit = crit,
+                                                          alg = BackwardElimination()), Xq,
+                                       Fq))
+            @test rb.M == rf.M && rb.b == rf.b && rb.edof == rf.edof
+            @test all(i -> any(!iszero, rb.M[i, :]), axes(rb.M, 1)) && all(>=(1), rb.edof)
         end
 
         # On 2 rows no factor leaves a residual. A forward search selects none and says so. A
-        # backward search keeps the full set, and the regression refits it.
+        # backward search has no set of one removal that leaves a residual, so it takes the
+        # empty set of the forward search, and says so too.
         X2 = copy(Xr)
         X2[1:(Ts - 2), 2] .= NaN
         for crit in crits, alg in (ForwardSelection(), BackwardElimination())
             msg = if alg isa ForwardSelection
                 r"Asset 2: the stepwise search selected no factor"
             else
-                r"Asset 2: the fit spends every one of its 2"
+                nostart
             end
             rr = @test_logs((:warn, msg), match_mode = :any,
                             regression(StepwiseRegression(; crit = crit, alg = alg), X2,
