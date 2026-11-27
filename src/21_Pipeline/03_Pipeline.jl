@@ -1113,7 +1113,7 @@ Fit a [`Pipeline`](@ref) on price data or returns data.
  1. When the pipeline has a schedule step, reset each schedule to its `default`.
  2. Fill the slot of the input type, giving `ctx`. A [`PricesResult`](@ref) fills `prices`, and a [`ReturnsResult`](@ref) fills `returns`. So a pipeline for returns data has no price steps, because a price step raises an `IsNothingError` when the `prices` slot is empty.
  3. Find the source of the gap drop of each step with [`pipeline_gap_sources`](@ref). The steps whose values the last optimiser receives, and the optimiser, drop a gap of a vector benchmark when a reader of their group states `ExcessSource()`, as the readers of one head do.
- 4. For each step in order, inject `ctx` into an optimisation step with [`maybe_inject_step`](@ref). Then run the step with [`run_group_step`](@ref) under its source, giving its fitted result and the new `ctx`.
+ 4. For each step in order, view the step at the assets of the `returns` slot with [`universe_step_view`](@ref), when a universe step before it cut the input universe. A value for each asset of the step is stated over the input universe, so the view keeps the values of the assets that survive. Then inject `ctx` into an optimisation step with [`maybe_inject_step`](@ref), and run the step with [`run_group_step`](@ref) under its source, giving its fitted result and the new `ctx`.
  5. Return the step names, the fitted results in step order and the last `ctx` as a [`PipelineResult`](@ref).
 
 # Arguments
@@ -1161,8 +1161,9 @@ function StatsAPI.fit(pipe::Pipeline, data::Prices_RR)::PipelineResult
     # value that the function returns, which can have any type.
     fitted = Vector{Any}(undef, length(pipe.steps))
     gsrcs = pipeline_gap_sources(pipe.steps)
+    nx0 = input_universe(data)
     for (i, est) in enumerate(pipe.steps)
-        step = maybe_inject_step(est, ctx)
+        step = maybe_inject_step(universe_step_view(est, nx0, ctx), ctx)
         fitted[i], ctx = run_group_step(step, ctx, gsrcs[i])
     end
     return PipelineResult(pipe.names, steps_form(pipe.steps, fitted), ctx)

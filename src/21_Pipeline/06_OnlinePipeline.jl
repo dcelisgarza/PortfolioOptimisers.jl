@@ -808,9 +808,9 @@ This is the call with no data of the online step of the Pipeline, as `optimise(o
 
  1. Rebuild the `ReturnsResult` of the observations folded so far from the row owner through [`pipeline_returns_result`](@ref), giving `rd₀`. A prior owner gives its rows through [`prior_returns_buffer`](@ref), and the Pipeline adds the rest from its own [`ReturnsBufferState`](@ref). An optimisation owner gives its `ReturnsResult` through [`returns_result`](@ref). The `ReturnsResult` spans the input universe of the pipeline at warm-up width.
  2. Walk the data steps before the owner in order, through [`fit_data_step_from_state`](@ref). A row-local step reads its fitted Result out of its state, restricted to the assets that survive so far. A universe-only step runs its batch verb over `rd₀` viewed to the surviving assets, and narrows the surviving set. The index `idx` of the surviving assets into `rd₀` is the column map, and `rd = port_opt_view(rd₀, :, idx)` is the context's returns.
- 3. Run every other step before the owner over that context, as batch runs it. Such a step is a phylogeny step, an uncertainty-set step or a constraint step.
+ 3. Run every other step before the owner over that context, as batch runs it, viewed at the surviving assets through [`universe_step_view`](@ref). Such a step is a phylogeny step, an uncertainty-set step or a constraint step.
  4. Read the owner out over the surviving assets through [`fit_owner_from_state`](@ref). A prior owner reads out through `prior(port_opt_view(pe, idx))`, which views its state by asset and never slices its rows again. An optimisation owner reads out through `optimise(opt)` on the viewed estimator, with the context injected.
- 5. Run every step after the owner as batch, the optimisation step with the context injected, and return the result.
+ 5. Run every step after the owner as batch, each viewed at the surviving assets of `rd₀` and the optimisation step with the context injected, and return the result.
 
 So a selection that moves between two steps is a view of a state fitted over the whole universe, which is the batch fit over those columns. The selector ranks the assets again at every step, as the batch loop refits it at every fold.
 
@@ -881,12 +881,13 @@ function fit_pipeline_from_state(pipe::Pipeline, cache::Option{<:ReturnsBufferSt
         if is_data_step(step)
             continue
         end
+        step = universe_step_view(step, rd0.nx, ctx)
         fitted[i], ctx = run_group_step(maybe_inject_step(step, ctx), ctx, gsrcs[i])
     end
     fitted[k], ctx = fit_owner_from_state(owner, idx, length(rd0.nx), ctx)
     for i in (k + 1):n
-        fitted[i], ctx = run_group_step(maybe_inject_step(pipe.steps[i], ctx), ctx,
-                                        gsrcs[i])
+        step = universe_step_view(pipe.steps[i], rd0.nx, ctx)
+        fitted[i], ctx = run_group_step(maybe_inject_step(step, ctx), ctx, gsrcs[i])
     end
     return PipelineResult(pipe.names, steps_form(pipe.steps, fitted), ctx)
 end

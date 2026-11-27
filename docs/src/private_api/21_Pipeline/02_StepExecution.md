@@ -37,6 +37,11 @@ pipeline_received
 pipeline_gap_sources
 run_group_step
 group_returns_view
+universe_step_view
+input_universe
+universe_index
+universe_matrix
+pipeline_step_view
 pipeline_refits
 terminal_frames
 pipe_data_benchmark_path
