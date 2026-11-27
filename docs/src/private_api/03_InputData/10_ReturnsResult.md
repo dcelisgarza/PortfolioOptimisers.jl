@@ -15,7 +15,7 @@ Prices_RR
 ```@docs
 check_names_and_returns_matrix
 check_exogenous_series
-PortfolioOptimisers.observation_count
+PortfolioOptimisers.observation_count(X::Option{<:MatNum}, F::Option{<:MatNum})
 PortfolioOptimisers.assert_asset_panel_supplied
 PortfolioOptimisers.consumer_returns
 PortfolioOptimisers.consumer_asset_names

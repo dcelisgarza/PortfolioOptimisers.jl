@@ -329,8 +329,27 @@ generate_sitemap(joinpath(@__DIR__, "build"), CANONICAL_URL)
 # `versions` stays at its default: it shapes only the version selector, and Documenter
 # deletes no version from `gh-pages`. The cap on the versions that `gh-pages` keeps is in
 # the same workflow.
-deploydocs(; repo = "github.com/dcelisgarza/PortfolioOptimisers.jl", target = "build",
-           devbranch = "main", branch = "gh-pages", push_preview = true)
+#
+# `gh-pages` has more than one writer: the deploy of each ref, and the cleanup workflow. The
+# concurrency group of `Docs.yml` is per ref, so it does not serialise them. A push that
+# loses the race fails with `cannot lock ref`, and the deploy of v0.34.17 failed so (#2403).
+# Each call of `deploydocs` clones `gh-pages` again, so a retry pushes onto the new head. A
+# failed push surfaces as a `ProcessFailedException`. Any other error is not retried.
+const DEPLOY_ATTEMPTS = 4
+for attempt in 1:DEPLOY_ATTEMPTS
+    try
+        deploydocs(; repo = "github.com/dcelisgarza/PortfolioOptimisers.jl",
+                   target = "build", devbranch = "main", branch = "gh-pages",
+                   push_preview = true)
+        break
+    catch err
+        if !(err isa ProcessFailedException && attempt < DEPLOY_ATTEMPTS)
+            rethrow()
+        end
+        @warn "The push to `gh-pages` failed. Attempt $(attempt + 1) of $(DEPLOY_ATTEMPTS) follows."
+        sleep(20 * attempt)
+    end
+end
 
 # ---------------------------------------------------------------------------------------
 # Viewing the docs locally
