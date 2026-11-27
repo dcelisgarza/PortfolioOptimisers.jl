@@ -89,6 +89,9 @@ Where:
 
 # Keyword arguments
 
+  - `loss::Bool`: If `true` (default), the measure is applied to the net portfolio returns; if
+    `false`, to their negation. The sorted negated returns are the negated sorted returns in
+    reverse, so the method builds the weight vector `-reverse(owa_w)` on the same `owa`.
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
 
 # Returns
@@ -106,7 +109,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArray{<:Any, <:Any,
                                                       <:ExactOrderedWeightsArray},
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
-                               prefix::Symbol = Symbol(""), kwargs...)
+                               loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
     sc = get_constraint_scale(model)
     X = pr.X
     T = get_T(model)
@@ -117,6 +120,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     owa_risk = state_set!(model, prefix, :owa_risk_, i,
                           JuMP.@expression(model, sum(owa_a + owa_b)))
     owa_w = owa_weights(r.w, T, :w)
+    # The gain tail reads the negated returns, whose sorted vector is the negated reversal.
+    owa_w = loss ? owa_w : -reverse(owa_w)
     state_set!(model, prefix, :cowa_, i,
                JuMP.@constraint(model,
                                 sc * (owa * transpose(owa_w) - ovec * transpose(owa_a) -
@@ -175,6 +180,9 @@ Where:
 
 # Keyword arguments
 
+  - `loss::Bool`: If `true` (default), the measure is applied to the net portfolio returns; if
+    `false`, to their negation. The sorted negated returns are the negated sorted returns in
+    reverse, so the method builds the weight vector `-reverse(owa_w)` on the same `owa`.
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
 
 # Returns
@@ -192,7 +200,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any,
                                                            <:ExactOrderedWeightsArray},
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
-                               prefix::Symbol = Symbol(""), kwargs...)
+                               loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
     sc = get_constraint_scale(model)
     X = pr.X
     T = get_T(model)
@@ -204,7 +212,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                 JuMP.@expression(model, sum(owa_a + owa_b)))
     owa_w1 = owa_weights(r.w1, T, :w1)
     owa_w2 = owa_weights(r.w2, T, :w2)
-    owa_w = owa_w1 - owa_w2
+    owa_w = loss ? owa_w1 - owa_w2 : reverse(owa_w2 - owa_w1)
     state_set!(model, prefix, :cowa_range_, i,
                JuMP.@constraint(model,
                                 sc * (owa * transpose(owa_w) - ovec * transpose(owa_a) -
@@ -431,6 +439,11 @@ formulation to `model`.
 
   - Each tail weight vector has one entry for each observation, through [`owa_weights`](@ref). Raises a `DimensionMismatch` that names `w1` or `w2`.
 
+# Keyword arguments
+
+  - `loss::Bool`: `true` builds the range on the net portfolio returns, and `false` on their negation, as a range that is itself the gain tail of a range does (default: `true`).
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
 # Returns
 
   - `aowa_range_risk`: The combined `loss + gain` risk expression added to the model.
@@ -447,18 +460,18 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any,
                                                            <:ApproxOrderedWeightsArray},
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
-                               prefix::Symbol = Symbol(""), kwargs...)
+                               loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
     # Each tail checks its own weights, but under the name `w` of the tail. Check them here
     # under the names that the caller gave.
     T = get_T(model)
     owa_weights(r.w1, T, :w1)
     owa_weights(r.w2, T, :w2)
-    (; loss, gain) = range_tails(r)
+    tails = range_tails(r)
     name = range_risk_key(r)
-    loss_risk = set_risk_constraints!(model, nested_index(:loss_, i), loss, opt, pr,
-                                      args...; loss = true, prefix = prefix, kwargs...)
-    gain_risk = set_risk_constraints!(model, nested_index(:gain_, i), gain, opt, pr,
-                                      args...; loss = false, prefix = prefix, kwargs...)
+    loss_risk = set_risk_constraints!(model, nested_index(:loss_, i), tails.loss, opt, pr,
+                                      args...; loss = loss, prefix = prefix, kwargs...)
+    gain_risk = set_risk_constraints!(model, nested_index(:gain_, i), tails.gain, opt, pr,
+                                      args...; loss = !loss, prefix = prefix, kwargs...)
     range_risk = state_set!(model, prefix, name, i,
                             JuMP.@expression(model, loss_risk + gain_risk))
     set_risk_bounds_and_expression!(model, opt, range_risk, r.settings, name, i;
@@ -630,6 +643,9 @@ Where:
 
 # Keyword arguments
 
+  - `loss::Bool`: If `true` (default), the measure is applied to the net portfolio returns; if
+    `false`, to their negation. The sorted negated returns are the negated sorted returns in
+    reverse, so the method builds the weight vector `-reverse(owa_w)` on the same `owa`.
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
 
 # Returns
@@ -651,9 +667,12 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArray{<:Any, <:Any,
                                                       <:SortingNetworkOrderedWeightsArray},
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
-                               prefix::Symbol = Symbol(""), kwargs...)
+                               loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
     T = get_T(model)
     owa_w = owa_weights(r.w, T, :w)
+    # The negated reversal of a nondecreasing vector is nondecreasing, so the network is exact
+    # on each side.
+    owa_w = loss ? owa_w : -reverse(owa_w)
     net = set_sorting_network_owa!(model, r.alg, pr.X, owa_w; prefix = prefix)
     state_set!(model, prefix, :sowa_z_, i, net.z)
     state_set!(model, prefix, :csowa_eq_, i, net.c_eq)
@@ -705,6 +724,9 @@ Where:
 
 # Keyword arguments
 
+  - `loss::Bool`: If `true` (default), the measure is applied to the net portfolio returns; if
+    `false`, to their negation. The sorted negated returns are the negated sorted returns in
+    reverse, so the method builds the weight vector `-reverse(owa_w)` on the same `owa`.
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
 
 # Returns
@@ -726,11 +748,12 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any,
                                                            <:SortingNetworkOrderedWeightsArray},
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
-                               prefix::Symbol = Symbol(""), kwargs...)
+                               loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
     T = get_T(model)
     owa_w1 = owa_weights(r.w1, T, :w1)
     owa_w2 = owa_weights(r.w2, T, :w2)
-    net = set_sorting_network_owa!(model, r.alg, pr.X, owa_w1 - owa_w2; prefix = prefix)
+    owa_w = loss ? owa_w1 - owa_w2 : reverse(owa_w2 - owa_w1)
+    net = set_sorting_network_owa!(model, r.alg, pr.X, owa_w; prefix = prefix)
     state_set!(model, prefix, :sowa_range_z_, i, net.z)
     state_set!(model, prefix, :csowa_range_eq_, i, net.c_eq)
     state_set!(model, prefix, :csowa_range_a_, i, net.c_a)

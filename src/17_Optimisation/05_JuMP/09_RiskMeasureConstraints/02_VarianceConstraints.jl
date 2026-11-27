@@ -1326,7 +1326,7 @@ Under a unit budget the lift of the objective has the corner `1`, so its worst c
 
   - `prefix::Symbol`: Model State namespace of the build (default: empty, i.e. the bare key).
   - `rd::ReturnsResult`: The optimisation's returns, read by an estimator of the set (default: an empty `ReturnsResult`).
-  - `kwargs...`: Passed to [`sigma_ucs`](@ref).
+  - `kwargs...`: The keywords of the caller that this method does not read, such as the side `loss` of a tail of a range.
 
 # Returns
 
@@ -1348,7 +1348,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVaria
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     # The prior travels beside the returns, because an `AbstractPriorUncertaintySetEstimator`
     # is fitted from the optimisation's own prior result rather than from returns data.
-    ucs = sigma_ucs(r.ucs, rd, pr; kwargs...)
+    # The keywords of a tail of a range, such as `loss`, state no option of the fit.
+    ucs = sigma_ucs(r.ucs, rd, pr)
     if !sdp_lifted_set(ucs)
         ucs_variance_risk, name = set_ucs_variance_risk!(model, i, ucs, sigma, r.mtx_sqrt;
                                                          prefix = prefix)

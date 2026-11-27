@@ -246,6 +246,34 @@
         (; loss, gain) = tails
         @test (loss.alpha, gain.alpha) == (0.05, 0.1)
         @test RangeTails(loss, gain).gain === gain
+        # The gain tail measures the negated portfolio. A measure that cannot be built on that
+        # side is refused there, and it stays a valid loss tail (#2328).
+        for bad in (MaximumDrawdown(; settings = off), UlcerIndex(; settings = off),
+                    ConditionalDrawdownatRisk(; settings = off), LowOrderMoment(; settings = off),
+                    LowOrderMoment(; settings = off, alg = MeanAbsoluteDeviation(), mu = 0.0),
+                    LowOrderMoment(; settings = off, alg = SecondMoment(; alg1 = SemiMoment())),
+                    LowOrderMoment(; settings = off, alg = EvenMoment(; alg = SemiMoment())),
+                    NegativeSkewness(; settings = off),
+                    TurnoverRiskMeasure(; settings = off, w = [0.5, 0.5]))
+            @test !PortfolioOptimisers.supports_gain_tail(bad)
+            @test_throws ArgumentError RangeTails(loss, bad)
+            @test RangeTails(bad, gain).loss === bad
+        end
+        # The refusal names the type and the declaration that a measure of a user's own makes.
+        @test_throws "supports_gain_tail(::MaximumDrawdown) = true" RangeTails(loss,
+                                                                               MaximumDrawdown(;
+                                                                                               settings = off))
+        # A full moment about the mean has one value on both sides, so it is a gain tail.
+        for alg in (MeanAbsoluteDeviation(), SecondMoment(), EvenMoment()),
+            mu in (nothing, [0.1, 0.2])
+
+            @test RangeTails(loss, LowOrderMoment(; settings = off, alg = alg, mu = mu)).gain.mu ===
+                  mu
+        end
+        # A range answers for its loss tail, because that tail moves to the gain side with it.
+        for (name, r) in vcat(declaring, fused)
+            @test PortfolioOptimisers.supports_gain_tail(r)
+        end
         @test_throws ArgumentError RangeTails(ConditionalValueatRisk(), gain)
         @test_throws ArgumentError RangeTails(loss, ConditionalValueatRisk())
         # The typed keyword constructor is the door that refuses another type. `@concrete`

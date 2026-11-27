@@ -307,7 +307,9 @@ formulation to `model`.
 
 Uses closed-form z-scores from `compute_value_at_risk_z` and `compute_value_at_risk_cz`
 and adds a second-order cone constraint. The range risk expression is the difference
-between the lower-tail and upper-tail VaR expressions.
+between the lower-tail and upper-tail VaR expressions. As the gain tail of a range, it is the
+same expression for the negated portfolio, which reads `-mu` and the law that
+[`gain_tail_distribution`](@ref) gives. The cone is symmetric in `w`, so it does not change.
 
 # Arguments
 
@@ -317,6 +319,11 @@ between the lower-tail and upper-tail VaR expressions.
     range risk measure with distribution-based formulation.
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr])
+
+# Keyword arguments
+
+  - `loss::Bool`: `true` builds the range on the portfolio `w`, and `false` on the negated portfolio `-w`, as a range that is itself the gain tail of a range does (default: `true`).
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
 
 # Returns
 
@@ -328,17 +335,19 @@ between the lower-tail and upper-tail VaR expressions.
   - [`DistributionValueatRisk`](@ref)
   - [`compute_value_at_risk_z`](@ref)
   - [`compute_value_at_risk_cz`](@ref)
+  - [`gain_tail_distribution`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
                                                    <:DistributionValueatRisk},
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
-                               prefix::Symbol = Symbol(""), kwargs...)
+                               loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
     alg = r.alg
     mu = nothing_scalar_array_selector(alg.mu, pr.mu)
+    mu = loss ? mu : -mu
     w = get_w(model, prefix)
-    dist = r.alg.dist
+    dist = loss ? alg.dist : gain_tail_distribution(alg.dist)
     z_l = compute_value_at_risk_z(dist, r.alpha)
     z_h = compute_value_at_risk_cz(dist, r.beta)
     g_var = set_distribution_var_cone!(model, i, chol_sigma_selector(model, pr, alg), w,

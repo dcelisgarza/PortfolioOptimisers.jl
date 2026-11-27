@@ -44,6 +44,7 @@ Where:
 
 # Keyword arguments
 
+  - `loss::Bool`: `true` builds the range on the net portfolio returns, and `false` on their negation, as a range that is itself the gain tail of a range does (default: `true`).
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
 
 # Returns
@@ -67,31 +68,33 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                           <:ValueatRisk{<:Any, <:Any, <:Any,
                                                                         <:DistributionValueatRisk}},
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
-                               prefix::Symbol = Symbol(""), kwargs...)
-    (; loss, gain) = range_tails(r)
+                               loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
+    tails = range_tails(r)
     name = range_risk_key(r)
-    G = chol_sigma_selector(model, pr, loss.alg)
+    G = chol_sigma_selector(model, pr, tails.loss.alg)
     # The cone bounds the standard deviation, which reads `G` and not `mu`. Tails that read
     # different covariance matrices have different standard deviations, so each keeps a cone of
     # its own.
-    g_var = if G == chol_sigma_selector(model, pr, gain.alg)
+    g_var = if G == chol_sigma_selector(model, pr, tails.gain.alg)
         set_distribution_var_cone!(model, i, G, get_w(model, prefix), :g_var_range_,
                                    :cvar_range_soc_; prefix = prefix)
     else
         nothing
     end
     # A sweep on a tail takes its span from that tail, so each tail records the measure of its
-    # own side as the owner of its entry before the whole range claims the rest.
+    # own side as the owner of its entry before the whole range claims the rest. A range that
+    # is itself a gain tail reads the negated portfolio, so its tails exchange their sides. The
+    # cone is symmetric in `w`, so both sides read the same one.
     first = risk_frontier_length(model)
-    loss_risk = set_risk_constraints!(model, nested_index(:loss_, i), loss, opt, pr,
-                                      args...; loss = true, prefix = prefix, g_var = g_var,
+    loss_risk = set_risk_constraints!(model, nested_index(:loss_, i), tails.loss, opt, pr,
+                                      args...; loss = loss, prefix = prefix, g_var = g_var,
                                       kwargs...)
-    set_risk_frontier_owner!(model, first, loss)
+    set_risk_frontier_owner!(model, first, loss ? tails.loss : GainTail(tails.loss))
     first = risk_frontier_length(model)
-    gain_risk = set_risk_constraints!(model, nested_index(:gain_, i), gain, opt, pr,
-                                      args...; loss = false, prefix = prefix, g_var = g_var,
+    gain_risk = set_risk_constraints!(model, nested_index(:gain_, i), tails.gain, opt, pr,
+                                      args...; loss = !loss, prefix = prefix, g_var = g_var,
                                       kwargs...)
-    set_risk_frontier_owner!(model, first, GainTail(gain))
+    set_risk_frontier_owner!(model, first, loss ? GainTail(tails.gain) : tails.gain)
     range_risk = state_set!(model, prefix, name, i,
                             JuMP.@expression(model, loss_risk + gain_risk))
     set_risk_bounds_and_expression!(model, opt, range_risk, r.settings, name, i;
