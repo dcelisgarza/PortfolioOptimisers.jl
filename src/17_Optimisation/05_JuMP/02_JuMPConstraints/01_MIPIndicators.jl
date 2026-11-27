@@ -442,7 +442,7 @@ end
 
 Return `true` when the bundle `ind` can serve a call whose features ask for a bundle of type `kind`.
 
-A bundle serves a call of its own kind. A [`LongShortIndicators`](@ref) bundle serves every call: its held indicator is `ilb + isb`, its long and short bits give the sign, and its gates carry each threshold. A [`HeldIndicators`](@ref) bundle has no sign, and a [`SignIndicators`](@ref) bundle has no held bit, so neither serves a call of another kind.
+A bundle serves a call of its own kind. A [`LongShortIndicators`](@ref) bundle serves every call: its held indicator is `ilb + isb`, its long and short bits give the sign, and its gates carry each threshold. A [`HeldIndicators`](@ref) bundle has no sign bit, because the bounds of each call give the side of its held bit ([`held_sides`](@ref)). A [`SignIndicators`](@ref) bundle has no held bit. So neither serves a call of another kind.
 
 # Related
 
@@ -574,8 +574,9 @@ that is exactly 0 or 1 even when the budget is free and the gates relax.
 
 For [`HeldIndicators`](@ref) the bounds give the sign, see [`HeldIndicators`](@ref). The long
 gate is the held bit of a long entry and zero on a short entry, and the short gate is the
-reverse. Each is exactly 0 or 1, so the gate and the binary of a side are the same expression.
-With no short entry, the long gate is `ib` itself.
+reverse. This bundle is asked for a decomposition only under a [`WeightsFromParts`](@ref)
+head, whose sign pair reads the gates alone, so the bundle has gates and no binaries. With no
+short entry, the long gate is `ib` itself.
 
 # Related
 
@@ -1170,9 +1171,10 @@ Run the MIP indicator builder the requested features call for and return its ind
 
 Selects among the three builders on flags shared by the asset space and every sub-group:
 
-  - [`sign_mip_constraints`](@ref) when `sign_only` — an explicit `xbgt` with nothing else to
-    consume a held indicator, so a single sign bit per asset suffices (returns a
-    [`SignIndicators`](@ref), which has no held indicator).
+  - [`sign_mip_constraints`](@ref) when `sign_only` — a pin, from an explicit `xbgt` or from a
+    [`WeightsFromParts`](@ref) head, with nothing else to consume a held indicator, so a single
+    sign bit per asset suffices (returns a [`SignIndicators`](@ref), which has no held
+    indicator).
   - [`short_mip_threshold_constraints`](@ref) when an explicit `xbgt` pins the decomposition, or
     when an entry of `sp` admits both signs ([`mip_sides`](@ref)) and a sign-specific feature
     needs the sign — a threshold, a fixed fee, or a pinned decomposition.

@@ -17,6 +17,7 @@ set_mip_ss_expr!
 mip_bit_space
 mip_wx!
 mip_bounds
+mip_sides
 held
 held_bin
 set_mip_indicators!
@@ -24,6 +25,7 @@ mip_indicators
 serves_mip_kind
 declare_mip_indicators!
 mip_indicators!
+held_sides
 lb_gate
 ub_gate
 long_gate
