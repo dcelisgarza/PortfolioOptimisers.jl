@@ -271,7 +271,7 @@ Folds a block of observations into a data step, and returns the block that the t
 
 This verb is the online form of a preprocessing step that changes the rows it receives. A [`Pipeline`](@ref) gives each step the block that the step before it returned, and takes back the block that the step returns. So the fold and the transform of a step are one call. The transform of the new rows reads the state that the earlier rows left, and the fold moves the state past the new rows. The two halves cannot be separated, because the first return of a new block reads the last price row that the step kept. So the verb returns both.
 
-For [`PricesToReturns`](@ref), [`PriceGapFill`](@ref) and [`MissingDataFilter`](@ref), [`partial_fit!`](@ref) returns the first element of this verb. A step makes its estimate from the state with [`fit_preprocessing`](@ref) and no data. A caller's own preprocessing estimator joins the online route of a `Pipeline` with three methods: this verb, a `fit_preprocessing` method that takes no data, and a [`supports_partial_fit`](@ref) method that returns `true`. It needs no `partial_fit!` method.
+For [`PricesToReturns`](@ref), [`PriceGapFill`](@ref), [`MissingDataFilter`](@ref) and [`PriceJumpFilter`](@ref), [`partial_fit!`](@ref) returns the first element of this verb. A step makes its estimate from the state with [`fit_preprocessing`](@ref) and no data. A caller's own preprocessing estimator joins the online route of a `Pipeline` with three methods: this verb, a `fit_preprocessing` method that takes no data, and a [`supports_partial_fit`](@ref) method that returns `true`. It needs no `partial_fit!` method.
 
 # Arguments
 
@@ -294,12 +294,13 @@ For [`PricesToReturns`](@ref), [`PriceGapFill`](@ref) and [`MissingDataFilter`](
   - [`PricesToReturns`](@ref)
   - [`PriceGapFill`](@ref)
   - [`MissingDataFilter`](@ref)
+  - [`PriceJumpFilter`](@ref)
 """
 function partial_fit_transform(est::AbstractPreprocessingEstimator, ::Prices_RR)
     return throw(ArgumentError("a `$(typeof(est).name.name)` has no online form: no `partial_fit_transform` method folds a block of observations into it. Give the step a `partial_fit_transform` and a `fit_preprocessing` method that takes no data, or declare a refit with `Online(pipe)`."))
 end
-function partial_fit!(est::Union{PricesToReturns, PriceGapFill, MissingDataFilter},
-                      data::Prices_RR)
+function partial_fit!(est::Union{PricesToReturns, PriceGapFill, MissingDataFilter,
+                                 PriceJumpFilter}, data::Prices_RR)
     return partial_fit_transform(est, data)[1]
 end
 #! Begin: PricesToReturns.
@@ -998,6 +999,209 @@ function supports_partial_fit(mdf::MissingDataFilter)
     return isone(mdf.row_thr)
 end
 #! End: MissingDataFilter.
+#! Begin: PriceJumpFilter.
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Keeps the assets with a Price Jump, and the price of each asset at each end of the folded rows, for an online price jump filter.
+
+[`PriceJumpFilter`](@ref) keeps this state in `cache`. A jump can lie between the last price of one block and the first price of the next one, so the state keeps both end prices. [`merge_states`](@ref) compares them, and the fold of a block is that merge. An absence from the listing ends a pair of prices, so a price on the far side of an absence is not an end price.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    PriceJumpFilterState(; nx::AbstractVector{Symbol}, factor::Number,
+                         jump::AbstractVector{Bool}, head::AbstractVector,
+                         tail::AbstractVector, open::AbstractVector{Bool})
+
+## Validation
+
+  - `length(nx) == length(jump) == length(head) == length(tail) == length(open)`. A `DimensionMismatch` is thrown otherwise.
+
+# Related
+
+  - [`AbstractPartialFitState`](@ref)
+  - [`PriceJumpFilter`](@ref)
+  - [`PriceJumpFilterResult`](@ref)
+"""
+@concrete struct PriceJumpFilterState <: AbstractPartialFitState
+    """
+    $(field_dict[:pf_nx_pinned])
+    """
+    nx
+    """
+    $(field_dict[:jump_factor])
+    """
+    factor
+    """
+    Whether the price of each asset jumps in the folded rows.
+    """
+    jump
+    """
+    The first price of each asset, or `missing` where no price precedes the first absence from the listing.
+    """
+    head
+    """
+    The last price of each asset, or `missing` where no price follows the last absence from the listing.
+    """
+    tail
+    """
+    Whether the folded rows hold no absence from the listing of each asset.
+    """
+    open
+    function PriceJumpFilterState(nx::AbstractVector{Symbol}, factor::Number,
+                                  jump::AbstractVector{Bool}, head::AbstractVector,
+                                  tail::AbstractVector, open::AbstractVector{Bool})
+        @argcheck(length(nx) ==
+                  length(jump) ==
+                  length(head) ==
+                  length(tail) ==
+                  length(open), DimensionMismatch)
+        return new{typeof(nx), typeof(factor), typeof(jump), typeof(head), typeof(tail),
+                   typeof(open)}(nx, factor, jump, head, tail, open)
+    end
+end
+function PriceJumpFilterState(; nx::AbstractVector{Symbol}, factor::Number,
+                              jump::AbstractVector{Bool}, head::AbstractVector,
+                              tail::AbstractVector,
+                              open::AbstractVector{Bool})::PriceJumpFilterState
+    return PriceJumpFilterState(nx, factor, jump, head, tail, open)
+end
+function Base.copy(x::PriceJumpFilterState)
+    return PriceJumpFilterState(copy(x.nx), x.factor, copy(x.jump), copy(x.head),
+                                copy(x.tail), copy(x.open))
+end
+function merge_states(a::PriceJumpFilterState, b::PriceJumpFilterState)
+    assert_pinned_value(a.nx, b.nx, :nx)
+    assert_pinned_value(a.factor, b.factor, :factor)
+    #! An end price crosses a block that holds neither a price nor an absence. An absence
+    #! stops it, so `b` without a price keeps the tail of `a` only when `b` is open.
+    return PriceJumpFilterState(; nx = a.nx, factor = a.factor,
+                                jump = a.jump .| b.jump .|
+                                       is_price_jump.(a.tail, b.head, a.factor),
+                                head = ifelse.(ismissing.(a.head) .& a.open, b.head,
+                                               a.head),
+                                tail = ifelse.(ismissing.(b.tail) .& b.open, a.tail,
+                                               b.tail), open = a.open .& b.open)
+end
+"""
+    end_price(X::AbstractMatrix, span::Option{<:AbstractMatrix{Bool}}, j::Integer, rows)
+
+Find the first price of column `j` along `rows`, before any absence from the listing.
+
+[`PriceJumpFilterState`](@ref) reads the price at the start of a block with `rows` in order, and the price at its end with `rows` in reverse.
+
+# Arguments
+
+  - `X`: The prices, `observations × assets`. An absent price is `NaN`.
+  - `span`: The listing statement of the prices, `observations × assets`, or `nothing` when the prices state no absence.
+  - `j`: Index of the column.
+  - `rows`: The rows to read, in the order to read them.
+
+# Returns
+
+  - `p::Union{Missing, Number}`: The price, or `missing` when an absence or the end of `rows` comes before a price.
+
+# Related
+
+  - [`PriceJumpFilterState`](@ref)
+  - [`foreach_price_jump`](@ref)
+"""
+function end_price(X::AbstractMatrix, span::Option{<:AbstractMatrix{Bool}}, j::Integer,
+                   rows)
+    for t in rows
+        if !(isnothing(span) || span[t, j])
+            return missing
+        elseif !is_missing_value(X[t, j])
+            return X[t, j]
+        end
+    end
+    return missing
+end
+"""
+    partial_fit_transform(pjf::PriceJumpFilter, pr::PricesResult) -> (pjf′, pr)
+
+Marks the assets whose price jumps in a block, or between the folded rows and the block, and returns the block unchanged.
+
+The filter changes only which assets survive. So the verb leaves the universe to the call with no data. There, [`fit_preprocessing`](@ref) with no data gives the [`PriceJumpFilterResult`](@ref) of the whole history, and a `Pipeline` applies it as a view.
+
+# Algorithm
+
+ 1. Make the [`PriceJumpFilterState`](@ref) of the block alone. [`price_jump_marks`](@ref) marks the assets with a jump inside the block, and [`end_price`](@ref) finds the price of each asset at the start and at the end of the block.
+ 2. When the step keeps a state, check that the block has its asset names, and merge the state of the block into it. The merge marks each asset that jumps from the last folded price to the first price of the block.
+ 3. Return the step with the new state, and `pr` unchanged.
+
+# Arguments
+
+  - `pjf`: The filter, with its state in `cache`, or `nothing` before the first block.
+  - `pr`: The block of prices.
+
+# Validation
+
+  - A later block has the asset names of the first block. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `(pjf′, pr)`: The filter with the block folded, and the block itself.
+
+# Related
+
+  - [`partial_fit_transform`](@ref)
+  - [`PriceJumpFilterState`](@ref)
+  - [`PriceJumpFilter`](@ref)
+"""
+function partial_fit_transform(pjf::PriceJumpFilter, pr::PricesResult)
+    vals = price_matrix(pr.X)
+    span = prices_listing_span(pr)
+    T = Union{Missing, eltype(vals)}
+    rows = axes(vals, 1)
+    state = PriceJumpFilterState(; nx = TimeSeries.colnames(pr.X), factor = pjf.factor,
+                                 jump = price_jump_marks(vals, span, pjf.factor),
+                                 head = T[end_price(vals, span, j, rows)
+                                          for j in axes(vals, 2)],
+                                 tail = T[end_price(vals, span, j, reverse(rows))
+                                          for j in axes(vals, 2)],
+                                 open = [gap_fill_open(span, j, 1) for j in axes(vals, 2)])
+    if !isnothing(pjf.cache)
+        state = merge_states(pjf.cache, state)
+    end
+    return rebuild_struct(pjf, (; cache = state)), pr
+end
+"""
+    fit_preprocessing(pjf::PriceJumpFilter)
+
+Gives the [`PriceJumpFilterResult`](@ref) of a stepped [`PriceJumpFilter`](@ref), as the batch fit over the same rows gives it.
+
+# Algorithm
+
+ 1. Read the state with [`partial_fit_cache`](@ref).
+ 2. Keep the assets with no mark in `jump` with [`price_jump_result`](@ref), which checks that one asset at least survives.
+
+# Validation
+
+  - The step keeps a state. [`partial_fit_cache`](@ref) throws an `ArgumentError` otherwise.
+  - One asset at least has no jump. An `IsEmptyError` is thrown otherwise.
+
+# Returns
+
+  - `res::PriceJumpFilterResult`: The fitted filter of the folded observations.
+
+# Related
+
+  - [`partial_fit_transform`](@ref)
+  - [`PriceJumpFilterState`](@ref)
+"""
+function fit_preprocessing(pjf::PriceJumpFilter)
+    state = partial_fit_cache(pjf)
+    return price_jump_result(state.nx, state.jump, pjf.factor)
+end
+function supports_partial_fit(::PriceJumpFilter)
+    return true
+end
+#! End: PriceJumpFilter.
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -1013,7 +1217,8 @@ The display shows `cache` only when the step keeps a state, so a step that has f
 
   - [`show_fields`](@ref)
 """
-function show_fields(est::Union{PricesToReturns, PriceGapFill, MissingDataFilter})
+function show_fields(est::Union{PricesToReturns, PriceGapFill, MissingDataFilter,
+                                PriceJumpFilter})
     fns = fieldnames(typeof(est))
     return isnothing(est.cache) ? filter(!=(:cache), fns) : fns
 end

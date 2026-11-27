@@ -298,3 +298,21 @@ removal makes the entry true rather than aspirational.
 
 The descriptor whose warm-up exceeds a fold's training window is not settled here. It is a fact
 about a descriptor rather than about ingestion, and it is owned elsewhere.
+
+## Amendment (2026-11-24)
+
+Issue #1990 adds a second drop at the price level. This ADR named `MissingDataFilter` as the only
+one.
+
+- **`price_jumps` reports, and it changes nothing.** It lists each Price Jump: a move above a
+  factor between two consecutive priced observations of one asset. The pair can span a gap, and it
+  never spans an absence from the listing, because no return crosses one. The library cannot tell
+  an unrecorded split from a market move, so the report is apart from the drop.
+- **`PriceJumpFilter` is a Universe Policy.** It drops the assets with a jump in the training
+  window, and it replays the universe by name. A jump of a kept asset in a later window stays in the
+  data, because a drop there can only use observations that postdate the fit.
+- **The filter drops a column, never an observation.** A jump stays a jump across a deleted row.
+- **Ingestion gives no notice.** A notice costs a pass over the prices on every ingestion, and a
+  caller who wants one calls `price_jumps`.
+- **The filter has an exact online form.** Its state holds the price of each asset at each end of
+  the folded rows, so a merge finds a jump between two blocks.

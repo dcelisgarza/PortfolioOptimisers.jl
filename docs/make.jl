@@ -235,6 +235,16 @@ contribute = [joinpath("contribute", file)
               for file in readdir(joinpath(@__DIR__, "src/contribute"))
               if splitext(file)[2] == ".md"]
 
+# The changes of the next release, one page for each change, which a release folds into the
+# migration guide (`docs/fold_next_release.jl`). The directory is absent after a release.
+include(joinpath(@__DIR__, "fold_next_release.jl"))
+next_release = [joinpath("next_release", basename(p)) for p in fragment_paths()]
+migration = if isempty(next_release)
+    MIGRATION_PAGE
+else
+    [MIGRATION_PAGE, "In the next release" => next_release]
+end
+
 # The base URL of the deployed site. `Documenter.HTML` writes it into every page's
 # `<link rel="canonical">`, and `generate_sitemap` roots every sitemap entry at it.
 const CANONICAL_URL = "https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable"
@@ -304,7 +314,7 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
                        (("Public API", public_api), ("Private API", private_api))
                    if !isempty(group)];
                   ["Contribute" => contribute;
-                   "Migration guide" => MIGRATION_PAGE;
+                   "Migration guide" => migration;
                    "References" => REFERENCES_PAGE]],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
                                          style = :numeric), CodeBlocks(), LandingPage()])

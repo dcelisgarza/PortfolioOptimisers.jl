@@ -645,7 +645,9 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `idx` is not empty, else an [`IsEmptyError`](@ref).
+  - No entry of `idx` is a `Bool`, else an `ArgumentError`. The entries are positions, and a mask is not.
   - Every entry of `idx` is positive, else a `DomainError`.
+  - [`FiniteAllocationInput`](@ref) checks that no entry of `idx` is larger than the length of `w`, with [`assert_unpriced_rule`](@ref).
   - The functor throws a `BoundsError` when an entry of `idx` is larger than the length of `w`.
 
 # Functor
@@ -679,6 +681,8 @@ julia> AssetRedistribution(; idx = 4)([0.5, 0.3, 0.2, 0.0], [false, false, true,
     idx
     function AssetRedistribution(idx::Union{Integer, VecInt})
         @argcheck(!isempty(idx), IsEmptyError("idx cannot be empty"))
+        @argcheck(!any(i -> isa(i, Bool), idx),
+                  ArgumentError("idx holds the positions of assets, so no entry can be a Bool. Got\nidx => $idx. Write findall(idx) for a mask."))
         @argcheck(all(>(0), idx), DomainError(idx, "every entry of idx must be > 0"))
         return new{typeof(idx)}(idx)
     end
@@ -831,6 +835,49 @@ function unpriced_weights(upw::UnpricedAlg_Func, w::VecNum, umsk::AbstractVector
               ArgumentError("the rule `upw` must return a weight vector of length $(length(w)) with a zero at every unpriced asset $(findall(umsk))"))
     return wt
 end
+"""
+    assert_unpriced_rule(::Option{<:UnpricedAlg_Func}, ::Integer)
+    assert_unpriced_rule(upw::AssetRedistribution, N::Integer)
+    assert_unpriced_rule(upw::SideRedistribution, N::Integer)
+
+Check that a rule for the target weight of an Unpriced Asset names only assets of a book of `N` assets.
+
+The constructor of [`FiniteAllocationInput`](@ref) calls this method, because a rule does not know the length of the book. The allocators call the rule only when a price is `NaN`. So without the check, a position outside the book passes on each date on which every asset has a price. A rule with no positions, a plain function and `nothing` pass. The method on a [`SideRedistribution`](@ref) checks the rule of each side.
+
+# Arguments
+
+  - `upw`: The rule of the `upw` field of [`FiniteAllocationInput`](@ref), or `nothing`.
+  - `N::Integer`: Number of assets of the book.
+
+# Validation
+
+  - No entry of the `idx` of an [`AssetRedistribution`](@ref) is larger than `N`, else a `DomainError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`AssetRedistribution`](@ref)
+  - [`SideRedistribution`](@ref)
+  - [`UnpricedAlg_Func`](@ref)
+  - [`FiniteAllocationInput`](@ref)
+"""
+function assert_unpriced_rule(::Option{<:UnpricedAlg_Func}, ::Integer)::Nothing
+    return nothing
+end
+function assert_unpriced_rule(upw::AssetRedistribution, N::Integer)::Nothing
+    @argcheck(all(<=(N), upw.idx),
+              DomainError(upw.idx,
+                          "every entry of the idx of an AssetRedistribution must be <= $N, the number of assets of the book"))
+    return nothing
+end
+function assert_unpriced_rule(upw::SideRedistribution, N::Integer)::Nothing
+    assert_unpriced_rule(upw.l, N)
+    assert_unpriced_rule(upw.s, N)
+    return nothing
+end
 export ProportionalRedistribution, EvenRedistribution, AssetRedistribution,
        SideRedistribution
 public unpriced_weights
@@ -895,6 +942,7 @@ Reads from a fitted optimisation every value that an allocation can take from it
   - `horizon` is not `nothing` when `fees` is not `nothing`, else an [`IsNothingError`](@ref).
   - The mask of `fees` is `nothing` or equal to `imsk`. [`mark_fees`](@ref) throws an `ArgumentError` otherwise.
   - `imsk`, stated or read from the fee, has `length(imsk) == length(w)`, else a `DimensionMismatch`, and `any(imsk)`, else an [`IsEmptyError`](@ref).
+  - An [`AssetRedistribution`](@ref) in `upw`, or in a side of a [`SideRedistribution`](@ref), names only positions of `w`, else a `DomainError`. [`assert_unpriced_rule`](@ref) does the check.
 
 # Examples
 
@@ -927,6 +975,7 @@ FiniteAllocationInput
   - [`setup_alloc_optim`](@ref)
   - [`AbstractCollateralAlgorithm`](@ref)
   - [`AbstractUnpricedWeightAlgorithm`](@ref)
+  - [`assert_unpriced_rule`](@ref)
   - [`prepare_finite_allocation`](@ref)
   - [`optimise`](@ref)
 """
@@ -992,6 +1041,7 @@ FiniteAllocationInput
             @argcheck(any(imsk),
                       IsEmptyError("imsk must keep at least one asset, and it keeps none"))
         end
+        assert_unpriced_rule(upw, length(w))
         return new{typeof(w), typeof(prices), typeof(cash), typeof(prev_cash),
                    typeof(horizon), typeof(fees), typeof(imsk), typeof(ca), typeof(upw)}(w,
                                                                                          prices,

@@ -115,33 +115,10 @@ function PortfolioOptimisers.plot_stacked_area_composition(pred::PopulationPredi
 end
 ## plot_risk_contribution
 function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.BaseRM_VecBaseRM,
-                                                    w::VecNum, rd::ReturnsResult,
-                                                    fees::Option{<:Fees} = nothing;
-                                                    delta::Number = 1e-6,
-                                                    marginal::Bool = false,
-                                                    percentage::Bool = true,
-                                                    N::Option{<:Number} = nothing,
-                                                    sca::Option{<:Scalariser} = nothing,
-                                                    kwargs...)
-    nx = isnothing(rd.nx) ? (1:size(rd.X, 2)) : rd.nx
-    return PortfolioOptimisers.plot_risk_contribution(r, w, rd.X, fees; nx = nx,
-                                                      delta = delta, marginal = marginal,
-                                                      percentage = percentage, N = N,
-                                                      sca = sca, kwargs...)
-end
-function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.BaseRM_VecBaseRM,
                                                     res::OptimisationResult,
-                                                    rd::ReturnsResult; delta::Number = 1e-6,
-                                                    marginal::Bool = false,
-                                                    percentage::Bool = true,
-                                                    N::Option{<:Number} = nothing,
-                                                    sca::Option{<:Scalariser} = nothing,
-                                                    kwargs...)
+                                                    rd::ReturnsResult; kwargs...)
     _, w, rd, fees = result_investable_view(res, rd)
-    return PortfolioOptimisers.plot_risk_contribution(r, w, rd, fees; delta = delta,
-                                                      marginal = marginal,
-                                                      percentage = percentage, N = N,
-                                                      sca = sca, kwargs...)
+    return PortfolioOptimisers.plot_risk_contribution(r, w, rd, fees; kwargs...)
 end
 function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.BaseRM_VecBaseRM,
                                                     res::OptimisationResult,
@@ -183,16 +160,10 @@ end
 ## plot_factor_risk_contribution
 function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimisers.BaseRM_VecBaseRM,
                                                            res::OptimisationResult,
-                                                           rd::ReturnsResult;
-                                                           re::RegE_Reg = StepwiseRegression(),
-                                                           delta::Number = 1e-6,
-                                                           N::Option{<:Number} = nothing,
-                                                           sca::Option{<:Scalariser} = nothing,
-                                                           kwargs...)
+                                                           rd::ReturnsResult; kwargs...)
     _, w, rd, fees = result_investable_view(res, rd)
-    return PortfolioOptimisers.plot_factor_risk_contribution(r, w, rd.X, fees; re = re,
-                                                             rd = rd, delta = delta, N = N,
-                                                             sca = sca, kwargs...)
+    return PortfolioOptimisers.plot_factor_risk_contribution(r, w, rd, fees; rd = rd,
+                                                             kwargs...)
 end
 function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimisers.BaseRM_VecBaseRM,
                                                            pred::PredictionResult{<:Any,
@@ -226,25 +197,28 @@ end
 function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.BaseRM_VecBaseRM,
                                                     w::VecNum, X::MatNum_Pr,
                                                     fees::Option{<:Fees} = nothing;
-                                                    nx::AbstractVector = 1:length(w),
+                                                    nx::Option{<:AbstractVector} = nothing,
                                                     delta::Number = 1e-6,
                                                     marginal::Bool = false,
                                                     percentage::Bool = true,
                                                     erc::Bool = true,
                                                     N::Option{<:Number} = nothing,
                                                     sca::Option{<:Scalariser} = nothing,
-                                                    kwargs...)
+                                                    strict::Bool = false, kwargs...)
     if !(delta > zero(delta))
         throw(DomainError(delta, "delta must be > 0"))
     end
     if !isnothing(N) && !(N > zero(N))
         throw(DomainError(N, "N must be > 0"))
     end
-    rc = risk_contribution(r, w, X, fees; delta = delta, marginal = marginal, sca = sca)
+    X, names = contribution_figure_data(w, X, strict)
+    rc = risk_contribution(r, w, X, fees; delta = delta, marginal = marginal, sca = sca,
+                           strict = strict)
     if percentage
         rc = rc / sum(rc)
     end
-    plt = PortfolioOptimisers.plot_composition(rc, nx; N = N, ylabel = "Contribution",
+    plt = PortfolioOptimisers.plot_composition(rc, something(nx, names); N = N,
+                                               ylabel = "Contribution",
                                                title = "Risk Contribution", kwargs...)
     if erc
         plt = hline!(plt, [mean(rc)])
@@ -266,14 +240,16 @@ function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimiser
                                                            percentage::Bool = true,
                                                            erc::Bool = true,
                                                            sca::Option{<:Scalariser} = nothing,
-                                                           kwargs...)
+                                                           strict::Bool = false, kwargs...)
     if !(delta > zero(delta))
         throw(DomainError(delta, "delta must be > 0"))
     end
     if !isnothing(N) && !(N > zero(N))
         throw(DomainError(N, "N must be > 0"))
     end
-    rc = factor_risk_contribution(r, w, X, fees; re = re, rd = rd, delta = delta, sca = sca)
+    X, _ = contribution_figure_data(w, X, strict)
+    rc = factor_risk_contribution(r, w, X, fees; re = re, rd = rd, delta = delta, sca = sca,
+                                  strict = strict)
     # The last element is the contribution of the part of `w` with no exposure to any factor,
     # not a regression intercept, so its bar is named for that. The names apply only when they
     # count the columns of the loadings: a dimension-reduction regression fits fewer columns

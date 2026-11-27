@@ -203,6 +203,78 @@ what keeps the JuMP families cheap.
         @test fm.miss == po.partial_fit!(MissingDataFilter(), pr).cache.miss
         fc = copy(fm)
         @test fc.miss == fm.miss && fc.miss !== fm.miss && fc.n == fm.n
+        # The price jump filter: each cut of the rows gives the universe of the batch fit,
+        # where a jump crosses a block edge, a gap, or an absence that ends its pair.
+        J = [1.0 1.0 1.0 1.0 1.0 NaN
+             NaN 9.0 NaN 1.0 1.0 NaN
+             NaN 9.0 9.0 1.0 1.0 1.0
+             9.0 9.0 9.0 1.0 NaN NaN
+             9.0 9.0 9.0 1.0 1.0 9.0]
+        sp = trues(size(J))
+        sp[2, 3] = false
+        sp[2, 6] = false
+        prj = PricesResult(; X = TimeArray(ts[1:5], J, nx), span = sp)
+        batch = fit_preprocessing(PriceJumpFilter(), prj)
+        @test batch.nx == [:A3, :A4, :A5]
+        whole = po.partial_fit!(PriceJumpFilter(), prj).cache
+        same_state(a, b) = all(f -> isequal(getfield(a, f), getfield(b, f)),
+                               fieldnames(po.PriceJumpFilterState))
+        for cut in ([1:1, 2:2, 3:3, 4:4, 5:5], [1:2, 3:5], [1:3, 4:5], [1:1, 2:5], [1:5])
+            est, online = online_rows(PriceJumpFilter(), prj, cut)
+            @test isequal(values(online.X), J)
+            @test fit_preprocessing(est).nx == batch.nx
+            @test same_state(est.cache, whole)
+            # A merge of states is associative, so a right fold gives the same state.
+            st = [po.partial_fit!(PriceJumpFilter(), rows(prj, r)).cache for r in cut]
+            @test same_state(foldr(po.merge_states, st), whole)
+        end
+        # Without a span, no absence is stated, and the gaps of `A3` and `A6` end no pair.
+        prn = PricesResult(; X = prj.X)
+        est, _ = online_rows(PriceJumpFilter(), prn, [1:1, 2:3, 4:5])
+        @test fit_preprocessing(est).nx ==
+              fit_preprocessing(PriceJumpFilter(), prn).nx ==
+              [:A4, :A5]
+        wc = copy(whole)
+        @test same_state(wc, whole)
+        @test all(f -> getfield(wc, f) !== getfield(whole, f),
+                  (:nx, :jump, :head, :tail, :open))
+        @test po.supports_partial_fit(PriceJumpFilter())
+        @test occursin("cache", sprint(show, MIME"text/plain"(), est))
+        @test !occursin("cache", sprint(show, MIME"text/plain"(), PriceJumpFilter()))
+        @test_throws ArgumentError fit_preprocessing(PriceJumpFilter())
+        @test_throws ArgumentError po.partial_fit!(est, po.port_opt_view(prj, :, 1:3))
+        # Two filters of different factors state two universes, so their states refuse.
+        @test_throws ArgumentError po.merge_states(whole,
+                                                   po.partial_fit!(PriceJumpFilter(;
+                                                                                   factor = 6),
+                                                                   prj).cache)
+        @test_throws DimensionMismatch po.PriceJumpFilterState(; nx = [:a], factor = 5,
+                                                               jump = [true, false],
+                                                               head = [1.0], tail = [1.0],
+                                                               open = [true])
+        # A Pipeline steps it as batch, after a filter that narrowed the universe, and it
+        # refuses a universe that the two filters empty together.
+        Pj = copy(P)
+        Pj[100:end, 1] .*= 10
+        prp = price_ingestion(PriceIngestion(), TimeArray(ts, Pj, nx))
+        jpipe = Pipeline(;
+                         steps = (PriceGapFill(), MissingDataFilter(; col_thr = 0.05),
+                                  PriceJumpFilter(), PricesToReturns(), EmpiricalPrior(),
+                                  InverseVolatility()))
+        spipe = stepped(jpipe, prp, [1:60, 61:99, 100:100, 101:130])
+        o = fit(spipe)
+        b = fit(jpipe, rows(prp, 1:130))
+        @test o.results[3] isa PriceJumpFilterResult
+        @test o.results[3].nx == b.results[3].nx == [:A2, :A4, :A5, :A6]
+        @test o.ctx.returns.nx == b.ctx.returns.nx
+        @test isapprox(o.w, b.w; atol = 1e-10)
+        Pe = [NaN 1.0; 10.0 1.0; 10.0 9.0; 10.0 9.0]
+        pre = price_ingestion(PriceIngestion(), TimeArray(ts[1:4], Pe, ["A", "B"]))
+        epipe = Pipeline(;
+                         steps = (MissingDataFilter(; col_thr = 0.0), PriceJumpFilter(),
+                                  PricesToReturns(), EmpiricalPrior(), InverseVolatility()))
+        @test_throws po.IsEmptyError fit(epipe, pre)
+        @test_throws po.IsEmptyError fit(stepped(epipe, pre, [1:2, 3:4]))
         # The two window-valued configurations and a caller's algorithm answer `false`.
         @test !po.supports_partial_fit(PriceGapFill(; fill = MeanValue()))
         @test !po.supports_partial_fit(MissingDataFilter(; row_thr = 0.5))

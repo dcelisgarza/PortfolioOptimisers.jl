@@ -8,6 +8,7 @@
         fees::Option{<:Fees} = nothing;
         ts::AbstractVector = 1:size(X, 1),
         compound::Bool = false,
+        strict::Bool = false,
         kwargs...
     ) -> Plot
     plot_portfolio_cumulative_returns(
@@ -16,6 +17,7 @@
         fees::Option{<:Fees} = nothing;
         ts::AbstractVector = 1:size(pr.X, 1),
         compound::Bool = false,
+        strict::Bool = false,
         kwargs...
     ) -> Plot
     plot_portfolio_cumulative_returns(
@@ -23,12 +25,14 @@
         pr::Pr_RR;
         fees::Option{<:Fees} = nothing,
         compound::Bool = false,
+        strict::Bool = false,
         kwargs...
     ) -> Plot
     plot_portfolio_cumulative_returns(
         res::OptimisationResult;
         fees::Option{<:Fees} = nothing,
         compound::Bool = false,
+        strict::Bool = false,
         kwargs...
     ) -> Plot
     plot_portfolio_cumulative_returns(
@@ -52,7 +56,7 @@ Plot the cumulative returns of a portfolio against time.
 
 The curve is [`cumulative_returns`](@ref) of the net portfolio returns that [`calc_net_returns`](@ref) forms from `w`, `X` and `fees`. A vector of weight vectors draws one curve per portfolio, labelled `Portfolio i`. The method that takes `net_ret` draws a return series the caller already formed. A population draws the curve of each member on one figure, labelled by the key of the member that [`portfolio_report`](@ref) uses. A member with many portfolios adds `Portfolio i` to its key. Each curve of a population takes `kwargs`, as the curve of a path does. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads after `using StatsPlots`.
 
-A gapped panel reaches this figure only through the returns that the caller gives it. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). A `w, X` or `w, pr` arity computes on the matrix that the caller holds and checks nothing, and `X * w` is `NaN` at a gap even where the weight is zero. Score a gapped panel through `predict(res, rd)` and plot the prediction.
+A gap in the returns does not make the figure `NaN`. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). Every arity that takes weights, or an optimisation result, reads a gap in the same way through [`filter_held_gaps`](@ref): a gap at a zero weight gives no message, and a Held Gap contributes zero with a warning, or raises an `ArgumentError` under `strict = true`.
 
 # Arguments
 
@@ -61,6 +65,7 @@ A gapped panel reaches this figure only through the returns that the caller give
   - `fees`: Transaction fees, or `nothing`.
   - `ts`: Labels of the time axis. A [`ReturnsResult`](@ref) that carries `ts` replaces the keyword with its own.
   - `compound`: Compound the returns when `true`, and sum them otherwise.
+  - $(arg_dict[:strict_held_gap])
   - `pr`: Prior result or [`ReturnsResult`](@ref). The figure reads its `X`.
   - `res`: Optimisation result. The figure reads its weights, and its fees when `fees` is `nothing`, on its investable universe. Without `pr`, it reads the returns of the prior it was fitted on.
   - `pred`: A prediction, whose return series the figure draws.
@@ -273,18 +278,18 @@ function plot_stacked_area_composition end
         w::VecNum,
         X::MatNum_Pr,
         fees::Option{<:Fees} = nothing;
-        nx::AbstractVector = 1:length(w),
+        nx::Option{<:AbstractVector} = nothing,
         delta::Number = 1e-6,
         marginal::Bool = false,
         percentage::Bool = true,
         erc::Bool = true,
         N::Option{<:Number} = nothing,
         sca::Option{<:Scalariser} = nothing,
+        strict::Bool = false,
         kwargs...
     ) -> Plot
-    plot_risk_contribution(r, w::VecNum, rd::ReturnsResult, fees = nothing; delta, marginal, percentage, erc, N, sca, kwargs...) -> Plot
-    plot_risk_contribution(r, res::OptimisationResult, rd::ReturnsResult; delta, marginal, percentage, erc, N, sca, kwargs...) -> Plot
-    plot_risk_contribution(r, res::OptimisationResult, pr::AbstractPriorResult; nx, delta, marginal, percentage, erc, N, sca, kwargs...) -> Plot
+    plot_risk_contribution(r, res::OptimisationResult, rd::ReturnsResult; nx, delta, marginal, percentage, erc, N, sca, strict, kwargs...) -> Plot
+    plot_risk_contribution(r, res::OptimisationResult, pr::AbstractPriorResult; nx, delta, marginal, percentage, erc, N, sca, strict, kwargs...) -> Plot
     plot_risk_contribution(r, pred::PredictionResult, fees = nothing; delta, marginal, percentage, erc, N, sca, kwargs...) -> Plot
 
 Plot the risk contribution of each asset as a bar chart.
@@ -294,6 +299,8 @@ The bars are [`risk_contribution`](@ref) of `w`, rescaled to shares when `percen
 The bars decompose **one** number, the scalarised aggregate of `r`, so they sum to the aggregate and not to any one element. Under [`MaxScalariser`](@ref) and [`MinScalariser`](@ref) the decomposition is exact only where the argmax is **unique**. At a near tie between two scaled measures the subgradient is a set, and the bars are one admissible answer of several.
 
 The method that takes a fold reads the target weights of the fold and the asset returns that its Held Weights record kept, and it settles the fee against the length of the fold, as [`predict`](@ref) did. Under a Weight Drift the bars are exact to **first order in the drift** only, for the reason [`risk_contribution`](@ref) states. A fold whose scheme set neither `wd` nor a `DriftedWeights` source keeps no record and so no asset returns.
+
+A gap in the returns does not change the size of the sample. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). Every arity that takes weights, or an optimisation result, reads a gap in the same way through [`filter_held_gaps`](@ref): a gap at a zero weight gives no message, and a Held Gap contributes zero with a warning, or raises an `ArgumentError` under `strict = true`.
 
 # Mathematical definition
 
@@ -315,17 +322,18 @@ Where:
 
   - `r`: Risk measure, or a vector of them that `sca` combines.
   - `w`: Portfolio weights vector.
-  - `X`: Asset returns matrix (observations × assets), or a prior result.
-  - `rd`: Returns result. The figure reads its `X` and its `nx`.
+  - `X`: Asset returns matrix (observations × assets), a prior result or a returns result.
+  - `rd`: Returns result. The figure reads its `X`, its `B` and its `nx`.
   - `pr`: Prior result. The figure reads its `X`.
   - `fees`: Transaction fees, or `nothing`.
-  - `nx`: Asset names.
+  - `nx`: Asset names. With `nothing`, they are the names of a returns result, and the positions of the assets otherwise.
   - `delta`: Finite difference step of [`risk_contribution`](@ref).
   - `marginal`: Draw the marginal contribution when `true`, and the component contribution otherwise.
   - `percentage`: Divide the contributions by their sum when `true`, so that the bars sum to one.
   - `erc`: Draw the reference line when `true`.
   - `N`: The count or the share of the bars to draw, or `nothing` for the effective number of the contributions. [`relevant_assets`](@ref) states the rule.
   - `sca`: Scalariser that combines the measures in `r`. It has no effect when `r` is one measure. Pass `res.sca` to draw the figure that the optimisation ran under.
+  - `strict`: Whether a Held Gap of the returns, or a held non-investable asset of a prior, raises an `ArgumentError`. With `false`, each gives a warning. Only the methods that take weights, or an [`OptimisationResult`](@ref), read it.
   - `res`: Optimisation result. The figure reads its weights and its fees on its investable universe.
   - `pred`: A fold, from [`predict`](@ref).
 
@@ -343,6 +351,7 @@ Where:
 # Related
 
   - [`risk_contribution`](@ref)
+  - [`filter_held_gaps`](@ref)
   - [`plot_composition`](@ref)
   - [`PredictionResult`](@ref)
   - [`HeldWeightsResult`](@ref)
@@ -366,9 +375,10 @@ function plot_risk_contribution end
         percentage::Bool = true,
         erc::Bool = true,
         sca::Option{<:Scalariser} = nothing,
+        strict::Bool = false,
         kwargs...
     ) -> Plot
-    plot_factor_risk_contribution(r, res::OptimisationResult, rd::ReturnsResult; re, delta, N, percentage, erc, sca, kwargs...) -> Plot
+    plot_factor_risk_contribution(r, res::OptimisationResult, rd::ReturnsResult; re, delta, N, percentage, erc, sca, strict, kwargs...) -> Plot
     plot_factor_risk_contribution(
         r,
         pred::PredictionResult,
@@ -384,6 +394,8 @@ The bars are [`factor_risk_contribution`](@ref) of `w`, rescaled to shares when 
 The bars take the names in `nf`, or else in `rd.nf`, only when the names count the columns of the loadings. A dimension reduction regression fits fewer columns than there are factors, so its bars are numbered.
 
 The method that takes a fold is the twin of the fold method of [`plot_risk_contribution`](@ref). It fits the loadings on a returns result that it builds from the fold, the asset returns of its Held Weights record beside the factor block the fold carried, unless the caller gives `rd`, which it views at the mask of the fold. The first order caveat of that method holds here too.
+
+A gap in the returns does not change the size of the sample. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). Every arity that takes weights, or an optimisation result, reads a gap in the same way through [`filter_held_gaps`](@ref): a gap at a zero weight gives no message, and a Held Gap contributes zero with a warning, or raises an `ArgumentError` under `strict = true`.
 
 # Mathematical definition
 
@@ -405,7 +417,7 @@ Where:
 
   - `r`: Risk measure, or a vector of them that `sca` combines.
   - `w`: Portfolio weights vector.
-  - `X`: Asset returns matrix (observations × assets), or a prior result.
+  - `X`: Asset returns matrix (observations × assets), a prior result or a returns result.
   - `fees`: Transaction fees, or `nothing`.
   - `re`: Factor regression estimator.
   - `rd`: Returns result that carries the factor returns the loadings are fitted on, and the factor names in `rd.nf`.
@@ -415,6 +427,7 @@ Where:
   - `percentage`: Divide the contributions by their sum when `true`, so that the bars sum to one.
   - `erc`: Draw the reference line when `true`.
   - `sca`: Scalariser that combines the measures in `r`. It has no effect when `r` is one measure. Pass `res.sca` to draw the figure that the optimisation ran under.
+  - `strict`: Whether a Held Gap of the returns, or a held non-investable asset of a prior, raises an `ArgumentError`. With `false`, each gives a warning. Only the methods that take weights, or an [`OptimisationResult`](@ref), read it.
   - `res`: Optimisation result. The figure reads its weights and its fees on its investable universe.
   - `pred`: A fold, from [`predict`](@ref).
 
@@ -432,6 +445,7 @@ Where:
 # Related
 
   - [`factor_risk_contribution`](@ref)
+  - [`filter_held_gaps`](@ref)
   - [`plot_composition`](@ref)
   - [`PredictionResult`](@ref)
   - [`HeldWeightsResult`](@ref)
@@ -547,10 +561,11 @@ function plot_clusters end
         alpha::Number = 0.05,
         kappa::Number = 0.3,
         rw = nothing,
+        strict::Bool = false,
         kwargs...
     ) -> Plot
-    plot_drawdowns(w, rd::ReturnsResult, fees = nothing; slv, compound, alpha, kappa, rw, kwargs...) -> Plot
-    plot_drawdowns(res::OptimisationResult, rd::ReturnsResult; slv, compound, alpha, kappa, rw, kwargs...) -> Plot
+    plot_drawdowns(w, rd::ReturnsResult, fees = nothing; slv, compound, alpha, kappa, rw, strict, kwargs...) -> Plot
+    plot_drawdowns(res::OptimisationResult, rd::ReturnsResult; slv, compound, alpha, kappa, rw, strict, kwargs...) -> Plot
     plot_drawdowns(pred::PredictionResult; slv, compound, alpha, kappa, rw, kwargs...) -> Plot
     plot_drawdowns(mpred::MultiPeriodPredictionResult; slv, compound, alpha, kappa, rw, kwargs...) -> Plot
     plot_drawdowns(ppred::PopulationPredictionResult; slv, compound, alpha, kappa, rw, kwargs...) -> Plot
@@ -560,7 +575,7 @@ Plot the cumulative returns of a portfolio above its drawdown, in two panels tha
 
 The upper panel is [`cumulative_returns`](@ref) of the net portfolio returns. The lower panel is their [`drawdowns`](@ref) in percent, with one horizontal line for each of these measures of the returns, negated and in percent: [`AverageDrawdown`](@ref), [`UlcerIndex`](@ref), [`DrawdownatRisk`](@ref), [`ConditionalDrawdownatRisk`](@ref) and [`MaximumDrawdown`](@ref). With `slv`, [`EntropicDrawdownatRisk`](@ref) and [`RelativisticDrawdownatRisk`](@ref) add two more lines. Under `compound` each measure is its relative form, such as [`RelativeMaximumDrawdown`](@ref). A population draws the mean of the return series of its members, which must be of one length, on the time axis of the first member. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads after `using StatsPlots`.
 
-A gapped panel reaches this figure only through the returns that the caller gives it. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). A `w, X` or `w, rd` arity computes on the matrix that the caller holds and checks nothing, and `X * w` is `NaN` at a gap even where the weight is zero. Score a gapped panel through `predict(res, rd)` and plot the prediction.
+A gap in the returns does not make the figure `NaN`. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). Every arity that takes weights, or an optimisation result, reads a gap in the same way through [`filter_held_gaps`](@ref): a gap at a zero weight gives no message, and a Held Gap contributes zero with a warning, or raises an `ArgumentError` under `strict = true`.
 
 # Arguments
 
@@ -573,6 +588,7 @@ A gapped panel reaches this figure only through the returns that the caller give
   - `alpha`: Significance level of the drawdown at risk lines.
   - `kappa`: Deformation parameter of the relativistic line.
   - `rw`: Observation weights of the average drawdown line, or `nothing`.
+  - $(arg_dict[:strict_held_gap])
   - `res`: Optimisation result. The figure reads its weights and its fees on its investable universe.
   - `pred`, `mpred`, `ppred`: A prediction, a walk-forward path or a population, whose return series the figure draws.
   - `ret`: Net portfolio returns.
@@ -606,12 +622,13 @@ function plot_drawdowns end
         c::BaseRM_VecBaseRM = ExpectedReturnRiskRatio(; rk=x, rt=ArithmeticReturn(), rf=0),
         slv::Option{<:Slv_VecSlv} = nothing,
         factory::Bool = true,
+        strict::Bool = false,
         kwargs...
     ) -> Plot
     plot_measures(
         res_vec::AbstractVector{<:OptimisationResult},
         pr::Option{<:Pr_RR} = nothing;
-        x, y, z, c, slv, fees, factory, kwargs...
+        x, y, z, c, slv, fees, factory, strict, kwargs...
     ) -> Plot
     plot_measures(
         pred::AbstractPredictionResult;
@@ -631,7 +648,7 @@ Each point is one portfolio. Its coordinates are [`expected_risk`](@ref) of `x`,
 
 Each axis takes one measure or a **vector** of them, and a vector becomes the one number that the axis plots. The figure names no scalariser, so a **bare vector on an axis takes [`SumScalariser`](@ref)**, each element weighted by its own `settings.scale`. A scalariser reaches an axis only through the `sca` field of a wrapper, [`ExpectedReturnRiskRatio`](@ref), [`MeanReturnRiskRatio`](@ref) or [`NonOptimisationRiskRatio`](@ref), and each axis can name its own. Those wrappers are all ratios, so the figure cannot apply a [`MaxScalariser`](@ref) to a **plain** vector of risks. Scalarise the vector with [`expected_risk`](@ref) and plot the numbers for that.
 
-[`expected_risk`](@ref) reduces a Prior Result to the Investable Mask at its own entry, so a gapped prior needs no step here. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref).
+The figure reduces the data once, before it binds and scores the measures, with the reduction that [`expected_risk`](@ref) does. A Prior Result is reduced to the Investable Mask, and the gaps of a [`ReturnsResult`](@ref) become zero through [`filter_held_gaps`](@ref). So one message names a held asset or a Held Gap for all the axes, and the result arity gives one for each result. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref).
 
 # Arguments
 
@@ -644,6 +661,7 @@ Each axis takes one measure or a **vector** of them, and a vector becomes the on
   - `c`: Measure of the colour, or a vector of them.
   - `slv`: Solver that [`factory`](@ref) binds to each measure.
   - `factory`: Bind each measure through [`factory`](@ref) before the figure scores it.
+  - `strict`: Whether a held non-investable asset of a prior, or a Held Gap of a returns result, raises an `ArgumentError`. With `false`, each gives a warning. A prediction does not read it.
   - `res_vec`: Optimisation results.
   - `pred`: A prediction, a walk-forward path or a population.
   - `plt`: A plot to draw into, or `nothing` for a new one.
@@ -651,6 +669,7 @@ Each axis takes one measure or a **vector** of them, and a vector becomes the on
 # Validation
 
   - The rules of [`expected_risk`](@ref) for each measure.
+  - Under `strict`, the rules of [`investable_reduction`](@ref).
 
 # Returns
 
@@ -659,6 +678,8 @@ Each axis takes one measure or a **vector** of them, and a vector becomes the on
 # Related
 
   - [`expected_risk`](@ref)
+  - [`filter_held_gaps`](@ref)
+  - [`investable_reduction`](@ref)
   - [`Scalariser`](@ref)
 """
 function plot_measures end
@@ -677,10 +698,11 @@ function plot_measures end
         rw = nothing,
         points::Integer = 0,
         reference::Bool = true,
+        strict::Bool = false,
         kwargs...
     ) -> Plot
-    plot_histogram(w, rd::ReturnsResult, fees = nothing; slv, alpha, kappa, rw, points, reference, kwargs...) -> Plot
-    plot_histogram(res::OptimisationResult, rd::ReturnsResult; slv, alpha, kappa, rw, points, reference, kwargs...) -> Plot
+    plot_histogram(w, rd::ReturnsResult, fees = nothing; slv, alpha, kappa, rw, points, reference, strict, kwargs...) -> Plot
+    plot_histogram(res::OptimisationResult, rd::ReturnsResult; slv, alpha, kappa, rw, points, reference, strict, kwargs...) -> Plot
     plot_histogram(pred::PredictionResult; slv, alpha, kappa, rw, points, reference, kwargs...) -> Plot
     plot_histogram(mpred::MultiPeriodPredictionResult; slv, alpha, kappa, rw, points, reference, kwargs...) -> Plot
     plot_histogram(ppred::PopulationPredictionResult; slv, alpha, kappa, rw, points, reference, kwargs...) -> Plot
@@ -692,7 +714,7 @@ The histogram is normalised to a density. Vertical lines mark, in this order: th
 
 The figure reads only the finite returns, as [`plot_exposure_distribution`](@ref) does. A return that is `NaN` or infinite is absent: the bins, the mean, the moments, every vertical line and the fitted Normal law read the finite returns, and ``T`` counts them. A walk-forward fold that failed to solve has `NaN` weights, so its returns are absent, and the figure of a [`portfolio_report`](@ref) still draws. A series with no finite return, such as a path whose every fold failed, draws the axes alone, with no bin and no line.
 
-A gapped panel reaches this figure only through the returns that the caller gives it. A prediction arity is finite at a gap, because the fold set the Held Gap to zero once in [`predict`](@ref). A `w, X` or `w, rd` arity computes on the matrix that the caller holds, and `X * w` is `NaN` at a gap even where the weight is zero, so the figure drops each such row. Score a gapped panel through `predict(res, rd)` and plot the prediction.
+A gap in the returns does not make the figure `NaN`. A prediction arity is finite at a gap, because the fold set the Held Gap to zero once in [`predict`](@ref). Every arity that takes weights, or an optimisation result, reads a gap in the same way through [`filter_held_gaps`](@ref): a gap at a zero weight gives no message, and a Held Gap contributes zero with a warning, or raises an `ArgumentError` under `strict = true`. So a gap drops no row.
 
 # Mathematical definition
 
@@ -723,6 +745,7 @@ Where:
   - `rw`: Observation weights of the mean absolute deviation line and of the four value at risk lines (plain, conditional, entropic and relativistic), or `nothing`. The mean, the standard deviation, the Gini mean difference and the tail Gini lines read no weights.
   - `points`: Number of points of the density grid, or `0` for the default.
   - `reference`: Draw the fitted Normal density when `true`.
+  - $(arg_dict[:strict_held_gap])
   - `res`: Optimisation result. The figure reads its weights and its fees on its investable universe.
   - `pred`, `mpred`, `ppred`: A prediction, a walk-forward path or a population, whose return series the figure draws.
   - `ret`: Net portfolio returns.
@@ -1186,10 +1209,11 @@ function plot_eigenspectrum end
         ts::AbstractVector = 1:size(X, 1),
         rolling::Integer = 0,
         sca::Option{<:Scalariser} = nothing,
+        strict::Bool = false,
         kwargs...
     ) -> Plot
-    plot_rolling_measure(r, w, rd::ReturnsResult, fees = nothing; rolling, sca, kwargs...) -> Plot
-    plot_rolling_measure(r, res::OptimisationResult, rd::ReturnsResult; rolling, sca, kwargs...) -> Plot
+    plot_rolling_measure(r, w, rd::ReturnsResult, fees = nothing; rolling, sca, strict, kwargs...) -> Plot
+    plot_rolling_measure(r, res::OptimisationResult, rd::ReturnsResult; rolling, sca, strict, kwargs...) -> Plot
     plot_rolling_measure(r, pred::PredictionResult; rolling, sca, kwargs...) -> Plot
     plot_rolling_measure(r, mpred::MultiPeriodPredictionResult; rolling, sca, kwargs...) -> Plot
     plot_rolling_measure(r, ppred::PopulationPredictionResult; rolling, sca, kwargs...) -> Plot
@@ -1199,7 +1223,7 @@ Plot a risk or return measure of the portfolio returns over a rolling window, ag
 
 [`rolling_window_measure`](@ref) scores each window of the net portfolio returns. Each window plots **one** number, so a vector of measures becomes its scalarised aggregate, not several lines. A population draws the mean of the return series of its members, on the time axis of the first member. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads after `using StatsPlots`.
 
-A gapped panel reaches this figure only through the returns that the caller gives it. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). A `w, X` or `w, rd` arity computes on the matrix that the caller holds and checks nothing, and `X * w` is `NaN` at a gap even where the weight is zero. Score a gapped panel through `predict(res, rd)` and plot the prediction.
+A gap in the returns does not make the figure `NaN`. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). Every arity that takes weights, or an optimisation result, reads a gap in the same way through [`filter_held_gaps`](@ref): a gap at a zero weight gives no message, and a Held Gap contributes zero with a warning, or raises an `ArgumentError` under `strict = true`.
 
 # Mathematical definition
 
@@ -1227,6 +1251,7 @@ Where:
   - `ts`: Labels of the time axis. A returns result or a prediction gives its own.
   - `rolling`: Length of the window, or `0` for the default.
   - `sca`: Scalariser that combines the measures in `r`. It has no effect when `r` is one measure.
+  - $(arg_dict[:strict_held_gap])
   - `res`: Optimisation result. The figure reads its weights and its fees on its investable universe.
   - `pred`, `mpred`, `ppred`: A prediction, a walk-forward path or a population, whose return series the figure draws.
   - `ret`: Net portfolio returns.
@@ -1499,10 +1524,11 @@ function plot_factor_mu end
         ts::AbstractVector = 1:size(X, 1),
         nb::Option{<:AbstractVector} = nothing,
         compound::Bool = false,
+        strict::Bool = false,
         kwargs...
     ) -> Plot
-    plot_benchmark(w, rd::ReturnsResult, fees = nothing; compound, kwargs...) -> Plot
-    plot_benchmark(res::OptimisationResult, rd::ReturnsResult; compound, kwargs...) -> Plot
+    plot_benchmark(w, rd::ReturnsResult, fees = nothing; compound, strict, kwargs...) -> Plot
+    plot_benchmark(res::OptimisationResult, rd::ReturnsResult; compound, strict, kwargs...) -> Plot
     plot_benchmark(pred::PredictionResult; compound, kwargs...) -> Plot
     plot_benchmark(mpred::MultiPeriodPredictionResult; compound, kwargs...) -> Plot
     plot_benchmark(
@@ -1518,6 +1544,8 @@ Plot the cumulative returns of a portfolio beside those of one or more benchmark
 
 Each curve is [`cumulative_returns`](@ref) of its series: the net portfolio returns as a solid line, and each benchmark as a dashed line. A benchmark without a name in `nb` is labelled `Benchmark i`. A returns result carries its benchmark in `B`, and the figure reads it only when it is one series. A matrix `B` is a benchmark per asset, and this figure does not draw it. A prediction whose series is a vector of series draws the first of them. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads after `using StatsPlots`.
 
+A gap in the returns does not make the curve of the portfolio `NaN`. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). Every arity that takes weights, or an optimisation result, reads a gap in the same way through [`filter_held_gaps`](@ref): a gap at a zero weight gives no message, and a Held Gap contributes zero with a warning, or raises an `ArgumentError` under `strict = true`.
+
 # Arguments
 
   - `w`: Portfolio weights.
@@ -1527,6 +1555,7 @@ Each curve is [`cumulative_returns`](@ref) of its series: the net portfolio retu
   - `ts`: Labels of the time axis. A returns result or a prediction gives its own.
   - `nb`: Benchmark names, at least one per benchmark, or `nothing`.
   - `compound`: Compound the returns of the portfolio and of every benchmark when `true`, and sum them otherwise.
+  - $(arg_dict[:strict_held_gap])
   - `rd`: Returns result. The figure reads its `X`, `B`, `ts` and `nb`.
   - `res`: Optimisation result. The figure reads its weights and its fees on its investable universe.
   - `pred`, `mpred`: A prediction or a walk-forward path, whose return series and benchmark the figure draws.
@@ -1677,6 +1706,7 @@ function plot_cokurtosis end
         kappa::Number = 0.3,
         rw = nothing,
         sca::Option{<:Scalariser} = nothing,
+        strict::Bool = false,
         kwargs...
     ) -> Plot
 
@@ -1687,9 +1717,11 @@ Plot one optimisation result as four panels in a 2 × 2 layout: its composition,
  3. The risk contribution of each asset under `r`, through [`plot_risk_contribution`](@ref).
  4. The drawdown, through [`plot_drawdowns`](@ref), which draws its own fixed set of drawdown measures and does not read `r`.
 
-The figure reads the weights and the fees of `res`, the returns of `rd`, and the names on the investable universe of the result. A returns result replaces `nx` and `ts` with its own when it carries them. Panel 3 reads a prior whole, so a measure with an unset moment, the default `Variance()` among them, takes the moment from the prior, and it reads the matrix of a returns result. The extra keywords reach the outer layout of 1200 × 800 pixels and no panel. The package extension `PortfolioOptimisersPlotsExt` implements the method, and it loads after `using StatsPlots`.
+The figure reads the weights and the fees of `res`, the returns of `rd`, and the names on the investable universe of the result. A returns result replaces `nx` and `ts` with its own when it carries them. Panel 3 reads a prior whole, so a measure with an unset moment, the default `Variance()` among them, takes the moment from the prior, and it reads the filtered matrix of a returns result. The extra keywords reach the outer layout of 1200 × 800 pixels and no panel. The package extension `PortfolioOptimisersPlotsExt` implements the method, and it loads after `using StatsPlots`.
 
 Each panel takes its own side of the draw and compute rule, and this figure adds no rule of its own. The figure views the result at its Investable Mask, so every panel draws the investable universe of the result alone.
+
+[`filter_held_gaps`](@ref) sets the gaps of the returns to zero once for the figure, so panels 2, 3 and 4 read one matrix, and one message names the assets of the Held Gaps.
 
 # Arguments
 
@@ -1708,10 +1740,12 @@ Each panel takes its own side of the draw and compute rule, and this figure adds
   - `alpha`: Significance level of the drawdown lines of panel 4.
   - `kappa`: Deformation parameter of the relativistic line of panel 4.
   - `rw`: Observation weights of the average drawdown line of panel 4, or `nothing`.
+  - $(arg_dict[:strict_held_gap])
 
 # Validation
 
   - The rules of [`plot_risk_contribution`](@ref) and of [`plot_drawdowns`](@ref).
+  - Under `strict`, the rule of [`filter_held_gaps`](@ref).
 
 # Returns
 
@@ -1781,18 +1815,19 @@ function plot_cv_dashboard end
         min_risk::Bool = true,
         max_score::Bool = true,
         factory::Bool = true,
+        strict::Bool = false,
         kwargs...
     ) -> Plot
     plot_efficient_frontier(res_vec::AbstractVector{<:OptimisationResult}, rd::ReturnsResult; kwargs...) -> Plot
-    plot_efficient_frontier(w::VecVecNum, pr::Pr_RR; x, y, c, slv, fees, min_risk, max_score, factory, kwargs...) -> Plot
-    plot_efficient_frontier(res::OptimisationResult, pr::Pr_RR; fees, kwargs...) -> Plot
+    plot_efficient_frontier(w::VecVecNum, pr::Pr_RR; x, y, c, slv, fees, min_risk, max_score, factory, strict, kwargs...) -> Plot
+    plot_efficient_frontier(res::OptimisationResult, pr::Pr_RR; fees, strict, kwargs...) -> Plot
     plot_efficient_frontier(res::OptimisationResult, rd::ReturnsResult; fees, kwargs...) -> Plot
 
 Plot a collection of portfolios as a line ordered by risk, coloured by a score, to trace an efficient frontier.
 
 Each point is [`expected_risk`](@ref) of `x` and `y` for one portfolio, and its colour is [`expected_risk`](@ref) of `c`. The default colour is the ratio of the arithmetic return to the risk of `x`. Under the default `Variance()` that is the return over the variance, not a Sharpe ratio. The line joins the points in ascending order of `x`. A blue star marks the portfolio of least `x`, and a red star the portfolio of largest `c`. When `factory` is `true`, [`factory`](@ref) binds each measure to the prior and to `slv` first. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads after `using StatsPlots`.
 
-A [`ReturnsResult`](@ref) in the second position is a tag and not data. Each result is scored against the prior it was fitted on, on its own investable universe, as [`plot_measures`](@ref) scores a vector of results. A prior in that position scores every portfolio against that one prior.
+A [`ReturnsResult`](@ref) in the second position is a tag and not data. Each result is scored against the prior it was fitted on, on its own investable universe, as [`plot_measures`](@ref) scores a vector of results. A prior in that position scores every portfolio against that one prior. The method that takes weights reads a [`ReturnsResult`](@ref) as data. The figure reduces the prior or the returns data once, before it binds and scores the measures, as [`plot_measures`](@ref) does, so one message names a held asset or a Held Gap for all the axes.
 
 Each axis takes one measure or a **vector** of them, and a vector becomes the one number that the axis plots. As in [`plot_measures`](@ref) the figure names no scalariser, so a **bare vector on an axis takes [`SumScalariser`](@ref)**, each element weighted by its own `settings.scale`. A scalariser reaches an axis only through the `sca` field of a ratio wrapper, so the figure cannot apply a [`MaxScalariser`](@ref) to a plain vector of risks. The order of the line and the two stars read the scalarised number, so a vector `x` orders the frontier by the aggregate and not by one measure. The axis label joins the element measures with `+`, whichever scalariser formed the number.
 
@@ -1811,10 +1846,12 @@ Each axis takes one measure or a **vector** of them, and a vector becomes the on
   - `min_risk`: Mark the portfolio of least `x` when `true`.
   - `max_score`: Mark the portfolio of largest `c` when `true`.
   - `factory`: Bind each measure through [`factory`](@ref) before the figure scores it.
+  - `strict`: Whether a held non-investable asset of a prior, or a Held Gap of a returns result, raises an `ArgumentError`. With `false`, each gives a warning. The methods that take a tag do not read it.
 
 # Validation
 
   - The rules of [`expected_risk`](@ref) for each measure.
+  - Under `strict`, the rules of [`investable_reduction`](@ref).
 
 # Returns
 
@@ -1824,6 +1861,7 @@ Each axis takes one measure or a **vector** of them, and a vector becomes the on
 
   - [`plot_measures`](@ref)
   - [`expected_risk`](@ref)
+  - [`investable_reduction`](@ref)
   - [`Scalariser`](@ref)
 """
 function plot_efficient_frontier end
@@ -1836,7 +1874,7 @@ function plot_efficient_frontier end
     plot_performance_summary(x::Union{AbstractArray, OptimisationResult,
                                       AbstractPredictionResult}, args...;
                              ppy, alpha, compound, rf, measures, benchmark, names,
-                             kwargs...) -> Plot
+                             strict, kwargs...) -> Plot
 
 Plot the performance statistics of one or more portfolios as bars, blue at a value of zero or more and red below it.
 
@@ -1844,7 +1882,7 @@ Every method but the first computes a [`PerformanceSummaryResult`](@ref) with [`
 
 A summary of one entry draws one bar chart, with the eleven bars below in order, seven of them in percent, and one bar more for each extra measure. A summary of many entries draws one panel for each figure, with one bar for each entry. The label of a bar names the keys of its entry that are not `nothing`: the candidate, the path and the member. The excess bars are `NaN`, drawn empty, when the summary has no benchmark, and the turnover bar is `NaN` on every arity that holds no path, which is every arity but a prediction.
 
-A gapped panel reaches this figure only through the returns that the caller gives it. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). A `w, X` or `w, rd` arity computes on the matrix that the caller holds and checks nothing, and `X * w` is `NaN` at a gap even where the weight is zero. Score a gapped panel through `predict(res, rd)` and plot the prediction.
+A gap in the returns does not make the figure `NaN`. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). Every arity that takes weights, or an optimisation result, reads a gap in the same way through [`filter_held_gaps`](@ref): a gap at a zero weight gives no message, and a Held Gap contributes zero with a warning.
 
 # Mathematical definition
 
@@ -1868,7 +1906,7 @@ Where:
 
   - `ps`: The summary to draw.
   - `x`, `args...`: The arguments of [`performance_summary`](@ref): a series, weights and returns, an optimisation result and its returns, a prediction, a population, or a vector of candidates.
-  - `ppy`, `alpha`, `compound`, `rf`, `measures`, `benchmark`, `names`: The keywords of [`performance_summary`](@ref).
+  - `ppy`, `alpha`, `compound`, `rf`, `measures`, `benchmark`, `names`, `strict`: The keywords of [`performance_summary`](@ref).
 
 # Validation
 
@@ -1897,10 +1935,11 @@ function plot_performance_summary end
         ts::AbstractVector = 1:size(X, 1),
         rolling::Integer = 0,
         compound::Bool = false,
+        strict::Bool = false,
         kwargs...
     ) -> Plot
-    plot_rolling_drawdowns(w, rd::ReturnsResult, fees = nothing; rolling, compound, kwargs...) -> Plot
-    plot_rolling_drawdowns(res::OptimisationResult, rd::ReturnsResult; rolling, compound, kwargs...) -> Plot
+    plot_rolling_drawdowns(w, rd::ReturnsResult, fees = nothing; rolling, compound, strict, kwargs...) -> Plot
+    plot_rolling_drawdowns(res::OptimisationResult, rd::ReturnsResult; rolling, compound, strict, kwargs...) -> Plot
     plot_rolling_drawdowns(pred::PredictionResult; rolling, compound, kwargs...) -> Plot
     plot_rolling_drawdowns(mpred::MultiPeriodPredictionResult; rolling, compound, kwargs...) -> Plot
     plot_rolling_drawdowns(ret::VecNum; ts::AbstractVector, rolling, compound, kwargs...) -> Plot
@@ -1909,7 +1948,7 @@ Plot the maximum drawdown of the portfolio over a rolling window, in percent, ag
 
 Each window is drawn down from its own entry value. The running peak starts at the capital at the start of the window, not at the capital at inception, so a window that only rises reads zero. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads after `using StatsPlots`.
 
-A gapped panel reaches this figure only through the returns that the caller gives it. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). A `w, X` or `w, rd` arity computes on the matrix that the caller holds and checks nothing, and `X * w` is `NaN` at a gap even where the weight is zero. Score a gapped panel through `predict(res, rd)` and plot the prediction.
+A gap in the returns does not make the figure `NaN`. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). Every arity that takes weights, or an optimisation result, reads a gap in the same way through [`filter_held_gaps`](@ref): a gap at a zero weight gives no message, and a Held Gap contributes zero with a warning, or raises an `ArgumentError` under `strict = true`.
 
 # Mathematical definition
 
@@ -1935,6 +1974,7 @@ Where:
   - `ts`: Labels of the time axis. A returns result or a prediction gives its own.
   - `rolling`: Length of the window, or `0` for the default.
   - `compound`: Compound the returns and take relative drawdowns when `true`.
+  - $(arg_dict[:strict_held_gap])
   - `res`: Optimisation result. The figure reads its weights and its fees on its investable universe.
   - `pred`, `mpred`: A prediction or a walk-forward path, whose return series the figure draws.
   - `ret`: Net portfolio returns.
