@@ -179,6 +179,7 @@ julia> fit_preprocessing(MissingDataFilter(; col_thr = 0.4, row_thr = 1 // 3,
   - [`FixedPointFilter`](@ref)
   - [`SinglePassFilter`](@ref)
   - [`MissingDataFilterResult`](@ref)
+  - [`PriceJumpFilter`](@ref)
   - [`AbstractPricesPreprocessingEstimator`](@ref)
   - [`PriceGapFill`](@ref)
   - [`PricesResult`](@ref)
@@ -435,14 +436,7 @@ function fit_preprocessing(mdf::MissingDataFilter,
 end
 function apply_preprocessing(res::MissingDataFilterResult, pr::PricesResult)::PricesResult
     names = TimeSeries.colnames(pr.X)
-    cols = Vector{Int}(undef, length(res.nx))
-    for (k, name) in pairs(res.nx)
-        j = findfirst(==(name), names)
-        @argcheck(!isnothing(j),
-                  ArgumentError(unknown_variable_msg(name, string.(names), :nx;
-                                                     consequence = "the window must contain the whole fitted universe")))
-        cols[k] = j
-    end
+    cols = fitted_columns(res.nx, pr)
     rows = kept_rows(asset_gap_cells(pr), shared_gap_rows(pr), cols, res.row_thr, names)
     #! The PricesResult states one clock, so every series it holds is read at the surviving
     #! timestamps and the fitted columns, by the view that owns that rule.
@@ -532,7 +526,9 @@ function asset_gap_cells(pr::PricesResult)::BitMatrix
     ts = TimeSeries.timestamp(pr.X)
     vals = values(pr.X)
     n = size(vals, 2)
-    return BitMatrix(is_missing_value.(vals)) .| clock_gap_cells(pr.iv, ts, n) .|
+    #! The values of one column can be a vector, which reads as a matrix of one column.
+    return BitMatrix(reshape(is_missing_value.(vals), :, n)) .|
+           clock_gap_cells(pr.iv, ts, n) .|
            clock_gap_cells(benchmark_columns(pr.B, false), ts, n)
 end
 """
@@ -560,6 +556,494 @@ function shared_gap_rows(pr::PricesResult)::BitVector
     return vec(any(clock_gap_cells(benchmark_columns(pr.B, true), ts, 1); dims = 2)) .|
            vec(any(clock_gap_cells(pr.F, ts, 1); dims = 2))
 end
+"""
+    assert_jump_factor(factor::Number) -> Nothing
 
-export MissingDataFilter, MissingDataFilterResult, SinglePassFilter, FixedPointFilter
+Assert that `factor` is a number greater than one, so that it can bound a move of a price.
+
+A factor of one or less makes every move of a price a Price Jump, so it is refused.
+
+# Arguments
+
+  - $(arg_dict[:jump_factor])
+
+# Validation
+
+  - `factor > 1`. Raises a `DomainError`.
+
+# Related
+
+  - [`price_jumps`](@ref)
+  - [`PriceJumpFilter`](@ref)
+"""
+function assert_jump_factor(factor::Number)::Nothing
+    @argcheck(factor > one(factor),
+              DomainError(factor,
+                          "factor > 1 must hold: a Price Jump is a move above `factor` or below its inverse, so a smaller factor makes every move a jump."))
+    return nothing
+end
+"""
+    is_price_jump(q::Number, p::Number, factor::Number) -> Bool
+    is_price_jump(q::Union{Missing, Number}, p::Union{Missing, Number}, factor::Number) -> Bool
+
+Tell whether the move from the price `q` to the price `p` is a Price Jump.
+
+The comparison is strict, so a ratio equal to `factor` or to its inverse is not a jump. The ratio of two floating-point prices can round across the bound, as `0.27 / 0.09 > 3` does. Two equal prices are no move, so two zero prices are not a jump.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+J\\left(q,\\,p\\right) &= \\begin{cases}
+1 & p \\neq q\\,,\\ \\frac{p}{q} > f \\text{ or } \\frac{p}{q} < \\frac{1}{f} \\\\
+0 & \\text{otherwise}
+\\end{cases}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``q``: Earlier price.
+  - ``p``: Later price.
+  - ``f``: Largest move that is not a Price Jump, as a ratio of two prices.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Both prices are numbers: return `true` when they differ and their ratio lies outside the closed interval from `1 / factor` to `factor`.
+ 2. A price is `missing`: return `false`, because an absent price states no move.
+
+# Arguments
+
+  - `q`: The earlier price.
+  - `p`: The later price.
+  - $(arg_dict[:jump_factor])
+
+# Returns
+
+  - `flag::Bool`: `true` when the move is a Price Jump.
+
+# Related
+
+  - [`price_jumps`](@ref)
+  - [`PriceJumpFilter`](@ref)
+"""
+function is_price_jump(q::Number, p::Number, factor::Number)::Bool
+    return p != q && !(one(p) / factor <= p / q <= factor)
+end
+function is_price_jump(::Union{Missing, Number}, ::Union{Missing, Number}, ::Number)::Bool
+    return false
+end
+"""
+    price_matrix(X::TimeSeries.TimeArray) -> AbstractMatrix
+
+Give the prices of `X` as a matrix in which each absent price is `NaN`.
+
+A `TimeArray` of one column can hold its values in a vector, which reads as a matrix of one column.
+
+# Arguments
+
+  - `X`: One price series, `observations × assets`.
+
+# Returns
+
+  - `P::AbstractMatrix`: The prices, `observations × assets`. It can share its memory with `X`, so do not change it.
+
+# Related
+
+  - [`unify_gaps`](@ref)
+  - [`price_jumps`](@ref)
+  - [`PriceJumpFilter`](@ref)
+"""
+function price_matrix(X::TimeSeries.TimeArray)
+    vals = values(unify_gaps(X))
+    return reshape(vals, size(vals, 1), size(vals, 2))
+end
+"""
+    foreach_price_jump(f, X::AbstractMatrix, span::Option{<:AbstractMatrix{Bool}},
+                       factor::Number) -> Nothing
+
+Call `f(j, s, t)` for each Price Jump of the prices `X`, from row `s` to row `t` of column `j`.
+
+Two priced observations of one asset make a pair when no priced observation and no absence from the listing lies between them. A gap inside the listing does not end a pair. An absence does, because no return crosses it.
+
+# Algorithm
+
+For each column `j` of `X`, in order:
+
+ 1. Start with no earlier price, `s = 0`.
+ 2. Read each row `t` in order. At a row outside the listing, clear the earlier price, `s = 0`. At a row with no price, go to the next row.
+ 3. At a priced row, call `f(j, s, t)` when `s` is not zero and [`is_price_jump`](@ref) holds for the prices at `s` and `t`. Then set `s = t`.
+
+# Arguments
+
+  - `f`: The function to call.
+  - `X`: The prices, `observations × assets`. An absent price is `NaN`.
+  - `span`: The listing statement of the prices, `observations × assets`, or `nothing` when the prices state no absence.
+  - $(arg_dict[:jump_factor])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`price_jumps`](@ref)
+  - [`PriceJumpFilter`](@ref)
+  - [`is_price_jump`](@ref)
+"""
+function foreach_price_jump(f::F, X::AbstractMatrix, span::Option{<:AbstractMatrix{Bool}},
+                            factor::Number)::Nothing where {F}
+    for j in axes(X, 2)
+        s = 0
+        for t in axes(X, 1)
+            if !(isnothing(span) || span[t, j])
+                s = 0
+                continue
+            end
+            p = X[t, j]
+            if is_missing_value(p)
+                continue
+            end
+            if !iszero(s) && is_price_jump(X[s, j], p, factor)
+                f(j, s, t)
+            end
+            s = t
+        end
+    end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+One Price Jump, a move of the price of one asset above a factor between two priced observations.
+
+[`price_jumps`](@ref) returns a vector of these records.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`price_jumps`](@ref)
+  - [`PriceJumpFilter`](@ref)
+"""
+@concrete struct PriceJump <: AbstractResult
+    """
+    Name of the asset, a column name of the prices.
+    """
+    asset
+    """
+    Timestamp of the last priced observation before the jump.
+    """
+    previous
+    """
+    Timestamp of the jump, the priced observation that holds the new price.
+    """
+    timestamp
+    """
+    Ratio of the price at `timestamp` to the price at `previous`.
+    """
+    ratio
+end
+"""
+    price_jumps(pr::PricesResult; factor::Number = 5) -> Vector{<:PriceJump}
+    price_jumps(X::TimeSeries.TimeArray; factor::Number = 5,
+                span::Option{<:AbstractMatrix{Bool}} = nothing) -> Vector{<:PriceJump}
+
+Find every move of a price above a factor between two consecutive priced observations of one asset.
+
+A price series can hold a jump that is not a move of the market, such as a split that the source of the data did not record, a reverse split, or a bad tick. One such jump enters the mean, the covariance and the tail of every risk measure, and no fit refuses it. This function finds the jumps and changes no data. It cannot tell a split from a real move, so the caller decides what a jump means. The caller can correct the price, keep the move, or drop the asset with a [`PriceJumpFilter`](@ref).
+
+The default factor of `5` suits the daily prices of a broad equity universe, where few real moves reach it. A factor of `3` also finds real events, such as a failed drug trial or the spin-off of a division. A split of `n` to one divides the price by about `n`, so give a factor below the ratio of the smallest split to find. The default finds no split of two, three or four to one unless the price also falls, and it can miss a split of five to one.
+
+The comparison reads consecutive *priced* observations, not adjacent rows, so it finds a jump across a gap. A split often happens while a stock is suspended. No return crosses an absence from the listing, so two prices on the two sides of one make no pair.
+
+# Algorithm
+
+ 1. Check that `factor` is greater than one.
+ 2. Give the prices as a matrix in which each absent price is `NaN` with [`price_matrix`](@ref), and check that `span` has the shape of the prices.
+ 3. Read the pairs of consecutive priced observations with [`foreach_price_jump`](@ref), and make one [`PriceJump`](@ref) for each pair that is a jump.
+
+The method of a [`PricesResult`](@ref) calls the other method with its prices and its Listing Span.
+
+# Arguments
+
+  - `pr`: The prices. The function reads the asset prices `X` and the Listing Span. To read the factor or the benchmark series, give that series as the `TimeArray`.
+  - `X`: One price series, `observations × assets`.
+  - $(arg_dict[:jump_factor])
+  - `span`: Optional listing statement of `X`, `observations × assets`. An absence that it states ends a pair.
+
+# Validation
+
+  - `factor > 1`. Raises a `DomainError`.
+  - `span` has one row for each observation of `X` and one column for each asset, when it is not `nothing`. Raises a `DimensionMismatch`.
+  - No price is infinite, and the element type of the prices is not `Missing` alone. [`unify_gaps`](@ref) raises otherwise.
+
+# Returns
+
+  - `jumps::Vector{<:PriceJump}`: The jumps, in the column order of the assets, and in time order for each asset. It is empty when the prices hold no jump.
+
+# Examples
+
+`A` splits five to one while it is suspended, and the source does not record the split.
+
+```jldoctest
+julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 4),
+                     [100.0 50.0; NaN 51.0; 19.0 52.0; 20.0 53.0], [\"A\", \"B\"]);
+
+julia> jumps = price_jumps(X);
+
+julia> length(jumps)
+1
+
+julia> (jumps[1].asset, jumps[1].previous, jumps[1].timestamp, jumps[1].ratio)
+(:A, Date(\"2020-01-01\"), Date(\"2020-01-03\"), 0.19)
+```
+
+# Related
+
+  - [`PriceJump`](@ref)
+  - [`PriceJumpFilter`](@ref)
+  - [`PricesResult`](@ref)
+"""
+function price_jumps(X::TimeSeries.TimeArray; factor::Number = 5,
+                     span::Option{<:AbstractMatrix{Bool}} = nothing)
+    assert_jump_factor(factor)
+    vals = price_matrix(X)
+    @argcheck(isnothing(span) || size(span) == size(vals),
+              DimensionMismatch("a listing statement and the prices that it describes have the same shape; got size(span) = $(size(span)) for prices of $(size(vals, 1)) observations and $(size(vals, 2)) assets"))
+    ts = TimeSeries.timestamp(X)
+    nx = TimeSeries.colnames(X)
+    moves = NTuple{3, Int}[]
+    foreach_price_jump(vals, span, factor) do j, s, t
+        push!(moves, (j, s, t))
+        return nothing
+    end
+    return [PriceJump(nx[j], ts[s], ts[t], vals[t, j] / vals[s, j]) for (j, s, t) in moves]
+end
+function price_jumps(pr::PricesResult; factor::Number = 5)
+    return price_jumps(pr.X; factor = factor, span = prices_listing_span(pr))
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Preprocessing estimator that drops each asset whose price jumps above a factor in the training window.
+
+The fit finds the jumps as [`price_jumps`](@ref) finds them, and an asset with one jump or more leaves the universe. The apply step replays that universe by name on a later window, in the fitted order, and refuses a window that lacks a fitted asset. So the set that the filter drops comes from the training window alone. A jump of a kept asset in a later window stays in the data, because a drop of that asset there can only use observations after the fit.
+
+The filter cannot tell an unrecorded split or a bad tick from a real move. Read the jumps with [`price_jumps`](@ref) before you compose the filter. When you know the cause, correct the price instead, so that the asset stays in the universe.
+
+A [`PriceGapFill`](@ref) with a [`CarriedPrice`](@ref) can run before or after the filter, because a carried price states no move. A fill by a statistic can make a jump, so put the filter before it.
+
+# Algorithm
+
+## Fit
+
+ 1. Mark the assets with a Price Jump in the training window with [`price_jump_marks`](@ref).
+ 2. Return a [`PriceJumpFilterResult`](@ref) that holds the names of the other assets, in the column order of the training window. Raise an `IsEmptyError` when no asset survives.
+
+## Apply
+
+ 1. Find the column of each fitted asset in the window, in the fitted order, with [`fitted_columns`](@ref). Raise an `ArgumentError` that names the first absent asset.
+ 2. Return [`port_opt_view`](@ref) of the `PricesResult` at every observation and the fitted columns.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    PriceJumpFilter(;
+        factor::Number = 5,
+        cache::Option{<:AbstractPartialFitState} = nothing,
+    ) -> PriceJumpFilter
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `factor > 1`, else `DomainError`.
+
+# Online form
+
+The filter changes only the universe. A stepped filter marks the assets of every block in `cache` through [`partial_fit_transform`](@ref) and passes the rows through. The state also keeps the last price of each asset, so the filter finds a jump between two blocks. [`fit_preprocessing`](@ref) with no data gives the [`PriceJumpFilterResult`](@ref) of the whole history, and a [`Pipeline`](@ref) applies that universe as a view in `fit(pipe)` with no data.
+
+# Examples
+
+```jldoctest
+julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 4),
+                     [100.0 50.0; NaN 51.0; 19.0 52.0; 20.0 53.0], [\"A\", \"B\"]);
+
+julia> pr = PricesResult(; X = X);
+
+julia> res = fit_preprocessing(PriceJumpFilter(), pr);
+
+julia> res.nx
+1-element Vector{Symbol}:
+ :B
+
+julia> colnames(apply_preprocessing(res, pr).X)
+1-element Vector{Symbol}:
+ :B
+```
+
+# Related
+
+  - [`price_jumps`](@ref)
+  - [`PriceJumpFilterResult`](@ref)
+  - [`MissingDataFilter`](@ref)
+  - [`AbstractPricesPreprocessingEstimator`](@ref)
+  - [`PricesResult`](@ref)
+"""
+@concrete struct PriceJumpFilter <: AbstractPricesPreprocessingEstimator
+    """
+    $(field_dict[:jump_factor])
+    """
+    factor
+    """
+    $(field_dict[:pfcache])
+    """
+    cache
+    function PriceJumpFilter(factor::Number, cache::Option{<:AbstractPartialFitState})
+        assert_jump_factor(factor)
+        return new{typeof(factor), typeof(cache)}(factor, cache)
+    end
+end
+function PriceJumpFilter(; factor::Number = 5,
+                         cache::Option{<:AbstractPartialFitState} = nothing)::PriceJumpFilter
+    return PriceJumpFilter(factor, cache)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Fitted result of a [`PriceJumpFilter`](@ref).
+
+It holds the asset universe that the training window selected. [`fit_preprocessing`](@ref) returns it and [`apply_preprocessing`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`PriceJumpFilter`](@ref)
+  - [`AbstractPricesPreprocessingResult`](@ref)
+"""
+@concrete struct PriceJumpFilterResult <: AbstractPricesPreprocessingResult
+    """
+    Names of the assets with no Price Jump in the training window, in its column order. This is the fitted universe.
+    """
+    nx
+end
+"""
+    price_jump_marks(X::AbstractMatrix, span::Option{<:AbstractMatrix{Bool}},
+                     factor::Number) -> BitVector
+
+Mark the assets of the prices `X` with one Price Jump or more.
+
+# Arguments
+
+  - `X`: The prices, `observations × assets`. An absent price is `NaN`.
+  - `span`: The listing statement of the prices, `observations × assets`, or `nothing` when the prices state no absence.
+  - $(arg_dict[:jump_factor])
+
+# Returns
+
+  - `jump::BitVector`: `true` for each asset with a jump, in the column order of `X`.
+
+# Related
+
+  - [`PriceJumpFilter`](@ref)
+  - [`foreach_price_jump`](@ref)
+"""
+function price_jump_marks(X::AbstractMatrix, span::Option{<:AbstractMatrix{Bool}},
+                          factor::Number)::BitVector
+    jump = falses(size(X, 2))
+    foreach_price_jump(X, span, factor) do j, _, _
+        jump[j] = true
+        return nothing
+    end
+    return jump
+end
+"""
+    price_jump_result(nx::AbstractVector{Symbol}, jump::AbstractVector{Bool},
+                      factor::Number) -> PriceJumpFilterResult
+
+Keep the assets with no Price Jump.
+
+The fit of a [`PriceJumpFilter`](@ref) on a window and the call of [`fit_preprocessing`](@ref) with no data both call this function, so the two refuse an empty universe alike.
+
+# Arguments
+
+  - `nx`: The names of the assets.
+  - `jump`: The assets with a jump, from [`price_jump_marks`](@ref).
+  - $(arg_dict[:jump_factor])
+
+# Validation
+
+  - One asset at least has no jump. An `IsEmptyError` is thrown otherwise.
+
+# Returns
+
+  - `res::PriceJumpFilterResult`: The fitted filter.
+
+# Related
+
+  - [`PriceJumpFilter`](@ref)
+  - [`PriceJumpFilterResult`](@ref)
+"""
+function price_jump_result(nx::AbstractVector{Symbol}, jump::AbstractVector{Bool},
+                           factor::Number)::PriceJumpFilterResult
+    @argcheck(!all(jump),
+              IsEmptyError("PriceJumpFilter with factor = $(factor) drops every asset, because the price of each one jumps. Use a larger factor, or find the jumps with `price_jumps` and correct the prices."))
+    return PriceJumpFilterResult(nx[.!jump])
+end
+"""
+    fitted_columns(nx::AbstractVector{Symbol}, pr::PricesResult) -> Vector{Int}
+
+Find the column of `pr.X` that holds each asset of a fitted universe, in the fitted order.
+
+# Arguments
+
+  - `nx`: The names of the fitted universe.
+  - `pr`: The window.
+
+# Validation
+
+  - The window holds every asset of `nx`. An `ArgumentError` that names the first absent asset is thrown otherwise.
+
+# Returns
+
+  - `cols::Vector{Int}`: The column positions, in the order of `nx`.
+
+# Related
+
+  - [`MissingDataFilter`](@ref)
+  - [`PriceJumpFilter`](@ref)
+"""
+function fitted_columns(nx::AbstractVector{Symbol}, pr::PricesResult)::Vector{Int}
+    names = TimeSeries.colnames(pr.X)
+    cols = Vector{Int}(undef, length(nx))
+    for (k, name) in pairs(nx)
+        j = findfirst(==(name), names)
+        @argcheck(!isnothing(j),
+                  ArgumentError(unknown_variable_msg(name, string.(names), :nx;
+                                                     consequence = "the window must contain the whole fitted universe")))
+        cols[k] = j
+    end
+    return cols
+end
+function fit_preprocessing(pjf::PriceJumpFilter, pr::PricesResult)::PriceJumpFilterResult
+    jump = price_jump_marks(price_matrix(pr.X), prices_listing_span(pr), pjf.factor)
+    return price_jump_result(TimeSeries.colnames(pr.X), jump, pjf.factor)
+end
+function apply_preprocessing(res::PriceJumpFilterResult, pr::PricesResult)::PricesResult
+    return port_opt_view(pr, :, fitted_columns(res.nx, pr))
+end
+
+export MissingDataFilter, MissingDataFilterResult, SinglePassFilter, FixedPointFilter,
+       PriceJump, PriceJumpFilter, PriceJumpFilterResult, price_jumps
 public AbstractMissingDataFilterAlgorithm, fit_universe
