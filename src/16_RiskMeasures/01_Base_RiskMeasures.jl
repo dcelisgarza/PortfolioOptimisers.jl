@@ -689,7 +689,7 @@ Implement the two methods below. The method of [`set_risk_constraints!`](@ref) f
 
 ## A formulation that fuses
 
-Implement a method of [`set_risk_constraints!`](@ref) for the formulation, and declare no `range_tails`. Its method is more specific than the method for a `RangeRiskMeasure`. `range_tails` then throws an `ArgumentError` that names the type. A formulation that can be the gain tail of a range declares [`supports_gain_tail`](@ref) too. When its [`risk_input_kind`](@ref) is [`WeightsReturnsFeesInput`](@ref), it also declares a method of [`gain_tail_risk`](@ref), which gives its value on the negated portfolio. A fee keeps its sign when the weights change sign, so the library has no generic value of such a range as a gain tail. [`rebuild_risk_frontier`](@ref) reads that value at the corners of a [`Frontier`](@ref) on the gain tail.
+Implement a method of [`set_risk_constraints!`](@ref) for the formulation, and declare no `range_tails`. Its method is more specific than the method for a `RangeRiskMeasure`. `range_tails` then throws an `ArgumentError` that names the type. A formulation that can be the gain tail of a range declares [`supports_gain_tail`](@ref) too. When its [`risk_input_kind`](@ref) is [`WeightsReturnsFeesInput`](@ref), it also declares a method of [`gain_tail_risk`](@ref), which gives its value on the negated portfolio. A fee keeps its sign when the weights change sign, so the library has no generic value of such a range as a gain tail. A [`Frontier`](@ref) on the gain tail reads that value at its corners.
 
 # Related
 

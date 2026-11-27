@@ -607,8 +607,8 @@ function PO.factory(r::MrsFusedWeightRange, args...; kwargs...)
     return MrsFusedWeightRange(r.settings, factory(r.sd, args...; kwargs...))
 end
 (r::MrsFusedWeightRange)(w::PO.VecNum, X::PO.MatNum, fees = nothing) = r.sd(w)
-function PO.gain_tail_risk(r::MrsFusedWeightRange, w::PO.VecNum, X::PO.MatNum, fees,
-                           ::PO.WeightsReturnsFeesInput)
+# The form that the docstring states, with no type on `w`, `X` and `fees`, is not ambiguous.
+function PO.gain_tail_risk(r::MrsFusedWeightRange, w, X, fees, ::PO.WeightsReturnsFeesInput)
     return r.sd(-w)
 end
 function PO.set_risk_constraints!(model::JuMP.Model, i::Any, r::MrsFusedWeightRange,
@@ -819,6 +819,10 @@ end
     # A range that fuses must declare the trait to be a gain tail, and the refusal says so.
     @test_throws "supports_gain_tail(::MrsFusedRange) = true" PO.RangeTails(cvar(0.1),
                                                                             MrsFusedRange(off))
+    # A drawdown measure builds the loss side alone, so it is no gain tail.
+    cdar = ConditionalDrawdownatRisk(; settings = off)
+    @test !PO.supports_gain_tail(cdar)
+    @test_throws "cannot be built on that side" PO.RangeTails(cvar(0.1), cdar)
     # An estimator of the set fits inside the build of a tail, which gives its side as a keyword.
     set = NormalUncertaintySet(; pe = nothing, rng = StableRNG(1), seed = 1,
                                alg = EllipsoidalUncertaintySetAlgorithm())

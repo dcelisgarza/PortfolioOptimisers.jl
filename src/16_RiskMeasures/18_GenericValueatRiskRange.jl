@@ -330,24 +330,24 @@ const SymmetricLowOrderMoment = LowOrderMoment{<:Any, <:Any, <:Option{<:VecNum},
                                                        EvenMoment{<:Any, <:Any,
                                                                   <:FullMoment}}}
 """
-    gain_tail_risk(r::RiskMeasure, w::VecNum, X::MatNum, fees::Option{<:Fees},
-                   kind::RiskInputKind = risk_input_kind(r))
+    gain_tail_risk(r::RiskMeasure, w::VecNum, X::MatNum, fees::Option{<:Fees})
+    gain_tail_risk(r::RiskMeasure, w, X, fees, kind::RiskInputKind)
     gain_tail_risk(r::SymmetricLowOrderMoment, w::VecNum, X::MatNum, fees::Option{<:Fees},
                    kind::WeightsReturnsFeesInput)
-    gain_tail_risk(r::RangeRiskMeasure, w::VecNum, X::MatNum, fees::Option{<:Fees},
-                   kind::WeightsReturnsFeesInput)
+    gain_tail_risk(r::RangeRiskMeasure, w, X, fees, kind::WeightsReturnsFeesInput)
     gain_tail_risk(r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:DistributionValueatRisk},
                    w::VecNum, X::MatNum, fees::Option{<:Fees},
                    kind::WeightsReturnsFeesInput)
 
 Evaluate the measure `r` as the gain tail of a range, on the portfolio `w`.
 
+  - The method with four arguments gives `r` and [`risk_input_kind`](@ref) of `r` to the method with five.
   - The method for a [`RiskMeasure`](@ref) evaluates [`gain_tail_measure`](@ref) of `r` on `-w` and on the negated net returns, with [`range_tail_risk`](@ref).
   - A [`SymmetricLowOrderMoment`](@ref) has one value on both sides, so the method evaluates `r` on `w`.
   - A range that reads the weights exchanges the sides of its tails, as the builder of a [`RangeRiskMeasure`](@ref) does. The method returns the sum of the value of its loss tail as a gain tail and of the value of its gain tail on the portfolio.
   - A [`ValueatRiskRange`](@ref) with [`DistributionValueatRisk`](@ref) declares no tails, so the method evaluates [`gain_tail_measure`](@ref) of `r` on `-w`.
 
-A measure of your own that reads the weights, the returns and the fees, and that declares [`supports_gain_tail`](@ref), also declares a method of this function with `kind::WeightsReturnsFeesInput`. A fee keeps its sign when the weights change sign, so no generic value of such a measure on the negated portfolio exists. A range of your own with a formulation that fuses and declares no [`range_tails`](@ref) is such a measure, as the `# Interfaces` section of [`RangeRiskMeasure`](@ref) states.
+A measure of your own that reads the weights, the returns and the fees, and that declares [`supports_gain_tail`](@ref), also declares a method of this function, `gain_tail_risk(r::MyRisk, w, X, fees, ::WeightsReturnsFeesInput)`. The methods for a [`RiskMeasure`](@ref) and for a [`RangeRiskMeasure`](@ref) with five arguments type only `r` and `kind`, so such a method needs no other type to be more specific. A fee keeps its sign when the weights change sign, so no generic value of such a measure on the negated portfolio exists. A range of your own with a formulation that fuses and declares no [`range_tails`](@ref) is such a measure, as the `# Interfaces` section of [`RangeRiskMeasure`](@ref) states.
 
 # Arguments
 
@@ -370,16 +370,19 @@ A measure of your own that reads the weights, the returns and the fees, and that
   - [`range_tail_risk`](@ref)
   - [`risk_input_kind`](@ref)
 """
-function gain_tail_risk(r::RiskMeasure, w::VecNum, X::MatNum, fees::Option{<:Fees},
-                        ::RiskInputKind = risk_input_kind(r))
+function gain_tail_risk(r::RiskMeasure, w::VecNum, X::MatNum, fees::Option{<:Fees})
+    return gain_tail_risk(r, w, X, fees, risk_input_kind(r))
+end
+# The two methods that a method of a user meets type `r` and the kind alone, so that a method
+# of a user with untyped `w`, `X` and `fees` is more specific and not ambiguous.
+function gain_tail_risk(r::RiskMeasure, w, X, fees, ::RiskInputKind)
     return range_tail_risk(gain_tail_measure(r), -w, -calc_net_returns(w, X, fees))
 end
 function gain_tail_risk(r::SymmetricLowOrderMoment, w::VecNum, X::MatNum,
                         fees::Option{<:Fees}, ::WeightsReturnsFeesInput)
     return r(w, X, fees)
 end
-function gain_tail_risk(r::RangeRiskMeasure, w::VecNum, X::MatNum, fees::Option{<:Fees},
-                        ::WeightsReturnsFeesInput)
+function gain_tail_risk(r::RangeRiskMeasure, w, X, fees, ::WeightsReturnsFeesInput)
     (; loss, gain) = range_tails(r)
     return gain_tail_risk(loss, w, X, fees) + expected_risk(gain, w, X, fees)
 end
