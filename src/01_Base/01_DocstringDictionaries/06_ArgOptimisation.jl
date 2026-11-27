@@ -130,6 +130,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :reso => "`reso`: Outer optimisation results.",#
                  :opti => "`opti`: Inner optimiser.",#
                  :opto => "`opto`: Outer optimiser.",#
+                 :min_solved => "`min_solved`: Number of sub-portfolios that must solve for the meta-optimiser to give an answer, as a [`CountOf`](@ref) or a [`FractionOf`](@ref) of its sub-portfolios. A count above their number asks for every one, and a fraction is the least share of them that solved, with no rounding. A plain number is read through [`count_or_fraction`](@ref). When enough sub-portfolios solve, the meta-optimiser drops the others. With fewer, its return code is an [`OptimisationFailure`](@ref), and its own fallback runs.",#
                  :pcol => "`pcol`: Rule of the panel collapse, an [`AbstractPanelCollapseAlgorithm`](@ref). It states how the collapse of the Asset Panel onto the sub-portfolios weighs a member at an observation where the member is outside the universe. [`RenormaliseActive`](@ref) divides by the weight of the active members, and [`InactiveAsCash`](@ref) reads the missing weight as cash with a zero feature.",#
                  # Cross-validation.
                  :n_folds => "`n`: Number of folds.",#

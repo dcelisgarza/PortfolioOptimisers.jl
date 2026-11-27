@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base meta optimisation, private API of PortfolioOptimisers.jl: FullUniverse, ClusterUniverse, sub_portfolio_cv, outer_optimisation_finaliser, …"
+Description = "Base meta optimisation, private API of PortfolioOptimisers.jl: FullUniverse, ClusterUniverse, sub_portfolio_cv, enough_solved, dropped_sub_portfolios, …"
 ```
 
 # Base meta optimisation: private API
@@ -8,6 +8,10 @@ Description = "Base meta optimisation, private API of PortfolioOptimisers.jl: Fu
 FullUniverse
 ClusterUniverse
 sub_portfolio_cv
+enough_solved
+dropped_sub_portfolios
+warn_dropped_sub_portfolios
+failed_outer_result
 outer_optimisation_finaliser
 combination_weights
 prepare_outer_rd

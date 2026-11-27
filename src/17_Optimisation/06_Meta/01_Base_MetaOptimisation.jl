@@ -260,14 +260,150 @@ function sub_portfolio_cv(cv)
     return !hasfield(typeof(cv), :rng) ? cv : copy(cv)
 end
 """
+    enough_solved(min_solved::CountOf, n::Integer, K::Integer) -> Bool
+    enough_solved(min_solved::FractionOf, n::Integer, K::Integer) -> Bool
+
+Say whether `n` solved sub-portfolios of `K` are enough for a meta-optimiser to give an answer.
+
+A count above `K` asks for every sub-portfolio. A fraction is the least share `n / K`, and the method rounds no count. So `FractionOf(0.07)` of `100` sub-portfolios asks for `7`. No value accepts `n = 0`.
+
+# Arguments
+
+  - `min_solved`: The `min_solved` field of the meta-optimiser.
+  - `n`: The number of sub-portfolios that solved.
+  - `K`: The number of sub-portfolios.
+
+# Returns
+
+  - `flag::Bool`: `true` when enough sub-portfolios solved.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.enough_solved(FractionOf(0.5), 2, 3)
+true
+
+julia> PortfolioOptimisers.enough_solved(CountOf(5), 2, 3)
+false
+```
+
+# Related
+
+  - [`dropped_sub_portfolios`](@ref)
+  - [`CountOf`](@ref)
+  - [`FractionOf`](@ref)
+"""
+function enough_solved(min_solved::CountOf, n::Integer, K::Integer)::Bool
+    return n >= min(min_solved.val, K)
+end
+function enough_solved(min_solved::FractionOf, n::Integer, K::Integer)::Bool
+    f = min_solved.val
+    # The share takes the type of the fraction, so the two round in the same way.
+    return n * one(f) / K >= f
+end
+"""
+    dropped_sub_portfolios(min_solved::AbstractCountOrFraction, retcodes) -> BitVector
+
+Find the sub-portfolios that a meta-optimiser drops: the failed ones, when enough of the others solved.
+
+A sub-portfolio solved when [`any_solved`](@ref) holds of its return code, the one that its own fallback chain ended with. So the fallback of the sub-portfolio substitutes first, then the meta-optimiser drops, and then the fallback of the meta-optimiser replaces.
+
+A dropped sub-portfolio is a synthetic asset with no returns. [`NestedClustered`](@ref) and [`Stacking`](@ref) set its inner weights to zero and its outer returns to `NaN`, so the Investable Mask of the outer prior removes it from the outer problem. [`SubsetResampling`](@ref) has no outer problem, and it averages the other subsets.
+
+# Algorithm
+
+ 1. Find the sub-portfolios that did not solve, giving `failed`.
+ 2. Return `failed` when [`enough_solved`](@ref) holds of the number of the others.
+ 3. Otherwise drop none, so the failed codes make the return code of the meta-optimiser a failure.
+
+# Arguments
+
+  - `min_solved`: The `min_solved` field of the meta-optimiser.
+  - `retcodes`: The return codes of the sub-portfolios, at one point of an efficient frontier.
+
+# Returns
+
+  - `dropped::BitVector`: One entry for each sub-portfolio, `true` for one that the meta-optimiser drops.
+
+# Related
+
+  - [`enough_solved`](@ref)
+  - [`warn_dropped_sub_portfolios`](@ref)
+  - [`outer_optimisation_finaliser`](@ref)
+  - [`subset_resampling_finaliser`](@ref)
+"""
+function dropped_sub_portfolios(min_solved::AbstractCountOrFraction,
+                                retcodes::VecOptRetCode)::BitVector
+    failed = .!any_solved.(retcodes)
+    K = length(failed)
+    return enough_solved(min_solved, K - count(failed), K) ? failed : falses(K)
+end
+"""
+    warn_dropped_sub_portfolios(dropped::BitVector)
+
+Log one warning that names the sub-portfolios that a meta-optimiser drops. The function logs nothing when it drops none.
+
+# Arguments
+
+  - `dropped`: One entry for each sub-portfolio, from [`dropped_sub_portfolios`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`dropped_sub_portfolios`](@ref)
+  - [`NestedClustered`](@ref)
+  - [`Stacking`](@ref)
+  - [`SubsetResampling`](@ref)
+"""
+function warn_dropped_sub_portfolios(dropped::BitVector)::Nothing
+    if any(dropped)
+        @warn("$(count(dropped)) of the $(length(dropped)) sub-portfolios failed, and the meta-optimiser drops them: $(findall(dropped)). Check `retcode.res.opti` of the result for the return code of each sub-portfolio.",
+              maxlog = log_limit(:warn), _id = @log_id())
+    end
+    return nothing
+end
+"""
+    failed_outer_result(rdo::ReturnsResult) -> NaiveOptimisationResult
+
+Give the failed outer result of a meta-optimiser whose synthetic assets have no return.
+
+When no sub-portfolio solves, no synthetic asset has a return. The outer prior then has no asset to estimate, and it throws an `IsEmptyError`. The meta-optimisers take this result in its place, so their return code is a failure and their fallback runs.
+
+# Arguments
+
+  - `rdo`: The returns data of the outer problem, with no finite return.
+
+# Returns
+
+  - `res::NaiveOptimisationResult`: An [`OptimisationFailure`](@ref) with one `NaN` weight for each synthetic asset.
+
+# Related
+
+  - [`NestedClustered`](@ref)
+  - [`Stacking`](@ref)
+  - [`failed_hold_weights`](@ref)
+  - [`predict_outer_returns`](@ref)
+"""
+function failed_outer_result(rdo::ReturnsResult)::NaiveOptimisationResult
+    return NaiveOptimisationResult(; pr = rdo, wb = nothing,
+                                   retcode = OptimisationFailure(;
+                                                                 res = "no sub-portfolio has a return, so the outer problem has no asset."),
+                                   w = failed_hold_weights(rdo.X), fb = nothing)
+end
+"""
     outer_optimisation_finaliser(wb::WeightBounds, wf::WeightFinaliser, resi::VecOpt,
-                                 rco::OptimisationReturnCode, w::VecNum, wi::MatNum)
+                                 rco::OptimisationReturnCode, w::VecNum, wi::MatNum,
+                                 partial::Bool)
     outer_optimisation_finaliser(wb::WeightBounds, wf::WeightFinaliser, resi::VecOpt,
-                                 rcos::VecOptRetCode, ws::VecVecNum, wi::MatNum)
+                                 rcos::VecOptRetCode, ws::VecVecNum, wi::MatNum,
+                                 partial::Bool)
 
 Combine the inner and outer weights of a meta-optimiser, and finalise them under its weight bounds.
 
-The return code reports a failure at any of the three stages: an inner solve, the outer solve, and the finalisation of the combined weights.
+The return code reports a failure at any of the three stages: an inner solve, the outer solve, and the finalisation of the combined weights. The failure of an inner solve alone leaves a success when the meta-optimiser dropped that sub-portfolio.
 
 # Mathematical definition
 
@@ -289,8 +425,9 @@ Where:
  1. Combine the weights, giving `w = wi * w`.
  2. Finalise `w` with `wf` under `wb` through [`finalise_weight_bounds`](@ref), giving `retcode` and the finalised `w`.
  3. Read the return code of every inner result, giving `resi_retcodes`.
- 4. When an inner return code, `rco` or `retcode` is an [`OptimisationFailure`](@ref), replace `retcode` with an `OptimisationFailure` whose `res` is `(; msg, opti, opto, wb)`. `msg` has one line for each stage that failed, in the order inner, outer, finalisation. `opti` is `resi_retcodes`, `opto` is `rco`, and `wb` is the return code of step 2.
- 5. Return `(retcode, w)`. The method returns the weights of step 2 when a stage fails too.
+ 4. When an inner return code, `rco` or `retcode` is a failure, build the payload `(; msg, opti, opto, wb)`. `msg` has one line for each stage that failed, in the order inner, outer, finalisation. `opti` is `resi_retcodes`, `opto` is `rco`, and `wb` is the return code of step 2.
+ 5. Replace `retcode` with a code whose `res` is the payload. It is an [`OptimisationSuccess`](@ref) when `partial` holds and the inner stage alone failed, and an [`OptimisationFailure`](@ref) otherwise.
+ 6. Return `(retcode, w)`. The method returns the weights of step 2 when a stage fails too.
 
 The method for an efficient frontier runs these steps once for each pair of `rcos` and `ws`.
 
@@ -303,6 +440,7 @@ The method for an efficient frontier runs these steps once for each pair of `rco
   - `w`: Outer weights, one entry for each sub-portfolio.
   - `rcos`, `ws`: The return codes and outer weights of the points of an efficient frontier.
   - `wi`: Inner weights, `assets × sub-portfolios`.
+  - `partial`: Whether the meta-optimiser dropped the sub-portfolios that failed, see [`dropped_sub_portfolios`](@ref). Their columns of `wi` are zero.
 
 # Returns
 
@@ -316,13 +454,14 @@ The method for an efficient frontier runs these steps once for each pair of `rco
   - [`WeightBounds`](@ref)
 """
 function outer_optimisation_finaliser(wb::WeightBounds, wf::WeightFinaliser, resi::VecOpt,
-                                      rco::OptimisationReturnCode, w::VecNum, wi::MatNum)
+                                      rco::OptimisationReturnCode, w::VecNum, wi::MatNum,
+                                      partial::Bool)
     w = wi * w
     retcode, w = finalise_weight_bounds(wf, wb, w)
-    wb_flag = isa(retcode, OptimisationFailure)
-    opto_flag = isa(rco, OptimisationFailure)
+    wb_flag = !any_solved(retcode)
+    opto_flag = !any_solved(rco)
     resi_retcodes = getproperty.(resi, :retcode)
-    resi_flag = any(x -> isa(x, OptimisationFailure), resi_retcodes)
+    resi_flag = !all(any_solved, resi_retcodes)
     if resi_flag || opto_flag || wb_flag
         msg = ""
         if resi_flag
@@ -334,15 +473,19 @@ function outer_optimisation_finaliser(wb::WeightBounds, wf::WeightFinaliser, res
         if wb_flag
             msg *= "weight bounds finalisation failed.\n"
         end
-        retcode = OptimisationFailure(;
-                                      res = (; msg = msg, opti = resi_retcodes, opto = rco,
-                                             wb = retcode))
+        res = (; msg = msg, opti = resi_retcodes, opto = rco, wb = retcode)
+        retcode = if partial && !opto_flag && !wb_flag
+            OptimisationSuccess(; res = res)
+        else
+            OptimisationFailure(; res = res)
+        end
     end
     return retcode, w
 end
 function outer_optimisation_finaliser(wb::WeightBounds, wf::WeightFinaliser, resi::VecOpt,
-                                      rcos::VecOptRetCode, ws::VecVecNum, wi::MatNum)
-    retcode_w = [outer_optimisation_finaliser(wb, wf, resi, rco, w, wi)
+                                      rcos::VecOptRetCode, ws::VecVecNum, wi::MatNum,
+                                      partial::Bool)
+    retcode_w = [outer_optimisation_finaliser(wb, wf, resi, rco, w, wi, partial)
                  for (rco, w) in zip(rcos, ws)]
     return map(x -> x[1], retcode_w), map(x -> x[2], retcode_w)
 end
@@ -450,7 +593,7 @@ Where:
   - $(math_dict[:W_tilde_syn])
   - $(math_dict[:N])
 
-A column of zeros in ``\\mathbf{W}`` gives a column of zeros in ``\\mathbf{V}^{o}`` and a zero entry in ``\\boldsymbol{a}^{o}``.
+A column of zeros in ``\\mathbf{W}`` gives a column of zeros in ``\\mathbf{V}^{o}``. Its entry in ``\\boldsymbol{a}^{o}`` is the mean of ``\\boldsymbol{a}``, because a Returns Result refuses a zero there.
 
 # Algorithm
 
@@ -1153,7 +1296,7 @@ The methods dispatch on `cv`, which selects the prediction, so a custom cross-va
 
   - Without folds, the column of each sub-portfolio is the net return of its own solve in `resi`, on the Prior Result and the Fees viewed onto it with [`sub_portfolio_view`](@ref).
   - A scheme of [`OptCVE_Onl`](@ref) predicts each sub-portfolio out of sample and stacks the folds with [`rebuild_returns_result`](@ref). An Online Scheme steps each sub-portfolio from fold to fold and does not refit it.
-  - A [`CombinatorialCrossValidation`](@ref) does the same, and first the `scorer` of the meta-optimiser selects one path from the population of each sub-portfolio. When `scorer` is `nothing`, [`NearestQuantilePrediction`](@ref) selects it.
+  - A [`CombinatorialCrossValidation`](@ref) does the same, and first the `scorer` of the meta-optimiser selects one path from the population of each sub-portfolio. When `scorer` is `nothing`, [`NearestQuantilePrediction`](@ref) selects it. A sub-portfolio with no path whose every fold solved has no path to select, so its column is `NaN`, as the column of a dropped sub-portfolio is (see [`dropped_sub_portfolios`](@ref)).
 
 `wi` holds the weights of the inner optimisers alone. A Combination Weight acts at the combination after the outer solve, so no method applies it here (see [`combination_weights`](@ref)).
 
@@ -1187,8 +1330,9 @@ Without folds:
 With cross-validation:
 
  1. Cross-validate every sub-portfolio with [`sub_portfolio_predictions`](@ref) under the scheme `cv`, giving `predictions`.
- 2. On the combinatorial path, select one path of each population with `opt.scorer`, or with [`NearestQuantilePrediction`](@ref) when it is `nothing`.
+ 2. On the combinatorial path, select one path of each population with `opt.scorer`, or with [`NearestQuantilePrediction`](@ref) when it is `nothing`. Take the first path of a population for which [`member_solved`](@ref) holds of no path.
  3. Stack the predictions with [`rebuild_returns_result`](@ref) under the rule `opt.pcol`.
+ 4. On the combinatorial path, set the column of each population with no solved path to `NaN`.
 
 # Arguments
 
@@ -1241,8 +1385,12 @@ function predict_outer_returns(cv::CombinatorialCrossValidation, opt,
     predictions = sub_portfolio_predictions(PopulationPredictionResult, opt.opti, u, rd, cv,
                                             opt.ex)
     scorer = isnothing(opt.scorer) ? NearestQuantilePrediction() : opt.scorer
-    return rebuild_returns_result(rd, [scorer(prediction) for prediction in predictions], u,
-                                  opt.pcol)
+    solved = [any(member_solved, prediction.pred) for prediction in predictions]
+    paths = [solved[i] ? scorer(predictions[i]) : first(predictions[i].pred)
+             for i in eachindex(predictions)]
+    rdo = rebuild_returns_result(rd, paths, u, opt.pcol)
+    rdo.X[:, .!solved] .= NaN
+    return rdo
 end
 """
     assert_meta_scorer(cv::Option{<:OptCVE_Onl},

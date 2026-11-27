@@ -162,11 +162,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the static defaults of the [`Stacking`](@ref) fields that can hold a [`TimeDependent`](@ref) schedule.
 
-The constructor reads them when it tests each entry of a schedule, and [`time_dependent_field_defaults`](@ref) returns them. `opti` and `opto` are required and have no static default, so their entry is [`NoDefault`](@ref). A schedule in one of them must carry its own `default`, or it cannot run outside a fold loop. The entries of `pe` and `wf` are their keyword defaults. The tuple holds no entry for `wb`, `fees`, `sets`, `scale` and `fb`, because their static default is `nothing`.
+The constructor reads them when it tests each entry of a schedule, and [`time_dependent_field_defaults`](@ref) returns them. `opti` and `opto` are required and have no static default, so their entry is [`NoDefault`](@ref). A schedule in one of them must carry its own `default`, or it cannot run outside a fold loop. The entries of `pe`, `wf` and `min_solved` are their keyword defaults. The tuple holds no entry for `wb`, `fees`, `sets`, `scale` and `fb`, because their static default is `nothing`.
 
 # Returns
 
-  - `NamedTuple`: The defaults of `pe`, `opti`, `opto` and `wf`.
+  - `NamedTuple`: The defaults of `pe`, `opti`, `opto`, `wf` and `min_solved`.
 
 # Related
 
@@ -176,7 +176,7 @@ The constructor reads them when it tests each entry of a schedule, and [`time_de
 """
 function stacking_td_defaults()::NamedTuple
     return (; pe = EmpiricalPrior(), opti = NoDefault(), opto = NoDefault(),
-            wf = IterativeWeightFinaliser())
+            wf = IterativeWeightFinaliser(), min_solved = FractionOf(1))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -264,6 +264,8 @@ With `cv`, row ``t`` of ``\\mathbf{R}_{\\cdot k}`` is the return at observation 
 
 ``\\mathcal{O}`` reads ``\\mathbf{R}``, which does not depend on ``s_k``. So the Combination Weight acts at the combination alone, and a run with `cv` applies it in the same way as a run without `cv`. The ratios ``c_k / c_j = s_k v_k / (s_j v_j)`` hold in both cases of ``c_k``, and the first case keeps the total, ``\\sum_k c_k = \\sum_k v_k``.
 
+Inner optimiser ``k`` is dropped when its full-sample solve fails and enough of the others solve, see `min_solved`. Column ``k`` of ``\\mathbf{W}`` is then zero and column ``k`` of ``\\mathbf{R}`` holds no return, so ``v_k = 0``, and ``\\mathcal{O}`` allocates across the others. With `cv`, a fold that fails leaves a gap in ``\\mathbf{R}_{\\cdot k}``, and the prior of ``\\mathcal{O}`` decides it.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -281,6 +283,7 @@ $(DocStringExtensions.FIELDS)
         cv::Option{<:OptCVE_Onl} = nothing,
         scorer::Option{<:PredictionCrossValScorer} = nothing,
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
+        min_solved::TD{<:Real_CountFraction} = FractionOf(1),
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
         fb::TDO_Option{<:OptE_Opt} = nothing,
         strict::Bool = false,
@@ -292,7 +295,7 @@ Keywords correspond to the struct's fields.
 
 ## Time-dependent fields
 
-`pe`, `wb`, `fees`, `sets`, `scale`, `wf`, `opto` and `fb` can hold a [`TimeDependent`](@ref) schedule. No inner fold loop of `Stacking` reads them, so the fold loop that reaches the `Stacking` resolves them. A schedule in `opto` or `fb` must bind `:outermost`. `opti` takes a schedule at two levels:
+`pe`, `wb`, `fees`, `sets`, `scale`, `wf`, `min_solved`, `opto` and `fb` can hold a [`TimeDependent`](@ref) schedule. No inner fold loop of `Stacking` reads them, so the fold loop that reaches the `Stacking` resolves them. A schedule in `opto` or `fb` must bind `:outermost`. `opti` takes a schedule at two levels:
 
   - **Element**, as in `opti = [static, TimeDependent(…)]`. The inner cross-validation solves each element on its own, so an element schedule can bind `:nearest`. Such a schedule needs an explicit `default` and a `cv` that is not `nothing`, because the full-sample solve of the element always resolves it to its `default`. See [`assert_nearest_optimiser_schedule`](@ref).
   - **Field**, as in `opti = TimeDependent([[…], […]])`, one vector of inner optimisers for each fold. See [`TD_VecOptE_Opt`](@ref). The schedule must bind `:outermost`. The inner cross-validation receives the elements and never the field, and a vector that changes with the fold changes the number and the order of the synthetic assets that `opto` reads.
@@ -308,8 +311,11 @@ Keywords correspond to the struct's fields.
   - `scorer` is `nothing` unless `cv` is a [`CombinatorialCrossValidation`](@ref). The constructor throws an `ArgumentError` otherwise, through [`assert_meta_scorer`](@ref).
   - `opto` passes [`assert_external_optimiser`](@ref), and every element of `opti` passes it when `cv !== nothing`. The constructor throws an `ArgumentError` otherwise. Such an optimiser runs on the synthetic assets or on the training rows of a fold, which it does not know in advance. So it cannot hold a precomputed prior or a precomputed constraint.
   - When `wb` is keyed by name ([`name_keyed`](@ref)) or `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`. The constructor throws an `IsNothingError` otherwise.
+  - A plain number in `min_solved` passes [`count_or_fraction`](@ref), and the field then holds a [`CountOf`](@ref) or a [`FractionOf`](@ref).
   - Each entry and the `default` of each schedule give a valid `Stacking`. [`assert_time_dependent_substitution`](@ref) runs the constructor on each of them.
   - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
+
+$(val_dict[:count_fraction_grid])
 
 ## Propagated parameters
 
@@ -400,6 +406,10 @@ Keywords correspond to the struct's fields.
     """
     wf
     """
+    $(field_dict[:min_solved])
+    """
+    min_solved
+    """
     $(field_dict[:ex])
     """
     ex
@@ -424,11 +434,12 @@ Keywords correspond to the struct's fields.
                       scale::TD_Option{<:VecNum},
                       opti::Union{VecOptE_Opt_TD, TD_VecOptE_Opt}, opto::OptE_TD,
                       cv::Option{<:OptCVE_Onl}, scorer::Option{<:PredictionCrossValScorer},
-                      wf::TD{<:WeightFinaliser}, ex::FLoops.Transducers.Executor,
-                      fb::TDO_Option{<:OptE_Opt}, strict::Bool,
-                      pcol::AbstractPanelCollapseAlgorithm,
+                      wf::TD{<:WeightFinaliser}, min_solved::TD{<:Real_CountFraction},
+                      ex::FLoops.Transducers.Executor, fb::TDO_Option{<:OptE_Opt},
+                      strict::Bool, pcol::AbstractPanelCollapseAlgorithm,
                       cache::Option{<:ReturnsBufferState})
         assert_meta_scorer(cv, scorer)
+        min_solved = count_or_fraction(min_solved)
         if isa(opti, TimeDependent)
             @argcheck(opti.bind !== :nearest,
                       ArgumentError("opti of Stacking cannot hold a `bind = :nearest` schedule at the field level: Stacking's inner cross-validation is entered per candidate (`cross_val_predict(opti[k], …)`), so the fold loop is handed the elements, never the field — and a per-fold candidate vector would change the number and identity of the returns-proxy columns opto sees. Schedule individual elements instead (`opti = [static, TimeDependent(…, :nearest; default = …)]`), or use `bind = :outermost` to vary the whole vector with the fold loop that reaches the Stacking."))
@@ -460,26 +471,14 @@ Keywords correspond to the struct's fields.
         end
         assert_time_dependent_substitution(Stacking,
                                            (; pe, wb, fees, sets, scale, opti, opto, cv,
-                                            scorer, wf, ex, fb, strict, pcol),
+                                            scorer, wf, min_solved, ex, fb, strict, pcol),
                                            stacking_td_defaults())
         opti = erase_optimiser_vector(opti)
         est = new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(scale),
                   typeof(opti), typeof(opto), typeof(cv), typeof(scorer), typeof(wf),
-                  typeof(ex), typeof(fb), typeof(strict), typeof(pcol), typeof(cache)}(pe,
-                                                                                       wb,
-                                                                                       fees,
-                                                                                       sets,
-                                                                                       scale,
-                                                                                       opti,
-                                                                                       opto,
-                                                                                       cv,
-                                                                                       scorer,
-                                                                                       wf,
-                                                                                       ex,
-                                                                                       fb,
-                                                                                       strict,
-                                                                                       pcol,
-                                                                                       cache)
+                  typeof(min_solved), typeof(ex), typeof(fb), typeof(strict), typeof(pcol),
+                  typeof(cache)}(pe, wb, fees, sets, scale, opti, opto, cv, scorer, wf,
+                                 min_solved, ex, fb, strict, pcol, cache)
         warn_raw_readers(est)
         return est
     end
@@ -493,12 +492,13 @@ function Stacking(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
                   cv::Option{<:OptCVE_Onl} = nothing,
                   scorer::Option{<:PredictionCrossValScorer} = nothing,
                   wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
+                  min_solved::TD{<:Real_CountFraction} = FractionOf(1),
                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                   fb::TDO_Option{<:OptE_Opt} = nothing, strict::Bool = false,
                   pcol::AbstractPanelCollapseAlgorithm = RenormaliseActive(),
                   cache::Option{<:ReturnsBufferState} = nothing)::Stacking
     return Stacking(pe, wb, fees, sets, scale, erase_optimiser_vector(opti), opto, cv,
-                    scorer, wf, ex, fb, strict, pcol, cache)
+                    scorer, wf, min_solved, ex, fb, strict, pcol, cache)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -698,8 +698,8 @@ function port_opt_view(st::Stacking, i, X::MatNum, args...)::Stacking
     opto = port_opt_view(st.opto, i, X)
     return Stacking(; pe = pe, wb = wb, fees = fees, sets = sets, scale = st.scale,
                     opti = opti, opto = opto, cv = st.cv, scorer = st.scorer, wf = st.wf,
-                    ex = st.ex, fb = view_child(st.fb, i, X), strict = st.strict,
-                    pcol = st.pcol, cache = port_opt_view(st.cache, i))
+                    min_solved = st.min_solved, ex = st.ex, fb = view_child(st.fb, i, X),
+                    strict = st.strict, pcol = st.pcol, cache = port_opt_view(st.cache, i))
 end
 function non_investable_universe(st::Stacking, ni::VecStr)::Stacking
     return rebuild_struct(st, (; sets = non_investable_sets(st.sets, ni)))
@@ -719,12 +719,13 @@ Run the stacking optimisation.
  4. Remove the two liquidation charges, `lq` and `flq`, from `fees`, giving `cfees`, the fees that the returns of the synthetic assets pay.
  5. Reduce `pr`, `st` and `rd` to the assets of `imsk` with [`investable_reduction`](@ref), giving `rdr`. `X` is the returns matrix of the reduced `pr`.
  6. Solve each inner optimiser of `st.opti` on `rdr` under `st.ex`, giving the inner results `resi`. Write the weights of result ``k`` to column ``k`` of `wi`.
- 7. Build the returns of the synthetic assets, `rdo`, with [`predict_outer_returns`](@ref) under `st.cv`.
- 8. Solve `st.opto` on `rdo`, giving the outer result `reso`.
- 9. Resolve the weight bounds `wb` from `st.wb` and `st.sets`.
-10. Apply the Combination Weight `st.scale` to `reso.w` with [`combination_weights`](@ref).
-11. Combine the coefficients with `wi`, and finalise the weights under `wb` and `st.wf` with [`outer_optimisation_finaliser`](@ref), giving `retcode` and `w`.
-12. Return a [`StackingResult`](@ref). Its keyword constructor expands `w` onto the full asset universe through `imsk`.
+ 7. Find the inner optimisers to drop with [`dropped_sub_portfolios`](@ref), giving `dropped`, and name them in one warning. Set their columns of `wi` to zero.
+ 8. Build the returns of the synthetic assets, `rdo`, with [`predict_outer_returns`](@ref) under `st.cv`. Set the columns of the dropped inner optimisers to `NaN`.
+ 9. Solve `st.opto` on `rdo`, giving the outer result `reso`. When `rdo` holds no finite return, `reso` is the failure of [`failed_outer_result`](@ref).
+10. Resolve the weight bounds `wb` from `st.wb` and `st.sets`.
+11. Apply the Combination Weight `st.scale` to `reso.w` with [`combination_weights`](@ref).
+12. Combine the coefficients with `wi`, and finalise the weights under `wb` and `st.wf` with [`outer_optimisation_finaliser`](@ref), giving `retcode` and `w`.
+13. Return a [`StackingResult`](@ref). Its keyword constructor expands `w` onto the full asset universe through `imsk`.
 
 # Arguments
 
@@ -741,7 +742,7 @@ Run the stacking optimisation.
 
 # Returns
 
-  - `res::StackingResult`: The stacked portfolio. `retcode` is an [`OptimisationFailure`](@ref) when an inner solve, the outer solve or the weight finaliser failed. An outer efficient frontier gives one weight vector and one return code for each point.
+  - `res::StackingResult`: The stacked portfolio. `retcode` is an [`OptimisationFailure`](@ref) when fewer inner optimisers solved than `st.min_solved` asks for, or when the outer solve or the weight finaliser failed. When the method drops an inner optimiser, the `res` of `retcode` holds the return code of each one. An outer efficient frontier gives one weight vector and one return code for each point.
 
 # Related
 
@@ -790,13 +791,23 @@ function _optimise(st::Stacking, rd::ReturnsResult; branchorder::Symbol = :optim
         wi[:, i] = res.w
         resi[i] = res
     end
+    dropped = dropped_sub_portfolios(st.min_solved, getproperty.(resi, :retcode))
+    warn_dropped_sub_portfolios(dropped)
+    wi[:, dropped] .= zero(Tf)
     rdo = predict_outer_returns(st.cv, st, FullUniverse(), rdr, pr, cfees, wi, resi)
-    reso = optimise(st.opto, rdo; branchorder = branchorder, str_names = str_names,
-                    save = save, kwargs...)
+    # A dropped candidate can hold finite weights, or finite returns in the folds.
+    rdo.X[:, dropped] .= NaN
+    reso = if any(isfinite, rdo.X)
+        optimise(st.opto, rdo; branchorder = branchorder, str_names = str_names,
+                 save = save, kwargs...)
+    else
+        failed_outer_result(rdo)
+    end
     wb = weight_bounds_constraints(st.wb, st.sets; rd = rdr, N = size(X, 2),
                                    strict = st.strict, datatype = Tf)
     retcode, w = outer_optimisation_finaliser(wb, st.wf, resi, reso.retcode,
-                                              combination_weights(st.scale, reso.w), wi)
+                                              combination_weights(st.scale, reso.w), wi,
+                                              any(dropped))
     return StackingResult(; pr = pr, wb = wb, fees = fees, resi = resi, reso = reso,
                           cv = st.cv, scorer = st.scorer, retcode = retcode, w = w,
                           imsk = imsk, fb = nothing)
