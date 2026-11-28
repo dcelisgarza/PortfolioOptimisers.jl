@@ -188,8 +188,8 @@ The build is keyed on `prefix` alone, with no measure index. A second call with 
  3. Create `Dt`, and register `Dx`, the matrix of the pairwise differences of `net_X`.
  4. Register the risk expression of `r.alg1` with [`set_brownian_distance_risk_constraint!`](@ref).
  5. Add the rows of `r.alg2` with [`set_brownian_distance_variance_constraints!`](@ref).
- 6. Convert the bound in `r.settings` to the units of a deviation with [`variance_risk_bounds_val`](@ref), and take the expression that it acts on from [`set_brownian_distance_bounds_expr!`](@ref). The risk expression has degree two in the weights, and the row of [`set_risk_upper_bound!`](@ref) multiplies the bound by ``k``, so under a ratio objective the bound holds only on an expression of degree one.
- 7. Add the bound on the deviation and the risk expression with [`set_unindexed_risk_bounds_and_expression!`](@ref), and return the risk expression.
+ 6. Convert the bound in `r.settings` to the units of a deviation with [`variance_risk_bounds_val`](@ref). The risk expression has degree two in the weights, and the row of [`set_risk_upper_bound!`](@ref) multiplies the bound by ``k``, so under a ratio objective the bound holds only on an expression of degree one.
+ 7. Add the bound on the deviation and the risk expression with [`set_unindexed_risk_bounds_and_expression!`](@ref), and return the risk expression. The setter takes the expression that the bound acts on from [`set_brownian_distance_bounds_expr!`](@ref), and only when the settings of `r` take effect. So a second measure in the model builds no deviation.
 
 # JuMP formulation
 
@@ -262,11 +262,13 @@ function set_risk_constraints!(model::JuMP.Model, ::Any, r::BrownianDistanceVari
         return bdvariance_risk
     end
     ub = variance_risk_bounds_val(SquareRootBound(), r.settings.ub)
-    r_expr_ub = set_brownian_distance_bounds_expr!(model, ub, bdvariance_risk;
-                                                   prefix = prefix)
+    # The setter calls `bound_expr` only when the settings of `r` take effect, so a second
+    # measure builds no deviation cone (#2391).
+    bound_expr = risk -> set_brownian_distance_bounds_expr!(model, ub, risk;
+                                                            prefix = prefix)
     set_unindexed_risk_bounds_and_expression!(model, opt, bdvariance_risk, r,
                                               :bdvariance_risk; prefix = prefix,
-                                              r_expr_ub = r_expr_ub, ub = ub)
+                                              bound_expr = bound_expr, ub = ub)
     return bdvariance_risk
 end
 """
