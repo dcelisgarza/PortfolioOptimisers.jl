@@ -508,7 +508,7 @@ Build the model of a [`FactorRiskContribution`](@ref), solve it, and return its 
  2. Resolve `frc.opt` against `rd` with [`resolve_jump_optimiser`](@ref), with the blocks of `blocks`, giving `attrs`.
  3. Take the view of `frc` and of `rd` at the investable assets with [`investable_view`](@ref). Both are unchanged when every asset is investable.
  4. Bind the benchmark of each [`DataBenchmarkTracking`](@ref) measure to `rd` with [`bind_data_benchmark`](@ref).
- 5. Build a new model. Register the scales with [`set_model_scales!`](@ref), the number of observations with [`set_model_observations!`](@ref), the homogenisation variables of a ratio with [`set_maximum_ratio_factor_variables!`](@ref) and the corner of a lifted variance with [`set_sdp_lift_corner!`](@ref).
+ 5. Build a new model. Register the scales with [`set_model_scales!`](@ref), the number of observations with [`set_model_observations!`](@ref), the homogenisation variables of a ratio with [`set_maximum_ratio_factor_variables!`](@ref), the corner of a lifted variance with [`set_sdp_lift_corner!`](@ref) and the ceiling on ``k`` with [`set_maximum_ratio_scale_ceiling!`](@ref).
  6. Create the factor weights and register `w` with [`set_factor_risk_contribution_constraints!`](@ref), giving `b1`, `b2` and `rr`. `b` is `b1`, or `[b1 b2]` when `flag = true`, the basis of the whole decision vector.
  7. Add the weight bounds, the budgets, the constraints, the return terms and the risk measures of every block with [`assemble_jump_model!`](@ref), which reads `b`. The constructor refuses an asset phylogeny of the semidefinite kind, so the assembly adds the rows of an integer one alone.
  8. Resolve `frc.frc_ple` on the factor returns with [`phylogeny_constraints`](@ref), giving `frc_plr`. Add its rows with [`set_sdp_frc_phylogeny_constraints!`](@ref) and [`set_frc_iplg_constraints!`](@ref).
@@ -552,6 +552,9 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_model_observations!(model, size(attrs.pr.X, 1))
     set_maximum_ratio_factor_variables!(model, frc.obj)
     set_sdp_lift_corner!(model, frc.obj, attrs.pr)
+    g = book_size_estimate(attrs.wb, frc.opt.bgt, frc.opt.sbgt, frc.opt.gbgt,
+                           size(attrs.pr.X, 2))
+    set_maximum_ratio_scale_ceiling!(model, frc.obj, attrs.ret, attrs.pr, g)
     b1, b2, rr = set_factor_risk_contribution_constraints!(model, frc.re, rd, attrs.pr,
                                                            frc.flag, frc.wi)
     # The risk builders read the basis of the whole decision vector, so a variance under

@@ -221,7 +221,7 @@ model returned `k = -0.090` and the orthant `-z`, which the caller did not ask f
 
 **The floor (#1845).** `risk_budgeting_scale_floor` returns `rb.kmin` when the caller states it.
 Otherwise it returns `1e-4 / |b_g+|`, where `b_g+ = budget_upper_bound(opt.bgt)`, and `0` when
-`b_g+` is zero or infinite. A stated `kmin` must be non-negative, and `kmin = 0` turns the floor off and keeps only `k >= 0`,
+`b_g+` is zero or infinite. A budget that pays costs gives the bound of its `bgt` since #2302. A stated `kmin` must be non-negative, and `kmin = 0` turns the floor off and keeps only `k >= 0`,
 the model of #1844. The same change applies to `MaximumRatio`: the Decision above validates a
 stated `kmin > 0`, and since #1845 it validates `kmin >= 0`. A stated zero on either head lowers
 the bound of `k` back to `0`.

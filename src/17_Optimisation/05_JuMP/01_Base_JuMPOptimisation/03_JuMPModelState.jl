@@ -27,6 +27,9 @@ const SHARED_STATE = Set{Symbol}([# Pure functions of the prior `pr`: identical 
                                   # `MaximumRatio`, a number the head registers beside
                                   # `:k` from the objective and the prior alone.
                                   :sdp_corner,
+                                  # The ceiling that sizes the big-M constant when `:k` is
+                                  # a variable, a number that the producer of `:k` records.
+                                  :k_ceil,
                                   # The fee spine, established once by the fee builder and
                                   # read by the return and the net-series builders. `:fees`
                                   # holds the per period terms and `:one_time_fees` the

@@ -184,6 +184,17 @@ end
     at = e.sections[3].blocks[1]
     @test at.df.asset == RP_ONE.rd.nx
     @test at.df.shares == 1.0:4 && at.df.cost == 10.0:10:40 && at.df.weight == fill(0.25, 4)
+    @test names(at.df) == ["asset", "shares", "price", "cost", "weight"]
+    @test at.df.price == fill(10.0, 4)
+    # #2409: the price has two decimal digits. A short position has a positive price, and
+    # an asset with no share has none.
+    al = PO.GreedyAllocationResult(; retcode = OptimisationSuccess(),
+                                   shares = [3.0, 0.0, -7.0, 0.5],
+                                   cost = [10.0, 0.0, -100.0, 6.1728], w = fill(0.25, 4),
+                                   cash = 2.5, fees = 0.5, fb = nothing)
+    ap = rp_section(portfolio_report(RP_ONE; alloc = al).entries[1], "Allocation")
+    @test isequal(ap.blocks[1].df.price, [3.33, NaN, 14.29, 12.35])
+    @test occursin("—", rp_md(ap))
     @test occursin("Cash left: 2.5", at.caption) && occursin("Fees: 0.5", at.caption)
     @test_throws DimensionMismatch portfolio_report(RP_ONE; alloc = rp_alloc(3))
     # A path allocates the target of its last fold.

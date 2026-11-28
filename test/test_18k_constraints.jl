@@ -1256,9 +1256,11 @@ end
 
 @testset "MIP indicator bundles and the big-M constant (#1912)" begin
     pe = PortfolioOptimisers
-    # The big-M constant of a free budget is the largest finite bound times 1000. A stated
-    # `ss` is used as it is. A bound that is absent adds no magnitude, and bounds that are
-    # all absent give 1000. The model keeps the constant under `:ss`.
+    # The big-M constant of these books with a finite bound on every weight is the ceiling of
+    # `k` times the largest bound above one (#2373). An absent bound is infinite, so the
+    # constant falls back to the largest finite bound times 1000, and to 1000 when every
+    # bound is absent. A stated `ss` is used as it is. The model keeps the constant under
+    # `:ss`. `nothing` in the table reads the ceiling.
     Xm = 0.01 .* randn(StableRNG(1919), 60, 5) .+ 0.001
     rdm = ReturnsResult(; nx = string.('A':'E'), X = Xm)
     prm = prior(EmpiricalPrior(), rdm)
@@ -1266,7 +1268,7 @@ end
                   solver = optimizer_with_attributes(HiGHS.Optimizer,
                                                      JuMP.MOI.Silent() => true),
                   check_sol = (; allow_local = true, allow_almost = true))
-    for (ss, wb, expected) in ((nothing, WeightBounds(; lb = 0.0, ub = 1.0), 1000.0),
+    for (ss, wb, expected) in ((nothing, WeightBounds(; lb = 0.0, ub = 1.0), nothing),
                                (7.0, WeightBounds(; lb = 0.0, ub = 1.0), 7.0),
                                (nothing, WeightBounds(; lb = nothing, ub = [0.5, 0.25, 0.5, 0.5, 0.5]), 500.0),
                                (nothing, WeightBounds(; lb = [-2.0, 0.5, 0.0, 0.0, 0.0], ub = nothing), 2000.0),
@@ -1275,8 +1277,151 @@ end
                                 opt = JuMPOptimiser(; pe = prm, slv = slvm, card = 3,
                                                     ss = ss, wb = wb)))
         @test isa(res.retcode, OptimisationSuccess)
-        @test res.model[:ss] == expected
+        @test res.model[:ss] == something(expected, res.model[:k_ceil])
     end
+    # A constant far above the gated terms gives the same book, because each constant
+    # releases its rows.
+    mip_book(obj; kw...) = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = obj,
+                                             opt = JuMPOptimiser(; pe = prm, slv = slvm,
+                                                                 kw...)))
+    kw = (; card = 3, wb = WeightBounds(; lb = 0.0, ub = 1.0))
+    res = mip_book(MaximumRatio(); kw...)
+    @test res.model[:ss] < 1000
+    @test isapprox(res.w, mip_book(MaximumRatio(); kw..., ss = 1000.0).w; atol = 1e-8)
+    # A constant `k` takes the exact bound of the weights, and a sub-group takes the bound of
+    # its largest group sum under a key of its own.
+    th = Threshold(; val = 0.05)
+    kw = (; card = 3, wb = WeightBounds(; lb = -0.5, ub = 0.8), sbgt = 0.3, lt = th,
+          st = th)
+    res = mip_book(MinimumRisk(); kw...)
+    @test isa(res.retcode, OptimisationSuccess)
+    @test pe.mip_indicators(res.model) isa pe.LongShortIndicators
+    @test res.model[:ss] == 0.8
+    @test isapprox(res.w, mip_book(MinimumRisk(); kw..., ss = 1000.0).w; atol = 1e-8)
+    kw = (; wb = WeightBounds(; lb = -0.5, ub = 0.8), sbgt = 0.3,
+          smtx = [1 1 0 0 0; 0 0 1 1 1], scard = 1, slt = th, sst = th)
+    res = mip_book(MinimumRisk(); kw...)
+    @test isa(res.retcode, OptimisationSuccess)
+    @test haskey(res.model, :sw_mip_st_1_)
+    @test !haskey(res.model, :ss)
+    @test res.model[:sss_1_] ≈ 2.4
+    @test isapprox(res.w, mip_book(MinimumRisk(); kw..., ss = 1000.0).w; atol = 1e-8)
+    # A stated `ohf` scales `k`, and the gate rows keep `k` at or below the constant, so the
+    # constant scales with it (#2302). A constant of 500 made this feasible book fail.
+    function solve_ohf(; cap = 0.5, ss = nothing, obj...)
+        return optimise(MeanRisk(; r = ConditionalValueatRisk(),
+                                 obj = MaximumRatio(; obj...),
+                                 opt = JuMPOptimiser(; pe = prm, slv = slvm, card = 3,
+                                                     ss = ss,
+                                                     wb = WeightBounds(; lb = 0.0,
+                                                                       ub = cap))))
+    end
+    base = solve_ohf()
+    @test isa(solve_ohf(; ohf = 5.0, ss = 500).retcode, OptimisationFailure)
+    for cap in (0.5, 2.0)
+        res = solve_ohf(; cap = cap, ohf = 5.0)
+        @test isa(res.retcode, OptimisationSuccess)
+        @test res.model[:ss] ≈ 10 * 5.0 / mean(max.(prm.mu, 0)) * max(cap, 1)
+        @test 500 < value(res.model[:k]) < res.model[:ss]
+        cap == 0.5 && @test isapprox(res.w, base.w; atol = 1e-4)
+    end
+    # A rate that one asset of five exceeds makes the excess return small, and `k` large.
+    function ceil_k(obj, pr = prm; ret = ArithmeticReturn(; mu = pr.mu), g = 1)
+        m = JuMP.Model()
+        pe.set_sdp_lift_corner!(m, obj, pr)
+        pe.set_maximum_ratio_scale_ceiling!(m, obj, ret, pr, g)
+        return m[:k_ceil]
+    end
+    ohf = clamp(mean(abs, prm.mu), 1e-3, 1e3)
+    @test ceil_k(MaximumRatio(; rf = 0.9 * maximum(prm.mu))) ≈
+          10 * ohf / (0.1 * maximum(prm.mu) / 5)
+    # No asset earns more than the rate, so the risk form sets `k`: the corner of a lifted
+    # variance is its size.
+    @test ceil_k(MaximumRatio(; rf = 1.0)) == 10
+    @test ceil_k(MaximumRatio(; rf = 1.0, ohf = 2.0)) ≈ 20 / ohf
+    # The ceiling takes the type of the data.
+    prq = pe.LowOrderPrior(; X = [1//100 -3//100; 2//100 1//100], mu = [1//100, -3//100],
+                           sigma = [1//1 0//1; 0//1 1//1])
+    @test ceil_k(MaximumRatio(; rf = 0//1), prq) === 40//1
+    # A small book earns less, so its `k` is larger. A book above one keeps the ceiling.
+    e = mean(max.(prm.mu, 0))
+    @test ceil_k(MaximumRatio(); g = 0.1) ≈ 10 * ohf / (0.1 * e)
+    @test ceil_k(MaximumRatio(); g = 3.0) ≈ 10 * ohf / e
+    # The ceiling reads the vector of the return terms, and the prior when no term has one.
+    # The weight of a single term weighs nothing, and the weights of two terms do.
+    st(x) = JuMPReturnsSettings(; scale = x)
+    @test ceil_k(MaximumRatio(); ret = ArithmeticReturn(; mu = prm.mu / 1e3)) ≈
+          1e4 * 1e-3 / e
+    @test ceil_k(MaximumRatio(); ret = LogarithmicReturn()) ≈ 10 * ohf / e
+    @test ceil_k(MaximumRatio();
+                 ret = ArithmeticReturn(; mu = prm.mu, settings = st(1e-3))) ≈ 10 * ohf / e
+    @test ceil_k(MaximumRatio();
+                 ret = [ArithmeticReturn(; mu = prm.mu, settings = st(1e-3)),
+                        LogarithmicReturn()]) ≈ 1e4 * 1e-3 / e
+    @test ceil_k(MaximumRatio(); ret = ArithmeticReturn(; mu = 0.5)) ≈ 10
+    # The size of the book: the net budget, and a smaller bound on the gross exposure.
+    size_of(ub; bgt = 1.0, sbgt = nothing, gbgt = nothing, lb = 0.0) = pe.book_size_estimate(WeightBounds(;
+                                                                                                          lb = lb,
+                                                                                                          ub = ub),
+                                                                                             bgt,
+                                                                                             sbgt,
+                                                                                             gbgt,
+                                                                                             4)
+    @test size_of(1.0) == 1
+    @test size_of(1.0; bgt = 2.0) == 2
+    @test size_of(1.0; bgt = -0.5, lb = -1.0) == 0.5
+    @test size_of(1.0; bgt = 0.0, lb = -1.0) == 1
+    @test size_of(1.0; bgt = nothing) == 1
+    @test size_of(0.1; bgt = nothing) == 0.4
+    @test size_of(1.0; bgt = BudgetRange(; lb = 0.5, ub = 0.8)) == 0.8
+    @test size_of(1.0; bgt = BudgetRange(; lb = 0.5, ub = nothing)) == 1
+    @test size_of(1.0; bgt = nothing, gbgt = 0.2, lb = -1.0) == 0.2
+    @test size_of(0.0) == 1
+    # No cost is negative, so a budget that pays costs bounds the sum by its own bound.
+    @test size_of(1.0; bgt = BudgetCosts(; bgt = 0.02, w = zeros(4))) == 0.02
+    @test size_of(1.0;
+                  bgt = BudgetMarketImpact(; bgt = BudgetRange(; lb = 0.01, ub = 0.03),
+                                           w = zeros(4))) == 0.03
+    # A book with a small budget, a small cap, a budget that pays costs, and a
+    # return term with a small vector have a `k` that the constant of a fully invested book of
+    # the prior refused (#2309). A stated constant far above `k` gives a book of the same
+    # shape. A budget that pays costs is a ceiling, and the ratio of a book with `rf = 0` is
+    # the same at each scale, so the scale of that book is free: the solver can return the
+    # book where a cap binds, or the smaller book where the gate rows hold `k` at the
+    # constant. Each optimal book has a `k` above the constant of the cap.
+    shape(w) = w / sum(w)
+    function solve_small(; kw...)
+        res = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(),
+                                opt = JuMPOptimiser(; pe = prm, slv = slvm, card = 3,
+                                                    kw...)))
+        @test isa(res.retcode, OptimisationSuccess)
+        return res
+    end
+    cap(x) = WeightBounds(; lb = 0.0, ub = x)
+    for kw in ((; bgt = 0.02, wb = cap(0.01)),
+               (; bgt = BudgetRange(; lb = 0.005, ub = 1.0), wb = cap(0.002)),
+               (; bgt = BudgetCosts(; bgt = 0.02, w = zeros(5), vp = 1e-3, vn = 1e-3),
+                wb = cap(0.01)), (; ret = ArithmeticReturn(; mu = prm.mu / 1e4), wb = cap(0.5)))
+        res = solve_small(; kw...)
+        ref = solve_small(; kw..., ss = 1e5)
+        @test 1000 * maximum(res.wb.ub) < value(ref.model[:k])
+        @test isapprox(shape(res.w), shape(ref.w); rtol = 1e-3)
+    end
+    # Any other objective has a constant `k`, so it records no ceiling, and a small bound
+    # is its constant.
+    mn = JuMP.Model()
+    @test isnothing(pe.set_maximum_ratio_scale_ceiling!(mn, MinimumRisk(),
+                                                        ArithmeticReturn(), prm, 1))
+    @test !haskey(mn, :k_ceil)
+    mn[:k] = 1
+    @test pe.get_mip_ss(nothing, WeightBounds(; lb = [0.0], ub = [0.01]), mn) == 0.01
+    @test pe.get_mip_ss(nothing, WeightBounds(; lb = [0.0], ub = [0.0]), mn) == 1.0
+    @test pe.get_mip_ss(nothing, WeightBounds(; lb = [0.0], ub = [Inf]), mn) == 1000.0
+    # A sub-group reads the bound of its largest group sum, and the bounds keep their type.
+    wbs = WeightBounds(; lb = [-1 // 1, 0 // 1, 0 // 1], ub = [1 // 2, 1 // 4, 1 // 4])
+    sps = pe.SubsetMIPSpace([1 1 0; 0 0 1], :s, 1)
+    @test pe.get_mip_ss(nothing, wbs, mn, sps) === 5 // 4
+    @test pe.get_mip_ss(nothing, wbs, mn) === 1 // 1
     # No consumer reads the held indicator of a long-short bundle, so a wrong read fails
     # loudly and does not miscount. A held bundle has no binaries for the slack-closing
     # rows: the held builder pins the decomposition only for a `WeightsFromParts` head.

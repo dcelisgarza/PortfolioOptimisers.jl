@@ -798,7 +798,7 @@ Build the model of a [`MeanRisk`](@ref), with every constraint, return term and 
 # Algorithm
 
  1. Make a new model. With `str_names`, give each variable and each row its string name.
- 2. Register the scales with [`set_model_scales!`](@ref), the number of observations with [`set_model_observations!`](@ref), the homogenisation variables of a ratio with [`set_maximum_ratio_factor_variables!`](@ref), the corner of a lifted variance with [`set_sdp_lift_corner!`](@ref), and the weights with [`set_w!`](@ref).
+ 2. Register the scales with [`set_model_scales!`](@ref), the number of observations with [`set_model_observations!`](@ref), the homogenisation variables of a ratio with [`set_maximum_ratio_factor_variables!`](@ref), the corner of a lifted variance with [`set_sdp_lift_corner!`](@ref), the ceiling on ``k`` with [`set_maximum_ratio_scale_ceiling!`](@ref), and the weights with [`set_w!`](@ref).
  3. Add the weight bounds, the budgets, the constraints, the return terms and the risk measures of every block with [`assemble_jump_model!`](@ref).
 
 # Arguments
@@ -827,6 +827,9 @@ function build_mean_risk_model(mr::MeanRisk, attrs::ResolvedJuMPOptimiser,
     set_model_observations!(model, size(attrs.pr.X, 1))
     set_maximum_ratio_factor_variables!(model, mr.obj)
     set_sdp_lift_corner!(model, mr.obj, attrs.pr)
+    g = book_size_estimate(attrs.wb, mr.opt.bgt, mr.opt.sbgt, mr.opt.gbgt,
+                           size(attrs.pr.X, 2))
+    set_maximum_ratio_scale_ceiling!(model, mr.obj, attrs.ret, attrs.pr, g)
     set_w!(model, attrs.pr.X, mr.wi)
     assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj; blocks = blocks)
     return model

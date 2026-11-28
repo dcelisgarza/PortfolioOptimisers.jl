@@ -92,3 +92,31 @@ short bit and the exact cost budget held the other four.
 - The rows of the exact cost budget take the keys `cost_bgt_gd_ub` and `cost_bgt_gd_lb`, after
   the form of the other gates, where they had `cost_bgt_gz_ub` and `cost_bgt_gz_lb`. Under a
   numeric `k` the model holds no `cost_bgt_g`.
+
+## Amendment (2026-11-24)
+
+`get_mip_ss` reads the scale of `k` as well as the weight bounds (#2302). When `k` is a variable,
+the rows of a gate keep `k` at or below the constant, and a small weight bound says nothing about
+`k`. So each producer of a variable `k` records a ceiling under `:k_ceil`, beside `k` itself:
+`set_maximum_ratio_scale_ceiling!` for a ratio and `risk_budgeting_scale_ceiling` for the risk
+budgeting head. Both read the size of the book from `book_size_estimate`, because the `k` of a
+solution grows when the net budget, the gross budget or the weight bounds make the book small. The
+ratio also reads the characteristic of its return terms, the vector that its normalisation reads.
+The ceiling is an estimate with a margin, because the solution sets `k`, and a stated `ss` replaces
+the constant.
+
+The constant has no factor of its own (#2373, the maintainer's ruling of 2026-11-26). It is the
+bound that the model holds on each term that it releases. With every weight bound finite, a
+constant `k` takes `B`, the exact bound of the gated terms, and a variable `k` takes
+`k_ceil * max(1, B)`. `B` reads the space: the largest bound magnitude of one asset in the asset
+space, and the largest group sum of the magnitudes in a `SubsetMIPSpace`. So a sub-group registers
+its own constant under `mip_key(sp, :ss)`, and every other space shares `:ss`. An infinite bound
+holds nothing, so there the factor `1000` of the largest finite bound stays as the fallback.
+
+A larger constant at every bound was refused, and so was the old factor `1000` beside finite bounds,
+because a constant that is far above the gated terms loosens the relaxation. The integrality
+tolerance of the solver then leaves more of a gate open, and an outer approximation can fail: a
+`MixedIntegerRiskBudgeting` with bounds of `±10` and no budget was `INFEASIBLE` with Pajarito at
+`10^4`, and it solved at every constant from `2` to `1000`. A first solve of the relaxation that
+reads `k` was refused too, because it costs a conic solve for each model, and the `k` of the
+relaxation is not the `k` of the mixed-integer solution.

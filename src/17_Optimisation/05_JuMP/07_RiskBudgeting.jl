@@ -882,6 +882,48 @@ function risk_budgeting_scale_floor(rb::RiskBudgeting, ::Nothing)
     return ifelse(iszero(bg), zero(kmin), kmin)
 end
 """
+    risk_budgeting_scale_ceiling(rb::RiskBudgeting, attrs::ResolvedJuMPOptimiser) -> Number
+
+Return the ceiling ``\\bar{k}`` on the variable ``k`` that scales the weights of a [`RiskBudgeting`](@ref), which sizes the big-M constant of the mixed-integer rows in [`get_mip_ss`](@ref).
+
+The row of the logarithm binds at the solution, so ``k`` is the inverse of the geometric mean of the magnitudes of the weights, under the weights ``\\boldsymbol{b}`` of the budget. A book of ``N`` equal weights with a gross exposure of ``\\hat{g}`` has ``k = N / \\hat{g}``. The ceiling is an estimate with a margin, not a bound that the model holds. The factor ``10`` leaves room for a book whose weights are far from equal.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\bar{k} &= \\frac{10\\, N}{\\hat{g}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:k_ceil])
+  - $(math_dict[:N]) A factor budget reads it too.
+  - ``\\hat{g}``: The size of the book, from [`book_size_estimate`](@ref).
+
+# Arguments
+
+  - `rb::RiskBudgeting`: The optimiser.
+  - `attrs::ResolvedJuMPOptimiser`: The resolved bundle of the optimiser. The function reads its prior and its weight bounds.
+
+# Returns
+
+  - `kceil::Number`: The ceiling on ``k``.
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`get_mip_ss`](@ref)
+  - [`risk_budgeting_scale_floor`](@ref)
+  - [`set_maximum_ratio_scale_ceiling!`](@ref)
+  - [`book_size_estimate`](@ref)
+"""
+function risk_budgeting_scale_ceiling(rb::RiskBudgeting, attrs::ResolvedJuMPOptimiser)
+    N = size(attrs.pr.X, 2)
+    return 10 * N / book_size_estimate(attrs.wb, rb.opt.bgt, rb.opt.sbgt, rb.opt.gbgt, N)
+end
+"""
     _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
                                      w::VecJuMPScalar; strict::Bool = false) -> RiskBudget
 
@@ -1131,7 +1173,7 @@ Build the model of a [`RiskBudgeting`](@ref), solve it, and return its result.
  3. Take the view of `rb` and of `rd` at the investable assets with [`investable_view`](@ref). Both are unchanged when every asset is investable.
  4. Bind the benchmark of each [`DataBenchmarkTracking`](@ref) measure to `rd` with [`bind_data_benchmark`](@ref).
  5. Build a new model. Register the scales with [`set_model_scales!`](@ref) and the number of observations with [`set_model_observations!`](@ref).
- 6. Add the weights, the row of the logarithm and the weight constraints with [`set_risk_budgeting_constraints!`](@ref), giving `rbr`.
+ 6. Add the weights, the row of the logarithm and the weight constraints with [`set_risk_budgeting_constraints!`](@ref), giving `rbr`. Record `k_ceil`, the [`risk_budgeting_scale_ceiling`](@ref) that sizes the big-M constant of the mixed-integer rows.
  7. Add the constraints of every block, the return terms and the risk measures with [`assemble_jump_model!`](@ref), under [`MinimumRisk`](@ref).
  8. Set the objective [`MinimumRisk`](@ref), and solve with [`optimise_JuMP_model!`](@ref), giving `retcode` and `sol`. [`process_model`](@ref) divides the unscaled weights by ``k``.
  9. Build the result. It holds `attrs`, `retcode`, `sol`, the model when `save` is `true`, the risk measures resolved against the prior, and `rbr`.
@@ -1172,6 +1214,7 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult();
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
     set_model_observations!(model, size(attrs.pr.X, 1))
     rbr = set_risk_budgeting_constraints!(model, rb, attrs.pr, attrs.wb, rd)
+    shared_set!(model, :k_ceil, risk_budgeting_scale_ceiling(rb, attrs))
     assemble_jump_model!(model, rb, rb.opt, attrs, rd, rb.r, MinimumRisk(); blocks = blocks)
     set_portfolio_objective_function!(model, MinimumRisk())
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(attrs.pr.X))

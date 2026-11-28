@@ -152,6 +152,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :r_f_ratio => "``r_f``: Risk-free rate of the ratio objective, the `rf` field of [`MaximumRatio`](@ref).",#
                  :ohf_ratio => "``\\mathrm{ohf}``: Normalisation factor of the ratio problem, the model's `:ohf`. It is positive.",#
                  :k_min => "``k_{\\min}``: Lower bound on the homogenisation variable ``k``, the field `kmin` of the optimiser or a size that the model derives. It is not negative, and zero turns the floor off.",#
+                 :k_ceil => "``\\bar{k}``: Upper estimate of the homogenisation variable ``k``, the model's `:k_ceil`. It holds a margin, and it sizes the big-M constant of the mixed-integer rows.",#
                  :y_homog => "``\\boldsymbol{y} = k \\boldsymbol{w}``: Homogenised weights, the weight variable of the model under the ratio objective.",#
                  :l_utility => "``l``: Risk aversion of the utility objective, the `l` field of [`MaximumUtility`](@ref). It is non-negative.",#
                  :op_penalty => "``\\mathrm{op}``: Penalty term of the objective, the model's `:op`, which holds the Objective Penalty. The regularisation, soft-constraint and custom-term builders add to it, and it is zero when none of them does.",#

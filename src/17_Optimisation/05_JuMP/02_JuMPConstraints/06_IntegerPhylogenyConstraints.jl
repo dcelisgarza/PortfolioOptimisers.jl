@@ -246,11 +246,12 @@ function set_frc_iplg_constraints!(model::JuMP.Model, plgs::Option{<:PlC_VecPlC}
         return nothing
     end
     fwb = factor_weight_bounds(wb, Bt)
-    if !isa(get_k(model), Number)
-        # `factor_weight_bounds` refused a `nothing` bound above.
-        set_mip_ss_expr!(model, ss, wb::WeightBounds)
-    end
     sp = FactorMIPSpace()
+    if !isa(get_k(model), Number)
+        # `factor_weight_bounds` refused a `nothing` bound above. The factor rows read the
+        # constant in their gates alone, so the bounds of the assets size it.
+        set_mip_ss_expr!(model, sp, ss, wb::WeightBounds)
+    end
     w1 = mip_wx!(model, sp)
     ind = declare_mip_indicators!(model, sp, HeldIndicators, fwb, w1, ss)
     mip_wb(model, sp, fwb, w1, ind)
