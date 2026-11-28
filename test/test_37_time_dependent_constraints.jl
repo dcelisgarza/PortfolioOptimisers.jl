@@ -228,6 +228,11 @@ end
         # Static validation still runs on substituted entries (card must be > 0).
         @test_throws DomainError JuMPOptimiser(; slv = slv, card = TimeDependent([0]))
         @test JuMPOptimiser(; slv = slv, card = TimeDependent([2, 3])) isa JuMPOptimiser
+        # An entry can be a count or a fraction, as the static slot can (#2305).
+        @test JuMPOptimiser(; slv = slv,
+                            card = TimeDependent([CountOf(2), FractionOf(0.5)])) isa
+              JuMPOptimiser
+        @test_throws DomainError JuMPOptimiser(; slv = slv, card = TimeDependent([1.0]))
         # Hierarchical host.
         htd = TimeDependent([Fees(; l = 0.001), Fees(; l = 0.002)])
         hopt = HierarchicalOptimiser(; slv = slv, fees = htd)

@@ -17,7 +17,9 @@ The block resolves in the two stages of a JuMP head. Once per fold, [`resolve_al
 
   - A Calibration Rule in `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp` or `linf`, against the prior and the solver `slv`.
 
-The settings `sbgt`, `gbgt`, `xbgt`, `card`, `scard`, `ss`, `ccnt` and `cobj` need no resolution. Each kind goes to the builder that [`JuMPOptimiser`](@ref) gives it to. The fields of the set read the prior and the rows of its block Result at every step:
+  - A [`CountOf`](@ref) or a [`FractionOf`](@ref) in `card` or `scard`, against the assets of the step. It reads no row and no prior.
+
+The settings `sbgt`, `gbgt`, `xbgt`, `ss`, `ccnt` and `cobj` need no resolution. Each kind goes to the builder that [`JuMPOptimiser`](@ref) gives it to. The fields of the set read the prior and the rows of its block Result at every step:
 
   - `r`, the risk ceilings. Each measure goes through its own JuMP builder, with the set as the [`RiskConstraintOwner`](@ref) and `settings.ub` as the ceiling. [`factory`](@ref) first materialises the measure against the prior, so a moment that the measure carries is the moment its row uses. A [`Variance`](@ref) or [`StandardDeviation`](@ref) that holds its matrix reads no rows and no prior. It goes through the same builder with no prior, so the source of the matrix does not change the formulation ([`set_allocation_risk_ceiling!`](@ref)).
   - `ret`, a floor on the prior's expected return of the allocation.
@@ -76,7 +78,7 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields and to the slots of [`ConstraintBlock`](@ref). `slv` has no default, because every projection onto the set is a programme. `slots...` takes each keyword of the block with its type and its default: `wb`, `sbgt`, `gbgt`, `lt`, `st`, `lcse`, `cte`, `gcarde`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `conc`, `tn`, `sets`, `tr`, `ple`, `ccnt`, `cobj`, `ss`, `card`, `scard`, `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp`, `linf` and `xbgt`. The constructor builds the block in `cbe` from these flat keywords, as the keyword constructor of [`JuMPOptimiser`](@ref) does. When the caller gives `cbe`, a flat keyword replaces that slot of the given block, and a slot that the caller does not name keeps its value, see [`constraint_block`](@ref). A name that is neither a field nor a slot raises a `MethodError`.
 
-`lcse`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `conc`, `tn` and `ple` take a vector that mixes the members of their element type. The keyword constructor of the block narrows it through [`narrow_mixed_vector`](@ref).
+`lcse`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `conc`, `tn`, `ple` and `scard` take a vector that mixes the members of their element type. The keyword constructor of the block narrows it through [`narrow_mixed_vector`](@ref).
 
 The positional constructor takes the fields in the order of the struct: `pe`, `slv`, `cbe`, `r`, `ret`, `sc` and `so`. Before the block, it took one argument for each slot.
 

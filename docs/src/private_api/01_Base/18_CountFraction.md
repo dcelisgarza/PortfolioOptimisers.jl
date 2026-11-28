@@ -1,5 +1,5 @@
 ```@meta
-Description = "Count fraction, private API of PortfolioOptimisers.jl: count_or_fraction, Real_CountFraction."
+Description = "Count fraction, private API of PortfolioOptimisers.jl: count_or_fraction, Real_CountFraction, VecReal_CountFraction, …"
 ```
 
 # Count fraction: private API
@@ -7,4 +7,10 @@ Description = "Count fraction, private API of PortfolioOptimisers.jl: count_or_f
 ```@docs
 count_or_fraction
 Real_CountFraction
+VecReal_CountFraction
+Real_CountFraction_VecReal_CountFraction
+fraction_floor
+cardinality_cap
+assert_cardinality_cap
+resolve_cardinality_cap
 ```

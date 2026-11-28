@@ -184,6 +184,12 @@ Keywords correspond to the struct's fields.
   - `rt`: Recursively updated through [`factory`](@ref).
   - `rk`: Recursively updated through [`factory`](@ref).
 
+## View parameters
+
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
+
+  - `rk`: Recursively viewed through [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -231,7 +237,7 @@ MeanReturnRiskRatio
     """
     $(field_dict[:rk])
     """
-    @fprop rk
+    @fprop @vprop rk
     """
     $(field_dict[:sca_rk])
     """
@@ -271,7 +277,7 @@ deferred_slots(r::MeanReturnRiskRatio) = (; rk = r.rk)
 
 Return the frames of the readers inside the risk side of a [`MeanReturnRiskRatio`](@ref), for the frame walk of a head.
 
-The risk side `rk` can hold a risk measure with a reader, such as an [`UncertaintySetVariance`](@ref). Each of those readers belongs to the group of the head that holds the measure, so the method walks every field of `r` with [`field_frames`](@ref). A field that holds no reader adds nothing.
+The risk side `rk` can hold a risk measure with a reader, such as an [`UncertaintySetVariance`](@ref). Each of those readers belongs to the group of the head that holds the measure, so the method walks every field of `r` with [`composite_frames`](@ref). A field that holds no reader adds nothing, and a measure with no reader builds no path.
 
 # Arguments
 
@@ -286,11 +292,11 @@ The risk side `rk` can hold a risk measure with a reader, such as an [`Uncertain
 # Related
 
   - [`reader_frames`](@ref)
-  - [`field_frames`](@ref)
+  - [`composite_frames`](@ref)
   - [`MeanReturnRiskRatio`](@ref)
 """
 function reader_frames(r::MeanReturnRiskRatio, path::AbstractString, refit::Bool)
-    return field_frames(r, path, refit)
+    return composite_frames(r, path, refit)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
