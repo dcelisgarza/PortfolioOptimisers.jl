@@ -27,7 +27,7 @@ The overview holds the table of [`DataFrames.DataFrame(ps::PerformanceSummaryRes
  1. **Statistics.** A candidate with one row of the overview gives a table of two columns, the figure and its value. A candidate with many rows gives its rows as a sortable table. A population also gives the distribution of each figure over its paths: the count of finite values, the minimum, the 25 % quantile, the median, the 75 % quantile and the maximum. The distribution describes the columns of the summary, and it adds no statistic.
  2. **Weights.** One table for each member, from [`prediction_weights`](@ref). A single fold gives one column of weights. A path gives one column for each fold, and a population one column for each path, after a `mean` column. The rows are sorted by the absolute value of the first column of weights. A row whose largest absolute weight is less than `weight_threshold` is not shown, and the caption gives the count of such rows.
  3. **Exposure**, when the entry has a [`UniverseSets`](@ref) and `taxonomy` names at least one taxonomy column: the sums of the weights of each group, as `# The Exposure section` states.
- 4. **Allocation**, when the entry has a finite allocation result: the shares, the cost and the realised weight of each asset, with the cash that is left and the fees in the caption. A finite allocation is the allocation of one portfolio. For a path, it is the allocation of the target of the last fold, the portfolio to hold now.
+ 4. **Allocation**, when the entry has a finite allocation result: the shares, the price, the cost and the realised weight of each asset, with the cash that is left and the fees in the caption. A finite allocation is the allocation of one portfolio. For a path, it is the allocation of the target of the last fold, the portfolio to hold now.
  5. **Figures**, when `entry_figures` gives one: one figure for each of its pairs, from the prediction.
 
 # The Exposure section
@@ -818,6 +818,8 @@ The Allocation section of the entry of one prediction, or `nothing` when the ent
 
 A finite allocation is the allocation of one portfolio. A single fold reads the names of its weights. A path reads the names of its last fold, the portfolio to hold now. A population holds no single portfolio, so it has no allocation.
 
+The table of the section has the columns `asset`, `shares`, `price`, `cost` and `weight`. The `price` of an asset is its cost divided by its shares, rounded to two decimal digits. A short position has a positive price. An asset that holds no share has the price `NaN`, which a writer shows as `—`.
+
 # Arguments
 
   - `pred`: The prediction.
@@ -847,6 +849,7 @@ function report_allocation(pred::PredictionResult,
     @argcheck(length(alloc.shares) == length(names),
               DimensionMismatch("the allocation carries $(length(alloc.shares)) shares, and the portfolio that it allocates holds $(length(names)) assets"))
     df = DataFrames.DataFrame(; asset = collect(names), shares = alloc.shares,
+                              price = round.(alloc.cost ./ alloc.shares; digits = 2),
                               cost = alloc.cost, weight = alloc.w)
     caption = string("Cash left: ", report_cell(alloc.cash, 6).text, ". Fees: ",
                      report_cell(alloc.fees, 6).text, ".")
