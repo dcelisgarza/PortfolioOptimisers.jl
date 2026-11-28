@@ -11,4 +11,8 @@ AbstractMissingDataFilterAlgorithm
 FixedPointFilter
 SinglePassFilter
 fit_universe
+PriceJumpFilter
+PriceJumpFilterResult
+PriceJump
+price_jumps
 ```

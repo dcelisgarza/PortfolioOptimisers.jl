@@ -458,8 +458,8 @@ The constructors of [`JuMPOptimiser`](@ref) and [`ProgrammeAllocationSet`](@ref)
 
 # Validation
 
-  - When `scard` is an `Integer`, it is finite and `scard > 0`. `smtx` is a matrix or an [`AssetSetsMatrixEstimator`](@ref), and `slt` and `sst` are each a scalar or `nothing`.
-  - When `scard` is a vector, it is not empty and each entry is finite and `> 0`. `smtx` is a vector of the same length, and a vector `slt` or `sst` is not empty and has that length too.
+  - When `scard` is one cap, an `Integer`, a [`CountOf`](@ref) or a [`FractionOf`](@ref), an `Integer` is `> 0`. `smtx` is a matrix or an [`AssetSetsMatrixEstimator`](@ref), and `slt` and `sst` are each a scalar or `nothing`.
+  - When `scard` is a vector, it is not empty and each `Integer` entry is `> 0`. `smtx` is a vector of the same length, and a vector `slt` or `sst` is not empty and has that length too.
   - When `scard` is `nothing` and `slt` or `sst` is a scalar, `smtx` is a matrix or an estimator.
   - When `scard` is `nothing` and `slt` or `sst` is a vector, `smtx` is a vector that is not empty, and each vector threshold has its length.
 
@@ -469,23 +469,24 @@ A value check throws an `IsEmptyError` or a `DomainError`. A type check throws a
 
   - [`set_smip_constraints!`](@ref)
   - [`assert_subgrouped_mip_fields`](@ref)
+  - [`assert_cardinality_cap`](@ref)
 """
 function assert_subgroup_mip_fields(scard, smtx, slt, sst)::Nothing
     if any(x -> isa(x, TimeDependent), (scard, smtx, slt, sst))
         return nothing
     end
-    if isa(scard, Integer)
+    if isa(scard, Real_CountFraction)
         assert_nonempty_gt0_finite_val(scard, :scard)
         @argcheck(isa(smtx, MatNum_ASetMatE),
-                  ArgumentError("smtx must be a MatNum_ASetMatE when scard is an Integer, got $(typeof(smtx))"))
+                  ArgumentError("smtx must be a MatNum_ASetMatE when scard is one cap, got $(typeof(smtx))"))
         @argcheck(isa(slt, Option{<:BtE_Bt}),
-                  ArgumentError("slt must be a scalar BtE_Bt or nothing when scard is an Integer, got $(typeof(slt))"))
+                  ArgumentError("slt must be a scalar BtE_Bt or nothing when scard is one cap, got $(typeof(slt))"))
         @argcheck(isa(sst, Option{<:BtE_Bt}),
-                  ArgumentError("sst must be a scalar BtE_Bt or nothing when scard is an Integer, got $(typeof(sst))"))
-    elseif isa(scard, VecInt)
-        assert_nonempty_gt0_finite_val(scard, :scard)
+                  ArgumentError("sst must be a scalar BtE_Bt or nothing when scard is one cap, got $(typeof(sst))"))
+    elseif isa(scard, AbstractVector)
+        assert_cardinality_cap(assert_nonempty_gt0_finite_val, scard, :scard)
         @argcheck(isa(smtx, AbstractVector),
-                  ArgumentError("smtx must be an AbstractVector when scard is a VecInt, got $(typeof(smtx))"))
+                  ArgumentError("smtx must be an AbstractVector when scard is a vector, got $(typeof(smtx))"))
         @argcheck(length(scard) == length(smtx),
                   DimensionMismatch("scard ($(length(scard))) must match smtx ($(length(smtx)))"))
         if isa(slt, AbstractVector)

@@ -201,7 +201,11 @@ function leaf_measures(T, acc = Type[])
     isempty(subs) ? push!(acc, T) : foreach(S -> leaf_measures(S, acc), subs)
     return acc
 end
-all_measures = Set(nameof.(leaf_measures(PortfolioOptimisers.AbstractBaseRiskMeasure)))
+# The page lists the measures that a user can choose, so it reads the exported leaves. An
+# internal leaf, such as `GainTail`, is no choice, as `NOT_A_CHOICE` of the capability
+# catalogue states.
+all_measures = Set(filter(n -> Base.isexported(PortfolioOptimisers, n),
+                          nameof.(leaf_measures(PortfolioOptimisers.AbstractBaseRiskMeasure))))
 listed = [first(p) for (_, fam) in catalogue for p in fam]
 @assert allunique(listed)
 @assert Set(listed) == all_measures

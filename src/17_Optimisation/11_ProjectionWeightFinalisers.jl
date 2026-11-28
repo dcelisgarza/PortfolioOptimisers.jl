@@ -302,13 +302,13 @@ end
 
 Return the tolerance to which [`weights_meet_bounds`](@ref) holds the finalised weights of element type `T` to their bounds and to their budget.
 
-A floating-point type rounds, so a finaliser that lands on a bound or on the budget can miss it by a few units in the last place. The tolerance is then ``\\sqrt{\\epsilon}``, with ``\\epsilon`` the machine epsilon of `T`. A `Rational` type does not round, so a finaliser lands on a bound exactly, and the tolerance is zero. `Rational` has no `eps` method, so the choice cannot come from `eps` itself.
+A floating-point type rounds, so a finaliser that lands on a bound or on the budget can miss it by a few units in the last place. The tolerance is then ``\\sqrt{\\epsilon}``, with ``\\epsilon`` the machine epsilon of `T`. An `Integer` or a `Rational` type does not round, so a finaliser lands on a bound exactly, and the tolerance is zero. These types have no `eps` method, so the choice cannot come from `eps` itself.
 
 The choice is made by dispatch on `Type{T}`. A package that defines another exact number type adds a method for it.
 
 # Algorithm
 
- 1. `T` is a subtype of `Rational`: return `zero(T)`.
+ 1. `T` is a subtype of `Integer` or `Rational`: return `zero(T)`.
  2. `T` is any other type: return `sqrt(eps(T))`. This covers every floating-point type, and every number type that defines `eps`, such as an automatic-differentiation dual.
 
 # Arguments
@@ -334,7 +334,7 @@ julia> PortfolioOptimisers.weights_bound_tolerance(Rational{Int})
   - [`weights_meet_bounds`](@ref)
 """
 weights_bound_tolerance(::Type{T}) where {T} = sqrt(eps(T))
-weights_bound_tolerance(::Type{T}) where {T <: Rational} = zero(T)
+weights_bound_tolerance(::Type{T}) where {T <: Union{Integer, Rational}} = zero(T)
 """
     weights_meet_bounds(wb::WeightBounds, w::VecNum, s::Number) -> Bool
 

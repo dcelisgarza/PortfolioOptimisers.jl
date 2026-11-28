@@ -103,7 +103,7 @@ The direct call of [`set_allocation_set_constraints!`](@ref) has a model of a fi
 
  1. Check that the prior prices every asset in `X` with [`assert_set_prior_priced`](@ref).
  2. Give the set the Price-Adjusted Allocation `w` with `factory(set, w)`, so a turnover ceiling, a tracking error, a risk ceiling, a custom constraint and a custom objective term that read the previous weights read the book of the step.
- 3. Resolve stage 2 of the block of the set against `pr` and `X` with [`resolve_constraint_block`](@ref), under the solver of the set and the `strict` flag of the current [`ProjectionStep`](@ref).
+ 3. Resolve stage 2 of the block of the set against `pr` and `X` with [`resolve_constraint_block`](@ref). When `X` is `nothing`, the number of assets in `w` takes its place. The step runs under the solver of the set and the `strict` flag of the current [`ProjectionStep`](@ref).
  4. Check the bounds of the step against the budget of one with [`assert_feasible_bounds`](@ref). A bound that reads the rows resolves only here ([`bounds_read_rows`](@ref)).
 
 # Arguments
@@ -131,7 +131,7 @@ function resolve_allocation_set_step(set::ProgrammeAllocationSet, w::AbstractVec
                                      pr::Option{<:AbstractPriorResult})::Tuple
     assert_set_prior_priced(pr, X)
     setw = factory(set, w)
-    cbr = resolve_constraint_block(setw.cbe, pr, X; slv = setw.slv,
+    cbr = resolve_constraint_block(setw.cbe, pr, something(X, length(w)); slv = setw.slv,
                                    strict = projection_step_strict())
     assert_feasible_bounds(cbr.wb)
     return setw, cbr
@@ -879,7 +879,7 @@ The projection programme holds no block of its own, so it is a bare head of [`re
 
  1. On a bounded set, return no mask, the set and no block Result. Stop.
  2. Give the set the Price-Adjusted Allocation `w` with `factory(set, w)`, so a turnover ceiling, a tracking error, a risk ceiling, a custom constraint and a custom objective term that read the previous weights read the book of the step.
- 3. With no rows, resolve the block with [`resolve_constraint_block`](@ref) on no prior, check the bounds with [`assert_feasible_bounds`](@ref), and return no mask, the set and the block Result. Stop.
+ 3. With no rows, resolve the block with [`resolve_constraint_block`](@ref) on no prior and the number of assets in `w`, check the bounds with [`assert_feasible_bounds`](@ref), and return no mask, the set and the block Result. Stop.
  4. Fit the prior of the set on `X` with [`fit_allocation_set_block`](@ref).
  5. Resolve the block through [`resolve_block_entry`](@ref), from the mask of the prior, [`investable_mask`](@ref), under the `strict` flag of the step, [`projection_step_strict`](@ref).
  6. Check the bounds of the step against the budget of one with [`assert_feasible_bounds`](@ref). A bound that reads the rows resolves only at stage 2 ([`bounds_read_rows`](@ref)).
@@ -925,7 +925,7 @@ function resolve_projection_entry(set::ProgrammeAllocationSet, w::AbstractVector
     # With no rows the set fits no prior, so it has no mask and runs no reader: stage 2
     # alone resolves the block. `allocation_set_prior` refuses a set that reads the rows.
     setw = factory(set, w)
-    cbr = resolve_constraint_block(setw.cbe, allocation_set_prior(setw, nothing), nothing;
+    cbr = resolve_constraint_block(setw.cbe, allocation_set_prior(setw, nothing), length(w);
                                    slv = setw.slv, strict = projection_step_strict())
     assert_feasible_bounds(cbr.wb)
     return nothing, setw, cbr

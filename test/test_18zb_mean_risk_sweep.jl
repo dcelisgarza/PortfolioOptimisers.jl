@@ -1,4 +1,5 @@
 using Clarabel, JuMP
+using Distributions: Normal
 const PO = PortfolioOptimisers
 
 # The sweep of `src/17_Optimisation/05_JuMP/04_MeanRisk.jl`. Each objective of `MeanRisk` is
@@ -563,6 +564,83 @@ end
                              kt = kt)
     res = optimise(MeanRisk(; opt = opt, r = r, obj = MaximumReturn()))
     @test length(res.w) == 4
+end
+
+# A range of a user's own, whose tails keep the bounds that the caller gives.
+struct MrsRange{T1, T2, T3} <: PO.RangeRiskMeasure
+    settings::T1
+    loss::T2
+    gain::T3
+end
+PO.risk_input_kind(::MrsRange) = PO.NetReturnsInput()
+PO.range_tails(r::MrsRange) = PO.RangeTails(r.loss, r.gain)
+PO.range_risk_key(::MrsRange) = :mrs_range_risk_
+
+@testset "MeanRisk sweep: a Frontier on a tail of a range spans that tail" begin
+    # The sweep took the span of the whole range, so the levels were too high and most points
+    # were the portfolio of maximum return (#2319).
+    front = RiskMeasureSettings(; rke = false, ub = Frontier(; N = 4))
+    off = RiskMeasureSettings(; rke = false)
+    cvar(s) = ConditionalValueatRisk(; settings = s)
+    # A law with a mean far from zero, so that the two tails read different z-scores.
+    vdist(s) = ValueatRisk(; settings = s,
+                           alg = DistributionValueatRisk(; dist = Normal(0.1, 2.0)))
+    gvar(l, g) = GenericValueatRiskRange(; loss = l, gain = g)
+    user(l, g) = MrsRange(RiskMeasureSettings(), l, g)
+    loss_value(r) = w -> expected_risk(r, w, MRS_PR)
+    gain_value(r) = w -> expected_risk(PO.GainTail(r), w, MRS_PR)
+    # Two returns tails, two tails that share a cone, a tail that reads the weights beside one
+    # that reads the returns, and a range of a user.
+    cases = ((gvar, cvar, cvar, :loss), (gvar, cvar, cvar, :gain),
+             (gvar, vdist, vdist, :loss), (gvar, vdist, vdist, :gain),
+             (gvar, cvar, vdist, :gain), (user, cvar, cvar, :gain))
+    @testset "case $i" for (i, (mk, l, g, side)) in enumerate(cases)
+        free = mk(l(off), g(off))
+        rng, value = if side === :loss
+            mk(l(front), g(off)), loss_value(l(off))
+        else
+            mk(l(off), g(front)), gain_value(g(off))
+        end
+        wmin = optimise(MeanRisk(; r = free, opt = mrs_opt())).w
+        wmax = optimise(MeanRisk(; r = free, opt = mrs_opt(), obj = MaximumReturn())).w
+        levels = range(minmax(value(wmin), value(wmax))...; length = 4)
+        # The levels of the whole range are far above the levels of the tail.
+        @test first(levels) < last(levels)
+        @test last(levels) < 0.9 * (loss_value(l(off))(wmax) + gain_value(g(off))(wmax))
+        res = optimise(MeanRisk(; r = rng, opt = mrs_opt(), obj = MaximumReturn()))
+        @test all(c -> isa(c, PO.OptimisationSuccess), res.retcode)
+        entry = only(res.model[:risk_frontier])
+        @test isa(entry.second[4], PO.GainTail) == (side === :gain)
+        # The maximum return meets each ceiling, so the tail of each point is its level.
+        @test isapprox([value(w) for w in res.w], levels; rtol = 1e-4)
+        # The corner solves of `NearOptimalCentering` clear the bounds of the tails with
+        # `no_bounds_risk_measure`, which the range of a user does not define.
+        if mk === user
+            continue
+        end
+        noc = NearOptimalCentering(; r = rng, opt = mrs_opt(), obj = MaximumReturn(),
+                                   alg = ConstrainedNearOptimalCentering())
+        res = optimise(noc)
+        # The centring model rebuilds the entry by the same owner, so it has the same levels.
+        registry = res.model[:risk_frontier]
+        @test isa(only(registry).second[4], PO.GainTail) == (side === :gain)
+        rebuilt = PO.rebuild_risk_frontier(noc, MRS_PR, nothing, registry, wmin, wmax, [1])
+        @test isapprox(only(rebuilt).second[2], levels; rtol = 1e-12)
+        # The centre is inside the region, so each point that solves lies at its level or
+        # below it. Clarabel stops at SLOW_PROGRESS on some points of the centring model, also
+        # for a frontier on a lone conditional value at risk.
+        @test length(res.w) == 4
+        @test all(((w, e),) -> !all(isfinite, w) || value(w) <= e * (1 + 1e-4),
+                  zip(res.w, levels))
+    end
+    # A sweep on the range keeps the span of the range beside a sweep on each tail.
+    r = GenericValueatRiskRange(; settings = RiskMeasureSettings(; ub = Frontier(; N = 2)),
+                                loss = cvar(front), gain = cvar(front))
+    res = optimise(MeanRisk(; r = r, opt = mrs_opt(), obj = MaximumReturn()))
+    owners = [e.second[4] for e in res.model[:risk_frontier]]
+    @test isa(owners[1], ConditionalValueatRisk)
+    @test isa(owners[2], PO.GainTail)
+    @test isa(owners[3], GenericValueatRiskRange)
 end
 
 @testset "MeanRisk sweep: a Frontier needs two points" begin

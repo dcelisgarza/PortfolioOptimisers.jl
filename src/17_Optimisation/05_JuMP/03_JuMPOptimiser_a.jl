@@ -342,11 +342,11 @@ $(DocStringExtensions.FIELDS)
         slots...,
     ) -> JuMPOptimiser
 
-Keywords correspond to the struct's fields and to the slots of [`ConstraintBlock`](@ref). `slots...` takes each keyword of the block with its type and its default: `wb`, `sbgt`, `gbgt`, `lt`, `st`, `lcse`, `cte`, `gcarde`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn`, `sets`, `tr`, `ple`, `ccnt`, `cobj`, `ss`, `card`, `scard`, `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp`, `linf` and `xbgt`. The constructor builds the block in `cbe` from these flat keywords, with the defaults of the block. When the caller gives `cbe`, a flat keyword replaces that slot of the given block, and a slot that the caller does not name keeps its value, see [`constraint_block`](@ref). So the default of a flat keyword never overwrites a slot of a given block. A name that is neither a field nor a slot raises a `MethodError`.
+Keywords correspond to the struct's fields and to the slots of [`ConstraintBlock`](@ref). `slots...` takes each keyword of the block with its type and its default: `wb`, `sbgt`, `gbgt`, `lt`, `st`, `lcse`, `cte`, `gcarde`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `conc`, `tn`, `sets`, `tr`, `ple`, `ccnt`, `cobj`, `ss`, `card`, `scard`, `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp`, `linf` and `xbgt`. The constructor builds the block in `cbe` from these flat keywords, with the defaults of the block. When the caller gives `cbe`, a flat keyword replaces that slot of the given block, and a slot that the caller does not name keeps its value, see [`constraint_block`](@ref). So the default of a flat keyword never overwrites a slot of a given block. A name that is neither a field nor a slot raises a `MethodError`.
 
 A field or a slot typed [`TD_Option`](@ref) or [`TD`](@ref) can hold a [`TimeDependent`](@ref) schedule in place of a static value. A cross-validation fold loop resolves the schedule at each fold, and an `optimise` call outside a fold loop reads the static default of the field. So the prior estimator, the returns model, the scalariser, the asset sets and the constraints can change from fold to fold. The execution settings `slv`, `sc`, `so` and `strict` are static.
 
-`lcse`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn` and `ple` take a vector that mixes the members of their element type, such as `[Turnover(…), TurnoverEstimator(…)]`. Such a literal infers an element type that the positional constructor refuses, so the keyword constructor of the block narrows it through [`narrow_mixed_vector`](@ref), and the caller writes no [`concrete_typed_array`](@ref).
+`lcse`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `conc`, `tn`, `ple` and `scard` take a vector that mixes the members of their element type, such as `[Turnover(…), TurnoverEstimator(…)]`. Such a literal infers an element type that the positional constructor refuses, so the keyword constructor of the block narrows it through [`narrow_mixed_vector`](@ref), and the caller writes no [`concrete_typed_array`](@ref).
 
 The positional constructor takes the fields in the order of the struct: `pe`, `slv`, `cbe`, `bgt`, `fees`, `ret`, `sca`, `sc`, `so`, `strict` and `cache`. Before the block, it took one argument for each slot.
 
@@ -362,7 +362,8 @@ The constructor of [`ConstraintBlock`](@ref) checks each slot on its own. This c
   - If `gbgt` is not `nothing` and `wb` is a [`WeightBounds`](@ref): `wb` admits a negative weight. The check of an [`AbstractWeightBoundsEstimator`](@ref) waits for the solve.
   - If `gbgt` has an upper end: it is non-negative, and it is at least the least magnitude that `bgt` admits, see [`assert_gross_budget_reaches_net`](@ref). The gross exposure is at least `abs(sum(w))`, so a smaller gross budget leaves no feasible weights. An `ArgumentError` is thrown otherwise.
   - If `lcse`, `cte`, `smtx`, `sgmtx`, `tn`, `tr`, `ple`, `l2`, `lp` or `lpc` is a vector: `!isempty`. An empty `l2`, `lp` or `lpc` builds no term, which is what `nothing` states.
-  - If `card`, `l2c`, `linfc`, `l1` or `linf` is a number: it is finite and `> 0`. `l1` and `linf` also take an ambiguity-radius rule, and `l2c` and `linfc` a norm-ceiling rule. A rule states no number at construction, so stage 2 of the block, [`resolve_constraint_block`](@ref), checks the number that the rule returns.
+  - A plain `card` or `scard` passes [`cardinality_cap`](@ref), and an `Integer` in `card` is `> 0`. A [`FractionOf`](@ref) resolves at stage 2 of the block, after the reduction to the Investable Mask.
+  - If `l2c`, `linfc`, `l1` or `linf` is a number: it is finite and `> 0`. `l1` and `linf` also take an ambiguity-radius rule, and `l2c` and `linfc` a norm-ceiling rule. A rule states no number at construction, so stage 2 of the block, [`resolve_constraint_block`](@ref), checks the number that the rule returns.
   - The rule in each [`LpRegularisation`](@ref) agrees with the field that holds it. `lp` is a penalty, so it refuses a norm-ceiling rule, and `lpc` is a constraint, so it refuses an ambiguity-radius rule. The term has one field for both readings, so the constructor of the block is the first point that knows the reading. The constructors of [`L2Regularisation`](@ref) and [`LpRegularisation`](@ref) check the other values of `l2`, `lp` and `lpc`.
   - The shapes of `scard`, `smtx`, `slt` and `sst` agree, see [`assert_subgroup_mip_fields`](@ref). The shapes of `sgcarde`, `sgmtx`, `sglt` and `sgst` agree, see [`assert_subgrouped_mip_fields`](@ref).
   - If a slot holds an estimator keyed by name ([`name_keyed`](@ref)), or `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`.
@@ -471,8 +472,8 @@ end
 # set it, so `opt.wb` and the search key `"opt.wb"` keep their meaning (ADR 0237).
 @forward_properties JuMPOptimiser begin
     forward(cbe, wb, sbgt, gbgt, lt, st, lcse, cte, gcarde, sgcarde, smtx, sgmtx, slt, sst,
-            sglt, sgst, tn, sets, tr, ple, ccnt, cobj, ss, card, scard, l2c, lpc, linfc, l1,
-            l2, lp, linf, xbgt; settable)
+            sglt, sgst, conc, tn, sets, tr, ple, ccnt, cobj, ss, card, scard, l2c, lpc,
+            linfc, l1, l2, lp, linf, xbgt; settable)
 end
 function time_dependent_candidate_fields(opt::JuMPOptimiser)::Tuple
     return (typed_time_dependent_fields(opt)..., typed_time_dependent_fields(opt.cbe)...)

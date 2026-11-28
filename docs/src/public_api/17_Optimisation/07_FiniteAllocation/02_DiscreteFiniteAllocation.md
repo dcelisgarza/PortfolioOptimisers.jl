@@ -1,5 +1,5 @@
 ```@meta
-Description = "Discrete finite allocation, public API of PortfolioOptimisers.jl: DiscreteAllocationResult, DiscreteAllocation, factory, _optimise."
+Description = "Discrete finite allocation, public API of PortfolioOptimisers.jl: DiscreteAllocationResult, DiscreteAllocation, port_opt_view, factory, _optimise."
 ```
 
 # Discrete finite allocation
@@ -7,6 +7,7 @@ Description = "Discrete finite allocation, public API of PortfolioOptimisers.jl:
 ```@docs
 DiscreteAllocationResult
 DiscreteAllocation
+port_opt_view(da::DiscreteAllocation, i, args...)
 factory(res::DiscreteAllocationResult, fb::Option{<:FOptE_FOpt_FbChain})
 _optimise(da::DiscreteAllocation, fai::FiniteAllocationInput)
 ```

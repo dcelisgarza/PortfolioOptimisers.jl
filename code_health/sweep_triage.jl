@@ -289,7 +289,36 @@ end
 number_or_dash(x) = x === nothing ? "—" : string(x)
 
 """
-    body_of(candidate, commit) -> String
+    landing_of(path, after; root = CodeHealth.REPO_ROOT) -> String
+
+The route of ADR 0240 for the sweep sub-issue of `path`. A sweep ticket can wait for the batch of
+`dev`, so its route is `dev` when `dev` has the file, or `main` has it, because a job merges `main`
+into `dev`.
+
+A file that neither has is on the branch of open work, and a session that takes the ticket on `dev`
+finds no file. The route is then `dev after <after>`, with the pull request or the branch that
+`--after` names. Twelve sub-issues of one day were filed with `dev` for such a file. With no
+`--after` the plan is refused. In a root that has neither ref, such as a fixture tree, the route is
+`dev`.
+"""
+function landing_of(path::AbstractString, after::AbstractString;
+                    root = CodeHealth.REPO_ROOT)
+    holds(args...) = CodeHealth.git_output([args...]; root) !== nothing
+    refs = [r for r in ("origin/dev", "origin/main") if holds("rev-parse", "--verify", r)]
+    if isempty(refs) || any(r -> holds("cat-file", "-e", "$r:$path"), refs)
+        return "dev"
+    end
+    if isempty(after)
+        error("Neither `origin/dev` nor `origin/main` has `$path`, so its sweep ticket must ",
+              "wait for the work that adds it. Run `git fetch origin`, and run this again. If it ",
+              "refuses again, run it with `--after '#<pr>'`, or with ",
+              "`--after dev-<feature>` while the branch has no pull request.")
+    end
+    return "dev after $after"
+end
+
+"""
+    body_of(candidate, commit; landing = "dev") -> String
 
 The sub-issue of ADR 0084. It mirrors the child map that owns it, one file wide: the
 `**Lands on:**` line of ADR 0240, the fixed `ROUTING` block, a Destination naming the file and its measured row, the six conditions of #404
@@ -304,10 +333,9 @@ at #404 without copying a rule.
 **Nothing here is ever machine-read.** The safeguard reads the title, and every other fact a later
 run needs comes from a committed file or from the tracker's own metadata.
 """
-function body_of(c::Candidate, commit::AbstractString)
+function body_of(c::Candidate, commit::AbstractString; landing::AbstractString = "dev")
     io = IOBuffer()
-    # The route of ADR 0240. A sweep ticket can wait for the batch of `dev`.
-    println(io, "**Lands on:** dev\n")
+    println(io, "**Lands on:** ", landing, "\n")
     println(io, ROUTING)
     println(io, "## Destination\n")
     if reopens(c)
@@ -351,7 +379,7 @@ end
 # --- the plan --------------------------------------------------------------
 
 """
-    write_plan(dir, chosen, umbrella_open, commit) -> nothing
+    write_plan(dir, chosen, umbrella_open, commit; after = "") -> nothing
 
 One title file and one body file per sub-issue to open, plus two tab-separated files the workflow
 reads and nothing more.
@@ -365,7 +393,10 @@ reads and nothing more.
 An empty plan writes an empty `plan.tsv` and an empty `reopen.tsv`, which is the first run's own
 outcome: all thirteen child maps are open today.
 """
-function write_plan(dir::AbstractString, chosen, umbrella_open, commit::AbstractString)
+function write_plan(dir::AbstractString, chosen, umbrella_open, commit::AbstractString;
+                    after::AbstractString = "")
+    # Before the old plan is cleared, so a refusal leaves the old plan whole.
+    landings = [landing_of(c.path, after) for c in chosen]
     mkpath(dir)
     # Only this job's own files are cleared. The workflow puts the tracker's two dumps in the same
     # directory, and a blanket `rm` of a path that arrives as an option would take them with it.
@@ -379,7 +410,7 @@ function write_plan(dir::AbstractString, chosen, umbrella_open, commit::Abstract
     for (i, c) in enumerate(chosen)
         stem = string(i; pad = 2)
         write(joinpath(dir, stem * ".title"), title_of(c))
-        write(joinpath(dir, stem * ".body"), body_of(c, commit))
+        write(joinpath(dir, stem * ".body"), body_of(c, commit; landing = landings[i]))
         println(plan, stem, '\t', c.path, '\t', c.map.issue)
     end
     write(joinpath(dir, "plan.tsv"), String(take!(plan)))
@@ -446,17 +477,20 @@ struct Options
     out::String
     fetch::Bool
     files::Vector{String}
+    after::String
 end
 
 const USAGE = """
-usage: sweep_triage.jl --maps <tsv> [--existing <tsv>] [--out <dir>] [--file <path>]...
-       sweep_triage.jl --fetch [--out <dir>] [--file <path>]...
+usage: sweep_triage.jl --maps <tsv> [--existing <tsv>] [--out <dir>] [--file <path>]... [--after <target>]
+       sweep_triage.jl --fetch [--out <dir>] [--file <path>]... [--after <target>]
 
   --maps <tsv>      the `wayfinder:map` dump. Required unless --fetch is given.
   --existing <tsv>  the `sweep` dump. Optional; an absent one reads as an empty tracker.
   --out <dir>       the plan directory. Default: code_health/_sweep.
   --fetch           run `code_health/sweep_issues.sh dump` first, and read what it wrote.
   --file <path>     plan this path whatever the state of its child map. Repeatable.
+  --after <target>  `#<pr>` or `dev-<feature>`, the work that adds a file that neither `dev` nor
+                    `main` has. The route of its ticket is then `dev after <target>` (ADR 0240).
 """
 
 """
@@ -471,7 +505,7 @@ that has no row, or whose row reads `swept = true`, throws in `candidates` rathe
 message can name the manifest and the census that prints the missing line.
 """
 function parse_options(args)
-    maps, existing, out, fetch = "", "", PLAN_DIR, false
+    maps, existing, out, fetch, after = "", "", PLAN_DIR, false, ""
     files = String[]
     i = 1
     while i <= length(args)
@@ -479,13 +513,16 @@ function parse_options(args)
         if a == "--fetch"
             fetch = true
             i += 1
-        elseif a in ("--maps", "--existing", "--out", "--file") && i < length(args)
+        elseif a in ("--maps", "--existing", "--out", "--file", "--after") &&
+               i < length(args)
             if a == "--maps"
                 (maps = args[i + 1])
             elseif a == "--existing"
                 (existing = args[i + 1])
             elseif a == "--file"
                 push!(files, args[i + 1])
+            elseif a == "--after"
+                (after = args[i + 1])
             else
                 (out = args[i + 1])
             end
@@ -497,7 +534,10 @@ function parse_options(args)
     if isempty(maps) && !(fetch)
         error(USAGE)
     end
-    return Options(maps, existing, out, fetch, files)
+    if !(isempty(after)) && !(occursin(r"^(#\d+|dev-[A-Za-z0-9][A-Za-z0-9._-]*)$", after))
+        error("`--after` takes `#<pr>` or `dev-<feature>`, not `$after`.\n\n", USAGE)
+    end
+    return Options(maps, existing, out, fetch, files, after)
 end
 
 """
@@ -518,7 +558,7 @@ function fetch_dumps(opts::Options)
                        joinpath(opts.out, "existing.tsv")
                    else
                        opts.existing
-                   end, opts.out, opts.fetch, opts.files)
+                   end, opts.out, opts.fetch, opts.files, opts.after)
 end
 
 function main(args)
@@ -536,7 +576,7 @@ function main(args)
     elsewhere = CodeHealth.rows_elsewhere(existing, keys(rows))
     reconcile(rows, map_names, maps, existing, elsewhere)
     chosen, skipped = candidates(rows, maps, coverage, existing, Set(opts.files))
-    write_plan(opts.out, chosen, umbrella_open, CodeHealth.git_short_commit())
+    write_plan(opts.out, chosen, umbrella_open, CodeHealth.git_short_commit(); opts.after)
 
     println(length(rows), " file(s) in the manifest, ", count(m -> !(m.open), values(maps)),
             " child map(s) closed, ", length(chosen), " sub-issue(s) to open.")

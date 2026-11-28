@@ -9,6 +9,7 @@ MatNum_ASetMatE
 MatNum_ASetMatE_VecMatNum_ASetMatE
 VecMatNum_ASetMatE
 PortfolioOptimisers.taxonomy_column
+PortfolioOptimisers.asset_name_mask
 PortfolioOptimisers.panel_input_name
 PortfolioOptimisers.panel_input_kind
 PortfolioOptimisers.panel_input_build

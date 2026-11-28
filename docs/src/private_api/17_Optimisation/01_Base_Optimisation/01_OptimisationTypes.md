@@ -19,6 +19,8 @@ set_retcode
 assert_special_nco_requirements(::OptE_Opt)
 assert_special_nco_requirements
 PortfolioOptimisers.field_frames
+PortfolioOptimisers.composite_frames
+PortfolioOptimisers.holds_reader
 PortfolioOptimisers.reader_frames(::AbstractVector{<:Number}, ::AbstractString, ::Bool)
 PortfolioOptimisers.data_benchmark_path
 PortfolioOptimisers.assert_data_benchmark_prior

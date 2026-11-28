@@ -49,6 +49,7 @@ $(DocStringExtensions.FIELDS)
         sst::TD_Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
         sglt::TD_Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
         sgst::TD_Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
+        conc::TD_Option{<:Union{CnlE_Cnl, AbstractVector}} = nothing,
         tn::TD_Option{<:Union{TnE_Tn, AbstractVector}} = nothing,
         sets::TD_Option{<:UniverseSets} = nothing,
         tr::TD_Option{<:Tr_VecTr} = nothing,
@@ -56,8 +57,8 @@ $(DocStringExtensions.FIELDS)
         ccnt::TD_Option{<:JuMPConstr_VecJuMPConstr} = nothing,
         cobj::TD_Option{<:JuMPObj_VecJuMPObj} = nothing,
         ss::TD_Option{<:Number} = nothing,
-        card::TD_Option{<:Integer} = nothing,
-        scard::TD_Option{<:Int_VecInt} = nothing,
+        card::TD_Option{<:Real_CountFraction} = nothing,
+        scard::TD_Option{<:Union{Real_CountFraction, AbstractVector}} = nothing,
         l2c::TD_Option{<:Num_NormCeilCal} = nothing,
         lpc::TD_Option{<:LpReg_VecLpReg} = nothing,
         linfc::TD_Option{<:Num_NormCeilCal} = nothing,
@@ -70,17 +71,21 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields. A slot typed [`TD_Option`](@ref) can hold a [`TimeDependent`](@ref) schedule in place of a static value, as the slot of the same name in [`JuMPOptimiser`](@ref) can.
 
-`lcse`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn` and `ple` take a vector that mixes the members of their element type. The keyword constructor narrows it through [`narrow_mixed_vector`](@ref).
+`lcse`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `conc`, `tn`, `ple` and `scard` take a vector that mixes the members of their element type. The keyword constructor narrows it through [`narrow_mixed_vector`](@ref).
 
 ## Validation
 
   - If `sbgt` or `gbgt` is a number: it is finite and `>= 0`.
-  - If `lcse`, `cte`, `smtx`, `sgmtx`, `tn`, `tr`, `ple`, `l2`, `lp` or `lpc` is a vector: `!isempty`.
-  - If `card`, `l2c`, `linfc`, `l1` or `linf` is a number: it is finite and `> 0`.
+  - If `lcse`, `cte`, `smtx`, `sgmtx`, `conc`, `tn`, `tr`, `ple`, `l2`, `lp` or `lpc` is a vector: `!isempty`.
+  - A plain `card` or `scard` passes [`cardinality_cap`](@ref). An `Integer` is the cap, and any other real number is a [`FractionOf`](@ref).
+  - If `card` is an `Integer`: it is `> 0`.
+  - If `l2c`, `linfc`, `l1` or `linf` is a number: it is finite and `> 0`.
   - `lp` holds no norm-ceiling rule, and `lpc` holds no ambiguity-radius rule, see [`assert_penalty_coefficient_role`](@ref) and [`assert_norm_ceiling_role`](@ref).
   - The shapes of `scard`, `smtx`, `slt` and `sst` agree, see [`assert_subgroup_mip_fields`](@ref). The shapes of `sgcarde`, `sgmtx`, `sglt` and `sgst` agree, see [`assert_subgrouped_mip_fields`](@ref).
   - If a slot holds an estimator keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`.
   - If a slot holds a [`TimeDependent`](@ref): the constructor runs again once for each entry of the schedule, see [`assert_time_dependent_substitution`](@ref).
+
+$(val_dict[:count_fraction_grid])
 
 The checks that read a field of the owner as well, such as [`assert_gross_budget_admissible`](@ref), run in the constructor of the owner.
 
@@ -93,6 +98,10 @@ julia> opt = JuMPOptimiser(; slv = Solver(; solver = nothing), cbe = cbe, card =
 
 julia> (opt.wb.ub, opt.card, opt.cbe.card)
 (0.4, 4, 4)
+
+julia> ConstraintBlock(; card = FractionOf(0.2)).card
+FractionOf
+  val ┴ Float64: 0.2
 ```
 
 # Related
@@ -162,6 +171,10 @@ julia> (opt.wb.ub, opt.card, opt.cbe.card)
     $(field_dict[:sgst])
     """
     sgst
+    """
+    $(field_dict[:conc])
+    """
+    conc
     """
     $(field_dict[:tn_jmp])
     """
@@ -242,12 +255,14 @@ julia> (opt.wb.ub, opt.card, opt.cbe.card)
                              sst::TD_Option{<:BtE_Bt_VecOptBtE_Bt},
                              sglt::TD_Option{<:BtE_Bt_VecOptBtE_Bt},
                              sgst::TD_Option{<:BtE_Bt_VecOptBtE_Bt},
+                             conc::TD_Option{<:CnlE_Cnl_VecCnlE_Cnl},
                              tn::TD_Option{<:TnE_Tn_VecTnE_Tn},
                              sets::TD_Option{<:UniverseSets}, tr::TD_Option{<:Tr_VecTr},
                              ple::TD_Option{<:PlCE_PlC_VecPlCE_PlC},
                              ccnt::TD_Option{<:JuMPConstr_VecJuMPConstr},
                              cobj::TD_Option{<:JuMPObj_VecJuMPObj}, ss::TD_Option{<:Number},
-                             card::TD_Option{<:Integer}, scard::TD_Option{<:Int_VecInt},
+                             card::TD_Option{<:Real_CountFraction},
+                             scard::TD_Option{<:Real_CountFraction_VecReal_CountFraction},
                              l2c::TD_Option{<:Num_NormCeilCal},
                              lpc::TD_Option{<:LpReg_VecLpReg},
                              linfc::TD_Option{<:Num_NormCeilCal},
@@ -262,8 +277,9 @@ julia> (opt.wb.ub, opt.card, opt.cbe.card)
             assert_nonempty_nonneg_finite_val(gbgt, :gbgt)
         end
         # `map` compiles one call for each slot, so the slots of different types are not boxed.
-        map(((lcse, :lcse), (cte, :cte), (smtx, :smtx), (sgmtx, :sgmtx), (tn, :tn),
-             (tr, :tr), (ple, :ple), (l2, :l2), (lp, :lp), (lpc, :lpc))) do (x, name)
+        map(((lcse, :lcse), (cte, :cte), (smtx, :smtx), (sgmtx, :sgmtx), (conc, :conc),
+             (tn, :tn), (tr, :tr), (ple, :ple), (l2, :l2), (lp, :lp), (lpc, :lpc))) do (x,
+                                                                                        name)
             if isa(x, AbstractVector)
                 @argcheck(!isempty(x), IsEmptyError("$name cannot be empty"))
             end
@@ -271,6 +287,8 @@ julia> (opt.wb.ub, opt.card, opt.cbe.card)
         end
         # The method for a value other than a number checks nothing, so `nothing`, a schedule
         # and a calibration rule pass these calls.
+        card = cardinality_cap(card)
+        scard = cardinality_cap(scard)
         assert_nonempty_gt0_finite_val(card, :card)
         assert_nonempty_gt0_finite_val(l2c, :l2c)
         assert_nonempty_gt0_finite_val(linfc, :linfc)
@@ -286,27 +304,29 @@ julia> (opt.wb.ub, opt.card, opt.cbe.card)
         assert_subgroup_mip_fields(scard, smtx, slt, sst)
         assert_subgrouped_mip_fields(sgcarde, sgmtx, sglt, sgst)
         if any(name_keyed,
-               (wb, lt, st, lcse, gcarde, sgcarde, smtx, sgmtx, slt, sst, sglt, sgst, tn))
+               (wb, lt, st, lcse, gcarde, sgcarde, smtx, sgmtx, slt, sst, sglt, sgst, conc,
+                tn))
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when estimator-type fields are provided"))
         end
         assert_time_dependent_substitution(ConstraintBlock,
                                            (; wb, sbgt, gbgt, lt, st, lcse, cte, gcarde,
-                                            sgcarde, smtx, sgmtx, slt, sst, sglt, sgst, tn,
-                                            sets, tr, ple, ccnt, cobj, ss, card, scard, l2c,
-                                            lpc, linfc, l1, l2, lp, linf, xbgt),
+                                            sgcarde, smtx, sgmtx, slt, sst, sglt, sgst,
+                                            conc, tn, sets, tr, ple, ccnt, cobj, ss, card,
+                                            scard, l2c, lpc, linfc, l1, l2, lp, linf, xbgt),
                                            constraint_block_td_defaults())
         return new{typeof(wb), typeof(sbgt), typeof(gbgt), typeof(lt), typeof(st),
                    typeof(lcse), typeof(cte), typeof(gcarde), typeof(sgcarde), typeof(smtx),
                    typeof(sgmtx), typeof(slt), typeof(sst), typeof(sglt), typeof(sgst),
-                   typeof(tn), typeof(sets), typeof(tr), typeof(ple), typeof(ccnt),
-                   typeof(cobj), typeof(ss), typeof(card), typeof(scard), typeof(l2c),
-                   typeof(lpc), typeof(linfc), typeof(l1), typeof(l2), typeof(lp),
-                   typeof(linf), typeof(xbgt)}(wb, sbgt, gbgt, lt, st, lcse, cte, gcarde,
-                                               sgcarde, smtx, sgmtx, slt, sst, sglt, sgst,
-                                               tn, sets, tr, ple, ccnt, cobj, ss, card,
-                                               scard, l2c, lpc, linfc, l1, l2, lp, linf,
-                                               xbgt)
+                   typeof(conc), typeof(tn), typeof(sets), typeof(tr), typeof(ple),
+                   typeof(ccnt), typeof(cobj), typeof(ss), typeof(card), typeof(scard),
+                   typeof(l2c), typeof(lpc), typeof(linfc), typeof(l1), typeof(l2),
+                   typeof(lp), typeof(linf), typeof(xbgt)}(wb, sbgt, gbgt, lt, st, lcse,
+                                                           cte, gcarde, sgcarde, smtx,
+                                                           sgmtx, slt, sst, sglt, sgst,
+                                                           conc, tn, sets, tr, ple, ccnt,
+                                                           cobj, ss, card, scard, l2c, lpc,
+                                                           linfc, l1, l2, lp, linf, xbgt)
     end
 end
 function ConstraintBlock(; wb::TD_Option{<:WbE_Wb} = WeightBounds(),
@@ -324,6 +344,7 @@ function ConstraintBlock(; wb::TD_Option{<:WbE_Wb} = WeightBounds(),
                          sst::TD_Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
                          sglt::TD_Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
                          sgst::TD_Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
+                         conc::TD_Option{<:Union{CnlE_Cnl, AbstractVector}} = nothing,
                          tn::TD_Option{<:Union{TnE_Tn, AbstractVector}} = nothing,
                          sets::TD_Option{<:UniverseSets} = nothing,
                          tr::TD_Option{<:Tr_VecTr} = nothing,
@@ -331,8 +352,8 @@ function ConstraintBlock(; wb::TD_Option{<:WbE_Wb} = WeightBounds(),
                          ccnt::TD_Option{<:JuMPConstr_VecJuMPConstr} = nothing,
                          cobj::TD_Option{<:JuMPObj_VecJuMPObj} = nothing,
                          ss::TD_Option{<:Number} = nothing,
-                         card::TD_Option{<:Integer} = nothing,
-                         scard::TD_Option{<:Int_VecInt} = nothing,
+                         card::TD_Option{<:Real_CountFraction} = nothing,
+                         scard::TD_Option{<:Union{Real_CountFraction, AbstractVector}} = nothing,
                          l2c::TD_Option{<:Num_NormCeilCal} = nothing,
                          lpc::TD_Option{<:LpReg_VecLpReg} = nothing,
                          linfc::TD_Option{<:Num_NormCeilCal} = nothing,
@@ -350,9 +371,11 @@ function ConstraintBlock(; wb::TD_Option{<:WbE_Wb} = WeightBounds(),
                            narrow_mixed_vector(sst, Option{<:BtE_Bt}, :sst),
                            narrow_mixed_vector(sglt, Option{<:BtE_Bt}, :sglt),
                            narrow_mixed_vector(sgst, Option{<:BtE_Bt}, :sgst),
+                           narrow_mixed_vector(conc, CnlE_Cnl, :conc),
                            narrow_mixed_vector(tn, TnE_Tn, :tn), sets, tr,
                            narrow_mixed_vector(ple, PlCE_PlC, :ple), ccnt, cobj, ss, card,
-                           scard, l2c, lpc, linfc, l1, l2, lp, linf, xbgt)
+                           narrow_mixed_vector(scard, Real_CountFraction, :scard), l2c, lpc,
+                           linfc, l1, l2, lp, linf, xbgt)
 end
 """
     constraint_block(cbe::Nothing; slots...) -> ConstraintBlock
@@ -507,7 +530,7 @@ The method of the owner calls it, see `port_opt_view(opt::JuMPOptimiser, i, X)` 
 
 # Algorithm
 
- 1. View at `i` the slots that can hold a value for each asset: `wb`, `lt`, `st`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn`, `lcse`, `sets`, `ccnt` and `cobj`. When `smtx` and `sgmtx` hold the same object, view it once, so that the two views are one object too. The same holds for `slt` and `sglt`, and for `sst` and `sgst`.
+ 1. View at `i` the slots that can hold a value for each asset: `wb`, `lt`, `st`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `conc`, `tn`, `lcse`, `sets`, `ccnt` and `cobj`. When `smtx` and `sgmtx` hold the same object, view it once, so that the two views are one object too. The same holds for `slt` and `sglt`, and for `sst` and `sgst`.
  2. View `tr` at `i` with `args`. A tracking measure gives the returns matrix `X` in `args` to the risk measure that it tracks.
  3. Keep every other slot. An estimator in `cte`, `gcarde` or `sgcarde` resolves its names against the viewed `sets`. A precomputed constraint in one of them keeps its width, because no view can narrow its matrix, see `port_opt_view(::LinearConstraint, i)`. `ple` reads the viewed prior of the owner. The other slots hold no value for each asset.
  4. Rebuild the block with its keyword constructor, which checks the viewed slots again.
@@ -534,7 +557,8 @@ function port_opt_view(cbe::ConstraintBlock, i, args...)::ConstraintBlock
     return rebuild_struct(cbe,
                           (; wb = port_opt_view(cbe.wb, i), lt = port_opt_view(cbe.lt, i),
                            st = port_opt_view(cbe.st, i), lcse = port_opt_view(cbe.lcse, i),
-                           smtx, sgmtx, slt, sst, sglt, sgst, tn = port_opt_view(cbe.tn, i),
+                           smtx, sgmtx, slt, sst, sglt, sgst,
+                           conc = port_opt_view(cbe.conc, i), tn = port_opt_view(cbe.tn, i),
                            sets = port_opt_view(cbe.sets, i),
                            tr = port_opt_view(cbe.tr, i, args...),
                            ccnt = port_opt_view(cbe.ccnt, i),
@@ -617,8 +641,8 @@ Holds the Resolved Constraint Block of the glossary: the data that a [`Constrain
 The Result holds three kinds of data:
 
  1. The prior result `pr` and the rows `rd` of its block. A block that reads no rows holds `nothing` in both.
- 2. The resolved slots. Each field holds the result of the slot of the block, and the five slots that change their name take the `r` of a result: `lcse` gives `lcsr`, `cte` gives `ctr`, `gcarde` gives `gcardr`, `sgcarde` gives `sgcardr` and `ple` gives `plr`. A Calibration Rule in `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp` or `linf` is resolved to its value.
- 3. The settings that need no resolution: `card`, `scard`, `ss`, `xbgt`, `sbgt`, `gbgt`, `ccnt` and `cobj`.
+ 2. The resolved slots. Each field holds the result of the slot of the block, and the five slots that change their name take the `r` of a result: `lcse` gives `lcsr`, `cte` gives `ctr`, `gcarde` gives `gcardr`, `sgcarde` gives `sgcardr` and `ple` gives `plr`. A Calibration Rule in `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp` or `linf` is resolved to its value. A [`CountOf`](@ref) or a [`FractionOf`](@ref) in `card` or `scard` is resolved to its number.
+ 3. The settings that need no resolution: `ss`, `xbgt`, `sbgt`, `gbgt`, `ccnt` and `cobj`.
 
 The tracking errors `tr` and the names `sets` are not fields. The builder of the tracking errors binds them to the rows of the Result, and no builder reads `sets`.
 
@@ -638,13 +662,13 @@ $(DocStringExtensions.FIELDS)
                             sgmtx::Option{<:MatNum_VecMatNum},
                             slt::Option{<:Bt_VecOptBt}, sst::Option{<:Bt_VecOptBt},
                             sglt::Option{<:Bt_VecOptBt}, sgst::Option{<:Bt_VecOptBt},
-                            tn::Option{<:Tn_VecTn}, plr::Option{<:PlC_VecPlC},
-                            l2c::Option{<:Number}, lpc::Option{<:LpReg_VecLpReg},
-                            linfc::Option{<:Number}, l1::Option{<:Number},
-                            l2::Option{<:L2Reg_VecL2Reg}, lp::Option{<:LpReg_VecLpReg},
-                            linf::Option{<:Number}, card::Option{<:Integer},
-                            scard::Option{<:Int_VecInt}, ss::Option{<:Number},
-                            xbgt::Bool, sbgt::Option{<:Num_BgtRg},
+                            conc::Option{<:Cnl_VecCnl}, tn::Option{<:Tn_VecTn},
+                            plr::Option{<:PlC_VecPlC}, l2c::Option{<:Number},
+                            lpc::Option{<:LpReg_VecLpReg}, linfc::Option{<:Number},
+                            l1::Option{<:Number}, l2::Option{<:L2Reg_VecL2Reg},
+                            lp::Option{<:LpReg_VecLpReg}, linf::Option{<:Number},
+                            card::Option{<:Integer}, scard::Option{<:Int_VecInt},
+                            ss::Option{<:Number}, xbgt::Bool, sbgt::Option{<:Num_BgtRg},
                             gbgt::Option{<:Num_BgtRg},
                             ccnt::Option{<:JuMPConstr_VecJuMPConstr},
                             cobj::Option{<:JuMPObj_VecJuMPObj}) -> ResolvedConstraintBlock
@@ -652,9 +676,9 @@ $(DocStringExtensions.FIELDS)
 Keywords correspond to the struct's fields, and each keyword has no default. Make the Result with [`resolve_constraint_block`](@ref). The constructor checks the type of each field, so a slot that holds an estimator raises a `TypeError`. It checks no value, because the resolution checked the values.
 
     ResolvedConstraintBlock(cbe::ConstraintBlock; pr, rd, wb, lcsr, gcardr, ctr, plr, l2c,
-                            lpc, linfc, l1, l2, lp, linf) -> ResolvedConstraintBlock
+                            lpc, linfc, l1, l2, lp, linf, card, scard) -> ResolvedConstraintBlock
 
-Builds the Result from the values of stage 2 and the slots of the block that stage 2 does not resolve. The keywords are the prior result, the rows and the twelve values of stage 2, and each keyword is required. The method takes the other slots and settings from `cbe`, with `cbe.sgcarde` as `sgcardr`. Both methods of [`resolve_constraint_block`](@ref) call it, so the list of the stage 1 slots and of the settings is written once.
+Builds the Result from the values of stage 2 and the slots of the block that stage 2 does not resolve. The keywords are the prior result, the rows and the fourteen values of stage 2, and each keyword is required. The method takes the other slots and settings from `cbe`, with `cbe.sgcarde` as `sgcardr`. Both methods of [`resolve_constraint_block`](@ref) call it, so the list of the stage 1 slots and of the settings is written once.
 
 # Related
 
@@ -725,6 +749,10 @@ Builds the Result from the values of stage 2 and the slots of the block that sta
     """
     sgst
     """
+    $(field_dict[:conc])
+    """
+    conc
+    """
     $(field_dict[:tnr])
     """
     tn
@@ -761,11 +789,11 @@ Builds the Result from the values of stage 2 and the slots of the block that sta
     """
     linf
     """
-    $(field_dict[:card])
+    $(field_dict[:cardr])
     """
     card
     """
-    $(field_dict[:scard])
+    $(field_dict[:scardr])
     """
     scard
     """
@@ -803,7 +831,8 @@ Builds the Result from the values of stage 2 and the slots of the block that sta
                                      sgmtx::Option{<:MatNum_VecMatNum},
                                      slt::Option{<:Bt_VecOptBt}, sst::Option{<:Bt_VecOptBt},
                                      sglt::Option{<:Bt_VecOptBt},
-                                     sgst::Option{<:Bt_VecOptBt}, tn::Option{<:Tn_VecTn},
+                                     sgst::Option{<:Bt_VecOptBt},
+                                     conc::Option{<:Cnl_VecCnl}, tn::Option{<:Tn_VecTn},
                                      plr::Option{<:PlC_VecPlC}, l2c::Option{<:Number},
                                      lpc::Option{<:LpReg_VecLpReg}, linfc::Option{<:Number},
                                      l1::Option{<:Number}, l2::Option{<:L2Reg_VecL2Reg},
@@ -816,14 +845,15 @@ Builds the Result from the values of stage 2 and the slots of the block that sta
         return new{typeof(pr), typeof(rd), typeof(wb), typeof(lt), typeof(st), typeof(lcsr),
                    typeof(ctr), typeof(gcardr), typeof(sgcardr), typeof(smtx),
                    typeof(sgmtx), typeof(slt), typeof(sst), typeof(sglt), typeof(sgst),
-                   typeof(tn), typeof(plr), typeof(l2c), typeof(lpc), typeof(linfc),
-                   typeof(l1), typeof(l2), typeof(lp), typeof(linf), typeof(card),
-                   typeof(scard), typeof(ss), typeof(xbgt), typeof(sbgt), typeof(gbgt),
-                   typeof(ccnt), typeof(cobj)}(pr, rd, wb, lt, st, lcsr, ctr, gcardr,
-                                               sgcardr, smtx, sgmtx, slt, sst, sglt, sgst,
-                                               tn, plr, l2c, lpc, linfc, l1, l2, lp, linf,
-                                               card, scard, ss, xbgt, sbgt, gbgt, ccnt,
-                                               cobj)
+                   typeof(conc), typeof(tn), typeof(plr), typeof(l2c), typeof(lpc),
+                   typeof(linfc), typeof(l1), typeof(l2), typeof(lp), typeof(linf),
+                   typeof(card), typeof(scard), typeof(ss), typeof(xbgt), typeof(sbgt),
+                   typeof(gbgt), typeof(ccnt), typeof(cobj)}(pr, rd, wb, lt, st, lcsr, ctr,
+                                                             gcardr, sgcardr, smtx, sgmtx,
+                                                             slt, sst, sglt, sgst, conc, tn,
+                                                             plr, l2c, lpc, linfc, l1, l2,
+                                                             lp, linf, card, scard, ss,
+                                                             xbgt, sbgt, gbgt, ccnt, cobj)
     end
 end
 function ResolvedConstraintBlock(; pr::Option{<:AbstractPriorResult},
@@ -836,34 +866,36 @@ function ResolvedConstraintBlock(; pr::Option{<:AbstractPriorResult},
                                  sgmtx::Option{<:MatNum_VecMatNum},
                                  slt::Option{<:Bt_VecOptBt}, sst::Option{<:Bt_VecOptBt},
                                  sglt::Option{<:Bt_VecOptBt}, sgst::Option{<:Bt_VecOptBt},
-                                 tn::Option{<:Tn_VecTn}, plr::Option{<:PlC_VecPlC},
-                                 l2c::Option{<:Number}, lpc::Option{<:LpReg_VecLpReg},
-                                 linfc::Option{<:Number}, l1::Option{<:Number},
-                                 l2::Option{<:L2Reg_VecL2Reg}, lp::Option{<:LpReg_VecLpReg},
-                                 linf::Option{<:Number}, card::Option{<:Integer},
-                                 scard::Option{<:Int_VecInt}, ss::Option{<:Number},
-                                 xbgt::Bool, sbgt::Option{<:Num_BgtRg},
-                                 gbgt::Option{<:Num_BgtRg},
+                                 conc::Option{<:Cnl_VecCnl}, tn::Option{<:Tn_VecTn},
+                                 plr::Option{<:PlC_VecPlC}, l2c::Option{<:Number},
+                                 lpc::Option{<:LpReg_VecLpReg}, linfc::Option{<:Number},
+                                 l1::Option{<:Number}, l2::Option{<:L2Reg_VecL2Reg},
+                                 lp::Option{<:LpReg_VecLpReg}, linf::Option{<:Number},
+                                 card::Option{<:Integer}, scard::Option{<:Int_VecInt},
+                                 ss::Option{<:Number}, xbgt::Bool,
+                                 sbgt::Option{<:Num_BgtRg}, gbgt::Option{<:Num_BgtRg},
                                  ccnt::Option{<:JuMPConstr_VecJuMPConstr},
                                  cobj::Option{<:JuMPObj_VecJuMPObj})::ResolvedConstraintBlock
     return ResolvedConstraintBlock(pr, rd, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx,
-                                   sgmtx, slt, sst, sglt, sgst, tn, plr, l2c, lpc, linfc,
-                                   l1, l2, lp, linf, card, scard, ss, xbgt, sbgt, gbgt,
-                                   ccnt, cobj)
+                                   sgmtx, slt, sst, sglt, sgst, conc, tn, plr, l2c, lpc,
+                                   linfc, l1, l2, lp, linf, card, scard, ss, xbgt, sbgt,
+                                   gbgt, ccnt, cobj)
 end
 function ResolvedConstraintBlock(cbe::ConstraintBlock; pr, rd, wb, lcsr, gcardr, ctr, plr,
-                                 l2c, lpc, linfc, l1, l2, lp, linf)::ResolvedConstraintBlock
+                                 l2c, lpc, linfc, l1, l2, lp, linf, card,
+                                 scard)::ResolvedConstraintBlock
     # The keyword constructor types each slot. `@concrete` also appends an untyped
     # positional constructor, so a positional call would let an estimator through.
     return ResolvedConstraintBlock(; pr = pr, rd = rd, wb = wb, lt = cbe.lt, st = cbe.st,
                                    lcsr = lcsr, ctr = ctr, gcardr = gcardr,
                                    sgcardr = cbe.sgcarde, smtx = cbe.smtx,
                                    sgmtx = cbe.sgmtx, slt = cbe.slt, sst = cbe.sst,
-                                   sglt = cbe.sglt, sgst = cbe.sgst, tn = cbe.tn, plr = plr,
-                                   l2c = l2c, lpc = lpc, linfc = linfc, l1 = l1, l2 = l2,
-                                   lp = lp, linf = linf, card = cbe.card, scard = cbe.scard,
-                                   ss = cbe.ss, xbgt = cbe.xbgt, sbgt = cbe.sbgt,
-                                   gbgt = cbe.gbgt, ccnt = cbe.ccnt, cobj = cbe.cobj)
+                                   sglt = cbe.sglt, sgst = cbe.sgst, conc = cbe.conc,
+                                   tn = cbe.tn, plr = plr, l2c = l2c, lpc = lpc,
+                                   linfc = linfc, l1 = l1, l2 = l2, lp = lp, linf = linf,
+                                   card = card, scard = scard, ss = cbe.ss, xbgt = cbe.xbgt,
+                                   sbgt = cbe.sbgt, gbgt = cbe.gbgt, ccnt = cbe.ccnt,
+                                   cobj = cbe.cobj)
 end
 """
     const VecRcb = AbstractVector{<:ResolvedConstraintBlock}
@@ -948,8 +980,9 @@ A slot is a stage 1 slot when its value follows a view at the mask, so the two o
  1. Resolve the thresholds `lt` and `st` with [`threshold_constraints`](@ref).
  2. Resolve the sub-grouped cardinality constraint `sgcarde` with [`linear_constraints`](@ref), with integer values. Its columns are the sub-groups and not the assets, so a view does not change it.
  3. Resolve the sub-group matrices `smtx` and `sgmtx` with [`asset_sets_matrix`](@ref), and the sub-group thresholds `slt`, `sst`, `sglt` and `sgst` with [`threshold_constraints`](@ref). When the two slots of a pair hold one object, resolve it once with [`shared_pair_resolution`](@ref).
- 4. Resolve the turnover constraints `tn` with [`turnover_constraints`](@ref).
- 5. Return `cbe` rebuilt with the resolved slots, with [`rebuild_struct`](@ref).
+ 4. Resolve the concentration rules `conc` with [`concentration_limit_constraints`](@ref). The matrix of a rule follows a view at the mask, as `smtx` does.
+ 5. Resolve the turnover constraints `tn` with [`turnover_constraints`](@ref).
+ 6. Return `cbe` rebuilt with the resolved slots, with [`rebuild_struct`](@ref).
 
 # Arguments
 
@@ -972,8 +1005,8 @@ function resolve_constraint_block_names(cbe::ConstraintBlock, strict::Bool,
                                         datatype::DataType)::ConstraintBlock
     sets = cbe.sets
     thr = x -> threshold_constraints(x, sets; datatype = datatype, strict = strict)
-    smtx, sgmtx = shared_pair_resolution(x -> asset_sets_matrix(x, sets), cbe.smtx,
-                                         cbe.sgmtx)
+    smtx, sgmtx = shared_pair_resolution(x -> asset_sets_matrix(x, sets; strict = strict),
+                                         cbe.smtx, cbe.sgmtx)
     slt, sglt = shared_pair_resolution(thr, cbe.slt, cbe.sglt)
     sst, sgst = shared_pair_resolution(thr, cbe.sst, cbe.sgst)
     return rebuild_struct(cbe,
@@ -981,6 +1014,8 @@ function resolve_constraint_block_names(cbe::ConstraintBlock, strict::Bool,
                            sgcarde = linear_constraints(cbe.sgcarde, sets; datatype = Int,
                                                         strict = strict), smtx, sgmtx, slt,
                            sst, sglt, sgst,
+                           conc = concentration_limit_constraints(cbe.conc, sets;
+                                                                  strict = strict),
                            tn = turnover_constraints(cbe.tn, sets; datatype = datatype,
                                                      strict = strict)))
 end
@@ -1015,10 +1050,11 @@ end
 """
     resolve_constraint_block(cbe::ConstraintBlock, pr::AbstractPriorResult, rd::ReturnsResult;
                              slv, strict::Bool = false, kwargs...) -> ResolvedConstraintBlock
-    resolve_constraint_block(cbe::ConstraintBlock, pr::Nothing, rd::Option{<:ReturnsResult};
+    resolve_constraint_block(cbe::ConstraintBlock, pr::Nothing,
+                             rd::Option{<:Union{ReturnsResult, Integer}};
                              strict::Bool = false, kwargs...) -> ResolvedConstraintBlock
-    resolve_constraint_block(cbe::ConstraintBlock, pr::AbstractPriorResult, rd::Nothing;
-                             kwargs...)
+    resolve_constraint_block(cbe::ConstraintBlock, pr::AbstractPriorResult,
+                             rd::Option{<:Integer}; kwargs...)
 
 Resolves a [`ConstraintBlock`](@ref) against its own prior and rows, to its [`ResolvedConstraintBlock`](@ref). This is stage 2 of the resolution.
 
@@ -1026,7 +1062,7 @@ Both owners of a block call it. The shared entry of every head, [`resolve_block_
 
 One rule orders the names and the reduction for every block. Stage 1 resolves before the reduction, and a view at the mask follows its values. This function resolves after the reduction, over the `sets` of the block, which carry the Non-Investable Axis. So a name that left the investable universe drops its row and is not refused, and a precomputed constraint keeps its width. [`assert_investable_constraint_width`](@ref) then refuses a precomputed `lcse` or `gcarde` whose width is not the number of assets of the block.
 
-The method for `pr = nothing` is the method of a programme set that reads no rows, see [`rows_needed`](@ref). Its prior-reading slots hold values that read no prior, so it resolves the slots that read names alone, and keeps every other slot. Its Result holds no prior and no rows.
+The method for `pr = nothing` is the method of a programme set that reads no rows, see [`rows_needed`](@ref). Its prior-reading slots hold values that read no prior, so it resolves the slots that read names and the cardinality caps alone, and keeps every other slot. Its Result holds no prior and no rows.
 
 # Algorithm
 
@@ -1037,20 +1073,22 @@ The method on a prior result runs these steps.
  3. Fit the centrality rows `ctr` with [`centrality_constraints`](@ref) and the phylogeny result `plr` with [`phylogeny_constraints`](@ref). Each reads the prior, the rows and the implied volatilities `rd.iv` and `rd.ivpa`. A reader that cannot estimate an asset raises a [`DistanceReaderRefusalError`](@ref), which the caller catches.
  4. Resolve each Calibration Rule against the prior and the solver `slv`. The norm ceilings `l2c` and `linfc` state their norm order in a [`CalibrationContext`](@ref), and `lpc` goes through [`norm_ceiling_factory`](@ref). The penalties `l1` and `linf` go through [`resolve_calibration_slot`](@ref), and `l2` and `lp` through their own `factory`.
  5. Check the four slots that hold a number, `l2c`, `linfc`, `l1` and `linf`, with [`assert_nonempty_gt0_finite_val`](@ref). A rule states no number at construction, so this is the first point that knows the number.
- 6. Return the Result, with the stage 1 slots and the settings of `cbe`, `pr` and `rd`.
+ 6. Resolve the caps `card` and `scard` with [`resolve_cardinality_cap`](@ref). The set behind a [`FractionOf`](@ref) is the `N` investable assets for `card`, and the sub-groups of the matrix of `smtx` for each entry of `scard`.
+ 7. Return the Result, with the stage 1 slots and the settings of `cbe`, `pr` and `rd`.
 
 # Arguments
 
   - `cbe`: The block, after stage 1 and the view at the mask.
   - `pr`: The prior result of the block, or `nothing` when the block reads no rows.
-  - `rd`: The rows of the block. The method for `pr = nothing` reads only their element type and their width, and it takes `nothing` outside an Online Update.
+  - `rd`: The rows of the block. The method for `pr = nothing` reads only their element type and their width. Outside an Online Update it takes the number of assets in their place, or `nothing` when that number is not known.
   - `slv`: The solver of the owner, which a Calibration Rule resolves against.
   - $(arg_dict[:strict])
   - `kwargs...`: Passed to [`centrality_constraints`](@ref) and [`phylogeny_constraints`](@ref).
 
 # Validation
 
-  - The rules of [`assert_investable_constraint_width`](@ref) for `lcsr` and `gcardr`. The method for `pr = nothing` checks them when it has rows.
+  - The rules of [`assert_investable_constraint_width`](@ref) for `lcsr` and `gcardr`. The method for `pr = nothing` checks them when it has rows or a number of assets.
+  - The method for `pr = nothing` with `rd === nothing` refuses a [`FractionOf`](@ref) in `card`. An `IsNothingError` is thrown.
   - `l2c`, `linfc`, `l1` and `linf` are `nothing` or finite and `> 0` after the resolution. A `DomainError` or an `IsNonFiniteError` is thrown otherwise.
   - A prior result with no rows. An `IsNothingError` is thrown. The prior of a block is fitted on its rows, so this pair does not occur in the library.
 
@@ -1095,27 +1133,31 @@ function resolve_constraint_block(cbe::ConstraintBlock, pr::AbstractPriorResult,
             plr = phylogeny_constraints(cbe.ple, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
                                         kwargs...), l2c,
             lpc = norm_ceiling_factory(cbe.lpc, pr, slv), linfc, l1,
-            l2 = factory(cbe.l2, pr, slv), lp = factory(cbe.lp, pr, slv), linf)
+            l2 = factory(cbe.l2, pr, slv), lp = factory(cbe.lp, pr, slv), linf,
+            card = resolve_cardinality_cap(cbe.card, N),
+            scard = resolve_cardinality_cap(cbe.scard, cbe.smtx))
     return ResolvedConstraintBlock(cbe; pr = pr, rd = rd, vals...)
 end
-function resolve_constraint_block(::ConstraintBlock, ::AbstractPriorResult, ::Nothing;
-                                  kwargs...)
+function resolve_constraint_block(::ConstraintBlock, ::AbstractPriorResult,
+                                  ::Option{<:Integer}; kwargs...)
     return throw(IsNothingError("the prior result of a block is fitted on its rows, so a block with a prior and no rows cannot resolve the slots that read the rows."))
 end
 function resolve_constraint_block(cbe::ConstraintBlock, ::Nothing,
-                                  rd::Option{<:ReturnsResult}; strict::Bool = false,
-                                  kwargs...)::ResolvedConstraintBlock
+                                  rd::Option{<:Union{ReturnsResult, Integer}};
+                                  strict::Bool = false, kwargs...)::ResolvedConstraintBlock
     sets = cbe.sets
     lcsr = linear_constraints(cbe.lcse, sets; strict = strict, rows_datatype(rd)...)
     gcardr = linear_constraints(cbe.gcarde, sets; datatype = Int, strict = strict)
-    assert_rows_constraint_width(lcsr, gcardr, rd)
+    N = rows_width(rd)
+    assert_rows_constraint_width(lcsr, gcardr, N)
     vals = (; wb = cbe.wb, lcsr, gcardr, ctr = cbe.cte, plr = cbe.ple, l2c = cbe.l2c,
             lpc = cbe.lpc, linfc = cbe.linfc, l1 = cbe.l1, l2 = cbe.l2, lp = cbe.lp,
-            linf = cbe.linf)
+            linf = cbe.linf, card = resolve_cardinality_cap(cbe.card, N),
+            scard = resolve_cardinality_cap(cbe.scard, cbe.smtx))
     return ResolvedConstraintBlock(cbe; pr = nothing, rd = nothing, vals...)
 end
 """
-    rows_datatype(rd::Nothing)
+    rows_datatype(rd::Option{<:Integer})
     rows_datatype(rd::ReturnsResult)
 
 Returns the element type of the rows of a block that reads no prior, as a keyword of a resolver.
@@ -1124,29 +1166,51 @@ A block with no prior and no rows passes no keyword, so the resolver takes its o
 
 # Returns
 
-  - `kw::NamedTuple`: `(; datatype = eltype(rd.X))`, or an empty tuple when `rd` is `nothing`.
+  - `kw::NamedTuple`: `(; datatype = eltype(rd.X))`, or an empty tuple when `rd` holds no rows.
 
 # Related
 
   - [`resolve_constraint_block`](@ref)
+  - [`rows_width`](@ref)
 """
-function rows_datatype(::Nothing)::NamedTuple
+function rows_datatype(::Option{<:Integer})::NamedTuple
     return (;)
 end
 function rows_datatype(rd::ReturnsResult)::NamedTuple
     return (; datatype = eltype(rd.X))
 end
 """
-    assert_rows_constraint_width(lcsr, gcardr, rd::Nothing)
-    assert_rows_constraint_width(lcsr, gcardr, rd::ReturnsResult)
+    rows_width(rd::Option{<:Integer})
+    rows_width(rd::ReturnsResult)
 
-Checks the width of the linear constraints of a block that reads no prior, against the columns of its rows.
+Returns the number of assets of a block that reads no prior: the columns of its rows, the number that its caller gives in place of the rows, or `nothing` when neither is known.
 
-A block with no rows has no width to check against, and the model refuses a wrong width.
+# Returns
+
+  - `N::Option{<:Integer}`: The number of assets, or `nothing`.
+
+# Related
+
+  - [`resolve_constraint_block`](@ref)
+  - [`rows_datatype`](@ref)
+"""
+function rows_width(rd::Option{<:Integer})
+    return rd
+end
+function rows_width(rd::ReturnsResult)
+    return size(rd.X, 2)
+end
+"""
+    assert_rows_constraint_width(lcsr, gcardr, N::Nothing)
+    assert_rows_constraint_width(lcsr, gcardr, N::Integer)
+
+Checks the width of the linear constraints of a block that reads no prior, against its number of assets `N`, see [`rows_width`](@ref).
+
+A block whose number of assets is not known has no width to check against, and the model refuses a wrong width.
 
 # Validation
 
-  - The rules of [`assert_investable_constraint_width`](@ref), with `N = size(rd.X, 2)`.
+  - The rules of [`assert_investable_constraint_width`](@ref).
 
 # Returns
 
@@ -1159,8 +1223,7 @@ A block with no rows has no width to check against, and the model refuses a wron
 function assert_rows_constraint_width(::Any, ::Any, ::Nothing)::Nothing
     return nothing
 end
-function assert_rows_constraint_width(lcsr, gcardr, rd::ReturnsResult)::Nothing
-    N = size(rd.X, 2)
+function assert_rows_constraint_width(lcsr, gcardr, N::Integer)::Nothing
     assert_investable_constraint_width(lcsr, N, "lcse")
     assert_investable_constraint_width(gcardr, N, "gcarde")
     return nothing
@@ -1219,7 +1282,7 @@ Phase 1:
  1. When `prefix` is not empty, register the weights of the model under it, with the owner `Symbol("")`. Add the weight bounds, the net budget `bgt`, and the short and gross budgets of the block. [`set_block_weight_constraints!`](@ref) does both.
  2. Mark `sdp_phylogeny` on the owner of the weights when `cbr.plr` holds a semidefinite phylogeny, with [`mark_sdp_phylogeny!`](@ref). Every variance on the weights then takes the semidefinite formulation, so a variance of the owner that the objective minimises holds down the lift that the rows of phase 2 bind.
  3. Add the linear rows `lcsr`, then the centrality rows `ctr`, with [`set_linear_weight_constraints!`](@ref).
- 4. Add the MIP kinds with [`set_mip_constraints!`](@ref), the exact cost budget of a [`BudgetCosts`](@ref) whose `xbgt` is `true` with [`set_cost_budget_mip_constraints!`](@ref), then the sub-group MIP kinds with [`set_smip_constraints!`](@ref).
+ 4. Add the MIP kinds with [`set_mip_constraints!`](@ref), the exact cost budget of a [`BudgetCosts`](@ref) whose `xbgt` is `true` with [`set_cost_budget_mip_constraints!`](@ref), then the sub-group MIP kinds with [`set_smip_constraints!`](@ref), then the concentration rules with [`set_concentration_constraints!`](@ref).
  5. Add the turnover ceilings with [`set_turnover_constraints!`](@ref).
  6. Add the tracking errors `tr` with [`set_tracking_error_constraints!`](@ref), on the prior of the block.
  7. Add the norm ceilings `l2c`, `lpc` and `linfc`, then the penalties `l1`, `l2`, `lp` and `linf`.
@@ -1272,6 +1335,7 @@ function set_block_constraints!(model::JuMP.Model, cbr::ResolvedConstraintBlock,
     set_cost_budget_mip_constraints!(model, bgt, wb, ss)
     set_smip_constraints!(model, wb, cbr.scard, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst,
                           ss; prefix = prefix)
+    set_concentration_constraints!(model, cbr.conc, wb, ss; prefix = prefix)
     set_turnover_constraints!(model, cbr.tn; prefix = prefix)
     set_tracking_error_constraints!(model, cbr.pr, tr, owner, plr, fees, b1;
                                     prefix = prefix, kwargs...)

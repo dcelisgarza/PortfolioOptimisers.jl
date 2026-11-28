@@ -92,8 +92,9 @@ end
     # each) and `RankOneCovariance` (two), so it rose by four. `GeodesicShrinkageCovariance`
     # carries two verbs, so it rose by two. The robust covariance estimators added
     # `MCDCovariance` and `TylerCovariance` (two verbs each) and `RobustExpectedReturns` (one),
-    # so it rose by five.
-    @test checked == 61
+    # so it rose by five. The S and MM estimators added `SCovariance` and `MMCovariance` (two
+    # verbs each), so it rose by four.
+    @test checked == 65
 end
 
 @testset "a panel arm answers the same at both orientations" begin

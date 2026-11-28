@@ -724,21 +724,23 @@ function supports_precomputed_returns(r::TrackingRiskMeasure{<:Any,
 end
 """
     bind_data_benchmark(r::TrackingRiskMeasure, rd)
-    bind_data_benchmark(r::Union{RiskTrackingError, RiskTrackingRiskMeasure}, rd)
+    bind_data_benchmark(r::RiskTrackingError, rd)
+    bind_data_benchmark(r::AbstractBaseRiskMeasure, rd)
 
-Bind the [`DataBenchmarkTracking`](@ref) that a tracking measure holds to the benchmark `B` of the returns data `rd`.
+Bind the [`DataBenchmarkTracking`](@ref) that a risk measure or a risk tracker holds to the benchmark `B` of the returns data `rd`.
 
-A [`TrackingRiskMeasure`](@ref) binds its `tr` field. A [`RiskTrackingError`](@ref) and a [`RiskTrackingRiskMeasure`](@ref) track a benchmark portfolio, so they bind the measure `r` that they track. Each rebuilds through its keyword constructor only when the field changes, as [`bind_data_benchmark`](@ref) states.
+A [`TrackingRiskMeasure`](@ref) binds its `tr` field. A [`RiskTrackingError`](@ref) tracks a benchmark portfolio, so it binds the measure `r` that it tracks. Every other measure binds the parts that its [`deferred_slots`](@ref) declares, so a composite, such as a [`RiskTrackingRiskMeasure`](@ref) or a ratio measure, needs no method of its own. A measure for which [`holds_data_benchmark`](@ref) is `false` comes back as itself.
 
 # Algorithm
 
- 1. Bind the field that can hold a data benchmark with [`bind_data_benchmark`](@ref): `tr` of a [`TrackingRiskMeasure`](@ref), giving `tr`, or the tracked measure `r` of the two risk trackers, giving `inner`.
- 2. Return `r` itself when the bound field is the field it replaces, by `===`.
- 3. Otherwise rebuild `r` with the bound field through its keyword constructor, with [`rebuild_struct`](@ref).
+ 1. On a [`TrackingRiskMeasure`](@ref), bind `tr`. On a [`RiskTrackingError`](@ref), bind the tracked measure `r`. Return `r` itself when the bound field is the field it replaces, by `===`. Otherwise rebuild `r` with the bound field through its keyword constructor, with [`rebuild_struct`](@ref).
+ 2. On any other measure, return `r` itself when [`holds_data_benchmark`](@ref) is `false`. Otherwise bind each slot of [`deferred_slots`](@ref), and rebuild `r` with [`rebuild_with_slots`](@ref), which runs the constructor only when a slot changes.
 
 # Related
 
   - [`bind_data_benchmark`](@ref)
+  - [`holds_data_benchmark`](@ref)
+  - [`deferred_slots`](@ref)
   - [`DataBenchmarkTracking`](@ref)
   - [`TrackingRiskMeasure`](@ref)
 """
@@ -746,13 +748,44 @@ function bind_data_benchmark(r::TrackingRiskMeasure, rd)
     tr = bind_data_benchmark(r.tr, rd)
     return tr === r.tr ? r : rebuild_struct(r, (; tr = tr))
 end
-function bind_data_benchmark(r::Union{RiskTrackingError, RiskTrackingRiskMeasure}, rd)
+function bind_data_benchmark(r::RiskTrackingError, rd)
     inner = bind_data_benchmark(r.r, rd)
     return inner === r.r ? r : rebuild_struct(r, (; r = inner))
 end
 function ucs_risk_measure(r::Union{RiskTrackingError, RiskTrackingRiskMeasure}, rd, pr)
     inner = ucs_risk_measure(r.r, rd, pr)
     return inner === r.r ? r : rebuild_struct(r, (; r = inner))
+end
+function bind_data_benchmark(r::AbstractBaseRiskMeasure, rd)
+    return if holds_data_benchmark(r)
+        rebuild_with_slots(r, map(x -> bind_data_benchmark(x, rd), deferred_slots(r)))
+    else
+        r
+    end
+end
+"""
+    holds_data_benchmark(r::TrackingRiskMeasure) -> Bool
+    holds_data_benchmark(r::RiskTrackingError) -> Bool
+    holds_data_benchmark(r::AbstractBaseRiskMeasure) -> Bool
+
+Return whether a risk measure or a risk tracker holds a [`DataBenchmarkTracking`](@ref).
+
+A [`TrackingRiskMeasure`](@ref) answers for its `tr` field, and a [`RiskTrackingError`](@ref) for the measure `r` that it tracks. Every other measure answers for the parts that its [`deferred_slots`](@ref) declares. The types decide the answer, so it is a constant for a measure of one concrete type.
+
+# Related
+
+  - [`holds_data_benchmark`](@ref)
+  - [`bind_data_benchmark`](@ref)
+  - [`deferred_slots`](@ref)
+"""
+function holds_data_benchmark(r::TrackingRiskMeasure)
+    return holds_data_benchmark(r.tr)
+end
+function holds_data_benchmark(r::RiskTrackingError)
+    return holds_data_benchmark(r.r)
+end
+function holds_data_benchmark(r::AbstractBaseRiskMeasure)
+    return any(holds_data_benchmark, values(deferred_slots(r)))
 end
 """
     reader_frames(r::Union{RiskTrackingError, RiskTrackingRiskMeasure},
