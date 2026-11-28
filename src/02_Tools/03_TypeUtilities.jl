@@ -154,17 +154,63 @@ function concrete_typed_array_if_abstract(A::AbstractArray)
     return isabstracttype(eltype(A)) ? concrete_typed_array(A) : A
 end
 """
-    concrete_typed_array_if_unionall(x)
+    holds_unionall(T) -> Bool
 
-Narrow the element type of a vector with [`concrete_typed_array`](@ref), but only when that element type is a `UnionAll`.
+Return whether the type `T` is a `UnionAll`, or a `Union` with a `UnionAll` member.
 
-A vector of one struct whose elements differ in a type parameter, such as `[Variance(), Variance(; sigma = S)]`, has the element type `Variance{…, T, …} where T`. That type is not abstract, so [`concrete_typed_array_if_abstract`](@ref) keeps it. Julia cannot split a `UnionAll`, so a predicate that the types decide, such as [`holds_data_benchmark`](@ref), becomes a runtime answer on each element. A composite that holds such a vector then rebuilds to a type that Julia cannot infer, and it pays a box at each [`bind_data_benchmark`](@ref). The `Union` of the element types gives each element a concrete type, so the predicate is a constant again.
-
-The function keeps an abstract element type. The bind keeps an abstract element type in the result, so such a vector pays nothing, and a copy would add a cost.
+Julia cannot split such a type, so a predicate that the types decide becomes a runtime answer on a value of it. [`concrete_typed_array_if_unionall`](@ref) reads this function to choose its branch.
 
 # Algorithm
 
- 1. A vector whose element type is a `UnionAll`: return [`concrete_typed_array`](@ref) of it, which copies.
+ 1. A `UnionAll`, such as `Variance{…, T, …} where T`: `true`.
+ 2. A `Union`: `true` if one of its two parts holds a `UnionAll`, by recursion.
+ 3. Any other type, such as a concrete type or an abstract type: `false`.
+
+The answer reads the type alone, so Julia folds it to a constant when the type is known.
+
+# Arguments
+
+  - `T`: The type to test, such as the element type of a vector.
+
+# Returns
+
+  - `Bool`: `true` if `T` is or holds a `UnionAll`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.holds_unionall(Union{Some, Int})
+true
+
+julia> PortfolioOptimisers.holds_unionall(Union{Some{Int}, Int})
+false
+```
+
+# Related
+
+  - [`concrete_typed_array_if_unionall`](@ref)
+"""
+function holds_unionall(::UnionAll)
+    return true
+end
+function holds_unionall(T::Union)
+    return holds_unionall(T.a) || holds_unionall(T.b)
+end
+function holds_unionall(::Any)
+    return false
+end
+"""
+    concrete_typed_array_if_unionall(x)
+
+Narrow the element type of a vector with [`concrete_typed_array`](@ref), but only when that element type is a `UnionAll`, or a `Union` with a `UnionAll` member.
+
+A vector of one struct whose elements differ in a type parameter, such as `[Variance(), Variance(; sigma = S)]`, has the element type `Variance{…, T, …} where T`. That type is not abstract, so [`concrete_typed_array_if_abstract`](@ref) keeps it. Julia cannot split a `UnionAll`, so a predicate that the types decide, such as [`holds_data_benchmark`](@ref), becomes a runtime answer on each element. A composite that holds such a vector then rebuilds to a type that Julia cannot infer, and it pays a box at each [`bind_data_benchmark`](@ref). The `Union` of the element types gives each element a concrete type, so the predicate is a constant again. A `Union` with a `UnionAll` member, such as `Union{Variance, Range}`, has the same defect, and it narrows too.
+
+The function keeps an abstract element type and a `Union` of concrete types. The bind keeps an abstract element type in the result, and Julia splits a `Union` of concrete types, so such a vector pays nothing, and a copy would add a cost.
+
+# Algorithm
+
+ 1. A vector whose element type [`holds_unionall`](@ref): return [`concrete_typed_array`](@ref) of it, which copies.
  2. Any other vector, or a value that is not a vector: return it, which copies nothing. The type of `x` decides the branch.
 
 # Arguments
@@ -173,7 +219,7 @@ The function keeps an abstract element type. The bind keeps an abstract element 
 
 # Returns
 
-  - `x`: With no change if it is not a vector whose element type is a `UnionAll`, else [`concrete_typed_array`](@ref) of it.
+  - `x`: With no change if it is not a vector whose element type [`holds_unionall`](@ref), else [`concrete_typed_array`](@ref) of it.
 
 # Examples
 
@@ -193,11 +239,12 @@ true
 
   - [`concrete_typed_array`](@ref)
   - [`concrete_typed_array_if_abstract`](@ref)
+  - [`holds_unionall`](@ref)
   - [`bind_data_benchmark`](@ref)
   - [`holds_data_benchmark`](@ref)
 """
 function concrete_typed_array_if_unionall(A::AbstractArray)
-    return isa(eltype(A), UnionAll) ? concrete_typed_array(A) : A
+    return holds_unionall(eltype(A)) ? concrete_typed_array(A) : A
 end
 function concrete_typed_array_if_unionall(x)
     return x

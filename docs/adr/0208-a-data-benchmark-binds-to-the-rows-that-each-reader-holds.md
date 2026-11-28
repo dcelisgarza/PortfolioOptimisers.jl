@@ -216,7 +216,9 @@ constructor of each ratio with a vector side narrows such a side to the `Union` 
 with `concrete_typed_array_if_unionall`. The bind then infers, and a side with no data benchmark
 allocates nothing, for a `Union` of 8 types too. The copy costs 2.2 µs and 896 bytes one time for
 two `Variance`, and each evaluation of the ratio then splits the `Union`, 6 % faster on that side.
-A concrete or an abstract side compiles the narrowing to `return x`.
+A side whose element type is a `Union` with a `UnionAll` member, such as
+`Union{Variance, Range}`, has the same defect, and `holds_unionall` narrows it too. A concrete side,
+an abstract side and a side of a `Union` of concrete types compile the narrowing to `return x`.
 
 An answer from the types alone was the other option. A slot of `deferred_slots` has a free type
 parameter with the bound `Any`, so each measure would need to state the types that the slot admits.

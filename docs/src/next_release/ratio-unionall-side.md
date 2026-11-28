@@ -1,5 +1,5 @@
 ```@meta
-Description = "A side of a ratio measure whose element type Julia cannot split narrows to the Union of the types of its elements, so the bind of a data benchmark costs nothing."
+Description = "A side of a ratio measure whose element type Julia cannot split narrows to the Union of its element types, so the bind of a data benchmark costs nothing."
 ```
 
 # [A ratio narrows a side whose element type Julia cannot split](@id migration-next-ratio-unionall-side)

@@ -275,19 +275,23 @@ end
             @test bd.r1[2].tr.B == rdv.B
             # A side of one struct whose elements differ in a type parameter has a `UnionAll`
             # element type. The constructor narrows it to a `Union`, so the bind infers, and a
-            # side with no data benchmark costs nothing (#2386).
+            # side with no data benchmark costs nothing (#2386). A `Union` with a `UnionAll`
+            # member narrows too.
             tw = TrackingRiskMeasure(; tr = WeightsTracking(; w = wb))
             sides(r) = isa(r, NonOptimisationRiskRatio) ? (r.r1, r.r2) : (r.rk,)
             for (side, held) in
                 (([Variance(), Variance(; sigma = cov(X))], false), ([tw, ts], false),
                  ([NonOptimisationRiskRatio(; r1 = Variance(), r2 = Range()),
                    NonOptimisationRiskRatio(; r1 = sd, r2 = Range())], false),
-                 ([tw, td], true))
-                @test isa(eltype(side), UnionAll)
+                 (Union{Variance, Range}[Variance(), Variance(; sigma = cov(X)), Range()],
+                  false), ([tw, td], true))
+                @test PO.holds_unionall(eltype(side))
                 for r in (NonOptimisationRiskRatio(; r1 = side, r2 = side),
                           MeanReturnRiskRatio(; rk = side),
                           ExpectedReturnRiskRatio(; rk = side))
-                    @test all(s -> isa(eltype(s), Union) && s == side, sides(r))
+                    @test all(s -> isa(eltype(s), Union) &&
+                                   !PO.holds_unionall(eltype(s)) &&
+                                   s == side, sides(r))
                     @test PO.holds_data_benchmark(r) == held
                     if held
                         br = PO.bind_data_benchmark(r, rdv)
@@ -299,10 +303,13 @@ end
                     end
                 end
             end
-            # A side whose element type is abstract or concrete keeps its vector.
+            # A side whose element type is abstract, concrete or a `Union` of concrete types
+            # keeps its vector.
             @test NonOptimisationRiskRatio(; r1 = vm).r1 === vm
             vc = [Variance(), Variance()]
             @test MeanReturnRiskRatio(; rk = vc).rk === vc
+            vu = Union{typeof(Variance()), typeof(Range())}[Variance(), Range()]
+            @test ExpectedReturnRiskRatio(; rk = vu).rk === vu
         end
         @testset "The previous weights" begin
             tn = TurnoverRiskMeasure(; w = wb)
