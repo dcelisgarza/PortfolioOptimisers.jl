@@ -15,24 +15,26 @@ function PortfolioOptimisers.plot_portfolio_dashboard(res::OptimisationResult, r
                                                       alpha::Number = 0.05,
                                                       kappa::Number = 0.3, rw = nothing,
                                                       sca::Option{<:Scalariser} = nothing,
-                                                      kwargs...)
+                                                      strict::Bool = false, kwargs...)
     _, w, rd, fees, nx = result_investable_view(res, rd, nothing, nx)
     if isa(rd, ReturnsResult)
         nx = isnothing(rd.nx) ? nx : rd.nx
         ts = isnothing(rd.ts) ? ts : rd.ts
     end
+    # One filter for the whole figure, and `nx` is on the axis of the view, so one message
+    # names the Held Gaps by the names of the caller.
+    X = filter_held_gaps(w, rd.X, strict; nx = string.(nx))
     p1 = PortfolioOptimisers.plot_composition(w, nx; N = N)
-    p2 = PortfolioOptimisers.plot_portfolio_cumulative_returns(w, rd.X, fees; ts = ts,
+    p2 = PortfolioOptimisers.plot_portfolio_cumulative_returns(w, X, fees; ts = ts,
                                                                compound = compound)
     # `rd` is handed whole where it is a prior, so a measure with an unstated slot,
     # the default `Variance()` among them, resolves it there; a returns result carries no
-    # moment to resolve against and is unwrapped to its matrix.
-    p3 = PortfolioOptimisers.plot_risk_contribution(r, w,
-                                                    isa(rd, ReturnsResult) ? rd.X : rd,
+    # moment to resolve against, so the panel reads its filtered matrix.
+    p3 = PortfolioOptimisers.plot_risk_contribution(r, w, isa(rd, ReturnsResult) ? X : rd,
                                                     fees; nx = nx, N = N, delta = delta,
                                                     marginal = marginal,
                                                     percentage = percentage, sca = sca)
-    p4 = PortfolioOptimisers.plot_drawdowns(w, rd.X, fees; slv = slv, ts = ts,
+    p4 = PortfolioOptimisers.plot_drawdowns(w, X, fees; slv = slv, ts = ts,
                                             compound = compound, alpha = alpha,
                                             kappa = kappa, rw = rw)
     return plot(p1, p2, p3, p4; layout = (2, 2), size = (1200, 800), kwargs...)
@@ -53,13 +55,15 @@ function PortfolioOptimisers.plot_efficient_frontier(res_vec::AbstractVector{<:O
                                                      fees::Option{<:Fees} = nothing,
                                                      min_risk::Bool = true,
                                                      max_score::Bool = true,
-                                                     factory::Bool = true, kwargs...)
+                                                     factory::Bool = true,
+                                                     strict::Bool = false, kwargs...)
+    # One reduction for every axis, so one message names a held asset.
+    _, pr, w, fees = investable_reduction(pr, getproperty.(res_vec, :w), fees, strict)
     if factory
         x = PortfolioOptimisers.factory(x, pr, slv)
         y = PortfolioOptimisers.factory(y, pr, slv)
         c = PortfolioOptimisers.factory(c, pr, slv)
     end
-    w = getproperty.(res_vec, :w)
     xr = expected_risk(x, w, pr, fees)
     yr = expected_risk(y, w, pr, fees)
     cr = expected_risk(c, w, pr, fees)
@@ -131,7 +135,10 @@ function PortfolioOptimisers.plot_efficient_frontier(w::VecVecNum, pr::Pr_RR;
                                                      fees::Option{<:Fees} = nothing,
                                                      min_risk::Bool = true,
                                                      max_score::Bool = true,
-                                                     factory::Bool = true, kwargs...)
+                                                     factory::Bool = true,
+                                                     strict::Bool = false, kwargs...)
+    # One reduction for every axis, so one message names a held asset or a Held Gap.
+    _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     if factory
         x = PortfolioOptimisers.factory(x, pr, slv)
         y = PortfolioOptimisers.factory(y, pr, slv)

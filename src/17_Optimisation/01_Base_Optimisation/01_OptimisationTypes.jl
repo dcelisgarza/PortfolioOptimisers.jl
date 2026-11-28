@@ -572,6 +572,69 @@ function field_frames(x, path::AbstractString, refit::Bool)
                             fieldnames(typeof(x)))...)
 end
 """
+    composite_frames(x, path::AbstractString, refit::Bool) -> ReturnsFrames
+
+Return the frames that the fields of a composite risk measure add to the group of a head, and build no path when no field holds a reader.
+
+A composite, such as a ratio measure or an [`ExpectedReturn`](@ref), holds other measures, and one of them can hold a reader, such as an [`UncertaintySetVariance`](@ref) with a prior of its own. Most composites hold none. [`field_frames`](@ref) builds a path for each field, so the function asks [`holds_reader`](@ref) first, and a composite with no reader pays nothing for the walk. A head keeps [`field_frames`](@ref), because a head holds a reader in most cases. A new field that holds a reader joins the walk with no edit here.
+
+# Algorithm
+
+ 1. Ask [`holds_reader`](@ref) of each field of `x`.
+ 2. When no field holds a reader, return the empty [`ReturnsFrames`](@ref).
+ 3. Otherwise return the frames of [`field_frames`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:frame_x])
+  - $(arg_dict[:frame_path])
+  - $(arg_dict[:frame_refit])
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames of the fields of `x`.
+
+# Related
+
+  - [`field_frames`](@ref)
+  - [`holds_reader`](@ref)
+  - [`reader_frames`](@ref)
+"""
+function composite_frames(x, path::AbstractString, refit::Bool)
+    held = ntuple(i -> holds_reader(getfield(x, i), refit), Val(fieldcount(typeof(x))))
+    return any(held) ? field_frames(x, path, refit) : ReturnsFrames()
+end
+"""
+    holds_reader(x, refit::Bool) -> Bool
+    holds_reader(v::AbstractVector, refit::Bool) -> Bool
+
+Return whether `x` adds a frame to the group of the head that holds it.
+
+The function asks [`reader_frames`](@ref) at the empty path and drops the paths of the answer, so it needs no list of the types that hold a reader. A vector answers for its elements and builds no path for them. A vector of numbers holds no reader, and the function does not visit each number.
+
+# Arguments
+
+  - $(arg_dict[:frame_x])
+  - $(arg_dict[:frame_refit])
+
+# Returns
+
+  - `flag::Bool`: Whether `x` states the Excess Frame or holds a raw reader.
+
+# Related
+
+  - [`composite_frames`](@ref)
+  - [`reader_frames`](@ref)
+  - [`ReturnsFrames`](@ref)
+"""
+function holds_reader(x, refit::Bool)::Bool
+    fr = reader_frames(x, "", refit)
+    return fr.excess || !isempty(fr.raw)
+end
+function holds_reader(v::AbstractVector, refit::Bool)::Bool
+    return eltype(v) <: Number ? false : any(x -> holds_reader(x, refit), v)
+end
+"""
     reader_frames(v::AbstractVector{<:Number}, path::AbstractString, refit::Bool) -> ReturnsFrames
     reader_frames(o::Online, path::AbstractString, refit::Bool) -> ReturnsFrames
     refits_regression(o::Online) -> Bool

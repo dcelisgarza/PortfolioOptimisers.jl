@@ -12,7 +12,6 @@ shared_has
 shared_get
 state_key
 assert_state_key_free
-state_set!
 state_has
 state_get
 state_build!

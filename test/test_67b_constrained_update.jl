@@ -542,6 +542,13 @@ end
         wc = po.project(EuclideanProjection(), cset, q, wh)
         @test count(x -> x > 1e-6, wc) == 1
         @test wc[1] ≈ 1 atol = 1e-6
+        # A fraction of the assets reads no row and no prior, so it resolves on the number of
+        # assets of the step, on both routes of a set with no rows (#2305).
+        fset = resolve(ProgrammeAllocationSet(; slv = mip, card = FractionOf(0.34)), 3)
+        @test po.rows_needed(fset) == 0
+        @test po.project(EuclideanProjection(), fset, q, wh) ≈ wc atol = 1e-6
+        @test last(po.resolve_projection_entry(fset, wh, nothing)).card == 1
+        @test last(po.resolve_allocation_set_step(fset, wh, nothing, nothing)).card == 1
         # The set builders add to a model a head did not build (ADR 0164).
         m = JuMP.Model()
         po.set_model_scales!(m, 1, 1)

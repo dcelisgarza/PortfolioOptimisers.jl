@@ -930,7 +930,7 @@ Reads one data step of a folded [`Pipeline`](@ref) out, and narrows the survivin
 Dispatch on the estimator of the step selects the method.
 
   - A [`PriceGapFill`](@ref) reads the [`PriceGapFillResult`](@ref) of the whole history out of its state, restricted to the assets that survive so far, because the batch fit ran over the columns that an earlier filter left.
-  - A [`MissingDataFilter`](@ref) reads its [`MissingDataFilterResult`](@ref) out the same way, and narrows the surviving assets to the ones that it keeps, in the order that they hold.
+  - A [`MissingDataFilter`](@ref) and a [`PriceJumpFilter`](@ref) each give the fitted result of their state, restricted the same way. They narrow the surviving assets to the ones that they keep, in the order that they hold.
   - An [`AbstractAssetSelector`](@ref) runs its batch verb over the rows of the owner, viewed to the surviving assets. It narrows them to the fitted universe, in the fitted order, as [`apply_preprocessing`](@ref) orders it.
   - Any other row-local step, such as a [`PricesToReturns`](@ref), reads out its own state through [`fit_preprocessing`](@ref) and narrows nothing.
 
@@ -939,6 +939,10 @@ Dispatch on the estimator of the step selects the method.
   - `est`: The step's estimator, carrying its state.
   - `rd0`: The `ReturnsResult` of every observation folded, over the pipeline's input universe.
   - `idx`: The indices into `rd0` of the assets surviving the steps before this one.
+
+# Validation
+
+  - A [`MissingDataFilter`](@ref) and a [`PriceJumpFilter`](@ref) keep one asset at least of the ones that survive. An `IsEmptyError` is thrown otherwise.
 
 # Returns
 
@@ -961,14 +965,16 @@ function fit_data_step_from_state(est::PriceGapFill, rd0::ReturnsResult,
     keep = findall(n -> string(n) in cur, res.nx)
     return rebuild_struct(res, (; nx = res.nx[keep], v = res.v[keep])), idx
 end
-function fit_data_step_from_state(est::MissingDataFilter, rd0::ReturnsResult,
-                                  idx::AbstractVector{<:Integer})
+function fit_data_step_from_state(est::Union{MissingDataFilter, PriceJumpFilter},
+                                  rd0::ReturnsResult, idx::AbstractVector{<:Integer})
     res = fit_preprocessing(est)
     cur = rd0.nx[idx]
     keep = findall(n -> string(n) in cur, res.nx)
+    @argcheck(!isempty(keep),
+              IsEmptyError("$(typeof(est).name.name) drops every asset that the steps before it keep, over the observations folded"))
     names = string.(res.nx[keep])
     sel = findall(in(names), cur)
-    return MissingDataFilterResult(res.nx[keep], res.row_thr), idx[sel]
+    return Accessors.set(res, Accessors.PropertyLens{:nx}(), res.nx[keep]), idx[sel]
 end
 function fit_data_step_from_state(sel::AbstractAssetSelector, rd0::ReturnsResult,
                                   idx::AbstractVector{<:Integer})

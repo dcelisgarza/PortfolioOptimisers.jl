@@ -7,7 +7,7 @@ The set holds its constraint kinds and its direct objective penalties in a [`Con
 
 The projection is a bare JuMP model with the variables and rows of the Weight Finaliser, which are `w`, `k = 1`, `Σw = 1`, the constraint scale and the objective scale. [`set_allocation_set_constraints!`](@ref) adds the constraint kinds through the builders of the optimiser, in the order that [`assemble_jump_model!`](@ref) runs them. [`set_projection_objective!`](@ref) sets the objective, the divergence of the rule's Projection Geometry plus the set's penalties.
 
-The block resolves in the two stages of a JuMP head. Once per fold, [`resolve_allocation_set`](@ref) runs stage 1, [`resolve_constraint_block_names`](@ref), and resolves `wb` when it reads no rows: the slots that hold a name over `sets` and whose value follows a view at the Investable Mask. These are `wb`, `lt`, `st`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst` and `tn`. At every step, [`resolve_allocation_set_step`](@ref) runs stage 2, [`resolve_constraint_block`](@ref), on the set viewed at the mask of the step and on the prior result of `pe` fitted on the head's rows. It gives the [`ResolvedConstraintBlock`](@ref) of the set, which the builders read. Stage 2 resolves these kinds:
+The block resolves in the two stages of a JuMP head. Once per fold, [`resolve_allocation_set`](@ref) runs stage 1, [`resolve_constraint_block_names`](@ref), and resolves `wb` when it reads no rows: the slots that hold a name over `sets` and whose value follows a view at the Investable Mask. These are `wb`, `lt`, `st`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `conc` and `tn`. At every step, [`resolve_allocation_set_step`](@ref) runs stage 2, [`resolve_constraint_block`](@ref), on the set viewed at the mask of the step and on the prior result of `pe` fitted on the head's rows. It gives the [`ResolvedConstraintBlock`](@ref) of the set, which the builders read. Stage 2 resolves these kinds:
 
   - `wb`, when it reads the returns ([`bounds_read_rows`](@ref)), as a [`ScoreWeightBounds`](@ref) does. Each step scores the assets on the head's rows at the Investable Mask of the step, as the batch fit of a JuMP head on those rows does, so the bound reads no row after the step. The bounds rows, the floor of a barrier geometry and the result that `optimise` returns for the head all read this bound of the step.
 
@@ -17,7 +17,9 @@ The block resolves in the two stages of a JuMP head. Once per fold, [`resolve_al
 
   - A Calibration Rule in `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp` or `linf`, against the prior and the solver `slv`.
 
-The settings `sbgt`, `gbgt`, `xbgt`, `card`, `scard`, `ss`, `ccnt` and `cobj` need no resolution. Each kind goes to the builder that [`JuMPOptimiser`](@ref) gives it to. The fields of the set read the prior and the rows of its block Result at every step:
+  - A [`CountOf`](@ref) or a [`FractionOf`](@ref) in `card` or `scard`, against the assets of the step. It reads no row and no prior.
+
+The settings `sbgt`, `gbgt`, `xbgt`, `ss`, `ccnt` and `cobj` need no resolution. Each kind goes to the builder that [`JuMPOptimiser`](@ref) gives it to. The fields of the set read the prior and the rows of its block Result at every step:
 
   - `r`, the risk ceilings. Each measure goes through its own JuMP builder, with the set as the [`RiskConstraintOwner`](@ref) and `settings.ub` as the ceiling. [`factory`](@ref) first materialises the measure against the prior, so a moment that the measure carries is the moment its row uses. A [`Variance`](@ref) or [`StandardDeviation`](@ref) that holds its matrix reads no rows and no prior. It goes through the same builder with no prior, so the source of the matrix does not change the formulation ([`set_allocation_risk_ceiling!`](@ref)).
   - `ret`, a floor on the prior's expected return of the allocation.
@@ -74,9 +76,9 @@ $(DocStringExtensions.FIELDS)
         slots...,
     ) -> ProgrammeAllocationSet
 
-Keywords correspond to the struct's fields and to the slots of [`ConstraintBlock`](@ref). `slv` has no default, because every projection onto the set is a programme. `slots...` takes each keyword of the block with its type and its default: `wb`, `sbgt`, `gbgt`, `lt`, `st`, `lcse`, `cte`, `gcarde`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn`, `sets`, `tr`, `ple`, `ccnt`, `cobj`, `ss`, `card`, `scard`, `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp`, `linf` and `xbgt`. The constructor builds the block in `cbe` from these flat keywords, as the keyword constructor of [`JuMPOptimiser`](@ref) does. When the caller gives `cbe`, a flat keyword replaces that slot of the given block, and a slot that the caller does not name keeps its value, see [`constraint_block`](@ref). A name that is neither a field nor a slot raises a `MethodError`.
+Keywords correspond to the struct's fields and to the slots of [`ConstraintBlock`](@ref). `slv` has no default, because every projection onto the set is a programme. `slots...` takes each keyword of the block with its type and its default: `wb`, `sbgt`, `gbgt`, `lt`, `st`, `lcse`, `cte`, `gcarde`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `conc`, `tn`, `sets`, `tr`, `ple`, `ccnt`, `cobj`, `ss`, `card`, `scard`, `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp`, `linf` and `xbgt`. The constructor builds the block in `cbe` from these flat keywords, as the keyword constructor of [`JuMPOptimiser`](@ref) does. When the caller gives `cbe`, a flat keyword replaces that slot of the given block, and a slot that the caller does not name keeps its value, see [`constraint_block`](@ref). A name that is neither a field nor a slot raises a `MethodError`.
 
-`lcse`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn` and `ple` take a vector that mixes the members of their element type. The keyword constructor of the block narrows it through [`narrow_mixed_vector`](@ref).
+`lcse`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `conc`, `tn`, `ple` and `scard` take a vector that mixes the members of their element type. The keyword constructor of the block narrows it through [`narrow_mixed_vector`](@ref).
 
 The positional constructor takes the fields in the order of the struct: `pe`, `slv`, `cbe`, `r`, `ret`, `sc` and `so`. Before the block, it took one argument for each slot.
 
@@ -152,6 +154,7 @@ ProgrammeAllocationSet
       │       sst ┼ nothing
       │      sglt ┼ nothing
       │      sgst ┼ nothing
+      │      conc ┼ nothing
       │        tn ┼ Turnover
       │           │       w ┼ Vector{Float64}: [0.25, 0.25, 0.25, 0.25]
       │           │     val ┼ Float64: 0.1
@@ -257,8 +260,8 @@ end
 # it, so `set.wb` keeps its meaning (ADR 0237). `r` and `ret` are fields of the set.
 @forward_properties ProgrammeAllocationSet begin
     forward(cbe, wb, sbgt, gbgt, lt, st, lcse, cte, gcarde, sgcarde, smtx, sgmtx, slt, sst,
-            sglt, sgst, tn, sets, tr, ple, ccnt, cobj, ss, card, scard, l2c, lpc, linfc, l1,
-            l2, lp, linf, xbgt; settable)
+            sglt, sgst, conc, tn, sets, tr, ple, ccnt, cobj, ss, card, scard, l2c, lpc,
+            linfc, l1, l2, lp, linf, xbgt; settable)
 end
 function port_opt_view(set::ProgrammeAllocationSet, i, args...)
     return rebuild_struct(set,
@@ -324,11 +327,12 @@ function reader_frames(set::ProgrammeAllocationSet, path::AbstractString, ::Bool
 end
 """
     name_keyed(x)
+    name_keyed(cl::ConcentrationLimitEstimator)
     name_keyed(x::AbstractVector)
 
 Tells whether a constraint slot holds an estimator that resolves its names over `sets`.
 
-The owner of such a slot must carry `sets`. The estimators are every [`AbstractWeightBoundsEstimator`](@ref), [`LinearConstraintEstimator`](@ref), [`ExposureConstraintEstimator`](@ref), [`ThresholdEstimator`](@ref), [`AssetSetsMatrixEstimator`](@ref) and [`TurnoverEstimator`](@ref). A [`ScoreWeightBounds`](@ref) is the exception: it is keyed by name only when its `val` or its static bounds name assets. A vector is keyed by name when one of its entries is.
+The owner of such a slot must carry `sets`. The estimators are every [`AbstractWeightBoundsEstimator`](@ref), [`LinearConstraintEstimator`](@ref), [`ExposureConstraintEstimator`](@ref), [`ThresholdEstimator`](@ref), [`AssetSetsMatrixEstimator`](@ref) and [`TurnoverEstimator`](@ref). A [`ScoreWeightBounds`](@ref) is the exception: it is keyed by name only when its `val` or its static bounds name assets. A [`ConcentrationLimitEstimator`](@ref) is keyed by name only when its `set` is. A vector is keyed by name when one of its entries is.
 
 # Returns
 
@@ -346,6 +350,9 @@ function name_keyed(::Union{AbstractWeightBoundsEstimator, LinearConstraintEstim
                             ExposureConstraintEstimator, ThresholdEstimator,
                             AssetSetsMatrixEstimator, TurnoverEstimator})
     return true
+end
+function name_keyed(cl::ConcentrationLimitEstimator)
+    return name_keyed(cl.set)
 end
 function name_keyed(x::AbstractVector)
     return any(name_keyed, x)

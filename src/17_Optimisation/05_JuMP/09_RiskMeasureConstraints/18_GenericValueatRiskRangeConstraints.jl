@@ -10,7 +10,7 @@ When the two tails read the same factor of the covariance matrix, they read one 
 
 The cone bounds ``g`` from below only, so a model is bounded when the coefficient of ``g`` is not negative. With a cone for each tail, that is ``z_{\\mathrm{loss}} \\geq 0`` and ``z_{\\mathrm{gain}} \\geq 0``. A `Normal` with a mean ``m`` far from zero makes one of the two negative, and the minimisation then has no finite solution. With one cone, the condition is ``z_{\\mathrm{loss}} + z_{\\mathrm{gain}} \\geq 0``, the condition of [`ValueatRiskRange`](@ref), which does not depend on ``m``.
 
-The tails keep their expressions, so the `ub` of each tail bounds its own value. A bound on a tail whose coefficient is negative lets ``g`` rise above the standard deviation, so the model holds a relaxation of that bound.
+The tails keep their expressions, so the `ub` of each tail bounds its own value, and a [`Frontier`](@ref) in that `ub` spans the values of its own tail. A bound on a tail whose coefficient is negative lets ``g`` rise above the standard deviation, so the model holds a relaxation of that bound.
 
 # Mathematical definition
 
@@ -56,6 +56,8 @@ Where:
   - [`ValueatRiskRange`](@ref)
   - [`RangeRiskMeasure`](@ref)
   - [`range_risk_key`](@ref)
+  - [`set_risk_frontier_owner!`](@ref)
+  - [`GainTail`](@ref)
   - [`set_distribution_var_cone!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
@@ -78,12 +80,18 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     else
         nothing
     end
+    # A sweep on a tail takes its span from that tail, so each tail records the measure of its
+    # own side as the owner of its entry before the whole range claims the rest.
+    first = risk_frontier_length(model)
     loss_risk = set_risk_constraints!(model, nested_index(:loss_, i), loss, opt, pr,
                                       args...; loss = true, prefix = prefix, g_var = g_var,
                                       kwargs...)
+    set_risk_frontier_owner!(model, first, loss)
+    first = risk_frontier_length(model)
     gain_risk = set_risk_constraints!(model, nested_index(:gain_, i), gain, opt, pr,
                                       args...; loss = false, prefix = prefix, g_var = g_var,
                                       kwargs...)
+    set_risk_frontier_owner!(model, first, GainTail(gain))
     range_risk = state_set!(model, prefix, name, i,
                             JuMP.@expression(model, loss_risk + gain_risk))
     set_risk_bounds_and_expression!(model, opt, range_risk, r.settings, name, i;
