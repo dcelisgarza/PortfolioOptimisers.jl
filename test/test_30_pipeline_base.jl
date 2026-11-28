@@ -3949,6 +3949,13 @@ end
         ps = PipelineStep(; est = ivb, writes = :opt)
         @test isapprox(fit(Pipeline(; steps = (sel, EmpiricalPrior(), ps)), rdl).w,
                        fit(Pipeline(; steps = (sel, EmpiricalPrior(), ivb)), rdl).w)
+        # A nested pipeline takes the view too. It raised a `DimensionMismatch` before the
+        # view of its steps.
+        flat = fit(Pipeline(; steps = (sel, EmpiricalPrior(), ivb)), rdl)
+        nested = fit(Pipeline(; steps = (sel, Pipeline(; steps = (EmpiricalPrior(), ivb)))),
+                     rdl)
+        @test length(nested.w) == 3
+        @test isapprox(nested.w, flat.w)
     end
     @testset "a price filter cuts the universe before any returns data" begin
         P = vcat(fill(100.0, 1, 6), cumprod(1 .+ X6; dims = 1) .* 100)
@@ -3973,7 +3980,15 @@ end
                                           ReturnsResult(; nf = ["f"], F = [1.0; 2.0;;])))
         @test isnothing(PO.universe_index(["A1", "A2"], rd))
         @test PO.universe_index(nx, rd) == [3, 1]
-        @test PO.universe_matrix(rd.X, [3, 1], 4) == [2.0 0.0 1.0 0.0; 4.0 0.0 3.0 0.0]
+        Xu = PO.UniverseMatrix(rd.X, [3, 1], 4)
+        @test Xu == [2.0 0.0 1.0 0.0; 4.0 0.0 3.0 0.0]
+        # A view of the surviving columns reads `X` with no copy, and a view of any other
+        # column reads the zeros of the matrix.
+        @test parent(view(Xu, 2:2, [1, 3])) === rd.X
+        @test view(Xu, 2:2, [1, 3]) == [4.0 3.0]
+        @test view(Xu, :, [2, 3]) == [0.0 1.0; 0.0 3.0]
+        @test_throws DimensionMismatch PO.UniverseMatrix(rd.X, [3], 4)
+        @test_throws BoundsError PO.UniverseMatrix(rd.X, [3, 5], 4)
         @test PO.input_universe(rd) == ["A3", "A1"]
         # A step with no cut before it, and a data step, run unchanged.
         iv = InverseVolatility()
@@ -3982,8 +3997,6 @@ end
         # A callable, a nested pipeline and a precomputed result run unchanged.
         f = c -> c.returns
         @test PO.pipeline_step_view(f, [3, 1], rd.X) === f
-        inner = Pipeline(; steps = (EmpiricalPrior(), iv))
-        @test PO.pipeline_step_view(inner, [3, 1], rd.X) === inner
         fps = PipelineStep(; est = f, writes = :opt)
         @test PO.pipeline_step_view(fps, [3, 1], rd.X).est === f
         res = optimise(EqualWeighted(), rd)

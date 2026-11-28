@@ -40,7 +40,7 @@ group_returns_view
 universe_step_view
 input_universe
 universe_index
-universe_matrix
+UniverseMatrix
 pipeline_step_view
 pipeline_refits
 terminal_frames
