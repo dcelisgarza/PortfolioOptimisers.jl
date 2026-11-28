@@ -416,7 +416,7 @@ formulation to `model`.
 # Algorithm
 
  1. Check `w1` and `w2` with [`owa_weights`](@ref), under their own names. Each tail checks its weights again, but under the name `w` of the tail.
- 2. Build the two tails, register their sum under `aowa_range_risk_` and bound it, as steps 1 to 5 of the method of `set_risk_constraints!` for a [`RangeRiskMeasure`](@ref) do. This copy of the steps agrees with that method.
+ 2. Build the two tails, register their sum under `aowa_range_risk_` and bound it, as steps 1 to 5 of the method of `set_risk_constraints!` for a [`RangeRiskMeasure`](@ref) do. This copy of the steps agrees with that method, but it records no owner of a frontier entry, because the tails hold no bound.
 
 # Arguments
 

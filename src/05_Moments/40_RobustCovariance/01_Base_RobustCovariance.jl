@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the covariance estimators that resist outliers in the returns.
 
-A bad tick, a split that the data source does not record, or one extreme day moves the sample covariance much. A robust estimator gives each observation a weight that falls with its distance from the centre of the data, so a few bad rows cannot control the estimate. [`MCDCovariance`](@ref) and [`TylerCovariance`](@ref) are its subtypes.
+A bad tick, a split that the data source does not record, or one extreme day moves the sample covariance much. A robust estimator gives each observation a weight that falls with its distance from the centre of the data, so a few bad rows cannot control the estimate. [`MCDCovariance`](@ref), [`TylerCovariance`](@ref), [`SCovariance`](@ref) and [`MMCovariance`](@ref) are its subtypes.
 
 # Interfaces
 

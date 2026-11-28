@@ -196,6 +196,11 @@ const NOT_A_CHOICE = Dict{Symbol, Symbol}(
                                           # capability is the range risk measure, and its
                                           # constraint builder reads the tails.
                                           :RangeTails => :internal,
+                                          # The gain tail of such a range on the portfolio
+                                          # (#2319). Its builder records it as the owner of
+                                          # a frontier on the gain tail. The capability is
+                                          # the range risk measure.
+                                          :GainTail => :internal,
                                           # The sub-portfolio enumerations that `Stacking`
                                           # and `NestedClustered` pass to the module that
                                           # they share (ADR 0066). The capability is the
@@ -553,6 +558,14 @@ const CATALOGUE = [Section("Core abstractions",
                                                    Cap(:MCDReweighting),
                                                    Cap(:MCDSmallSampleCorrection),
                                                    Cap(:MCDShrinkage)]),
+                                            Group(Cap(:SCovariance),
+                                                  [Cap(:BisquareRho), Cap(:RockeRho),
+                                                   Cap(:DetS), Cap(:FastS),
+                                                   Cap(:RobustStartS)]),
+                                            Group(Cap(:MMCovariance),
+                                                  [Group(Cap(:BisquareReweighting),
+                                                         [Cap(:ShapeEfficiency),
+                                                          Cap(:LocationEfficiency)])]),
                                             Group(Cap(:TylerCovariance),
                                                   [Group(Cap(:TylerShrinkage),
                                                          [Cap(:TraceNormalisedShrinkage),

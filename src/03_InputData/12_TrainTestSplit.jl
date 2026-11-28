@@ -10,9 +10,8 @@ A size is a [`CountOf`](@ref) of observations or a [`FractionOf`](@ref) of the o
 The method that Julia selects is the first step, because a count and a fraction mean different things.
 
  1. `s` is a [`CountOf`](@ref) of rows. Return `min(Int(s.val), N)`.
- 2. `s` is a [`FractionOf`](@ref) of the rows, with `f = s.val`. Round `f * N` to the nearest integer, giving `n`.
- 3. If `n / N`, computed in the type of `f`, exceeds `f`, subtract one from `n`. Now `n` is the largest count whose share of the rows does not exceed `f`, which is `floor(f * N)` in exact arithmetic. A direct `floor(Int, f * N)` loses a row when the product lands below a whole number, and `0.29 * 100` is `28.999999999999996`.
- 4. Return `clamp(n, 1, N)`. The clamp stops a small fraction of a short window from resolving to zero rows.
+ 2. `s` is a [`FractionOf`](@ref) of the rows. Take `n` from [`fraction_floor`](@ref), the largest count whose share of the rows does not exceed the fraction.
+ 3. Return `clamp(n, 1, N)`. The clamp stops a small fraction of a short window from resolving to zero rows.
 
 # Arguments
 
@@ -25,6 +24,7 @@ The method that Julia selects is the first step, because a count and a fraction 
 
 # Related
 
+  - [`fraction_floor`](@ref)
   - [`safe_index`](@ref)
   - [`TrainTestSplit`](@ref)
 """
@@ -32,12 +32,7 @@ function split_count(s::CountOf, N::Integer)::Int
     return min(Int(s.val), N)
 end
 function split_count(s::FractionOf, N::Integer)::Int
-    f = s.val
-    n = round(Int, f * N)
-    if n * one(f) / N > f
-        n -= 1
-    end
-    return clamp(n, 1, N)
+    return clamp(fraction_floor(s, N), 1, N)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

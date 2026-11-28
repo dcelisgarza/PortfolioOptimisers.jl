@@ -4625,6 +4625,31 @@ end
     # The two guards that run before the rewrite.
     @test_throws ArgumentError IntegerPhylogeny(; A = Float64[1 1; 1 1], B = 1)
     @test_throws ArgumentError IntegerPhylogeny(; A = Float64[0 1; 0 0], B = 1)
+    # A fraction is a fraction of the sum of each stored row, so a scalar gives a cap for each
+    # row, and the Result holds integers alone (#2305).
+    A5 = [0 1 1 1 0; 1 0 1 1 0; 1 1 0 1 0; 1 1 1 0 0; 0 0 0 0 0]
+    @test IntegerPhylogeny(; A = A5, B = FractionOf(0.6)).B == [2, 1]
+    @test IntegerPhylogeny(; A = Float64.(A5), B = 0.6).B == [2, 1]
+    @test IntegerPhylogeny(; A = PhylogenyResult(; X = A5), B = FractionOf(0.6)).B == [2, 1]
+    @test IntegerPhylogeny(; A = A5, B = CountOf(9)).B === 9
+    @test IntegerPhylogeny(; A = A5, B = [FractionOf(0.75), 0]).B == [3, 0]
+    @test_throws DimensionMismatch IntegerPhylogeny(; A = A5, B = [FractionOf(0.6)])
+    @test_throws DomainError IntegerPhylogeny(; A = A5, B = 1.0)
+    @test_throws DomainError IntegerPhylogeny(; A = A5, B = [FractionOf(0.6), -1])
+    # The estimator holds the form of the caller, and the fit resolves it.
+    @test IntegerPhylogenyEstimator(; B = 0).B === 0
+    @test IntegerPhylogenyEstimator(; B = 0.5).B === FractionOf(0.5)
+    ipe = IntegerPhylogenyEstimator(; B = FractionOf(0.5))
+    X = reshape([sin(7 * i) + cos(3 * i * i) for i in 1:400], 50, 8)
+    ip = phylogeny_constraints(ipe, X)
+    @test ip.B == [max(fld(n, 2), 1) for n in sum(ip.A; dims = 2)[:, 1]]
+    # A vector in the estimator meets the cluster count, as a vector of integers does.
+    cle = ClustersEstimator(; onc = OptimalNumberClusters(; alg = 2))
+    pcl = IntegerPhylogenyEstimator(; pl = cle, B = [FractionOf(0.5), 2])
+    icl = phylogeny_constraints(pcl, X)
+    @test icl.B == [max(fld(sum(icl.A[1, :]), 2), 1), 2]
+    @test_throws DomainError IntegerPhylogenyEstimator(; pl = cle,
+                                                       B = fill(FractionOf(0.5), 3))
 end
 @testset "The integer phylogeny `B` guard fires only for a stated cluster count" begin
     using PortfolioOptimisers, Test
