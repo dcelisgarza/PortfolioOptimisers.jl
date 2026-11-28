@@ -1702,6 +1702,12 @@ end
         @test count(PO.rule_keep(RankRule(; best = FractionOf(0.05)), s10, false)) == 1
         @test count(PO.rule_keep(RankRule(; best = FractionOf(0.04)), s10, false)) == 0
         @test PO.rule_tail_count(FractionOf(0.625), 4) == 3
+        # An exact half is found where the product rounds it away: 0.575 * 100 is
+        # 57.49999999999999.
+        @test all(k -> PO.rule_tail_count(FractionOf(k / 100), 100) == k, 1:100)
+        @test all(k -> PO.rule_tail_count(FractionOf((2k - 1) / 200), 100) == k, 1:100)
+        @test PO.rule_tail_count(FractionOf(prevfloat(0.575)), 100) == 57
+        @test PO.rule_tail_count(FractionOf(1 // 2), 0) == 0
         @test PO.rule_tail_count(CountOf(50), 30) == 50
         @test isnothing(PO.rule_tail_count(nothing, 30))
 

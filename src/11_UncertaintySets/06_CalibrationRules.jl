@@ -1305,7 +1305,7 @@ Where:
 
  1. Read the returns matrix of `pr` into `X`, and its element count into `np`.
  2. Take the sign `s` from `key` and `ctx.series` with [`series_end_sign`](@ref). A drawdown series has one end, so it refuses the head key.
- 3. Make the count `k = ceil(Int, ctx.alpha * np)`, the number of order statistics that the estimate reads.
+ 3. Make the count `k = `[`fraction_ceil`](@ref)`(ctx.alpha, np)`, the number of order statistics that the estimate reads.
  4. Estimate the tail index `a` of the pool with [`hill_tail_index`](@ref). Under every marker, the pool holds the series that `ctx.series` names, with one entry for each observation of each column.
  5. Return `inv(a)`, the deformation parameter.
 
@@ -1355,7 +1355,7 @@ function (alg::HillTailDecay)(key::Symbol, pr::AbstractPriorResult, ::Any, ::Any
     # then serves both ends. The series decides which ends there are to price.
     s = series_end_sign(ctx.series, key)
     np = prod(size(X))
-    k = ceil(Int, ctx.alpha * np)
+    k = fraction_ceil(ctx.alpha, np)
     @argcheck(k >= alg.kmin,
               DomainError(k,
                           "`HillTailDecay` reads the worst `k = ceil(alpha * T * N) = $k` of the $np pooled standardised values, and `HillTailDecay.kmin` puts the floor at $(alg.kmin). A Hill estimate over fewer order statistics moves from fold to fold for no reason in the data, and the deformation parameter moves with it. Lengthen the sample, widen `alpha`, or lower `kmin` and take the noise."))
@@ -1640,7 +1640,7 @@ Where:
 # Algorithm
 
  1. Read the returns matrix of `pr` into `X`, and its row count into `T`.
- 2. Make the count `k = ceil(Int, ctx.alpha * T)`, the number of order statistics that the estimate reads. A drawdown series has one entry for each observation, so the count is the same under every marker.
+ 2. Make the count `k = `[`fraction_ceil`](@ref)`(ctx.alpha, T)`, the number of order statistics that the estimate reads. A drawdown series has one entry for each observation, so the count is the same under every marker.
  3. Take the sample, its centre and its whitening factor with [`radial_series_inputs`](@ref).
  4. Estimate the tail index `a` of the radial series with [`radial_tail_index`](@ref).
  5. Return `inv(a)`, the deformation parameter.
@@ -1689,7 +1689,7 @@ function (alg::RadialTailDecay)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any,
               IsNothingError("`CalibrationContext.alpha` is `nothing`, so `RadialTailDecay` cannot form the count `k = ceil(alpha * T)`. The probability of the end reaches the rule in the context the slot owner builds, after it resolves that end's own probability. State `alpha` in the context to run the rule outside a measure."))
     X = pr.X
     T = size(X, 1)
-    k = ceil(Int, ctx.alpha * T)
+    k = fraction_ceil(ctx.alpha, T)
     @argcheck(k >= alg.kmin,
               DomainError(k,
                           "`RadialTailDecay` reads the largest `k = ceil(alpha * T) = $k` of the $T radial distances, and `RadialTailDecay.kmin` puts the floor at $(alg.kmin). A Hill estimate over fewer order statistics moves from fold to fold for no reason in the data, and the deformation parameter moves with it. The radial series holds one entry per observation where the pool of `HillTailDecay` holds `N`, so the same floor binds harder here. Lengthen the sample, widen `alpha`, or lower `kmin` and take the noise."))

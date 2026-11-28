@@ -148,6 +148,18 @@ end
         @test POR.mcd_consistency(4, 1.0) == 1
         @test POR.mcd_subset_size(nothing, 0.5, 100, 5) == 53
         @test POR.mcd_subset_size(nothing, 1, 100, 5) == 100
+        # One observation more than the assets is the smallest sample. Its subset is the whole
+        # sample, in each numeric type of the fraction.
+        @test POR.mcd_subset_size(nothing, 3 // 4, 6, 5) == 6
+        @test_throws "the number of observations = 6 and p = 8" POR.mcd_subset_size(nothing,
+                                                                                    0.75, 6,
+                                                                                    8)
+        # The floor is exact in the fraction that the decimal states. With 101 observations
+        # of one asset, the floating-point product is one too small at 0.57 and at 0.58.
+        @test all(50:100) do k
+            return POR.mcd_subset_size(nothing, k / 100, 101, 1) ==
+                   floor(Int, 1 + 100 * (k // 100))
+        end
         for p in (1, 2, 5), kind in (:raw, :rew)
             f = POR.mcd_correction(MCDSmallSampleCorrection(), p, 60, 0.5, kind)
             @test f > 1

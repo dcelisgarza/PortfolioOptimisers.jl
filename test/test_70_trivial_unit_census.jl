@@ -321,6 +321,7 @@ end
                                                :online_entry_state => "its vector method walks the elements through `element_path`, which four walks share (rule 3, #2088)",
                                                :count_or_fraction => "its `Integer` method calls the constructor of `CountOf` (rule 3, #2088)",
                                                :cardinality_cap => "one method for each form of a cap: its method on a real number that is not an `Integer` calls `count_or_fraction`, which the constructor of each field of a part of a set shares (rule 3, #2305)",
+                                               :neighbour_count => "one method for each form of the count: its method on a fraction calls `fraction_floor`, which 5 functions share (rule 3, #2307)",
                                                # src/04_MatrixProcessing (#2091).
                                                :sample_matrix_processing! => "its method on every estimator other than `MatrixProcessing` calls `matrix_processing!`, an exported verb (rule 3, #2091)",
                                                :matrix_processing_step! => "one method for each step of `mp.order`: each step calls the declared verb of its field, `posdef!`, `denoise!`, `detone!` or `matrix_processing_algorithm!` (rule 3, #2091)",

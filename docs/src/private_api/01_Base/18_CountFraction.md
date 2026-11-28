@@ -10,6 +10,7 @@ Real_CountFraction
 VecReal_CountFraction
 Real_CountFraction_VecReal_CountFraction
 fraction_floor
+fraction_ceil
 cardinality_cap
 assert_cardinality_cap
 resolve_cardinality_cap

@@ -1868,6 +1868,13 @@ end
     # The floor is NOT zero. A pair whose tails never coincide is reported as sqrt(eps).
     @test iszero(ref[1, 3])
     @test code[1, 3] == mv
+
+    # The ceiling is exact: 100 * 0.07 is 7.000000000000001, and the tail holds 7 rows.
+    qs7 = [sort(Xt[:, i])[7] for i in 1:N]
+    ref7 = [count((Xt[:, i] .<= qs7[i]) .& (Xt[:, j] .<= qs7[j])) / 7
+            for i in 1:N, j in 1:N]
+    @test PortfolioOptimisers.lower_tail_dependence(Xt, 0.07) ≈
+          clamp.(ref7, mv, one(eltype(Xt)))
 end
 
 @testset "Lower tail dependence: the k == 0 guard" begin

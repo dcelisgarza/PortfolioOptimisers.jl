@@ -174,7 +174,7 @@ The function clamps each entry of the symmetric result to ``[\\sqrt{\\varepsilon
 
 # Algorithm
 
- 1. Set ``k = \\lceil T \\alpha \\rceil``, the number of observations in the lower tail. Allocate the result as a matrix of zeros. The allocation is `zeros` and not `undef`, so the caller gets zeros and not uninitialised memory when `k` is not positive.
+ 1. Set ``k = \\lceil T \\alpha \\rceil`` with [`fraction_ceil`](@ref), the number of observations in the lower tail. Allocate the result as a matrix of zeros. The allocation is `zeros` and not `undef`, so the caller gets zeros and not uninitialised memory when `k` is not positive.
  2. If `k` is not positive, return the zero matrix. The `# Validation` section states the cases that get to this branch.
  3. Copy `X`. Partially sort each column of the copy about position `k`. Position `k` of the sorted column is then the ``k``-th order statistic, which is the empirical ``\\alpha``-quantile of that asset.
  4. Fill the boolean mask one column at a time. Entry `(t, j)` is true when ``x_{tj}`` is at or below the quantile of step 3. The method fills all of the mask before step 5. Iteration `j` of the threaded loop of step 5 reads each column `i <= j`, so a mask that the loop fills itself can be incomplete when an iteration reads it.
@@ -188,8 +188,8 @@ The function clamps each entry of the symmetric result to ``[\\sqrt{\\varepsilon
 
 # Validation
 
-  - `ceil(Int, T * alpha) > 0`. If the count is not positive, the function returns a zero matrix and not an estimate. This happens when `alpha <= 0` or when `X` has no observation. A small positive `alpha` does not get to this branch, because `ceil` of a positive real is at least `1`. So `alpha = nextfloat(0.0)` on a matrix of one or more observations selects one observation.
-  - `ceil(Int, T * alpha) <= T`. The function does not check it. An `alpha > 1` makes `k` larger than `T`, and `partialsort!` raises a `BoundsError`.
+  - ``k > 0``. If the count is not positive, the function returns a zero matrix and not an estimate. This happens when `alpha <= 0` or when `X` has no observation. A small positive `alpha` does not get to this branch, because the ceiling of a positive real is at least `1`. So `alpha = nextfloat(0.0)` on a matrix of one or more observations selects one observation.
+  - ``k \\leq T``. The function does not check it. An `alpha > 1` makes `k` larger than `T`, and `partialsort!` raises a `BoundsError`.
   - [`LowerTailDependenceCovariance`](@ref) refuses an `alpha` outside ``(0, 1)`` at construction, because [`assert_unit_interval`](@ref) requires `0 < alpha < 1`. So only a direct call gets to the two cases above.
 
 # Returns
@@ -208,7 +208,7 @@ The function clamps each entry of the symmetric result to ``[\\sqrt{\\varepsilon
 function lower_tail_dependence(X::MatNum, alpha::Number = 0.05,
                                ex::FLoops.Transducers.Executor = FLoops.SequentialEx())
     T, N = size(X)
-    k = ceil(Int, T * alpha)
+    k = fraction_ceil(alpha, T)
     # `zeros`, not `undef`: when `alpha <= 0` or `T == 0`, `k` is not positive and the loop
     # below never runs, so an uninitialised matrix would reach the caller as an estimate.
     rho = zeros(eltype(X), N, N)
