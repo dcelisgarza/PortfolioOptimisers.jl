@@ -752,6 +752,10 @@ function bind_data_benchmark(r::RiskTrackingError, rd)
     inner = bind_data_benchmark(r.r, rd)
     return inner === r.r ? r : rebuild_struct(r, (; r = inner))
 end
+function ucs_risk_measure(r::Union{RiskTrackingError, RiskTrackingRiskMeasure}, rd, pr)
+    inner = ucs_risk_measure(r.r, rd, pr)
+    return inner === r.r ? r : rebuild_struct(r, (; r = inner))
+end
 function bind_data_benchmark(r::AbstractBaseRiskMeasure, rd)
     return if holds_data_benchmark(r)
         rebuild_with_slots(r, map(x -> bind_data_benchmark(x, rd), deferred_slots(r)))

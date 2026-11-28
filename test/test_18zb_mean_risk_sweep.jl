@@ -733,3 +733,120 @@ end
     @test_throws ArgumentError PO.sort_by_measure(SumScalariser(), pop, r)
     @test_throws ArgumentError PO.quantile_by_measure(SumScalariser(), pop, r, 0.5)
 end
+
+# A head fits the set of an `UncertaintySetVariance` once, so an estimator gives the
+# optimisation that its own fitted set gives (#2318).
+const MRS_RD = ReturnsResult(; nx = string.("A", 1:5), X = MRS_X)
+# Each estimator fits without a draw, or with a seed, so its set is the set of the head.
+const MRS_UES = (DeltaUncertaintySet(), DeltaUncertaintySet(; pe = nothing),
+                 NormalUncertaintySet(; seed = 2318,
+                                      alg = EllipsoidalUncertaintySetAlgorithm()))
+mrs_usv(u; kwargs...) = UncertaintySetVariance(; ucs = u, kwargs...)
+
+@testset "A Frontier on an UncertaintySetVariance spans the worst case of its estimator (#2318)" begin
+    st = RiskMeasureSettings(; ub = Frontier(; N = 4))
+    for ue in MRS_UES
+        set = sigma_ucs(ue, MRS_RD, MRS_PR)
+        res, ref = [optimise(MeanRisk(; r = mrs_usv(u; settings = st),
+                                      obj = MaximumReturn(), opt = mrs_opt()), MRS_RD)
+                    for u in (ue, set)]
+        @test all(rc -> isa(rc, OptimisationSuccess), res.retcode)
+        @test all(isapprox.(res.w, ref.w; rtol = 1e-6))
+        # The rows of a ratio sweep need a parametric solver, so the span is read from the
+        # model, which holds it before the first point.
+        spans = map((ue, set)) do u
+            x = optimise(MeanRisk(; r = mrs_usv(u; settings = st), obj = MaximumRatio(),
+                                  opt = mrs_opt()), MRS_RD)
+            return collect(only(x.model[:risk_frontier]).second[2])
+        end
+        @test isapprox(spans[1], spans[2]; rtol = 1e-8)
+        # The top of the span is the worst case of the last point of the sweep.
+        @test isapprox(spans[1][end], PO.ucs_variance(set, MRS_PR.sigma, res.w[end]);
+                       rtol = 1e-3)
+        res, ref = [optimise(NearOptimalCentering(; r = mrs_usv(u; settings = st),
+                                                  opt = mrs_opt(),
+                                                  alg = ConstrainedNearOptimalCentering()),
+                             MRS_RD) for u in (ue, set)]
+        @test isa.(res.noc_retcode, OptimisationSuccess) ==
+              isa.(ref.noc_retcode, OptimisationSuccess)
+        for (a, b, rc) in zip(res.w, ref.w, ref.noc_retcode)
+            @test !isa(rc, OptimisationSuccess) || isapprox(a, b; rtol = 1e-5)
+        end
+    end
+end
+
+@testset "The anchors, the trackers and the Result read the set of an estimator (#2318)" begin
+    w0 = fill(0.2, 5)
+    wt = WeightsTracking(; w = w0)
+    for ue in MRS_UES
+        set = sigma_ucs(ue, MRS_RD, MRS_PR)
+        wc(w) = PO.ucs_variance(set, MRS_PR.sigma, w)
+        # The Result holds the fitted set.
+        res = optimise(MeanRisk(; r = mrs_usv(ue), opt = mrs_opt()), MRS_RD)
+        @test isapprox(expected_risk(res.r, res.w, res.pr), wc(res.w); rtol = 1e-12)
+        @test expected_risk(res.r, res.w, res.pr) > dot(res.w, MRS_PR.sigma, res.w)
+        # The anchors of a centring.
+        for alg in (UnconstrainedNearOptimalCentering(), ConstrainedNearOptimalCentering())
+            noc = NearOptimalCentering(; alg = alg, r = mrs_usv(ue), opt = mrs_opt())
+            s = PO.near_optimal_centering_setup(noc, MRS_RD)
+            @test isapprox(s.rk_opt - s.rk_delta, wc(s.w_opt); rtol = 1e-10)
+        end
+        # The benchmark risk of a dependent tracker, in the objective and as a constraint.
+        for alg in (DependentVariableTracking(), IndependentVariableTracking())
+            rtr(u) = RiskTrackingRiskMeasure(; tr = wt, r = mrs_usv(u), alg = alg)
+            res, ref = [optimise(MeanRisk(; r = rtr(u), opt = mrs_opt()), MRS_RD)
+                        for u in (ue, set)]
+            @test isapprox(expected_risk(res.r, res.w, res.pr),
+                           expected_risk(ref.r, ref.w, ref.pr); atol = 1e-8)
+            te = RiskTrackingError(; tr = wt, r = mrs_usv(ue), alg = alg, err = 2e-6)
+            res = optimise(MeanRisk(; obj = MaximumReturn(), opt = mrs_opt(; tr = te)),
+                           MRS_RD)
+            @test isa(res.retcode, OptimisationSuccess)
+            risk = if isa(alg, DependentVariableTracking)
+                wc(res.w) - wc(w0)
+            else
+                wc(res.w - w0)
+            end
+            # The solver can lower the slack of the lifted matrix, so the value level of the
+            # ellipsoid is at or above the model expression.
+            if isa(set, BoxUncertaintySet)
+                @test isapprox(risk, 2e-6; rtol = 1e-3)
+            end
+        end
+    end
+end
+
+@testset "NearOptimalCentering views its risk measures at the Investable Mask (#2320)" begin
+    Xn = copy(MRS_X)
+    Xn[1:100, 3] .= NaN
+    rdn = ReturnsResult(; nx = string.("A", 1:5), X = Xn)
+    keep = [1, 2, 4, 5]
+    rdk = ReturnsResult(; nx = rdn.nx[keep], X = Xn[:, keep])
+    opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = MRS_SLV)
+    sds(i) = StandardDeviation(; sigma = MRS_PR.sigma[i, i])
+    for (r, rk) in ((sds(1:5), sds(keep)), map(x -> (x, x), mrs_usv.(MRS_UES))...)
+        for alg in (UnconstrainedNearOptimalCentering(), ConstrainedNearOptimalCentering())
+            res = optimise(NearOptimalCentering(; r = r, opt = opt, alg = alg), rdn)
+            ref = optimise(NearOptimalCentering(; r = rk, opt = opt, alg = alg), rdk)
+            @test isa(res.retcode, OptimisationSuccess) ==
+                  isa(ref.retcode, OptimisationSuccess)
+            @test iszero(res.w[3])
+            @test isapprox(res.w[keep], ref.w; rtol = 1e-5)
+        end
+    end
+end
+
+@testset "A RiskTrackingError resolves the Deferred Quantity of its measure" begin
+    wt = WeightsTracking(; w = fill(0.2, 5))
+    for alg in (DependentVariableTracking(), IndependentVariableTracking())
+        ws = map((PortfolioOptimisersCovariance(), MRS_PR.sigma)) do sigma
+            te = RiskTrackingError(; tr = wt, r = Variance(; sigma = sigma), alg = alg,
+                                   err = 2e-6)
+            res = optimise(MeanRisk(; obj = MaximumReturn(), opt = mrs_opt(; tr = te)),
+                           MRS_RD)
+            @test isa(res.retcode, OptimisationSuccess)
+            return res.w
+        end
+        @test isapprox(ws[1], ws[2]; rtol = 1e-6)
+    end
+end

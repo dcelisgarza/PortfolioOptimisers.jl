@@ -654,3 +654,20 @@ function bind_data_benchmark(est::RiskJuMPOptimisationEstimator, rd::ReturnsResu
         rebuild_struct(est, (; opt = opt, r = r))
     end
 end
+function ucs_risk_measure(opt::JuMPOptimiser, rd, pr)
+    tr = ucs_risk_measure(opt.tr, rd, pr)
+    return tr === opt.tr ? opt : rebuild_struct(opt, (; tr = tr))
+end
+function ucs_risk_measure(est::JuMPOptimisationEstimator, rd, pr)
+    opt = ucs_risk_measure(est.opt, rd, pr)
+    return opt === est.opt ? est : rebuild_struct(est, (; opt = opt))
+end
+function ucs_risk_measure(est::RiskJuMPOptimisationEstimator, rd, pr)
+    opt = ucs_risk_measure(est.opt, rd, pr)
+    r = ucs_risk_measure(est.r, rd, pr)
+    return if opt === est.opt && r === est.r
+        est
+    else
+        rebuild_struct(est, (; opt = opt, r = r))
+    end
+end

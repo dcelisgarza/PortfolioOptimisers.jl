@@ -2442,6 +2442,54 @@ end
         end
     end
 
+    @testset "The set fits the uncertainty set of a ceiling and of a tracking error (#2318)" begin
+        # A set with an estimator in an `UncertaintySetVariance` gives the portfolio of the
+        # fitted set, with its own `pe` too, whose fit reads the rows of the block.
+        R = 0.02 .* randn(StableRNG(2318), 40, 3)
+        X = ReturnsResult(; nx = ["A", "B", "C"], X = R)
+        pr = prior(EmpiricalPrior(), X)
+        w0 = [0.5, 0.3, 0.2]
+        wt = WeightsTracking(; w = w0, fixed = true)
+        ues = (DeltaUncertaintySet(; pe = EmpiricalPrior()),
+               DeltaUncertaintySet(; pe = nothing))
+        box = sigma_ucs(ues[2], pr)
+        wc(w) = po.ucs_variance(box, pr.sigma, w)
+        usv(u; kw...) = UncertaintySetVariance(; ucs = u, kw...)
+        bnd(ub) = RiskMeasureSettings(; ub = ub)
+        dv = DependentVariableTracking()
+        ub = wc(w0)
+        function solve_set(; kw...)
+            set = resolve(ProgrammeAllocationSet(; slv = slv, kw...), 3)
+            model = JuMP.Model(Clarabel.Optimizer)
+            JuMP.set_silent(model)
+            po.set_model_scales!(model, 1, 1)
+            po.set_model_observations!(model, 40)
+            po.set_maximum_ratio_factor_variables!(model, MinimumRisk())
+            po.set_w!(model, R, nothing)
+            po.set_allocation_set_constraints!(model, set, w0, X)
+            JuMP.@objective(model, Max, sum([0.0, 0.0, 1.0] .* model[:w]))
+            JuMP.optimize!(model)
+            @test JuMP.termination_status(model) == JuMP.MOI.OPTIMAL
+            return JuMP.value.(model[:w])
+        end
+        for ue in ues
+            # The ceiling binds at the worst case.
+            w = solve_set(; r = usv(ue; settings = bnd(ub)))
+            @test isapprox(w, solve_set(; r = usv(box; settings = bnd(ub))); atol = 1e-6)
+            @test isapprox(wc(w), ub; rtol = 1e-5)
+            # The dependent trackers compare two worst cases.
+            for k in (u -> (;
+                            r = RiskTrackingRiskMeasure(; tr = wt, r = usv(u), alg = dv,
+                                                        settings = bnd(ub / 100))),
+                      u -> (;
+                            tr = RiskTrackingError(; tr = wt, r = usv(u), alg = dv, err = ub / 100)))
+                w = solve_set(; k(ue)...)
+                @test isapprox(w, solve_set(; k(box)...); atol = 1e-6)
+                @test isapprox(wc(w), 1.01 * ub; rtol = 1e-5)
+            end
+        end
+    end
+
     @testset "The set fits its prior in the frame that its prior states (#1663)" begin
         # The rows stay raw, and the set gives them to its prior, which reads its own source.
         # Under `x_src = ExcessSource()` a Variance ceiling is a ceiling on the tracking

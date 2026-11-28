@@ -609,7 +609,7 @@ A JuMP head calls it after [`mark_risk_minimised!`](@ref), and the projection ca
 
 # Algorithm
 
- 1. Bind each [`DataBenchmarkTracking`](@ref) of the ceilings to the benchmark of the rows `cbr.rd`, and add the ceilings with [`set_allocation_risk_ceiling!`](@ref).
+ 1. Bind each [`DataBenchmarkTracking`](@ref) of the ceilings to the benchmark of the rows `cbr.rd`, and fit the uncertainty sets of the ceilings on the rows `cbr.rd` and the prior `cbr.pr` with [`ucs_risk_measure`](@ref). Add the ceilings with [`set_allocation_risk_ceiling!`](@ref).
  2. Resolve the floor against the prior `cbr.pr` with [`factory`](@ref), and add it with [`set_allocation_return_floor!`](@ref), with the rows.
 
 # Arguments
@@ -633,8 +633,8 @@ A JuMP head calls it after [`mark_risk_minimised!`](@ref), and the projection ca
 function set_allocation_risk_return_bounds!(model::JuMP.Model, set::ProgrammeAllocationSet,
                                             cbr::ResolvedConstraintBlock;
                                             prefix::Symbol = Symbol(""))::Nothing
-    set_allocation_risk_ceiling!(model, bind_data_benchmark(set.r, cbr.rd), set, cbr.pr,
-                                 cbr.plr; prefix = prefix)
+    r = ucs_risk_measure(bind_data_benchmark(set.r, cbr.rd), cbr.rd, cbr.pr)
+    set_allocation_risk_ceiling!(model, r, set, cbr.pr, cbr.plr; prefix = prefix)
     set_allocation_return_floor!(model, factory(set.ret, cbr.pr), cbr.pr; prefix = prefix,
                                  rd = cbr.rd)
     return nothing

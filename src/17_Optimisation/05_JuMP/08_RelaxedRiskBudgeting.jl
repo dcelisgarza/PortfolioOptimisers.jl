@@ -767,7 +767,7 @@ Build the model of a [`RelaxedRiskBudgeting`](@ref), solve it, and return its re
  1. Replace each schedule of `rrb` with its static default through [`reset_time_dependent_estimator`](@ref).
  2. Resolve `rrb.opt` against `rd` with [`resolve_jump_optimiser`](@ref), with the blocks of `blocks`, giving `attrs`. It holds the prior, the block Results, the fees, the return terms and the Investable Mask.
  3. Take the view of `rrb` and of `rd` at the investable assets with [`investable_view`](@ref). Both are unchanged when every asset is investable.
- 4. Bind the benchmark of each [`DataBenchmarkTracking`](@ref) term to `rd` with [`bind_data_benchmark`](@ref).
+ 4. Bind the benchmark of each [`DataBenchmarkTracking`](@ref) term to `rd` with [`bind_data_benchmark`](@ref). Fit the uncertainty set of each [`UncertaintySetVariance`](@ref) on `rd` and the reduced prior with [`ucs_risk_measure`](@ref).
  5. Build a new model. Register the scales with [`set_model_scales!`](@ref), the number of observations with [`set_model_observations!`](@ref), and the expression `k = 1` with [`set_maximum_ratio_factor_variables!`](@ref), because [`MinimumRisk`](@ref) does not scale the weights.
  6. Add the weights, the cones and the weight constraints with [`set_relaxed_risk_budgeting_constraints!`](@ref), giving `rbr`.
  7. Add the constraints of every block and the return terms of `rrb.opt` with [`assemble_jump_model!`](@ref).
@@ -805,6 +805,7 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
     # `rd`. Both are unchanged when every asset is investable.
     rrb, rd = investable_view(rrb, rd, attrs.pr, attrs.imsk)
     rrb = bind_data_benchmark(rrb, rd)
+    rrb = ucs_risk_measure(rrb, rd, attrs.pr)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rrb.opt.sc, rrb.opt.so)

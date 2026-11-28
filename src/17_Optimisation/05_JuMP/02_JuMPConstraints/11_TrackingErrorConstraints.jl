@@ -209,7 +209,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                                     AbstractProgrammeAllocationSet},
                                          pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees},
                                          args...; prefix::Symbol = Symbol(""), kwargs...)
-    r = tr.r
+    r = resolve_deferred_quantities(tr.r, pr, risk_constraint_solver(opt))
+    assert_declared_calibration_resolver(r)
     wb = tr.tr.w
     err = tr.err
     w = get_w(model, prefix)
@@ -233,7 +234,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                                     AbstractProgrammeAllocationSet},
                                          pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees},
                                          args...; prefix::Symbol = Symbol(""), kwargs...)
-    ri = tr.r
+    ri = resolve_deferred_quantities(tr.r, pr, risk_constraint_solver(opt))
+    assert_declared_calibration_resolver(ri)
     wb = tr.tr.w
     err = tr.err
     rb = expected_risk(factory(ri, pr, risk_constraint_solver(opt)), wb, pr.X, fees)

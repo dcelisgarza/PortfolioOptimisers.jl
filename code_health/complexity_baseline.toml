@@ -302,7 +302,7 @@ commit = "2252e4f368"
 "src/14_NetReturnsDrawdowns.jl" = { cyc = 6, cog = 8, arg = 5, cyc_sum = 128, cog_sum = 83, arg_sum = 204, macros = [] }
 "src/15_Tracking.jl" = { cyc = 4, cog = 5, arg = 3, cyc_sum = 45, cog_sum = 27, arg_sum = 48, macros = ["@propagatable"] }
 "src/16_RiskMeasures/01_Base_RiskMeasures.jl" = { cyc = 6, cog = 12, arg = 6, cyc_sum = 136, cog_sum = 76, arg_sum = 179, macros = [] }
-"src/16_RiskMeasures/02_Variance.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 57, cog_sum = 21, arg_sum = 103, macros = ["@propagatable"] }
+"src/16_RiskMeasures/02_Variance.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 53, cog_sum = 22, arg_sum = 98, macros = ["@propagatable"] }
 "src/16_RiskMeasures/03_MomentRiskMeasures.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 59, cog_sum = 32, arg_sum = 95, macros = ["@propagatable"] }
 "src/16_RiskMeasures/04_Kurtosis.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 15, cog_sum = 4, arg_sum = 10, macros = [] }
 "src/16_RiskMeasures/05_NegativeSkewness.jl" = { cyc = 4, cog = 6, arg = 7, cyc_sum = 17, cog_sum = 9, arg_sum = 12, macros = [] }
