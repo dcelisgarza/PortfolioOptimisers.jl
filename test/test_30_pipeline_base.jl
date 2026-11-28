@@ -3894,3 +3894,116 @@ end
         end
     end
 end
+@testset "A Pipeline views each step at the assets that a universe step keeps (#2383)" begin
+    using Dates, StableRNGs, TimeSeries, Clarabel
+    PO = PortfolioOptimisers
+    X6 = randn(StableRNG(1), 120, 6) ./ 100 .+ 0.0005
+    nx = string.("A", 1:6)
+    rd6 = ReturnsResult(; nx = nx, X = X6, ts = Date(2024, 1, 1) .+ Day.(0:119))
+    sel = ScoreSelector(; score = SCM(), rule = RankRule(; best = 3))
+    W(r) = hcat([p.res.w for p in r.pred]...)
+    N(r) = [collect(p.rd.nx) for p in r.pred]
+    pos(names) = [findfirst(==(n), nx) for n in names]
+    @testset "a risk measure that holds the coskewness of the input universe" begin
+        # The selector keeps three assets, and the measure holds the coskewness of six. The
+        # walk raised a `DimensionMismatch` in the risk constraint before the view.
+        prh = prior(HighOrderPriorEstimator(), rd6)
+        slv = Solver(; name = :cl, solver = Clarabel.Optimizer,
+                     check_sol = (; allow_local = true, allow_almost = true),
+                     settings = Dict("verbose" => false))
+        opn = MeanRisk(; r = NegativeSkewness(; sk = prh.sk, V = prh.V),
+                       opt = JuMPOptimiser(; pe = HighOrderPriorEstimator(), slv = slv,
+                                           wb = WeightBounds(; lb = 0.0, ub = 1.0)))
+        cv = IndexWalkForward(60, 20; expand_train = true)
+        res = cross_val_predict(Pipeline(; steps = (sel, opn)), rd6, cv)
+        # Each fold equals the optimiser viewed by hand at the assets that the selector keeps
+        # over the training window.
+        for p in res.pred
+            rdt = PO.port_opt_view(rd6, 1:(first(p.idx) - 1), :)
+            idx = pos(fit_preprocessing(sel, rdt).nx)
+            ref = optimise(PO.port_opt_view(opn, idx, rdt.X), PO.port_opt_view(rdt, :, idx))
+            @test length(p.res.w) == 3
+            @test isapprox(p.res.w, ref.w; atol = 1e-10)
+        end
+    end
+    @testset "a vector bound of the input universe, batch and online" begin
+        rdl = ReturnsResult(; nx = nx, X = X6[1:60, :], ts = rd6.ts[1:60])
+        ub = [0.9, 0.12, 0.9, 0.12, 0.9, 0.12]
+        ivb = InverseVolatility(; wb = WeightBounds(; lb = 0.0, ub = ub))
+        expanding = IndexWalkForward(20, 5; expand_train = true)
+        online = OnlineIndexWalkForward(20, 5)
+        # The prior owns the rows in the first pipeline, so the online read-out runs the
+        # optimiser after the owner. The optimiser owns them in the second.
+        for p in (Pipeline(; steps = (sel, EmpiricalPrior(), ivb)),
+                  Pipeline(; steps = (sel, ivb)))
+            b = cross_val_predict(p, rdl, expanding)
+            o = cross_val_predict(p, rdl, online)
+            @test isapprox(W(o), W(b); atol = 1e-12)
+            @test N(o) == N(b)
+            for q in b.pred
+                @test all(q.res.w .<= ub[pos(q.rd.nx)] .+ 1e-12)
+            end
+            @test length(unique(N(b))) > 1
+        end
+        # A wrapped optimiser takes the view too.
+        ps = PipelineStep(; est = ivb, writes = :opt)
+        @test isapprox(fit(Pipeline(; steps = (sel, EmpiricalPrior(), ps)), rdl).w,
+                       fit(Pipeline(; steps = (sel, EmpiricalPrior(), ivb)), rdl).w)
+        # A nested pipeline takes the view too. It raised a `DimensionMismatch` before the
+        # view of its steps.
+        flat = fit(Pipeline(; steps = (sel, EmpiricalPrior(), ivb)), rdl)
+        nested = fit(Pipeline(; steps = (sel, Pipeline(; steps = (EmpiricalPrior(), ivb)))),
+                     rdl)
+        @test length(nested.w) == 3
+        @test isapprox(nested.w, flat.w)
+    end
+    @testset "a price filter cuts the universe before any returns data" begin
+        P = vcat(fill(100.0, 1, 6), cumprod(1 .+ X6; dims = 1) .* 100)
+        P[2:100, 2] .= NaN
+        prs = PricesResult(; X = TimeArray(Date(2020, 1, 1) .+ Day.(0:120), P, Symbol.(nx)))
+        ub = [0.9, 0.9, 0.9, 0.15, 0.9, 0.2]
+        ivb = InverseVolatility(; wb = WeightBounds(; lb = 0.0, ub = ub))
+        r = fit(Pipeline(;
+                         steps = (MissingDataFilter(; col_thr = 0.5), PricesToReturns(),
+                                  EmpiricalPrior(), ivb)), prs)
+        @test r.ctx.returns.nx == ["A1", "A3", "A4", "A5", "A6"]
+        @test all(r.w .<= ub[pos(r.ctx.returns.nx)] .+ 1e-12)
+    end
+    @testset "the helpers of the view" begin
+        rd = ReturnsResult(; nx = ["A3", "A1"], X = [1.0 2.0; 3.0 4.0])
+        ctx = PO.PipelineContext(; returns = rd)
+        # No cut, an empty slot, no names, or a name outside the input universe: no view.
+        @test isnothing(PO.universe_index(["A3", "A1"], rd))
+        @test isnothing(PO.universe_index(nx, nothing))
+        @test isnothing(PO.universe_index(nothing, rd))
+        @test isnothing(PO.universe_index(nx,
+                                          ReturnsResult(; nf = ["f"], F = [1.0; 2.0;;])))
+        @test isnothing(PO.universe_index(["A1", "A2"], rd))
+        @test PO.universe_index(nx, rd) == [3, 1]
+        Xu = PO.UniverseMatrix(rd.X, [3, 1], 4)
+        @test Xu == [2.0 0.0 1.0 0.0; 4.0 0.0 3.0 0.0]
+        # A view of the surviving columns reads `X` with no copy, and a view of any other
+        # column reads the zeros of the matrix.
+        @test parent(view(Xu, 2:2, [1, 3])) === rd.X
+        @test view(Xu, 2:2, [1, 3]) == [4.0 3.0]
+        @test view(Xu, :, [2, 3]) == [0.0 1.0; 0.0 3.0]
+        @test_throws DimensionMismatch PO.UniverseMatrix(rd.X, [3], 4)
+        @test_throws BoundsError PO.UniverseMatrix(rd.X, [3, 5], 4)
+        @test PO.input_universe(rd) == ["A3", "A1"]
+        # A step with no cut before it, and a data step, run unchanged.
+        iv = InverseVolatility()
+        @test PO.universe_step_view(iv, ["A3", "A1"], ctx) === iv
+        @test PO.universe_step_view(sel, nx, ctx) === sel
+        # A callable, a nested pipeline and a precomputed result run unchanged.
+        f = c -> c.returns
+        @test PO.pipeline_step_view(f, [3, 1], rd.X) === f
+        fps = PipelineStep(; est = f, writes = :opt)
+        @test PO.pipeline_step_view(fps, [3, 1], rd.X).est === f
+        res = optimise(EqualWeighted(), rd)
+        @test PO.universe_step_view(res, nx, ctx) === res
+        # A vector bound keeps the values of the kept assets, in the order of the slot.
+        wb = WeightBounds(; lb = 0.0, ub = collect(0.1:0.1:0.6))
+        v = PO.universe_step_view(InverseVolatility(; wb = wb), nx, ctx)
+        @test v.wb.ub == [0.3, 0.1]
+    end
+end

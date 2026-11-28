@@ -1042,6 +1042,177 @@ function group_returns_view(step, rd, ::ExcessSource)
     return step, rd
 end
 """
+    universe_step_view(step, nx0, ctx::PipelineContext)
+
+Views a step of a [`Pipeline`](@ref) at the assets of the `returns` slot, when the steps before it cut the input universe `nx0`.
+
+A universe step, such as an [`AbstractAssetSelector`](@ref) or a [`MissingDataFilter`](@ref), selects its assets at each fit. So the caller can state a value for each asset of a later step only over the input universe: a [`WeightBounds`](@ref) vector, the coskewness of a [`NegativeSkewness`](@ref), a vector of fees. The walk views such a step at the assets that survive, with [`port_opt_view`](@ref), before the context is injected. `fit(pipe)` with no data views its row owner the same way, through [`view_owner`](@ref), and its other steps through this function, so the batch walk and the online walk agree.
+
+Internal machinery — not part of the user-facing API.
+
+# Algorithm
+
+ 1. Find the index of the assets of the `returns` slot in `nx0` with [`universe_index`](@ref). No index means that no cut happened, or that the slot is empty, and the step runs unchanged.
+ 2. A data step runs unchanged, because it reads the data slot and holds no value for each asset of a later universe.
+ 3. Read the returns of the slot over the input universe with a [`UniverseMatrix`](@ref), and view the step with [`pipeline_step_view`](@ref).
+
+# Arguments
+
+  - `step`: The step, before [`maybe_inject_step`](@ref).
+  - `nx0`: The names of the input universe, from [`input_universe`](@ref), or `nothing`.
+  - `ctx`: The pipeline context.
+
+# Returns
+
+  - `step′`: The step viewed at the surviving assets, or `step` itself.
+
+# Related
+
+  - [`fit(pipe::Pipeline, data::Prices_RR)`](@ref)
+  - [`fit(pipe::Pipeline)`](@ref)
+  - [`view_owner`](@ref)
+"""
+function universe_step_view(step, nx0, ctx::PipelineContext)
+    idx = universe_index(nx0, ctx.returns)
+    if isnothing(idx) || is_data_step(step)
+        return step
+    end
+    return pipeline_step_view(step, idx, UniverseMatrix(ctx.returns.X, idx, length(nx0)))
+end
+"""
+    input_universe(rd::AbstractReturnsResult)
+    input_universe(pr::AbstractPricesResult)
+
+Returns the names of the assets of the input data of a [`Pipeline`](@ref): the field `nx` of returns data, and the column names of the price matrix of price data.
+
+Internal machinery — not part of the user-facing API.
+
+# Related
+
+  - [`universe_step_view`](@ref)
+"""
+input_universe(rd::AbstractReturnsResult) = rd.nx
+function input_universe(pr::AbstractPricesResult)
+    return string.(TimeSeries.colnames(pr.X))
+end
+"""
+    universe_index(nx0::VecStr, rd::AbstractReturnsResult)
+    universe_index(nx0::VecStr, ::Nothing)
+    universe_index(::Nothing, rd::Option{<:AbstractReturnsResult})
+
+Returns the index into `nx0` of each asset of `rd`, in the order of `rd`, or `nothing` when the walk views no step.
+
+The walk views no step when the slot holds no returns data, when either side has no names, when `rd` holds the input universe in its own order, or when `rd` holds a name outside `nx0`. Input data with no names of assets, such as returns data of the factors alone, gives a `nothing` universe. A name outside the input universe comes from a callable step that writes returns data of its own, and such a step states its own universe.
+
+Internal machinery — not part of the user-facing API.
+
+# Related
+
+  - [`universe_step_view`](@ref)
+"""
+function universe_index(nx0::VecStr, rd::AbstractReturnsResult)
+    nx = rd.nx
+    if isnothing(nx) || nx == nx0
+        return nothing
+    end
+    idx = indexin(nx, nx0)
+    return any(isnothing, idx) ? nothing : something.(idx)
+end
+universe_index(::VecStr, ::Nothing) = nothing
+universe_index(::Nothing, ::Option{<:AbstractReturnsResult}) = nothing
+"""
+    UniverseMatrix{T, M, I} <: AbstractMatrix{T}
+
+The returns of the surviving assets, read as a matrix over the `n` assets of the input universe of a [`Pipeline`](@ref). Its columns `idx` are the columns of `X`, and its other columns read zero.
+
+The rows are the rows of `X`, so a cut of the observations, such as a [`TrainTestSplit`](@ref), holds too. The matrix exists for a cut of price data too, before any returns data spans the input universe. A view reads the width of the matrix and its columns `idx`, and no other column. So the matrix copies nothing: a view of columns that `idx` holds is a view of `X`, and a step with no value for each asset pays only the column map.
+
+Internal machinery — not part of the user-facing API.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    UniverseMatrix(X::AbstractMatrix, idx::AbstractVector{<:Integer}, n::Integer)
+
+## Validation
+
+  - `X` has one column for each entry of `idx`, else a `DimensionMismatch`.
+  - Each entry of `idx` is in `1:n`, else a `BoundsError`.
+
+# Related
+
+  - [`universe_step_view`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+struct UniverseMatrix{T, M <: AbstractMatrix{T}, I <: AbstractVector{<:Integer}} <:
+       AbstractMatrix{T}
+    """
+    The returns of the surviving assets, observations × assets.
+    """
+    X::M
+    """
+    The position in the input universe of each column of `X`.
+    """
+    idx::I
+    """
+    The column of `X` of each asset of the input universe, or `0` for an asset that did not survive.
+    """
+    col::Vector{Int}
+    function UniverseMatrix(X::AbstractMatrix, idx::AbstractVector{<:Integer}, n::Integer)
+        @argcheck(size(X, 2) == length(idx),
+                  DimensionMismatch("the returns have $(size(X, 2)) columns, but $(length(idx)) positions in the input universe"))
+        col = zeros(Int, n)
+        col[idx] = eachindex(idx)
+        return new{eltype(X), typeof(X), typeof(idx)}(X, idx, col)
+    end
+end
+function Base.size(Xu::UniverseMatrix)
+    return (size(Xu.X, 1), length(Xu.col))
+end
+Base.@propagate_inbounds function Base.getindex(Xu::UniverseMatrix, t::Integer, i::Integer)
+    @boundscheck checkbounds(Xu, t, i)
+    j = Xu.col[i]
+    return iszero(j) ? zero(eltype(Xu)) : Xu.X[t, j]
+end
+function Base.view(Xu::UniverseMatrix, t, i::AbstractVector{<:Integer})
+    j = Xu.col[i]
+    return all(!iszero, j) ? view(Xu.X, t, j) : view(Matrix(Xu), t, i)
+end
+"""
+    pipeline_step_view(step, idx, X)
+    pipeline_step_view(ps::PipelineStep, idx, X)
+    pipeline_step_view(step::Function, idx, X)
+    pipeline_step_view(p::AbstractPipelineEstimator, idx, X)
+
+Views one step of a [`Pipeline`](@ref) at the assets `idx` of the input universe, with the matrix `X` over that universe.
+
+An estimator is viewed with [`view_child`](@ref), so a precomputed optimisation result, which the fold of a mixed [`TimeDependent`](@ref) schedule puts in the step, runs on the universe of its own solve. A [`PipelineStep`](@ref) views the estimator that it wraps. A callable reads the context itself, so it runs unchanged. A nested Pipeline views each of its steps, because the caller states its values over the input universe of the outer Pipeline too. It holds no data step, because [`assert_nested_data_slots`](@ref) refuses one, and a nested Pipeline that writes a data slot is a data step of the outer Pipeline, which [`universe_step_view`](@ref) does not view.
+
+Internal machinery — not part of the user-facing API.
+
+# Related
+
+  - [`universe_step_view`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function pipeline_step_view(step, idx, X)
+    return view_child(step, idx, X)
+end
+function pipeline_step_view(ps::PipelineStep, idx, X)
+    return rebuild_struct(ps, (; est = pipeline_step_view(ps.est, idx, X)))
+end
+function pipeline_step_view(step::Function, ::Any, ::Any)
+    return step
+end
+function pipeline_step_view(p::AbstractPipelineEstimator, idx, X)
+    return rebuild_struct(p,
+                          (;
+                           steps = map_steps(s -> pipeline_step_view(s, idx, X), p.steps)))
+end
+"""
     pipeline_refits(ests, received, opt) -> Tuple{Bool, Bool}
 
 Return `refit` for the steps of a [`Pipeline`](@ref) and `refit` for its last optimiser, see [`refits_regression`](@ref).
