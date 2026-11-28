@@ -126,6 +126,19 @@ end
     @test isapprox(rbs_share(res.w), RBS_B; atol = 5e-5)
     zm = Int.(sign.(res.w))
     @test zm * zm[1] == zs[argmin(risk)]
+    # Finite bounds that do not bind reach the same orthant. The held bit, read as a long
+    # sign, forbade every short under them (#2372). With nothing that reads a held bit the
+    # pin takes one sign bit for each asset, and a cardinality takes a long and a short bit.
+    fkw = merge(kw, (; wb = WeightBounds(; lb = -1.0, ub = 1.0)))
+    for (extra, kind) in (((;), PO.SignIndicators), ((; card = 5), PO.LongShortIndicators))
+        resb = rbs_solve(MixedIntegerRiskBudgeting(); slv = RBS_MIP, so = 10_000, fkw...,
+                         extra...)
+        @test isa(resb.retcode, OptimisationSuccess)
+        @test PO.mip_indicators(resb.model) isa kind
+        @test isapprox(rbs_share(resb.w), RBS_B; atol = 5e-5)
+        zb = Int.(sign.(resb.w))
+        @test zb * zb[1] == zs[argmin(risk)]
+    end
     # Under a budget, a short budget range leaves the short exposure free, so the search
     # reaches the same orthant.
     res = rbs_solve(MixedIntegerRiskBudgeting(); slv = RBS_MIP, so = 10_000,
@@ -146,7 +159,11 @@ end
     th = Threshold(; val = 0.18)
     free = rbs_solve(MixedIntegerRiskBudgeting(); kw...)
     held = rbs_solve(MixedIntegerRiskBudgeting(); kw..., lt = th)
-    both = rbs_solve(MixedIntegerRiskBudgeting(); kw..., lt = th, st = th)
+    # The bounds of each asset give the sign of its held bit, so a long-short bundle needs an
+    # asset whose bounds admit both signs (#2372). The budget keeps the book long.
+    both = rbs_solve(MixedIntegerRiskBudgeting();
+                     merge(kw, (; wb = WeightBounds(; lb = -1.0, ub = 1.0)))..., lt = th,
+                     st = th)
     @test minimum(free.w) < 0.18 - 1e-3
     for res in (held, both)
         @test isa(res.retcode, OptimisationSuccess)

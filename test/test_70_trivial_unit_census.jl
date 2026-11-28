@@ -391,6 +391,7 @@ end
                                                :fold_optimiser => "its callee `partial_fit!` is a shared public verb (rule 3, #2102)",
                                                :step_fallback => "its callee `partial_fit!` is a shared public verb (rule 3, #2102)",
                                                :gram_geometry => "one method for each geometry: the `GramProjection` method binds the matrix through `rebuild_struct`, which many functions share, and every other geometry comes back unchanged (rule 3, rule 6, #2102)",
+                                               :held_sides => "one method for each indicator bundle: the `HeldIndicators` method sets the sides of the bounds of a call through `rebuild_struct`, which many functions share, and every other bundle carries its sign in its bits and comes back unchanged (rule 3, rule 6, #2372)",
                                                :rule_state_view => "its callee `port_opt_view` is a shared public verb (rule 3, #2102)",
                                                :buffer_column_view => "19 functions share its callee `sample_buffer` (rule 3, #2102)",
                                                :rule_state_seed => "one method for each rule: the forecast-reading rules share one method on `ForecastReadingRule`, which calls `forecaster_seed`, a function of its own (rule 3, #2102, the review of #2072)",
