@@ -389,7 +389,7 @@ Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref)
  4. Remove the two liquidation charges, `lq` and `flq`, from `fees`, giving `cfees`, the fees that the risks read.
  5. Reduce `pr`, `hrp` and `rd` to the assets of `imsk`, with [`investable_reduction`](@ref). `X` is the returns matrix of the reduced `pr`.
  6. Cluster the assets with `opt.cle`, giving `clr`. The call passes no `branchorder`, so the leaf order `clr.res.order` keeps the default optimal order, because a different order changes the allocation.
- 7. Resolve the risk measure `r` against `pr` and `opt.slv`, with [`factory`](@ref).
+ 7. Resolve the risk measure `r` against `pr` and `opt.slv`, with [`resolve_ucs_measure`](@ref). An [`UncertaintySetVariance`](@ref) fits the estimator of its set on the reduced `rd`, so every risk below is the worst case over one fitted set.
  8. Compute the risk of each asset held alone, `rku`, with [`unitary_expected_risks`](@ref).
  9. Resolve the weight bounds `wb` from `opt.wb` and `opt.sets`. Expand a side that resolves to a scalar or to `nothing` to one bound per asset, because [`split_factor_weight_constraints`](@ref) sums the bounds of each half.
 10. Set every entry of `w` to one, and set `items` to the one part `clr.res.order`.
@@ -403,13 +403,14 @@ Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref)
 # Arguments
 
   - `hrp`: The hierarchical risk parity optimiser to use.
-  - $(arg_dict[:rd]) When `hrp.opt.pe` holds a prior result, the allocation reads no returns from `rd`, but a fallback or the clusterisation can.
+  - $(arg_dict[:rd]) When `hrp.opt.pe` holds a prior result, the allocation reads no returns from `rd`, but a fallback, the clusterisation or the estimator of an uncertainty set can.
   - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
   - `kwargs`: Ignored. A `branchorder` passed here has no effect.
 
 # Related
 
   - [`HierarchicalRiskParity`](@ref)
+  - [`UncertaintySetVariance`](@ref)
   - [`optimise`](@ref)
   - [`_optimise`](@ref)
 """
@@ -461,7 +462,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
                                                              hrp0.opt.strict), kwargs...)
     end
     assert_clustering_universe(clr, size(X, 2))
-    r = factory(hrp.r, pr, hrp.opt.slv)
+    r = resolve_ucs_measure(hrp.r, pr, hrp.opt.slv, rd)
     wu = Matrix{T}(undef, size(X, 2), 2)
     rku = unitary_expected_risks(r, X, cfees)
     wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; rd = rd, N = size(X, 2),
@@ -591,7 +592,7 @@ Run the Hierarchical Risk Parity optimisation for a vector of risk measures, sca
 # Arguments
 
   - `hrp`: The hierarchical risk parity optimiser to use, with a vector of risk measures.
-  - $(arg_dict[:rd]) When `hrp.opt.pe` holds a prior result, the allocation reads no returns from `rd`, but a fallback or the clusterisation can.
+  - $(arg_dict[:rd]) When `hrp.opt.pe` holds a prior result, the allocation reads no returns from `rd`, but a fallback, the clusterisation or the estimator of an uncertainty set can.
   - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
   - `kwargs`: Ignored. A `branchorder` passed here has no effect.
 
@@ -650,7 +651,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
                                                              hrp0.opt.strict), kwargs...)
     end
     assert_clustering_universe(clr, size(X, 2))
-    r = factory(hrp.r, pr, hrp.opt.slv)
+    r = resolve_ucs_measure(hrp.r, pr, hrp.opt.slv, rd)
     wu = Matrix{T}(undef, size(X, 2), 2)
     rkus = [unitary_expected_risks(ri, X, cfees) for ri in r]
     wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; rd = rd, N = size(X, 2),

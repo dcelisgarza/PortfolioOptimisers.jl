@@ -2975,14 +2975,19 @@ end
         @test factory(usv, pr, nothing, ell).ucs === box
         @test factory(usv, pr, ell).ucs === box
         @test factory(usv, ell, pr).ucs === box
-        @test factory(usv0, pr, nothing, ell).ucs === ell
-        @test factory(usv0, pr, ell).ucs === ell
+        # An ellipsoid takes the factor of its matrix, so the value and the model read one
+        # root.
+        same_ell(u) = u.sigma === ell.sigma &&
+                      u.k === ell.k &&
+                      transpose(u.chol) * u.chol ≈ Om
+        @test same_ell(factory(usv0, pr, nothing, ell).ucs)
+        @test same_ell(factory(usv0, pr, ell).ucs)
         @test factory(usv0, pr).sigma === pr.sigma
         # Without a prior the uncertainty-set-first method keeps `sigma` as it stands.
         r = factory(usv0, ell)
-        @test r.ucs === ell && isnothing(r.sigma)
+        @test same_ell(r.ucs) && isnothing(r.sigma)
         r = factory(usv0, ell, pr)
-        @test r.ucs === ell && r.sigma === pr.sigma
+        @test same_ell(r.ucs) && r.sigma === pr.sigma
         @test factory(UncertaintySetVariance(; ucs = nothing, sigma = S), ell, pr).sigma ===
               S
     end

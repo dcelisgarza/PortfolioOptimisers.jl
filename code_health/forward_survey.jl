@@ -1172,6 +1172,9 @@ const RULED_DEFAULTS = Dict{Symbol, Tuple{String, String}}(#
                                                            :ucs_risk_measure =>
                                                                ("keep (default)",
                                                                 "a traversal owns the identity on a leaf and ignores its context slots, as `bind_data_benchmark` does (#2108, #2318)"),
+                                                           :resolve_ellipsoid_chol =>
+                                                               ("keep (default)",
+                                                                "a resolution step owns the identity on every set but the ellipsoid with no factor: the `ucs` slot is open to every estimator, result and extension, and only that ellipsoid has a factor to fill, as `ucs_risk_measure` does (#2108, #2379)"),
                                                            :timestamp_positions =>
                                                                ("keep (default)",
                                                                 "an index that is not a timestamp or a name passes to `view`, which is the gate of the index (#2108)"),

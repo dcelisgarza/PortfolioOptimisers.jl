@@ -904,6 +904,31 @@ end
         @test g20 == po.loss_gradient(rl5, u, X[21, :], rows(rd, 16:20))
         @test isapprox(g20, 2 .* cov(R[16:20, :]) * u; atol = 1e-15)
         @test maxerr(g20, 2 .* cov(R[1:20, :]) * u) > 1e-5
+        # Issue #2324: the loss fits the set of an `UncertaintySetVariance` on its window. The
+        # worst case over a box is the variance under its upper bound, for weights that are
+        # not negative.
+        w20 = rows(rd, 1:20)
+        pr20 = prior(EmpiricalPrior(), w20)
+        grad(r, w = w20) = po.loss_gradient(RiskLoss(; r = r), u, X[21, :], w)
+        for ue in (DeltaUncertaintySet(), DeltaUncertaintySet(; pe = nothing))
+            usv = UncertaintySetVariance(; ucs = ue)
+            ub = sigma_ucs(ue, w20, pr20).ub
+            @test isapprox(grad(usv), 2 .* ub * u; atol = 1e-9)
+            @test isapprox(grad([usv, Variance()]), 2 .* (ub + pr20.sigma) * u; atol = 1e-9)
+            @test maxerr(grad(usv), grad(Variance())) > 1e-5
+            ar(x) = ExpectedReturn(; rt = ArithmeticReturn(; ucs = x))
+            @test grad(ar(ue)) == grad(ar(mu_ucs(ue, w20, pr20)))
+            @test maxerr(grad(ar(ue)), grad(ar(nothing))) > 1e-5
+            # An asset that the window does not cover gets a zero gradient, and the set fits
+            # on the other assets.
+            Xn = copy(w20.X)
+            Xn[:, 2] .= NaN
+            keep = setdiff(1:N, 2)
+            g = grad(usv, ReturnsResult(; nx = w20.nx, X = Xn))
+            ubk = sigma_ucs(ue, po.port_opt_view(w20, keep), po.port_opt_view(pr20, keep)).ub
+            @test iszero(g[2])
+            @test isapprox(g[keep], 2 .* ubk * u[keep]; atol = 1e-9)
+        end
         # A tracking error on the set needs every row, so the head holds them all. The
         # set does not bind, and the path is still the hand recursion on 5 rows. The set
         # fits no covariance on one row, so the first step is a Held Step at the drifted

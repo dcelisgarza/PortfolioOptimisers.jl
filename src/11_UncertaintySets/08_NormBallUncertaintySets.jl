@@ -49,7 +49,7 @@ $(DocStringExtensions.FIELDS)
                            mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
         -> NormBallUncertaintySet
 
-Keywords correspond to the struct's fields. The second constructor converts a built [`EllipsoidalUncertaintySet`](@ref) with one square root at construction time: `L = matrix_square_root(mtx_sqrt, ucs.sigma)`, `p = 2`, and `kappa`, `class` and `val` carried through from `k`, `class` and `val`. It is the route through which every estimator that emits an ellipsoid reaches this type. The default `mtx_sqrt = EigenFallbackSquareRoot()` takes the Cholesky factor where it exists, and the square root of the eigendecomposition of a singular positive semidefinite matrix otherwise. `mtx_sqrt = nothing` takes the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. [`matrix_square_root`](@ref) states each algorithm. At `p = 2` the set reads `L` only through ``\\mathbf{L}\\mathbf{L}^{\\intercal}``, so the eigen square root of a singular shape gives the same set as the ellipsoid.
+Keywords correspond to the struct's fields. The second constructor converts a built [`EllipsoidalUncertaintySet`](@ref) with one square root at construction time: `L = matrix_square_root(mtx_sqrt, ucs.sigma)`, or the transpose of the factor `ucs.chol` when the set states one, `p = 2`, and `kappa`, `class` and `val` carried through from `k`, `class` and `val`. It is the route through which every estimator that emits an ellipsoid reaches this type. The default `mtx_sqrt = EigenFallbackSquareRoot()` takes the Cholesky factor where it exists, and the square root of the eigendecomposition of a singular positive semidefinite matrix otherwise. `mtx_sqrt = nothing` takes the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. [`matrix_square_root`](@ref) states each algorithm. At `p = 2` the set reads `L` only through ``\\mathbf{L}\\mathbf{L}^{\\intercal}``, so the eigen square root of a singular shape gives the same set as the ellipsoid.
 
 ## Validation
 
@@ -143,8 +143,13 @@ function NormBallUncertaintySet(; kappa::Number, L::MatNum, p::Number = 2,
 end
 function NormBallUncertaintySet(ucs::EllipsoidalUncertaintySet,
                                 mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())::NormBallUncertaintySet
-    return NormBallUncertaintySet(ucs.k, matrix_square_root(mtx_sqrt, ucs.sigma), 2,
-                                  ucs.class, ucs.val)
+    # A stated factor `G` of the ellipsoid gives the map `L = G'`, with `L L' = sigma`.
+    L = if isnothing(ucs.chol)
+        matrix_square_root(mtx_sqrt, ucs.sigma)
+    else
+        copy(transpose(ucs.chol))
+    end
+    return NormBallUncertaintySet(ucs.k, L, 2, ucs.class, ucs.val)
 end
 """
     assert_norm_ball_axis(::MuUncertaintySetClass, L::MatNum)

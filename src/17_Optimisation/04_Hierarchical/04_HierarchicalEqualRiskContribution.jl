@@ -553,15 +553,15 @@ function herc_cluster_risk(sca::Option{<:Scalariser}, rs::VecOptRM, rkus::VecVec
 end
 """
     herc_risk(hec::HierarchicalEqualRiskContribution, pr::AbstractPriorResult,
-              cls::VecVecInt, fees::Option{<:Fees}) -> Tuple
+              cls::VecVecInt, fees::Option{<:Fees}, rd::ReturnsResult) -> Tuple
 
 Compute the shares inside each cluster and the risk of each cluster that HERC allocates with.
 
 # Algorithm
 
- 1. Resolve the inner measure `ri` against `pr` and `hec.opt.slv`, with [`factory`](@ref).
+ 1. Resolve the inner measure `ri` against `pr` and `hec.opt.slv`, with [`resolve_ucs_measure`](@ref). An [`UncertaintySetVariance`](@ref) fits the estimator of its set on `rd`.
  2. Compute its unitary risks `riku`, with [`herc_unitary_risks`](@ref).
- 3. When `hec.ro` is the same object as `hec.ri`, take `ro = ri` and `roku = riku`. Otherwise resolve `ro` and compute `roku` the same way.
+ 3. When `hec.ro` is the same object as `hec.ri`, take `ro = ri` and `roku = riku`, so the two read one fitted set. Otherwise resolve `ro` and compute `roku` the same way.
  4. For each cluster `cl`, under the executor `hec.ex`, write the shares of [`herc_intra_cluster_weights`](@ref) into `w[cl]`, and the risk of [`herc_cluster_risk`](@ref) into the cluster's entry of `rkcl`.
 
 # Arguments
@@ -570,6 +570,7 @@ Compute the shares inside each cluster and the risk of each cluster that HERC al
   - `pr`: Prior result. Its `X` is the return matrix, and its moments resolve the measures.
   - `cls`: Asset indices of each cluster, one entry per cluster.
   - `fees`: Resolved fees, or `nothing`. The caller resolves them on its own universe and strips both liquidation charges, `lq` and `flq`, first, because a cluster-level risk prices no forced exit. The exiting asset is in no cluster, because its column is `NaN`.
+  - `rd`: Returns data, on the assets of `pr`.
 
 # Returns
 
@@ -583,11 +584,11 @@ Compute the shares inside each cluster and the risk of each cluster that HERC al
   - [`herc_unitary_risks`](@ref)
 """
 function herc_risk(hec::HierarchicalEqualRiskContribution, pr::AbstractPriorResult,
-                   cls::VecVecInt, fees::Option{<:Fees})
+                   cls::VecVecInt, fees::Option{<:Fees}, rd::ReturnsResult)
     X = pr.X
-    ri = factory(hec.ri, pr, hec.opt.slv)
+    ri = resolve_ucs_measure(hec.ri, pr, hec.opt.slv, rd)
     riku = herc_unitary_risks(ri, X, fees)
-    ro = hec.ri === hec.ro ? ri : factory(hec.ro, pr, hec.opt.slv)
+    ro = hec.ri === hec.ro ? ri : resolve_ucs_measure(hec.ro, pr, hec.opt.slv, rd)
     roku = hec.ri === hec.ro ? riku : herc_unitary_risks(ro, X, fees)
     # A weight is a quotient of two risks, so it takes the type of the returns. A `Float32`
     # sample stays in `Float32`.
@@ -625,7 +626,7 @@ Run the Hierarchical Equal Risk Contribution optimisation.
 # Arguments
 
   - `hec`: The hierarchical equal risk contribution optimiser to use.
-  - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, a standalone optimisation does not need `rd`, but a fallback or the clustering can need it.
+  - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, a standalone optimisation does not need `rd`, but a fallback, the clustering or the estimator of an uncertainty set can need it.
   - `branchorder`: The branch order of the clustering. The weights do not depend on the order of the leaves, so a faster order that is not optimal gives the same weights. When `opt.cle` holds a clustering result, the order has no effect.
   - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
   - `kwargs`: Keyword arguments that the method accepts and does not read.
@@ -685,7 +686,7 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     assert_clustering_universe(clr, N)
     idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
-    w, rkcl, ri, ro = herc_risk(hec, pr, cls, cfees)
+    w, rkcl, ri, ro = herc_risk(hec, pr, cls, cfees, rd)
     nd = to_tree(clr.res)[2]
     # `Clustering.cutree` does the first `N - k` merges in the order of `sortperm` of the
     # heights, so the last `k - 1` merges of that order are the nodes above the cut. A sort

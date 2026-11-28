@@ -987,7 +987,7 @@ Where:
   - ``\\mathbf{A}_l``, ``\\mathbf{A}_u``: Dual matrices of the two sides of the box.
   - ``\\hat{\\mathbf{\\Sigma}}``: Centre of the set, the set's `val` when it states one and `sigma` otherwise.
   - ``\\mathbf{E}``: Dual matrix of the condition that the worst covariance is positive semidefinite.
-  - ``k_{e}``, ``\\mathbf{G}_{\\Omega}``: Radius of the ellipsoid, `k`, and the transpose of the square root of its matrix ``\\mathbf{\\Omega}``, `sigma`, that [`matrix_square_root`](@ref) takes under `mtx_sqrt`, so ``\\mathbf{G}_{\\Omega}^\\intercal \\mathbf{G}_{\\Omega} = \\mathbf{\\Omega}``.
+  - ``k_{e}``, ``\\mathbf{G}_{\\Omega}``: Radius of the ellipsoid, `k`, and the factor of its matrix ``\\mathbf{\\Omega}``, `sigma`, so ``\\mathbf{G}_{\\Omega}^\\intercal \\mathbf{G}_{\\Omega} = \\mathbf{\\Omega}``. It is the `chol` of the set when the set states one, and otherwise the transpose of the square root that [`matrix_square_root`](@ref) takes under `mtx_sqrt`. [`ellipsoid_chol`](@ref) reads it, as [`ucs_variance`](@ref) does.
   - ``\\kappa_{b}``, ``\\mathbf{L}``, ``p^{*}``: Radius of the norm ball, its map, and the dual order of its norm.
   - ``\\mathbf{C}``, ``\\mathbf{Q}``, ``\\mathbf{R}``, ``\\boldsymbol{z}``: Diagonal metric of the compact set, its basis, the factor of the rows a view dropped from the basis, and the free coefficients of the basis. A fitted set has no row in ``\\mathbf{R}``.
   - ``\\langle \\mathbf{X}, \\mathbf{Y} \\rangle = \\mathrm{Tr}(\\mathbf{X}^\\intercal \\mathbf{Y})``: Inner product of two matrices.
@@ -1050,7 +1050,7 @@ $(val_dict[:relax])
   - $(arg_dict[:ci])
   - `ucs`: The uncertainty set, a [`BoxUncertaintySet`](@ref), an [`EllipsoidalUncertaintySet`](@ref), a [`CompactCovarianceUncertaintySet`](@ref) or a covariance [`NormBallUncertaintySet`](@ref).
   - `sigma::MatNum`: The fallback centre. The set's own `val` wins over it, and the box ignores both, because it names no centre.
-  - `mtx_sqrt`: Square-root algorithm of the matrix of an ellipsoid and of the centre of a compact set, the `mtx_sqrt` of the [`UncertaintySetVariance`](@ref), or `nothing` for the plain Cholesky factor. The box and the norm ball ignore it.
+  - `mtx_sqrt`: Square-root algorithm of the matrix of an ellipsoid and of the centre of a compact set, the `mtx_sqrt` of the [`UncertaintySetVariance`](@ref), or `nothing` for the plain Cholesky factor. An ellipsoid that states its factor `chol`, the box and the norm ball ignore it. [`ellipsoid_chol`](@ref) reads the factor of an ellipsoid.
 
 # Keyword arguments
 
@@ -1120,7 +1120,7 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipsoidalUncer
     # centre. The risk measure's field and then the prior are the fallbacks (ADR 0050).
     sigma = something(ucs.val, sigma)
     k = ucs.k
-    G = transpose(matrix_square_root(mtx_sqrt, ucs.sigma))
+    G = ellipsoid_chol(ucs, mtx_sqrt)
     t_eucs = state_set!(model, prefix, :t_eucs, i, JuMP.@variable(model))
     x_eucs = state_set!(model, prefix, :x_eucs, i, JuMP.@expression(model, G * vec(WpE)))
     ucs_variance_risk = state_set!(model, prefix, :eucs_variance_risk_, i,

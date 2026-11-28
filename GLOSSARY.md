@@ -527,6 +527,8 @@ The composing estimator that applies a sequence of post-processing steps to a co
 
 **Matrix Square Root**
 A matrix `L` with `L L' = Σ`. A factor prior states its covariance through it as `chol`, and a second-order cone reads it. `nothing` takes the plain Cholesky factor and refuses a matrix that is not positive definite. `RidgeCholeskySquareRoot` adds a ridge to the diagonal that grows tenfold until the factor exists, and `EigenFallbackSquareRoot` takes the square root of the eigendecomposition of a positive semidefinite matrix. Every estimator that takes a square root of a covariance holds the algorithm in `mtx_sqrt`: the two factor priors, `FactorBlackLittermanPrior`, `Variance`, `StandardDeviation`, `DistributionValueatRisk`, `UncertaintySetVariance`, `ArithmeticReturn`, `RelaxedRiskBudgeting`, `Kurtosis`, `NegativeSkewness`, `NormBallUncertaintySetAlgorithm` and `OrthogonalUncertaintySet`, and each defaults to `EigenFallbackSquareRoot`.
+
+An `EllipsoidalUncertaintySet` holds the factor of its shape matrix as `chol` too. A risk measure fills it one time when it resolves the set, so the worst-case value and the cone of the model read one root.
 *Avoid*: Cholesky factor, for a square root that is not triangular or that carries a ridge.
 
 ### 3.6 Prior
