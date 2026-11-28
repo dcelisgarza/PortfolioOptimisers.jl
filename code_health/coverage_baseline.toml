@@ -203,6 +203,9 @@ commit = "391be5e"
 "src/05_Moments/40_RobustCovariance/08_TylerShrinkage.jl" = { lines = 111, misses = 0 }
 "src/05_Moments/40_RobustCovariance/09_TylerCovariance.jl" = { lines = 71, misses = 0 }
 "src/05_Moments/40_RobustCovariance/10_RobustExpectedReturns.jl" = { lines = 11, misses = 0 }
+"src/05_Moments/40_RobustCovariance/11_SRho.jl" = { lines = 61, misses = 0 }
+"src/05_Moments/40_RobustCovariance/12_SCovariance.jl" = { lines = 92, misses = 0 }
+"src/05_Moments/40_RobustCovariance/13_MMCovariance.jl" = { lines = 44, misses = 0 }
 "src/06_Distance/01_Base_Distance.jl" = { lines = 12, misses = 0 }
 "src/06_Distance/02_Distance.jl" = { lines = 73, misses = 0 }
 "src/06_Distance/03_DistanceDistance.jl" = { lines = 15, misses = 0 }

@@ -39,7 +39,7 @@ function _leaves610(T)
     return out
 end
 
-# The default instance of each leaf. Three leaves have a keyword with no default.
+# The default instance of each leaf. Four leaves have a keyword with no default.
 function _build610(T)
     nm = nameof(T)
     wb = fill(0.2, 5)
@@ -47,6 +47,8 @@ function _build610(T)
         return T(; tr = WeightsTracking(; w = wb))
     elseif nm === :TurnoverRiskMeasure
         return T(; w = wb)
+    elseif nm === :GainTail
+        return T(; r = ConditionalValueatRisk())
     end
     return T()
 end

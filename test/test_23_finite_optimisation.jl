@@ -1171,6 +1171,35 @@ end
     @test_throws DomainError AssetRedistribution(; idx = 0)
     @test_throws BoundsError AssetRedistribution(; idx = 9)([0.5, 0.5], [false, true])
 end
+@testset "A rule for an Unpriced Asset names only assets of the book (#2341)" begin
+    using PortfolioOptimisers, Test
+    w = [0.5, 0.3, 0.2]
+    # The check does not read the prices: a wrong position is refused on a date on which
+    # every asset has a price too, and a correct one passes on both dates.
+    for p in ([10.0, 20.0, 5.0], [10.0, 20.0, NaN])
+        fai(upw) = FiniteAllocationInput(; w = w, prices = p, cash = 1e3, upw = upw)
+        for idx in (4, 7, [1, 4], UInt8(4))
+            bad = AssetRedistribution(; idx = idx)
+            @test_throws DomainError fai(bad)
+            @test_throws DomainError fai(SideRedistribution(; l = bad))
+            @test_throws DomainError fai(SideRedistribution(; s = bad))
+            @test_throws DomainError FiniteAllocationInput(w, p, 1e3, 1e3, nothing, nothing,
+                                                           nothing, ProceedsCollateral(),
+                                                           bad)
+        end
+        for upw in (nothing, ProportionalRedistribution(), EvenRedistribution(),
+                    AssetRedistribution(; idx = 3), AssetRedistribution(; idx = 1:3),
+                    SideRedistribution(; l = AssetRedistribution(; idx = [1, 3])),
+                    (w, m) -> [0.5, 0.3, 0.0])
+            @test isa(optimise(GreedyAllocation(), fai(upw)).retcode, OptimisationSuccess)
+        end
+    end
+    # A mask is not a list of positions. An all-`true` mask has no entry below one, and it
+    # failed only in the functor.
+    @test_throws ArgumentError AssetRedistribution(; idx = true)
+    @test_throws ArgumentError AssetRedistribution(; idx = [true, true, true])
+    @test_throws ArgumentError AssetRedistribution(; idx = trues(3))
+end
 @testset "The cash of a finite allocation is the cash that the account holds (#1961)" begin
     using PortfolioOptimisers, Test, HiGHS
     slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
@@ -1276,9 +1305,9 @@ end
         @test_throws DimensionMismatch optimise(DiscreteAllocation(; slv = mip_slv,
                                                                    unit = LotUnit([1, 2]),
                                                                    fb = nothing), fai)
-        @test PO.allocation_lot_unit(LotUnit(0.5), nothing, false, fai) == 0.5
+        @test PO.allocation_lot_unit(LotUnit(0.5), nothing, nothing, false, fai) == 0.5
         @test PO.allocation_lot_unit(LotUnitEstimator(; val = Dict("C" => 10.0)), sets,
-                                     false, fai) == [1.0, 1.0, 10.0]
+                                     nothing, false, fai) == [1.0, 1.0, 10.0]
         # The default fallback of the discrete allocator buys the same lots.
         u = LotUnitEstimator(; val = Dict("C" => 10.0))
         da = DiscreteAllocation(; slv = mip_slv, unit = u, sets = sets, strict = true)
@@ -1347,5 +1376,98 @@ end
         @test isa(rl.retcode, OptimisationSuccess)
         @test is_lot_multiple(collect(rl.shares), [0.5, 0.25, 1.0])
         @test rl.shares[2] < 0
+    end
+
+    # A selection cuts the asset axis, and the allocator follows it (#1991). The estimator
+    # resolves on the whole universe and then keeps the selected assets.
+    @testset "a view of an allocator follows a cut of the assets" begin
+        usets = UniverseSets(;
+                             dict = Dict("nx" => ["A", "B", "C", "D"], "g" => ["A", "C"],
+                                         "isin" => ["a", "b", "c", "d"]))
+        l = [100.0, 0.5, 1.0, 0.25]
+        u = LotUnitEstimator(; val = Dict("A" => 100, "B" => 0.5, "D" => 0.25))
+        wc = FiniteAllocationInput(; w = [0.6, 0.4], prices = [71.0, 129.0], cash = 1000.0)
+        ga = GreedyAllocation(; unit = u, sets = usets, strict = true)
+        da = DiscreteAllocation(; slv = mip_slv, unit = u, sets = usets, strict = true)
+
+        # A cut name gives no refusal under `strict`, and no warning without it.
+        for i in ([2, 4], BitVector([0, 1, 0, 1]), 2:2:4)
+            for a in (ga, da)
+                v = PO.port_opt_view(a, i)
+                @test v.unit === u
+                @test v.sets === usets
+                @test v.idx == [2, 4]
+                r = optimise(v, wc)
+                @test r.shares ==
+                      optimise(PO.rebuild_struct(a, (; unit = LotUnit(l[[2, 4]]))), wc).shares
+                @test is_lot_multiple(collect(r.shares), [0.5, 0.25])
+            end
+        end
+        # The fallback views the same assets.
+        @test PO.port_opt_view(da, [2, 4]).fb.idx == [2, 4]
+        # The loose form logs nothing for a cut name.
+        vl = PO.port_opt_view(GreedyAllocation(; unit = u, sets = usets), [2, 4])
+        @test (@test_logs optimise(vl, wc)).shares ==
+              optimise(PO.port_opt_view(ga, [2, 4]), wc).shares
+        # A name outside the whole universe is still refused.
+        vz = PO.port_opt_view(GreedyAllocation(;
+                                               unit = LotUnitEstimator(; val = "Z" => 0.5),
+                                               sets = usets, strict = true), [2, 4])
+        @test_throws ArgumentError optimise(vz, wc)
+
+        # A view of a view indexes the assets that the first view kept, in the stated order.
+        v2 = PO.port_opt_view(PO.port_opt_view(ga, BitVector([1, 1, 0, 1])), [3, 1])
+        @test v2.idx == [4, 1]
+        @test PO.allocation_lot_unit(v2.unit, v2.sets, v2.idx, true, wc) == [0.25, 100.0]
+        # The whole axis keeps every asset.
+        @test PO.port_opt_view(ga, :).idx == 1:4
+
+        # The group, the vector, the scalar and the keyed forms resolve on the whole universe.
+        lots(unit, i) =
+            let v = PO.port_opt_view(GreedyAllocation(; unit = unit, sets = usets,
+                                                      strict = true), i)
+                PO.allocation_lot_unit(v.unit, v.sets, v.idx, v.strict, wc)
+            end
+        @test lots(LotUnitEstimator(; val = "g" => 10.0), [3, 4]) == [10.0, 1.0]
+        @test lots(LotUnitEstimator(; val = l), [4, 1]) == [0.25, 100.0]
+        @test lots(LotUnitEstimator(; val = 0.5), [4, 1]) == 0.5
+        @test lots(LotUnitEstimator(; val = Dict("a" => 5.0, "d" => 2.0), key = "isin"),
+                   [3, 4]) == [1.0, 2.0]
+        # The number type comes from the input, as with no view.
+        w32 = FiniteAllocationInput(; w = Float32[0.6, 0.4], prices = Float32[71, 129],
+                                    cash = 1000.0f0)
+        v32 = PO.port_opt_view(ga, [2, 4])
+        @test eltype(PO.allocation_lot_unit(v32.unit, v32.sets, v32.idx, true, w32)) ==
+              Float32
+
+        # A resolved lot unit is sliced, and a scalar one is kept.
+        vu = PO.port_opt_view(DiscreteAllocation(; slv = mip_slv, unit = LotUnit(l)),
+                              [2, 4])
+        @test vu.unit.val == [0.5, 0.25]
+        @test vu.fb.unit.val == [0.5, 0.25]
+        @test isnothing(vu.idx)
+        @test PO.port_opt_view(GreedyAllocation(; unit = LotUnit(0.5)), [2, 4]).unit.val ==
+              0.5
+        # No fallback views to none, and a precomputed fallback stays as it is.
+        @test isnothing(PO.port_opt_view(ga, [2, 4]).fb)
+        rg = optimise(ga,
+                      FiniteAllocationInput(; w = fill(0.25, 4), prices = fill(1.0, 4),
+                                            cash = 1000.0))
+        @test PO.port_opt_view(GreedyAllocation(; fb = rg), [2, 4]).fb === rg
+
+        # The constructors refuse an `idx` that no estimator reads, an empty one, and one
+        # that does not index the universe. A stated mask reads as its positions do.
+        for f in (kw -> GreedyAllocation(; kw...),
+                  kw -> DiscreteAllocation(; slv = mip_slv, kw...))
+            @test_throws ArgumentError f((; unit = LotUnit(l), idx = [1, 2]))
+            @test_throws PO.IsEmptyError f((; unit = u, sets = usets, idx = Int[]))
+            for i in ([2, 5], [0, 1], [true, false])
+                @test_throws DomainError f((; unit = u, sets = usets, idx = i))
+            end
+            mk = f((; unit = u, sets = usets, idx = BitVector([0, 1, 0, 1])))
+            @test optimise(mk, wc).shares ==
+                  optimise(f((; unit = u, sets = usets, idx = [2, 4])), wc).shares
+            @test PO.port_opt_view(mk, [2]).idx == [4]
+        end
     end
 end

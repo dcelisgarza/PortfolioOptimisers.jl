@@ -337,8 +337,8 @@ function SemiDefinitePhylogeny(; A::MatNum_PhRMatNum,
     return SemiDefinitePhylogeny(A, p)
 end
 """
-    _validate_length_integer_phylogeny_constraint_B(alg::Integer, B::VecNum)
-    _validate_length_integer_phylogeny_constraint_B(alg::Int_ONC, B::VecNum)
+    _validate_length_integer_phylogeny_constraint_B(alg::Integer, B::VecReal_CountFraction)
+    _validate_length_integer_phylogeny_constraint_B(alg::Int_ONC, B::VecReal_CountFraction)
 
 Check the length of `B` against an integer cluster count `alg`.
 
@@ -366,18 +366,20 @@ The method on [`Int_ONC`](@ref) is the no-op of the value check on the set that 
   - [`validate_length_integer_phylogeny_constraint_B`](@ref): the caller, which applies the `max_k` bound before it delegates here.
   - [`IntegerPhylogenyEstimator`](@ref)
 """
-function _validate_length_integer_phylogeny_constraint_B(alg::Integer, B::VecNum)::Nothing
+function _validate_length_integer_phylogeny_constraint_B(alg::Integer,
+                                                         B::VecReal_CountFraction)::Nothing
     @argcheck(length(B) <= alg,
               DomainError((length(B), alg),
                           "`B` holds $(length(B)) entries, and `alg` fixes $alg clusters. Each entry of `B` bounds one cluster, so `length(B) <= alg` must hold."))
     return nothing
 end
-function _validate_length_integer_phylogeny_constraint_B(::Int_ONC, ::VecNum)::Nothing
+function _validate_length_integer_phylogeny_constraint_B(::Int_ONC,
+                                                         ::VecReal_CountFraction)::Nothing
     return nothing
 end
 """
-    validate_length_integer_phylogeny_constraint_B(cle::ClustersEstimator, B::VecNum)
-    validate_length_integer_phylogeny_constraint_B(cle::NwE_ClE, B::VecNum)
+    validate_length_integer_phylogeny_constraint_B(cle::ClustersEstimator, B::VecReal_CountFraction)
+    validate_length_integer_phylogeny_constraint_B(cle::NwE_ClE, B::VecReal_CountFraction)
 
 Check the length of `B` against the number of clusters that the estimator `cle` can return.
 
@@ -403,7 +405,8 @@ Only the [`ClustersEstimator`](@ref) method checks `B`. The method on [`NwE_ClE`
   - [`_validate_length_integer_phylogeny_constraint_B`](@ref): the delegate that applies the `alg` bound.
   - [`IntegerPhylogenyEstimator`](@ref)
 """
-function validate_length_integer_phylogeny_constraint_B(cle::ClustersEstimator, B::VecNum)
+function validate_length_integer_phylogeny_constraint_B(cle::ClustersEstimator,
+                                                        B::VecReal_CountFraction)
     if !isnothing(cle.onc.max_k)
         @argcheck(length(B) <= cle.onc.max_k,
                   DomainError((length(B), cle.onc.max_k),
@@ -412,7 +415,7 @@ function validate_length_integer_phylogeny_constraint_B(cle::ClustersEstimator, 
     _validate_length_integer_phylogeny_constraint_B(cle.onc.alg, B)
     return nothing
 end
-function validate_length_integer_phylogeny_constraint_B(::NwE_ClE, ::VecNum)
+function validate_length_integer_phylogeny_constraint_B(::NwE_ClE, ::VecReal_CountFraction)
     return nothing
 end
 """
@@ -436,7 +439,7 @@ $(DocStringExtensions.FIELDS)
 
     IntegerPhylogenyEstimator(;
         pl::NwE_ClE = NetworkEstimator(),
-        B::Int_VecInt = 1,
+        B::Union{Real_CountFraction, AbstractVector} = 1,
         x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> IntegerPhylogenyEstimator
 
@@ -444,15 +447,17 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - [`assert_nonempty_nonneg_finite_val`](@ref) checks `B`.
+  - A plain `B` passes [`cardinality_cap`](@ref), and [`assert_nonempty_nonneg_finite_val`](@ref) checks each `Integer` of `B`.
 
-      + `AbstractVector`: [`validate_length_integer_phylogeny_constraint_B`](@ref) also checks it.
+      + `AbstractVector`: `!isempty(B)`. [`validate_length_integer_phylogeny_constraint_B`](@ref) also checks it.
 
   - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). Otherwise the constructor raises an `ArgumentError`.
 
   - `returns_source(pl) === nothing`, see [`assert_inner_reader`](@ref). The network or clustering estimator reads the matrix that this estimator selects, so it states no source of its own. Otherwise the constructor raises an `ArgumentError`.
 
   - The type bound [`NwE_ClE`](@ref) of `pl` refuses a precomputed [`PhylogenyResult`](@ref) or [`Clusters`](@ref). So the keyword constructor raises a `TypeError` at once, and not later in a solve. To use a precomputed structure, build the [`IntegerPhylogeny`](@ref) that `phylogeny_constraints(estimator, X)` returns.
+
+$(val_dict[:count_fraction_grid])
 
 # Examples
 
@@ -518,10 +523,12 @@ IntegerPhylogenyEstimator
     $(field_dict[:x_src_graph])
     """
     x_src
-    function IntegerPhylogenyEstimator(pl::NwE_ClE, B::Int_VecInt,
+    function IntegerPhylogenyEstimator(pl::NwE_ClE,
+                                       B::Real_CountFraction_VecReal_CountFraction,
                                        x_src::Option{<:AbstractReturnsSource})::IntegerPhylogenyEstimator
-        assert_nonempty_nonneg_finite_val(B, :B)
-        if isa(B, VecInt)
+        B = cardinality_cap(B)
+        assert_cardinality_cap(assert_nonempty_nonneg_finite_val, B, :B)
+        if isa(B, AbstractVector)
             validate_length_integer_phylogeny_constraint_B(pl, B)
         end
         assert_returns_source(x_src, ALL_RETURNS_SOURCES, :IntegerPhylogenyEstimator)
@@ -529,9 +536,11 @@ IntegerPhylogenyEstimator
         return new{typeof(pl), typeof(B), typeof(x_src)}(pl, B, x_src)
     end
 end
-function IntegerPhylogenyEstimator(; pl::NwE_ClE = NetworkEstimator(), B::Int_VecInt = 1,
+function IntegerPhylogenyEstimator(; pl::NwE_ClE = NetworkEstimator(),
+                                   B::Union{Real_CountFraction, AbstractVector} = 1,
                                    x_src::Option{<:AbstractReturnsSource} = nothing)::IntegerPhylogenyEstimator
-    return IntegerPhylogenyEstimator(pl, B, x_src)
+    return IntegerPhylogenyEstimator(pl, narrow_mixed_vector(B, Real_CountFraction, :B),
+                                     x_src)
 end
 function returns_source(x::Union{SemiDefinitePhylogenyEstimator, IntegerPhylogenyEstimator})
     return x.x_src
@@ -582,8 +591,9 @@ The constructor rewrites the matrix it is given, so the stored `A` is a derived 
  1. Check that the diagonal of `A` is zero and that `A` is symmetric.
  2. Add the identity to `A`, which puts each asset in its own row.
  3. Drop the repeated rows of the sum with `unique(...; dims = 1)`. The result is the stored `A`. One row survives per distinct neighbourhood or cluster, so the stored matrix usually has fewer rows than columns.
- 4. Check that `B` is non-empty, non-negative and finite.
+ 4. Read a plain `B` with [`cardinality_cap`](@ref). Check that `B` is non-empty, and that each `Integer` of it is non-negative.
  5. Check `size(A, 1) == length(B)` when `B` is a vector, against the row count of step 3 and not against the number of assets.
+ 6. Resolve `B` with [`resolve_cardinality_cap`](@ref). A [`FractionOf`](@ref) is a fraction of the sum of a row of step 3, the number of related assets of the row. So a scalar fraction gives one cap for each row, and the stored `B` holds integers alone.
 
 # Fields
 
@@ -593,11 +603,11 @@ $(DocStringExtensions.FIELDS)
 
     IntegerPhylogeny(
         A::MatNum_PhRMatNum,
-        B::Int_VecInt
+        B::Real_CountFraction_VecReal_CountFraction
     ) -> IntegerPhylogeny
     IntegerPhylogeny(;
         A::MatNum_PhRMatNum,
-        B::Int_VecInt = 1
+        B::Union{Real_CountFraction, AbstractVector} = 1
     ) -> IntegerPhylogeny
 
 Keywords correspond to the struct's fields.
@@ -606,8 +616,9 @@ Keywords correspond to the struct's fields.
 
   - `LinearAlgebra.issymmetric(A)` and `all(iszero, LinearAlgebra.diag(A))`. A breach raises an `ArgumentError`.
 
-  - [`assert_nonempty_nonneg_finite_val`](@ref) checks `B`.
+  - A plain `B` passes [`cardinality_cap`](@ref), and [`assert_nonempty_nonneg_finite_val`](@ref) checks each `Integer` of `B`.
 
+      + `AbstractVector`: `!isempty(B)`. An [`IsEmptyError`](@ref) is thrown otherwise.
       + `AbstractVector`: `size(unique(A + LinearAlgebra.I; dims = 1), 1) == length(B)`. A breach raises a `DimensionMismatch`.
 
 # Examples
@@ -617,6 +628,11 @@ julia> IntegerPhylogeny(; A = [0.0 1.0; 1.0 0.0], B = 2)
 IntegerPhylogeny
   A ┼ 1×2 Matrix{Float64}
   B ┴ Int64: 2
+
+julia> IntegerPhylogeny(; A = [0 1 1 0; 1 0 1 0; 1 1 0 0; 0 0 0 0], B = FractionOf(0.7)).B
+2-element Vector{Int64}:
+ 2
+ 1
 ```
 
 # Related
@@ -640,28 +656,35 @@ IntegerPhylogeny
     """
     A
     """
-    $(field_dict[:B_phylo])
+    $(field_dict[:B_iphylo])
     """
     B
-    function IntegerPhylogeny(A::MatNum, B::Int_VecInt)::IntegerPhylogeny
+    function IntegerPhylogeny(A::MatNum,
+                              B::Real_CountFraction_VecReal_CountFraction)::IntegerPhylogeny
         @argcheck(all(iszero, LinearAlgebra.diag(A)),
                   ArgumentError("all diagonal entries of A must be zero"))
         @argcheck(LinearAlgebra.issymmetric(A),
                   ArgumentError("A must be a symmetric matrix"))
         A = unique(A + LinearAlgebra.I; dims = 1)
-        assert_nonempty_nonneg_finite_val(B, :B)
-        if isa(B, VecInt)
+        B = cardinality_cap(B)
+        assert_cardinality_cap(assert_nonempty_nonneg_finite_val, B, :B)
+        if isa(B, AbstractVector)
             @argcheck(size(A, 1) == length(B),
                       DimensionMismatch("size(A, 1) ($(size(A, 1))) must match length(B) ($(length(B)))"))
+        end
+        if !isa(B, Int_VecInt)
+            B = resolve_cardinality_cap(B, map(sum, eachrow(A)))
         end
         return new{typeof(A), typeof(B)}(A, B)
     end
 end
-function IntegerPhylogeny(A::PhylogenyResult{<:MatNum}, B::Int_VecInt)::IntegerPhylogeny
+function IntegerPhylogeny(A::PhylogenyResult{<:MatNum},
+                          B::Real_CountFraction_VecReal_CountFraction)::IntegerPhylogeny
     return IntegerPhylogeny(A.X, B)
 end
-function IntegerPhylogeny(; A::MatNum_PhRMatNum, B::Int_VecInt = 1)::IntegerPhylogeny
-    return IntegerPhylogeny(A, B)
+function IntegerPhylogeny(; A::MatNum_PhRMatNum,
+                          B::Union{Real_CountFraction, AbstractVector} = 1)::IntegerPhylogeny
+    return IntegerPhylogeny(A, narrow_mixed_vector(B, Real_CountFraction, :B))
 end
 """
     phylogeny_constraints(plc::Option{<:PlCE_PlC}, X::MatNum; dims::Int = 1, kwargs...)

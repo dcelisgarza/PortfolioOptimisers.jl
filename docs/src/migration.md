@@ -1106,12 +1106,97 @@ A `ConstraintBlock` holds concentration rules, such as the UCITS 5/10/40 rule, i
 
 ## From v0.34.6 to v0.34.7
 
-### [Results that move](@id migration-0-34-7-numbers)
+### [Views of a finite allocator](@id migration-0-34-7-allocators)
 
-- **The default big-M constant of a mixed-integer model, `ss = nothing`.** v0.34.6 read `1000` times the largest weight bound `b`. v0.34.7 reads the bound that the model holds on each term that the constant releases, with no factor of its own.
-  - **Every weight bound finite, and a constant `k`**, as under `MinimumRisk`: the constant is `b`, the exact bound of each weight. A sub-group cardinality or threshold gates the sum of each group, so it takes its own constant, the largest group sum of `max.(abs.(lb), abs.(ub))`.
-  - **Every weight bound finite, and a variable `k`**, under `MaximumRatio` or `RiskBudgeting`: the constant is the ceiling of `k` times `max(1, b)`. The ceiling is `10 N / g` for a `RiskBudgeting` of `N` assets, and `10 ohf / mean(max.(min(g, 1) .* mu .- rf, 0))` for a `MaximumRatio`, where `g` is the smaller of `abs(bgt)` and the gross exposure that the weight bounds and the budgets admit. `mu` is the vector of the return terms.
-  - **An infinite bound** holds nothing, so the constant stays `1000 b`, or `1000` with no finite bound. Under a variable `k` it is at least the ceiling times `max(1, b)`.
+`DiscreteAllocation` and `GreedyAllocation` have the field `idx` after `sets`, with the default `nothing`. Code that builds them by keyword does not change.
 
-  The rows of these models keep `k` at or below the constant. A small bound gave a constant below `k`, and a large bound under a free `k` gave a constant so far above the gated terms that the solver failed. A `MixedIntegerRiskBudgeting` with bounds of `±10`, `bgt = nothing` and `card = 5` was `INFEASIBLE` with Pajarito at `10^4`. Each new constant releases its rows, so the optimum does not change, but the solver can take another path to the same book, or return another book of equal objective. A stated `ss` does not change. Write `ss = 1000 * maximum(abs, bounds)` for the constant of v0.34.6.
-- **A `BudgetCosts` or a `BudgetMarketImpact` in `bgt`** bounds the sum of the weights by the bound of its own `bgt`. v0.34.6 read no bound from it. The big-M constant that an XatRisk measure derives is smaller for long-only weights, and for long-short weights with a short budget. The default `kmin` of a `RiskBudgeting` is `1e-4 / abs(bgt)`, and it was zero.
+- **`DiscreteAllocation`** takes nine positional arguments, where v0.34.6 took eight, because `fb` is now the ninth field. Pass `nothing` after `sets`, or use the keyword constructor. The type parameters gain one entry after the one of `sets`.
+- **`GreedyAllocation`** takes five positional arguments, where v0.34.6 took three or four, because `fb` is now the fifth field and has no default. Pass `nothing` after `sets`, or use the keyword constructor. The type parameters gain one entry after the one of `sets`.
+- **The show** of both types prints the row `idx ┼ nothing` after `sets`. A doctest of your own that prints an allocator gains the row.
+- **An allocator with a `LotUnitEstimator`, after a selection.** `optimise` on the selected assets raised a `DimensionMismatch`, and with the `sets` viewed by hand it raised an `ArgumentError` under `strict`. Give `PortfolioOptimisers.port_opt_view(allocator, idx)` the index of the selection, and it buys the lots of the assets that remain.
+
+## From v0.34.7 to v0.34.8
+
+### [Calls that now answer](@id migration-0-34-8-answers)
+
+| Call | v0.34.7 | v0.34.8 |
+| --- | --- | --- |
+| `prior` of an `OpinionPoolingPrior` with `alg = LogarithmicOpinionPooling()`, when an opinion of zero probability gives an observation a zero weight | `ArgumentError` | Runs. The opinion does not change the pool. |
+| `prior` of an `OpinionPoolingPrior` with a large `p`, when the penalty takes the probability of every opinion below the smallest number | `ArgumentError` | Runs. The opinions nearest the consensus keep the probability. |
+
+### [Calls that now raise](@id migration-0-34-8-raises)
+
+| Call | v0.34.7 | v0.34.8 |
+| --- | --- | --- |
+| `OpinionPoolingPrior(; p = Inf)` | `ArgumentError` in `prior` | Raises a `DomainError` at the construction. |
+
+### [Results that move](@id migration-0-34-8-numbers)
+
+- **An entropy pooling prior with `OptimEntropyPooling`, the default optimiser, and a prior probability of zero** meets its views. With `alg = LogEntropyPooling()`, v0.34.7 stopped at the start of the solve and reported success, and the posterior missed the views. With `alg = ExpEntropyPooling()`, v0.34.7 could miss a view when an observation of zero prior probability held an extreme value. `JuMPEntropyPooling` had neither defect.
+- **An `EntropyPoolingPrior` or a `MeucciEntropyPoolingPrior` with a prior probability of zero at an extreme return**, such as a crash that `w` removes, meets its views under every optimiser. v0.34.7 scaled each view with the return that the prior removes. A kurtosis view could miss its target by a third of it. An entropic value at risk view gave the prior back, with no error, or raised an error about the grid or about a `NaN` coefficient. The views now read the mean row of the other observations there, so the posterior moves by rounding when the removed returns are ordinary.
+
+## From v0.34.9 to v0.34.10
+
+### [Summaries and plots of weights read a gap as a prediction does](@id migration-next-summary-gap-filter)
+
+#### [Results that move](@id migration-next-summary-gap-filter-numbers)
+
+- **`performance_summary` of weights or of an optimisation result reads a gap in the returns as `predict` does.** The previous release multiplied the returns by the weights as they are, and `0 * NaN` is `NaN`. So one asset with a gap made the figures `NaN`, also an asset with a zero weight, and the `cvar` was a finite wrong number. Each return that is not finite is now zero. A gap at a zero weight gives no message. A gap at a weight that is not zero gives a warning that names the asset, and an `ArgumentError` under the new keyword `strict = true`. So `performance_summary(res, rd)` gives the figures of `performance_summary(predict(res, rd))`, except the three excess statistics, which only the prediction takes from the benchmark of `rd`. The figures of returns with no gap do not move. `plot_performance_summary` takes the same keyword.
+- **`plot_portfolio_cumulative_returns`, `plot_drawdowns`, `plot_histogram`, `plot_rolling_drawdowns`, `plot_rolling_measure` and `plot_benchmark` of weights or of an optimisation result** read a gap in the same way, with a warning for a gap at a weight that is not zero, or an `ArgumentError` under the new keyword `strict = true`. `plot_portfolio_dashboard` reads a gap in the same way in its panels 2, 3 and 4, and takes the same keyword. `plot_histogram` dropped each row with a gap, and now it keeps the row. `plot_portfolio_cumulative_returns` of weights on a prior with a non-investable asset draws a finite curve. `plot_asset_cumulative_returns` does not change.
+
+## From v0.34.10 to v0.34.11
+
+### [Risk verbs read a gap as a prediction does](@id migration-next-risk-gap-filter)
+
+#### [Results that move](@id migration-next-risk-gap-filter-numbers)
+
+- **`expected_risk`, `risk_contribution`, `risk_gradient` and `factor_risk_contribution` of a `ReturnsResult`, and `expected_risk` of an optimisation result with a `ReturnsResult` or a matrix,** read a gap in the returns as `performance_summary` does. The previous release gave `NaN` for a moment measure, and a finite wrong number for a tail measure, with no message. Each return that is not finite is now zero, with a warning for a gap at a weight that is not zero, or an `ArgumentError` under `strict = true`. `factor_risk_contribution` of a prior reads the gaps of `original_X` in this way too. The train score of a search over an optimiser with no prior is now finite on returns with a gap. The figures of returns with no gap do not move. A bare matrix without a result, as in `expected_risk(r, w, X)`, keeps the old rule. For a gapped matrix, give a `ReturnsResult`, for example `ReturnsResult(; nx = nx, X = X)`.
+- **`plot_risk_contribution`, `plot_factor_risk_contribution`, `plot_measures` and `plot_efficient_frontier`** draw these figures, and they take the keyword `strict`. `plot_measures` and `plot_efficient_frontier` bind each measure to the prior of the assets that it could estimate, so the default measures draw on a prior with a `NaN` asset, where the previous release raised an error. `plot_measures` of one weight vector draws one point, where the previous release raised an error.
+- **`StepwiseRegression` and `DimensionReductionRegression` fit each asset on the observations where its return is finite**, and, through a `ReturnsResult` whose asset panel carries an active mask, where the mask is `true`. An asset that lists late gets the loadings of its own history, and no other asset changes. `DimensionReductionRegression` keeps one reduction of the factors over every observation. A column with no gap gives the same loadings as before. `factor_risk_contribution` of a `ReturnsResult` with a gap, and `plot_factor_risk_contribution`, raised a `BoundsError` under the default `StepwiseRegression`, and now they give the figures. An asset with no finite, active return raises an `IsNonFiniteError` that names it.
+- **A cell that the active mask turns off is out of the fit of a regression also when its return is finite**, so the loadings of such an asset move. The loadings that `factor_risk_contribution`, a `FactorRiskContribution` optimisation and the exposure constraints fit from a `ReturnsResult` move with them.
+- **A p-value search of `StepwiseRegression` that finds no p-value at any factor**, as for a return with no variance, gives the asset a model with the intercept alone, and a warning. The previous release raised a `BoundsError`.
+
+## From v0.34.12 to v0.34.13
+
+### [A `Frontier` on one tail of a range](@id migration-next-frontier-range-tail)
+
+- **A `Frontier` in the `ub` of one tail of a `GenericValueatRiskRange`** takes its levels from the value of that tail at the two corner portfolios, in `MeanRisk` and in `NearOptimalCentering`. Before this change it took them from the value of the whole range, so the levels were too high and most points of the sweep were one portfolio. A range of your own, a subtype of `RangeRiskMeasure` that the generic builder builds, takes the same levels.
+
+#### [If you extend the library](@id migration-next-frontier-range-tail-extending)
+
+- **A `Frontier` on the gain tail of a range of your own** raises an `ArgumentError` when that tail reads the weights, the returns and the fees, a `WeightsReturnsFeesInput` measure, except a `ValueatRisk` with `DistributionValueatRisk`. Such a tail has no value on the negated portfolio, so the sweep cannot value its corners. Before this change the sweep took the span of the whole range.
+
+## From v0.34.16 to v0.34.17
+
+### [The walks enter the sides of a ratio measure](@id migration-next-ratio-data-benchmark)
+
+#### [Calls that now succeed](@id migration-next-ratio-data-benchmark-success)
+
+- **A `DataBenchmarkTracking` inside a `RiskRatio`, a `NonOptimisationRiskRatio`, a `MeanReturnRiskRatio` or an `ExpectedReturnRiskRatio`** reads the benchmark of the returns data. Before this release, `HierarchicalRiskParity`, `HierarchicalEqualRiskContribution`, `RiskLoss` and `expected_risk` raised an `ArgumentError`, because no reader bound it.
+- **A ratio measure or an `ExpectedReturn` that holds per-asset data, with an asset that is not investable.** The data are a covariance matrix, benchmark weights, turnover weights or expected returns. Before this release, the call raised a `DimensionMismatch`, because it did not cut the parts of the measure to the investable assets.
+
+#### [Results that move](@id migration-next-ratio-data-benchmark-numbers)
+
+- **The walk-forward of an optimiser whose `RiskRatio` holds previous weights**, such as a `TurnoverRiskMeasure` or a `WeightsTracking` whose `fixed` is `false`, runs its folds in sequence and gives each fold the weights of the fold before. Before this release, the folds ran in parallel, and each fold read the weights that the caller gave.
+
+#### [Warnings that are new](@id migration-next-ratio-data-benchmark-warnings)
+
+- **A `RiskRatio` or a `NonOptimisationRiskRatio` that holds a reader with no `x_src`**, such as an `UncertaintySetVariance` whose uncertainty set has a prior of its own, in a head with a reader that states `x_src = ExcessSource()`. The head names the reader in its warning, as it does for the other measures. Such a reader that states `x_src = ExcessSource()` also drops the observations at which a vector benchmark has a gap.
+
+#### [If you extend the library](@id migration-next-ratio-data-benchmark-extending)
+
+- **A risk measure of your own that holds a tracking part** and adds a method of the internal `PortfolioOptimisers.bind_data_benchmark` also adds one of `PortfolioOptimisers.holds_data_benchmark`, which the bind of a vector and of a composite reads first. A measure that declares the part in `PortfolioOptimisers.deferred_slots` needs neither.
+
+## From v0.34.17 to v0.34.18
+
+### [Cardinality caps as a count or a fraction](@id migration-next-cardinality-caps)
+
+The cardinality caps `card` and `scard` of `ConstraintBlock`, `JuMPOptimiser` and `ProgrammeAllocationSet`, and the `B` of `IntegerPhylogenyEstimator` and `IntegerPhylogeny`, take a `CountOf` or a `FractionOf`. A fraction resolves against the set that the fit sees, so `card = FractionOf(0.2)` keeps its meaning when a view or a resample reduces the universe, or when an asset leaves it. A plain `Integer` keeps its meaning, and the slot holds the same integer. A fraction rounds down, to at least one member.
+
+| Call | The previous release | This release |
+| --- | --- | --- |
+| `JuMPOptimiser(; card = 0.2)`, and a plain real number between zero and one in `scard` or in `B` | A `TypeError` | Reads `FractionOf(0.2)`. |
+| `JuMPOptimiser(; card = 3.0)` or `card = 1.0`, and the same in `scard` and `B` | A `TypeError` | Raises a `DomainError`. Write `3`, `CountOf(3)` or `FractionOf(1)`. |
+| `IntegerPhylogeny(; A, B).B` with a `FractionOf` in `B` | A `TypeError` | A vector of integers, one cap for each row of the stored `A`. |
+| A projection onto a `ProgrammeAllocationSet` that reads no rows, in a direct call of `project`, with a precomputed `lcse` or `gcarde` whose width is not the number of assets | The model raised the error | Raises the `DimensionMismatch` of the constraint width, as the same set raises it on rows. |
+| `JuMPOptimiser(; smtx = [A, B], …)` with precomputed matrices and no `sets` | Raised a `MethodError` at the fit | Solves, as one precomputed matrix does. |

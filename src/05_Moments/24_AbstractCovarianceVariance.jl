@@ -302,8 +302,12 @@ end
     reads_active_mask(ce::Union{WindowedVariance, WindowedCovariance}) -> Bool
     reads_active_mask(ce::PortfolioOptimisersCovariance) -> Bool
     reads_active_mask(ce::GeodesicShrinkageCovariance) -> Bool
+    reads_active_mask(re::AbstractTimeSeriesRegressionEstimator) -> Bool
+    reads_active_mask(re::Union{StepwiseRegression, DimensionReductionRegression}) -> Bool
 
 Answer whether `ce` is a mask-aware estimator: whether the Asset Panel method of its variance reads the active mask itself, and not the Coverage Universe of the window.
+
+A time-series regression estimator answers whether its method `regression(re, X, F)` takes the keyword `active_mask`. [`regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult)`](@ref) gives the active mask of the Asset Panel of `rd` only to such an estimator. The fallback answers `false`, so a regression of your own with no keyword fits a panel with a mask as before. [`StepwiseRegression`](@ref) and [`DimensionReductionRegression`](@ref) answer `true`. They fit each asset on the cells that [`asset_fit_rows`](@ref) gives.
 
 A plain estimator takes the reduce-and-expand root of [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref), so it answers `false`, which is the fallback. Each mask-aware family overrides the panel method and answers `true` with a method in its own file: a [`Covariance`](@ref) or a [`SimpleVariance`](@ref) with a [`CoveragePolicy`](@ref), the exponentially weighted family and the regime-adjusted family. A windowed estimator, a [`PortfolioOptimisersCovariance`](@ref) and a [`GeodesicShrinkageCovariance`](@ref) give the panel to their inner estimator, so they answer for it.
 
@@ -312,6 +316,7 @@ A plain estimator takes the reduce-and-expand root of [`Statistics.cov(ce::Abstr
 # Arguments
 
   - $(arg_dict[:ce])
+  - `re`: The time-series regression estimator.
 
 # Returns
 
@@ -323,6 +328,7 @@ A plain estimator takes the reduce-and-expand root of [`Statistics.cov(ce::Abstr
   - [`assert_mask_aware_variance`](@ref)
   - [`cross_sectional_fold_variance`](@ref)
   - [`CoveragePolicy`](@ref)
+  - [`asset_fit_rows`](@ref)
 """
 function reads_active_mask(::StatsBase.CovarianceEstimator)
     return false

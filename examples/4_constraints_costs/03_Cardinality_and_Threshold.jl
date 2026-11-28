@@ -113,7 +113,9 @@ sets = UniverseSets(;
 #=
 ## 2. Asset-level: `card`, `lt`, `st`
 
-`card` caps the number of assets that hold a weight. `lt` and `st` are the minimum sizes of a
+`card` caps the number of assets that hold a weight. It takes a number of assets, or a
+[`FractionOf`](@ref) the investable assets, so `FractionOf(0.2)` keeps its meaning when the universe
+changes. A fraction rounds down, to at least one asset. `lt` and `st` are the minimum sizes of a
 long and of a short position. We use `card` in three problems: minimum risk with `card = 3`,
 maximum ratio with `card = 3` and an L2 penalty, and a long-short maximum ratio with `card = 7`.
 The cells set no `lt` or `st`.
