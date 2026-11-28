@@ -349,18 +349,18 @@ function asset_name_mask(on::Union{AbstractString, VecStr}, sets::UniverseSets,
     return msk
 end
 """
-    asset_sets_matrix(smtx::VecMatNum_ASetMatE,
-                      sets::UniverseSets; strict::Bool = false)
+    asset_sets_matrix(smtx::VecMatNum_ASetMatE, sets::UniverseSets; strict::Bool = false)
+    asset_sets_matrix(smtx::VecMatNum_ASetMatE, ::Nothing; kwargs...)
 
 Apply [`asset_sets_matrix`](@ref) to each entry of the vector.
 
-Each entry dispatches to its own method, so one vector can hold estimators and precomputed matrices together.
+Each entry dispatches to its own method, so one vector can hold estimators and precomputed matrices together. The method for `nothing` serves a vector of precomputed matrices, which needs no `sets`. It reads no `strict`, because no estimator entry resolves without `sets`.
 
 # Arguments
 
   - `smtx`: A vector whose entries are each an [`AssetSetsMatrixEstimator`](@ref) or a precomputed numeric matrix.
-  - `sets`: A [`UniverseSets`](@ref) that holds the asset universe and the groups.
-  - $(arg_dict[:strict]) The method gives it to each estimator entry.
+  - `sets`: A [`UniverseSets`](@ref) that holds the asset universe and the groups, or `nothing` when no entry is an estimator.
+  - $(arg_dict[:strict]) The method on a [`UniverseSets`](@ref) gives it to each estimator entry.
 
 # Validation
 
@@ -379,6 +379,9 @@ Each entry dispatches to its own method, so one vector can hold estimators and p
 function asset_sets_matrix(smtx::VecMatNum_ASetMatE, sets::UniverseSets;
                            strict::Bool = false)
     return [asset_sets_matrix(smtxi, sets; strict = strict) for smtxi in smtx]
+end
+function asset_sets_matrix(smtx::VecMatNum_ASetMatE, ::Nothing; kwargs...)
+    return [asset_sets_matrix(smtxi, nothing) for smtxi in smtx]
 end
 """
     panel_input_name(sets::UniverseSets, key::AbstractString) -> String

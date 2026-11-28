@@ -2342,6 +2342,36 @@ end
         @test_throws DimensionMismatch PO.resolve_constraint_block(ConstraintBlock(;
                                                                                    lcse = lcw),
                                                                    nothing, rd)
+        # A cap resolves at stage 2, against the assets that the Investable Mask leaves, and the
+        # sub-groups that still select one (#2305).
+        S3 = [1 1 0 0 0; 0 0 1 1 0; 0 0 0 0 1]
+        oc = JuMPOptimiser(; slv, card = FractionOf(0.5), scard = FractionOf(0.67),
+                           smtx = S3)
+        jc = PO.resolve_jump_optimiser(oc, rd)
+        @test (jc.cbr.card, jc.cbr.scard) == (2, 2)
+        Xg = float.(copy(rd.X))
+        Xg[3, 4:5] .= NaN
+        jg = PO.resolve_jump_optimiser(oc, ReturnsResult(; nx = rd.nx, X = Xg))
+        @test (jg.cbr.card, jg.cbr.scard) == (1, 1)
+        @test PO.constraint_block_from_resolved(oc.cbe, jg.cbr).card === 1
+        # A block with no prior takes its number of assets from its rows, or from its caller.
+        bc = ConstraintBlock(; wb = nothing, card = FractionOf(0.5))
+        @test PO.resolve_constraint_block(bc, nothing, rd).card == 2
+        @test PO.resolve_constraint_block(bc, nothing, 7).card == 3
+        @test_throws IsNothingError PO.resolve_constraint_block(bc, nothing, nothing)
+        @test_throws IsNothingError PO.resolve_constraint_block(bc, pr, 5; slv = slv)
+        @test_throws DimensionMismatch PO.resolve_constraint_block(ConstraintBlock(;
+                                                                                   lcse = lcw),
+                                                                   nothing, 5)
+        # A vector of precomputed matrices needs no `sets`, as one matrix needs none.
+        js = PO.resolve_jump_optimiser(JuMPOptimiser(; slv, smtx = [S3, S3],
+                                                     scard = [2, FractionOf(0.5)]), rd)
+        @test js.cbr.scard == [2, 1] && js.cbr.smtx == [S3, S3]
+        @test_throws ArgumentError ConstraintBlock(; scard = Any[2, "a"], smtx = [S3, S3])
+        @test_throws DomainError ConstraintBlock(; scard = [0, FractionOf(0.5)],
+                                                 smtx = [S3, S3])
+        @test_throws DimensionMismatch ConstraintBlock(; scard = [2, FractionOf(0.5)],
+                                                       smtx = [S3])
         # The rename table of the block drops no field of the Result.
         back = PO.constraint_block_from_resolved(o.cbe, jor.cbr)
         @test back.lcse === jor.lcsr && back.lt === jor.lt && back.l2c == 0.9
