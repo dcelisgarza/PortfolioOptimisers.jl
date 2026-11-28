@@ -316,7 +316,7 @@ Fits the minimum covariance determinant of [`MCDCovariance`](@ref) to the data.
 
   - $(val_dict[:dims])
   - `all(isfinite, X)`.
-  - With `shr = nothing`, `h > p`. Otherwise, the method raises a `DomainError` that names `h`, `p` and the limit.
+  - With `shr = nothing`, the number of observations is more than `p`. Otherwise, the method raises a `DomainError` that names the two numbers and the limit.
   - No column of `X` is constant, see [`mcd_standardise`](@ref).
   - The factor of `ce.ssc` is positive, see [`mcd_correction`](@ref).
   - The scatter of each subset is positive definite. With `shr = nothing` this means that no subset of `h` observations lies on a hyperplane. Otherwise, the method raises the `DomainError` of [`squared_distances`](@ref).

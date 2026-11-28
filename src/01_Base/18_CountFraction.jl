@@ -80,7 +80,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The size of a part of a set, stated as a fraction of the size of the set.
 
-The reader multiplies `val` by the size of its set, and rounds the product to a count by the rule of its source. The docstring of each field states the rounding.
+The reader takes the part `val` of the size of its set, and rounds it to a count by the rule of its source. The docstring of each field states the rounding.
 
 # Fields
 
@@ -225,20 +225,20 @@ const Real_CountFraction_VecReal_CountFraction = Union{Real_CountFraction,
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Returns the largest number of members whose share of a set of size `n` is at most `part.val`.
+Returns the largest number of members whose share of a set of size `n` is at most `f`.
 
-A plain `floor(part.val * n)` can be one too small, because the product can round below a whole number. The product of `0.29` and `100` is `28.999999999999996`. This function compares the share of the count with the fraction, so `FractionOf(0.29)` of `100` members is `29`.
+A plain `floor(f * n)` can be one too small, because the product can round below a whole number. The product of `0.29` and `100` is `28.999999999999996`. This function compares the share of the count with the fraction, so `0.29` of `100` members is `29`.
 
 # Algorithm
 
- 1. Round `part.val * n` to the nearest integer `c`.
- 2. When `c` is positive and `c / n > part.val`, subtract one from `c`. A set with no member gives zero.
+ 1. Round `f * n` to the nearest integer `c`.
+ 2. When `c` is positive and `c / n > f`, subtract one from `c`. A set with no member gives zero.
  3. Return `c`.
 
 # Arguments
 
-  - `part`: The fraction of the set.
-  - `n`: The size of the set.
+  - `f`: The fraction of the set, such as the `val` of a [`FractionOf`](@ref).
+  - `n`: The size of the set, `n >= 0`.
 
 # Returns
 
@@ -247,24 +247,74 @@ A plain `floor(part.val * n)` can be one too small, because the product can roun
 # Examples
 
 ```jldoctest
-julia> PortfolioOptimisers.fraction_floor(FractionOf(0.29), 100)
+julia> PortfolioOptimisers.fraction_floor(0.29, 100)
 29
 
-julia> PortfolioOptimisers.fraction_floor(FractionOf(0.5), 7)
+julia> PortfolioOptimisers.fraction_floor(0.5, 7)
 3
 ```
 
 # Related
 
   - [`FractionOf`](@ref)
+  - [`fraction_ceil`](@ref)
   - [`split_count`](@ref)
+  - [`neighbour_count`](@ref)
+  - [`rule_tail_count`](@ref)
+  - [`mcd_subset_size`](@ref)
   - [`resolve_cardinality_cap`](@ref)
 """
-function fraction_floor(part::FractionOf, n::Real)::Int
-    f = part.val
+function fraction_floor(f::Number, n::Real)::Int
     c = round(Int, f * n)
     # A count of zero is the floor already, and a set with no member has no share to compare.
     return c > 0 && c * one(f) / n > f ? c - 1 : c
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the smallest number of members whose share of a set of size `n` is at least `f`.
+
+A plain `ceil(f * n)` can be one too large, because the product can round above a whole number. The product of `0.07` and `100` is `7.000000000000001`. This function compares the share of the count with the fraction, so `0.07` of `100` members is `7`.
+
+# Algorithm
+
+ 1. Round `f * n` to the nearest integer `c`.
+ 2. When `n` is positive and `c / n < f`, add one to `c`. A set with no member gives zero.
+ 3. Return `c`.
+
+# Arguments
+
+  - `f`: The fraction of the set, such as the `val` of a [`FractionOf`](@ref) or a significance level.
+  - `n`: The size of the set, `n >= 0`.
+
+# Returns
+
+  - `c::Int`: The number of members. It is at least one when `f` and `n` are positive.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.fraction_ceil(0.07, 100)
+7
+
+julia> PortfolioOptimisers.fraction_ceil(0.5, 7)
+4
+```
+
+# Related
+
+  - [`FractionOf`](@ref)
+  - [`fraction_floor`](@ref)
+  - [`ep_sbar`](@ref)
+  - [`lower_tail_dependence`](@ref)
+  - [`HillTailDecay`](@ref)
+  - [`RadialTailDecay`](@ref)
+  - [`mcd_subset_size`](@ref)
+"""
+function fraction_ceil(f::Number, n::Real)::Int
+    c = round(Int, f * n)
+    # A set with no member has no share to compare.
+    return n > 0 && c * one(f) / n < f ? c + 1 : c
 end
 """
     cardinality_cap(x::Option{<:Union{UnresolvedValue, Integer, VecInt}})
@@ -347,7 +397,7 @@ Only a [`FractionOf`](@ref) reads the set. It rounds down with [`fraction_floor`
 
  2. A [`CountOf`](@ref) gives its number.
 
- 3. A [`FractionOf`](@ref) gives `max(fraction_floor(cap, n), 1)`, with `n` the size of its set:
+ 3. A [`FractionOf`](@ref) gives `max(fraction_floor(cap.val, n), 1)`, with `n` the size of its set:
 
       + A number is the size itself.
       + A vector of sizes gives a vector, with one cap for each size.
@@ -398,13 +448,13 @@ function resolve_cardinality_cap(cap::CountOf, ::Any)
     return cap.val
 end
 function resolve_cardinality_cap(cap::FractionOf, n::Real)::Int
-    return max(fraction_floor(cap, n), 1)
+    return max(fraction_floor(cap.val, n), 1)
 end
 function resolve_cardinality_cap(cap::FractionOf, ns::AbstractVector)
     return [resolve_cardinality_cap(cap, n) for n in ns]
 end
 function resolve_cardinality_cap(cap::FractionOf, smtx::MatNum)::Int
-    return max(fraction_floor(cap, count(row -> any(!iszero, row), eachrow(smtx))), 1)
+    return max(fraction_floor(cap.val, count(row -> any(!iszero, row), eachrow(smtx))), 1)
 end
 function resolve_cardinality_cap(cap::FractionOf, ::Nothing)
     return throw(IsNothingError("the cardinality cap $(cap.val) is a fraction of the assets, and the block resolves with no rows and no number of assets. State the cap as a `CountOf`, or resolve the block on its rows."))

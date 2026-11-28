@@ -605,17 +605,18 @@ Returns the number of neighbours that a nearest-neighbour selector keeps out of 
 
 # Returns
 
-  - `l::Integer`: `min(neighbours.val, n)` for a count, and `floor(Int, neighbours.val * n)` for a fraction.
+  - `l::Integer`: `min(neighbours.val, n)` for a count, and [`fraction_floor`](@ref)`(neighbours.val, n)` for a fraction.
 
 # Related
 
   - [`NearestNeighbourMatch`](@ref)
+  - [`fraction_floor`](@ref)
 """
 function neighbour_count(neighbours::CountOf, n::Integer)
     return min(neighbours.val, n)
 end
 function neighbour_count(neighbours::FractionOf, n::Integer)
-    return floor(Int, neighbours.val * n)
+    return fraction_floor(neighbours.val, n)
 end
 function matched_rows(sel::NearestNeighbourMatch, ::AbstractMatrix, cands::AbstractVector,
                       latest::AbstractVector)

@@ -204,7 +204,7 @@ end
 
 Refuses a sample with too few observations for a robust scatter.
 
-A robust scatter of `p` assets needs more than `p` observations in the set that defines it. Otherwise the matrix is singular. [`MCDCovariance`](@ref) passes the size `h` of its subset, and [`TylerCovariance`](@ref) passes the number of observations.
+A robust scatter of `p` assets needs more than `p` observations in the set that defines it. Otherwise the matrix is singular. [`MCDCovariance`](@ref) passes the number of observations, because its subset holds more than `p` observations exactly when the sample does. [`TylerCovariance`](@ref) passes the number of observations with a weight that is not zero. [`SCovariance`](@ref) passes the size `h` of its start subsets.
 
 # Arguments
 
@@ -224,6 +224,7 @@ A robust scatter of `p` assets needs more than `p` observations in the set that 
 
   - [`MCDCovariance`](@ref)
   - [`TylerCovariance`](@ref)
+  - [`SCovariance`](@ref)
 """
 function assert_robust_rows(n::Integer, p::Integer, what::AbstractString)
     @argcheck(n > p,

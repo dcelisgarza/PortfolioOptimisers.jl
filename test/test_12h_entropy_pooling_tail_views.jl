@@ -890,6 +890,17 @@ end
     @test PO.ep_sbar(CountOf(10 * T), T) == T
     @test PO.ep_sbar(FractionOf(0.25), T) == ceil(Int, 0.25 * T)
     @test PO.ep_sbar(FractionOf(1), T) == T
+    # The ceiling is exact: 0.07 * 100 is 7.000000000000001.
+    @test all(k -> PO.ep_sbar(FractionOf(k / 100), 100) == k, 1:100)
+    # Half of the mass is on the largest loss, so the rule of thumb reads its floor.
+    @test all(k -> PO.ep_sbar(nothing, 100, k / 100, [fill(0.5 / 99, 99); 0.5], 1:100) ==
+                   2 * k, 1:50)
+    # Equal probabilities reach `k / n` at the loss `k`, and ten of 100 add to less than 0.1.
+    @test all((100, 120, 200, 252, 2520)) do n
+        return all(k -> PO.ep_sbar(nothing, n, k / n, fill(1 / n, n), 1:n) == min(n, 2 * k),
+                   1:n)
+    end
+    @test PO.ep_sbar(nothing, 100, nextfloat(0.1, 100), fill(0.01, 100), 1:100) == 22
     @test PO.ep_sbar(nothing, T, ep_a, ep_w0, ord) ==
           min(T, max(2 * s, ceil(Int, 2 * ep_a * T), 1))
     @test PO.ep_sbar(nothing, T, ep_a, ep_w0, ord) >= ceil(Int, 2 * ep_a * T)

@@ -32,7 +32,7 @@ function split_count(s::CountOf, N::Integer)::Int
     return min(Int(s.val), N)
 end
 function split_count(s::FractionOf, N::Integer)::Int
-    return clamp(fraction_floor(s, N), 1, N)
+    return clamp(fraction_floor(s.val, N), 1, N)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -747,10 +747,25 @@ end
     @test eltype(mixed) === Union{Int, FractionOf{Float64}}
     # The floor is exact where the product of the fraction and the size is not.
     @test 0.29 * 100 < 29
-    @test all(k -> pe.fraction_floor(FractionOf(k / 100), 100) == k, 1:100)
-    @test pe.fraction_floor(FractionOf(0.5), 7) == 3
-    @test pe.fraction_floor(FractionOf(0.5), 1) == 0
-    @test pe.fraction_floor(FractionOf(0.5), 0) == 0
+    @test all(k -> pe.fraction_floor(k / 100, 100) == k, 1:100)
+    @test pe.fraction_floor(0.5, 7) == 3
+    @test pe.fraction_floor(0.5, 1) == 0
+    @test pe.fraction_floor(0.5, 0) == 0
+    # The ceiling is the mirror of the floor, in each numeric type of the fraction.
+    @test 0.07 * 100 > 7
+    for f in (k -> k / 100, k -> Float32(k / 100), k -> k // 100), k in 1:100
+        @test pe.fraction_floor(f(k), 100) == pe.fraction_ceil(f(k), 100) == k
+    end
+    @test pe.fraction_ceil(nextfloat(0.07), 100) == 8
+    @test pe.fraction_floor(prevfloat(0.29), 100) == 28
+    @test pe.fraction_ceil(0.5, 7) == 4
+    @test pe.fraction_ceil(nextfloat(0.0), 100) == 1
+    @test pe.fraction_ceil(0.5, 0) == 0
+    # An empty set gives zero in each numeric type: a `Rational` raises on `0 // 0`.
+    for f in (1 // 2, 0.5f0, big"0.5", 1)
+        @test pe.fraction_floor(f, 0) == pe.fraction_ceil(f, 0) == 0
+    end
+    @test pe.fraction_ceil(1, 7) == pe.fraction_floor(1, 7) == 7
     # The cap is at least one, and a count above the set does not bind.
     @test pe.resolve_cardinality_cap(FractionOf(0.2), 18) == 3
     @test pe.resolve_cardinality_cap(FractionOf(0.2), 3) == 1
@@ -768,7 +783,6 @@ end
     @test pe.resolve_cardinality_cap([FractionOf(1), CountOf(4)], [S, S]) == [2, 4]
     # A set with no member gives zero for an exact fraction too, and the cap is then one.
     for f in (0.5, 1 // 2)
-        @test pe.fraction_floor(FractionOf(f), 0) == 0
         @test pe.resolve_cardinality_cap(FractionOf(f), zeros(Int, 2, 3)) == 1
     end
     # The check of a slot goes entry by entry, and an empty vector is refused.

@@ -350,9 +350,9 @@ Find the number of largest losses that the integer conditional value-at-risk for
 # Algorithm
 
  1. A [`CountOf`](@ref) is a number of losses. Return `sbar.val`, at most `T`.
- 2. A [`FractionOf`](@ref) is a fraction of `T`. Return `ceil(Int, sbar.val * T)`, at least one and at most `T`.
- 3. `nothing` uses the rule of thumb of [EPTail](@cite). Go through the losses from the largest down, and add their prior probabilities. Stop at the position `s` at which the sum first reaches `alpha`.
- 4. Return two times `s`, at least `ceil(Int, 2 * alpha * T)`, at least one and at most `T`.
+ 2. A [`FractionOf`](@ref) is a fraction of `T`. Return [`fraction_ceil`](@ref)`(sbar.val, T)`, at most `T`. The fraction is positive, so the count is at least one.
+ 3. `nothing` uses the rule of thumb of [EPTail](@cite). Go through the losses from the largest down, and add their prior probabilities. Stop at the position `s` at which the sum first reaches `alpha`. A sum of `j` probabilities reaches `alpha` when it is below `alpha` by at most `j` units in its last place, the bound on its rounding error. The first ten of 100 equal probabilities add to `0.09999999999999999`, and they reach `0.1`.
+ 4. Return two times `s`, at least [`fraction_ceil`](@ref)`(2 * alpha, T)`, at least one and at most `T`.
 
 [EPTail](@citet) uses a count of at most `s` for a view at or above the prior CVaR. For a view below the prior CVaR, it uses a count above `s` and far below `T`. Its examples use `int(alpha * T)` for the first case and `int(2 * alpha * T)` for the second case. The library uses the larger count for every view, and the factor of two is its own.
 
@@ -372,6 +372,7 @@ Find the number of largest losses that the integer conditional value-at-risk for
 
   - [`IntegerConditionalValueatRiskView`](@ref)
   - [`ep_tail_views!`](@ref)
+  - [`fraction_ceil`](@ref)
 
 # References
 
@@ -382,18 +383,18 @@ function ep_sbar(sbar::Nothing, T::Integer, alpha::Number, w::VecNum, ord::VecIn
     s = T
     for (j, o) in enumerate(Iterators.reverse(ord))
         cw += w[o]
-        if cw >= alpha
+        if cw + j * eps(cw) >= alpha
             s = j
             break
         end
     end
-    return min(T, max(2 * s, ceil(Int, 2 * alpha * T), 1))
+    return min(T, max(2 * s, fraction_ceil(2 * alpha, T), 1))
 end
 function ep_sbar(sbar::CountOf, T::Integer, args...)
     return min(T, Int(sbar.val))
 end
 function ep_sbar(sbar::FractionOf, T::Integer, args...)
-    return min(T, max(1, ceil(Int, sbar.val * T)))
+    return min(T, fraction_ceil(sbar.val, T))
 end
 """
     ep_assert_reachable_view(op::Symbol, rhs::Number, x::AbstractVector{<:VecNum},

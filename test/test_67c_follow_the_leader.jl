@@ -123,6 +123,8 @@ end
               sort((3:6)[order[1:2]])
         @test isempty(po.select_rows(NearestNeighbourMatch(; window = 2, neighbours = 0.2),
                                      H))
+        # The floor is exact: 0.29 * 100 is 28.999999999999996.
+        @test all(k -> po.neighbour_count(FractionOf(k / 100), 100) == k, 1:100)
         # Correlation of the concatenated windows; the recurring window correlates with
         # the latest at one, so a threshold near one keeps row 3 of H8 alone.
         c = [cor(vec(H[(i - 2):(i - 1), :]), latest) for i in 3:6]
