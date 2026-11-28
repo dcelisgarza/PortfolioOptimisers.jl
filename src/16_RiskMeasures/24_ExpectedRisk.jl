@@ -510,7 +510,7 @@ The function is [`regression(re::AbstractTimeSeriesRegressionEstimator, rd::Retu
 
   - `!isnothing(rd.X)` and `!isnothing(rd.F)`. Throws an [`IsNothingError`](@ref) that names the three arguments `re`, `pr` and `rd` that can supply loadings.
   - The rules of [`benchmark_relative_returns`](@ref).
-  - The rule of [`asset_fit_rows`](@ref): every asset carries at least one finite and active return.
+  - The rule of [`asset_fit_rows`](@ref): every asset carries at least two finite and active returns.
 
 # Returns
 

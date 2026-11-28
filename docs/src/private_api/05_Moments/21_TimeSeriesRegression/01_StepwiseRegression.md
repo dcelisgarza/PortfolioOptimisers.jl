@@ -12,8 +12,11 @@ _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriterion, <:Bac
 add_best_factor_after_pval_failure!
 get_forward_reg_incl_excl!
 get_backward_reg_incl!
+saturated_set_pval_removal
+stepwise_score
 assert_stepwise_included
 assert_stepwise_regression
+stepwise_search
 stepwise_factor_set
 stepwise_asset_fit!
 pin_regression_choice(re::StepwiseRegression{<:Any, <:Any, <:Any, <:PinnedChoice}, X::MatNum, F::MatNum, w::Option{<:ObsWeights} = nothing)

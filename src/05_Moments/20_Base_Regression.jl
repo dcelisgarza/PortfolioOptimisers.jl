@@ -1693,7 +1693,7 @@ end
 
 Return the threshold that a forward stepwise regression search starts from.
 
-The value is the worst score the criterion can take, so the first candidate model always improves on it. [`regression_polarity`](@ref) states which of `typemax` and `typemin` that is, and `typemax(Float64)` is `Inf`. Only [`ForwardSelection`](@ref) reads it. [`BackwardElimination`](@ref) starts from the score of the full model, because its first move must improve on a model that already exists.
+The value is the worst score the criterion can take, so the first candidate model that leaves a residual improves on it. A Saturated Fit scores the worst value too, as [`stepwise_score`](@ref) states, so it never improves on it. [`regression_polarity`](@ref) states which of `typemax` and `typemin` that is, and `typemax(Float64)` is `Inf`. Only [`ForwardSelection`](@ref) reads it. [`BackwardElimination`](@ref) starts from the score of the full model, because its first move must improve on a model that already exists.
 
 # Arguments
 
@@ -2129,6 +2129,8 @@ A cell is in the fit when its return is finite and the active mask admits it, wh
 
 When every cell of an asset is in the fit, its entry is `nothing`, and the fit takes the path of a complete column, with no copy and no cut of the observation weights.
 
+Each fit has an intercept, so an asset needs two cells in the fit: one for the intercept and one for the residual. A fit with more parameters than the cells less one is a Saturated Fit, and [`asset_fit_coefficients`](@ref) refits it on the intercept alone. So two cells are enough for every model.
+
 # Arguments
 
   - $(arg_dict[:X])
@@ -2140,7 +2142,7 @@ When every cell of an asset is in the fit, its entry is `nothing`, and the fit t
 # Validation
 
   - `active_mask`, when it is not `nothing`, has the size of `X`. Otherwise, the function throws a `DimensionMismatch`.
-  - Each asset has at least one cell in the fit. Otherwise, the function throws an [`IsNonFiniteError`](@ref) that names the asset.
+  - Each asset has at least two cells in the fit. Otherwise, the function throws an [`IsNonFiniteError`](@ref) that names the asset and its count, or an `ArgumentError` when the sample holds fewer than two observations and no gap.
 
 # Returns
 
@@ -2168,12 +2170,92 @@ function asset_fit_rows(x::VecNum, a::Option{<:AbstractVector{<:Bool}},
     # The method is compiled for the type of `a`, so the test of `nothing` folds away.
     live = t -> (isnothing(a) || a[t]) && isfinite(x[t])
     if all(live, eachindex(x))
+        @argcheck(length(x) >= 2,
+                  ArgumentError("a time-series regression fits an intercept for each asset, so it needs at least two observations, one for the intercept and one for the residual, and the sample holds $(length(x)). Fit over a longer sample."))
         return nothing
     end
     rows = findall(live, eachindex(x))
-    @argcheck(!isempty(rows),
-              IsNonFiniteError("asset $i carries no finite and active return in the $(length(x)) observations of the sample, so a regression has no observation to fit its loadings on. Remove the asset from the sample, or fit over a window in which it is listed."))
+    @argcheck(length(rows) >= 2,
+              IsNonFiniteError("asset $i carries $(length(rows)) finite and active return(s) in the $(length(x)) observations of the sample, and a time-series regression needs at least two, one for the intercept and one for the residual. Remove the asset from the sample, or fit over a window in which it is listed."))
     return rows
+end
+"""
+    is_saturated_fit(fri, x1::MatNum) -> Bool
+
+Return `true` when a fit is a Saturated Fit, which leaves less than one residual degree of freedom.
+
+The function reads the residual count of the fit with [`residual_count`](@ref), and compares it with one. An unpenalised fit has an integer count, so the test is the test of a count that is not positive. A penalised fit states a real count, and under a weak penalty that count goes to zero and not below it. So a count between zero and one spends less than one full parameter on the residual, and the fit interpolates the returns as a count of zero does. The fit of the intercept alone leaves at least one, because [`asset_fit_rows`](@ref) gives each asset two cells. So the rule needs no tolerance.
+
+[`asset_fit_coefficients`](@ref) reads it to refit a Saturated Fit, and the stepwise search of [`StepwiseRegression`](@ref) reads it to admit only a factor set that leaves a residual.
+
+# Arguments
+
+  - `fri`: The fitted model.
+  - `x1`: The design of the fit, `observations × parameters`.
+
+# Returns
+
+  - `flag::Bool`: `true` when `residual_count(fri, x1) < 1`.
+
+# Related
+
+  - [`residual_count`](@ref)
+  - [`asset_fit_coefficients`](@ref)
+  - [`StepwiseRegression`](@ref)
+"""
+function is_saturated_fit(fri, x1::MatNum)::Bool
+    nu = residual_count(fri, x1)
+    return nu < one(nu)
+end
+"""
+    asset_fit_coefficients(tgt::AbstractRegressionTarget, x1::MatNum, x::VecNum,
+                           i::Integer) -> Tuple{Vector, Real}
+
+Fits the model of one asset of a time-series regression, and refits a Saturated Fit on the intercept alone.
+
+A Saturated Fit leaves less than one residual degree of freedom: an asset with fewer cells in the fit than the parameters of its model plus one. Its coefficients interpolate the returns and are not an estimate, and its residual variance is zero, so a factor prior reads the asset as a pure factor bet. The function tests the fit with [`is_saturated_fit`](@ref). On a Saturated Fit, it warns, names the asset, and fits the intercept column alone. Each factor column then gets a coefficient of zero, as a column that the pivot of `GLM` drops. A fit that leaves a residual does not change. A penalised target states its own count, so a penalised fit on more columns than rows keeps its coefficients while its count is at least one.
+
+[`asset_fit_rows`](@ref) gives each asset at least two cells, so the fit of the intercept alone leaves a residual. The stepwise search admits only a factor set that leaves a residual, so for [`StepwiseRegression`](@ref) the refit guards only a factor set that a caller pins. A backward search whose full set has no admissible set of one removal takes the set of a forward search, as [`stepwise_search`](@ref) states.
+
+# Algorithm
+
+ 1. Fit `tgt` to `x1` and `x`. Return the coefficients and the residual count `nu` of the fit when [`is_saturated_fit`](@ref) is `false`.
+ 2. Otherwise warn, and fit `tgt` to the first column of `x1`, the column of ones, and `x`.
+ 3. Return a vector of zeros of the width of `x1` with the intercept of step 2 first, and the residual count of the fit of step 2.
+
+# Arguments
+
+  - `tgt`: Regression target, with its first column named by `factory(tgt, InterceptColumn(1))`.
+  - `x1`: The design of the asset, with the column of ones first, `observations × parameters`.
+  - `x`: Returns of asset `i`, `observations × 1`.
+  - `i`: Index of the asset, which names it in the warning.
+
+# Returns
+
+  - `params::Vector`: One coefficient for each column of `x1`, with the intercept first.
+  - `nu::Real`: The residual count of the fit whose coefficients the function returns.
+
+# Related
+
+  - [`residual_count`](@ref)
+  - [`asset_fit_rows`](@ref)
+  - [`StepwiseRegression`](@ref)
+  - [`DimensionReductionRegression`](@ref)
+"""
+function asset_fit_coefficients(tgt::AbstractRegressionTarget, x1::MatNum, x::VecNum,
+                                i::Integer)
+    fri = StatsAPI.fit(tgt, x1, x)
+    if !is_saturated_fit(fri, x1)
+        return StatsAPI.coef(fri), residual_count(fri, x1)
+    end
+    @warn("Asset $i: the fit spends every one of its $(size(x1, 1)) observations on its $(size(x1, 2)) parameters, and leaves less than one residual degree of freedom. The asset gets an intercept-only model, and its row of the loadings matrix is all zeros.",
+          maxlog = log_limit(:warn), _id = @log_id())
+    x0 = x1[:, 1:1]
+    f0 = StatsAPI.fit(tgt, x0, x)
+    c0 = StatsAPI.coef(f0)
+    params = zeros(eltype(c0), size(x1, 2))
+    params[1] = c0[1]
+    return params, residual_count(f0, x0)
 end
 """
     pin_regression_choice(re::AbstractTimeSeriesRegressionEstimator, X::MatNum, F::MatNum,

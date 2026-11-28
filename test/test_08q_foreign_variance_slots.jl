@@ -69,7 +69,7 @@ end
             x1, Vp, mu, sigma = FVS.prep_dim_red_reg(re, F)
             @test isapprox(mu, vec(mean(F, w; dims = 1)))
             y = X[:, 1]
-            b = FVS._regression(re, y, mu, sigma, x1, Vp).beta
+            b = FVS._regression(re, y, mu, sigma, x1, Vp, 1).beta
             m = FVS.StatsAPI.fit(re.retgt, x1, y)
             @test isapprox(b[1] .+ F * b[2:end], FVS.StatsAPI.predict(m); rtol = 1e-10)
             D = [ones(T) F]
