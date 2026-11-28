@@ -180,10 +180,10 @@ every asset in the universe and so has no exact slice.
 const NO_VIEW_HOSTS = (ExpWeightedExpectedReturns, ExpWeightedVariance,
                        ExpWeightedCovariance, RegimeAdjustedExpWeightedVariance,
                        RegimeAdjustedExpWeightedCovariance, PricesToReturns, PriceGapFill,
-                       MissingDataFilter, RollingLogReturn, EWMean, EWVolumeRatio,
-                       DaysToCover, GrowthRate, ChangeToScale, ChangeInIntensity,
-                       EWVolatility, EWResidualVolatility, EWBeta, EWMacroSensitivity,
-                       EWDownsideBeta)
+                       MissingDataFilter, PriceJumpFilter, RollingLogReturn, EWMean,
+                       EWVolumeRatio, DaysToCover, GrowthRate, ChangeToScale,
+                       ChangeInIntensity, EWVolatility, EWResidualVolatility, EWBeta,
+                       EWMacroSensitivity, EWDownsideBeta)
 
 # Hosts whose `port_opt_view` refuses outright, so a cache never travels a view of them. A
 # `Pipeline`'s asset universe is fitted state, which ADR 0028 says a view cannot select. The
@@ -207,6 +207,7 @@ const UNVIEWED_STATES = (po.ExpWeightedExpectedReturnsState => ExpWeightedExpect
                          po.PricesToReturnsState => PricesToReturns,
                          po.PriceGapFillState => PriceGapFill,
                          po.MissingDataFilterState => MissingDataFilter,
+                         po.PriceJumpFilterState => PriceJumpFilter,
                          po.RollingLogReturnState => RollingLogReturn,
                          po.EWMeanState => EWMean, po.LagDescriptorState => GrowthRate,
                          po.EWVolatilityState => EWVolatility, po.EWBetaState => EWBeta,

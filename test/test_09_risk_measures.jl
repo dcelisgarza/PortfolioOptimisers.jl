@@ -1023,7 +1023,8 @@ const _x_series = [sinpi(2i / 64) * 0.1 + cospi(i / 32) * 0.03 for i in 1:64]
                      VarianceSkewKurtosis(), RiskRatio(), LowOrderMoment(; mu = mu2),
                      HighOrderMoment(; mu = mu2), Skewness(), Kurtosis(),
                      MedianAbsoluteDeviation(; mu = mu2), ThirdCentralMoment(; mu = mu2),
-                     TrackingRiskMeasure(; tr = WeightsTracking(; w = [0.5, 0.5]))]
+                     TrackingRiskMeasure(; tr = WeightsTracking(; w = [0.5, 0.5])),
+                     PO.GainTail(ConditionalValueatRisk())]
     for r in ineligible
         @test !PO.supports_precomputed_returns(r)
         @test_throws ArgumentError g(r, _x_series)

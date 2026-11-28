@@ -1110,6 +1110,43 @@ end
             # The per-entry box is not a joint region: over N entries it covers less.
             @test mean(vec(all(abs.(E) .<= z .* sd; dims = 1))) < 1 - ue.q
         end
+        @testset "The projections can cross the covariance bounds, and `pdm = nothing` cannot (#2344)" begin
+            # The case that the warning of `NormalUncertaintySet` documents. Each bound is
+            # projected on its own, and the 40 rows make one pair of entries cross.
+            Xc = let rng = StableRNG(686)
+                T, N = 300, 5
+                F = randn(rng, T, 2)
+                0.0008 .+ F * (0.01 .* randn(rng, 2, N)) .+ 0.01 .* randn(rng, T, N) .+
+                (0.0004 .* (1:N))'
+            end
+            pr40 = prior(EmpiricalPrior(), Xc[1:40, :])
+            ue(pdm) = NormalUncertaintySet(; pe = nothing, rng = StableRNG(1), seed = 1,
+                                           pdm = pdm)
+            proj = sigma_ucs(ue(Posdef()), pr40)
+            crossed = proj.lb .> proj.ub
+            @test any(crossed)
+            @test !all(proj.lb .<= pr40.sigma .<= proj.ub)
+            # The quantile bounds stay in order and hold the point estimate, although the
+            # lower one is indefinite.
+            raw = sigma_ucs(ue(nothing), pr40)
+            @test all(raw.lb .<= pr40.sigma .<= raw.ub)
+            @test !isposdef(raw.lb)
+            # A swap of the entries that cross leaves the interval at or above the upper
+            # quantile, so it excludes the point estimate.
+            @test all(min.(proj.lb, proj.ub)[crossed] .>= raw.ub[crossed])
+            @test all(min.(proj.lb, proj.ub)[crossed] .> pr40.sigma[crossed])
+            slvc = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                          settings = Dict("verbose" => false))
+            solve_over(ucs) = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = ucs),
+                                                opt = JuMPOptimiser(; pe = pr40,
+                                                                    slv = slvc)))
+            # The empty box leaves the worst case unbounded, the status that the warning names.
+            rc = solve_over(ue(Posdef())).retcode
+            @test isa(rc, OptimisationFailure)
+            @test rc.res[:clarabel][:termination_status] ==
+                  PortfolioOptimisers.JuMP.MOI.DUAL_INFEASIBLE
+            @test isa(solve_over(ue(nothing)).retcode, OptimisationSuccess)
+        end
         @testset "The scaling parameter reads two sources in order, one moment at a time" begin
             rng = StableRNG(2468)
             N, T = 3, 400

@@ -13,4 +13,11 @@ PortfolioOptimisers.clock_gap_cells
 PortfolioOptimisers.asset_gap_cells
 PortfolioOptimisers.shared_gap_rows
 PortfolioOptimisers.benchmark_columns
+PortfolioOptimisers.assert_jump_factor
+PortfolioOptimisers.is_price_jump
+PortfolioOptimisers.price_matrix
+PortfolioOptimisers.foreach_price_jump
+PortfolioOptimisers.price_jump_marks
+PortfolioOptimisers.price_jump_result
+PortfolioOptimisers.fitted_columns
 ```

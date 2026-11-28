@@ -1,5 +1,5 @@
 ```@meta
-Description = "Preprocessing partial fit, private API of PortfolioOptimisers.jl: PricesToReturnsState, PriceGapFillState, MissingDataFilterState, vcat_observations, …"
+Description = "Preprocessing partial fit, private API of PortfolioOptimisers.jl: PricesToReturnsState, PriceGapFillState, MissingDataFilterState, PriceJumpFilterState, …"
 ```
 
 # Preprocessing partial fit: private API
@@ -10,6 +10,7 @@ Description = "Preprocessing partial fit, private API of PortfolioOptimisers.jl:
 PortfolioOptimisers.PricesToReturnsState
 PortfolioOptimisers.PriceGapFillState
 PortfolioOptimisers.MissingDataFilterState
+PortfolioOptimisers.PriceJumpFilterState
 ```
 
 ## Functions
@@ -28,5 +29,6 @@ PortfolioOptimisers.advance_anchor
 PortfolioOptimisers.block_gap_return!
 PortfolioOptimisers.series_values_returns
 PortfolioOptimisers.returns_with_series
-PortfolioOptimisers.show_fields(est::Union{PricesToReturns, PriceGapFill, MissingDataFilter})
+PortfolioOptimisers.end_price
+PortfolioOptimisers.show_fields(est::Union{PricesToReturns, PriceGapFill, MissingDataFilter, PriceJumpFilter})
 ```

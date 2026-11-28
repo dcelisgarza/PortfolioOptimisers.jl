@@ -120,6 +120,12 @@ Under normal returns, the sample mean has a normal law, and the sample covarianc
 
 `alg` selects the shape of the set. `n_sim` sets the number of draws on each route that simulates. [`DeltaUncertaintySet`](@ref) fits a box with no sample, and [`ARCHUncertaintySet`](@ref) fits a set with no assumed law.
 
+!!! warning
+
+    `pdm` can make the covariance box wrong. It projects the lower bound and the upper bound to the nearest positive definite matrix, each on its own, and a projection moves the entries of its bound. The quantiles of the lower bound are often indefinite, so its projection often runs. The box then does not always hold the point estimate. With few observations, an entry of the lower bound can go above its entry of the upper bound. Such a box is empty, its worst case is unbounded, and an optimiser with an [`UncertaintySetVariance`](@ref) over it fails with the status `DUAL_INFEASIBLE`. A swap of the two entries does not repair the box, because the swapped interval starts at the quantile of the upper bound and excludes the point estimate.
+
+    Set `pdm = nothing` to keep the quantile bounds. They are in order at every entry, and the model of the box factorises neither of them, so it needs no definite bound. `pdm` also repairs the covariance of the sampling law of the mean, so the covariance of the prior must be positive definite when `pdm` is `nothing`.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -692,7 +698,11 @@ Builds the box of the covariance axis of a [`NormalUncertaintySet`](@ref).
 
 The function draws `ue.n_sim` Wishart matrices with `T` degrees of freedom and scale `sigma_mu`. The element-wise `q` and `1 - q` quantiles of the draws are the bounds. The function then projects each bound to the nearest positive definite matrix. The box methods of [`ucs`](@ref) and [`sigma_ucs`](@ref) both call it, so the two give the same box under one seed.
 
-The mean of a ``\\mathrm{Wishart}(T, \\mathbf{\\Sigma}_{\\boldsymbol{\\mu}})`` draw is ``T \\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}``, which is ``\\hat{\\mathbf{\\Sigma}}``. So the draws are centred on the point estimate, and the two bounds are on the two sides of it.
+The mean of a ``\\mathrm{Wishart}(T, \\mathbf{\\Sigma}_{\\boldsymbol{\\mu}})`` draw is ``T \\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}``, which is ``\\hat{\\mathbf{\\Sigma}}``. So the draws are centred on the point estimate, and the two quantiles of an entry are usually on the two sides of it.
+
+!!! warning
+
+    The projections of step 5 do not keep the order of the two bounds, and they do not keep the point estimate in the box. [`NormalUncertaintySet`](@ref) states the failure that follows, and why `pdm = nothing` is the repair.
 
 # Algorithm
 

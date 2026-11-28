@@ -229,7 +229,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Records `r` as the owner of every `:risk_frontier` entry after position `first` that has no owner yet.
 
-[`rebuild_risk_frontier`](@ref) resolves a [`Frontier`](@ref) bound into a span of numbers, and it values the corner portfolios with the measure that owns the entry. The owner is the measure that the bounded expression measures, and [`expected_risk`](@ref) values it. The functor of each owner gives the value of its bounded expression, in the units that the `bound` of the `Frontier` converts. For a plain measure, that is the measure itself. A composite measure bounds the expression of a term, so its builder records the measure of that term first. The `vr`, `sk` and `kt` terms of [`VarianceSkewKurtosis`](@ref) are the example. The position of an entry does not give its measure: a measure registers an entry only when its `settings.ub` is a [`Front_NumVec`](@ref), and one measure can register several entries.
+[`rebuild_risk_frontier`](@ref) resolves a [`Frontier`](@ref) bound into a span of numbers, and it values the corner portfolios with the measure that owns the entry. The owner is the measure that the bounded expression measures, and [`expected_risk`](@ref) values it. The functor of each owner gives the value of its bounded expression, in the units that the `bound` of the `Frontier` converts. For a plain measure, that is the measure itself. A composite measure bounds the expression of a term, so its builder records the measure of that term first. The `vr`, `sk` and `kt` terms of [`VarianceSkewKurtosis`](@ref) and the two tails of a [`GenericValueatRiskRange`](@ref) are the examples. The gain tail reads the negated portfolio, so its owner is a [`GainTail`](@ref). The position of an entry does not give its measure: a measure registers an entry only when its `settings.ub` is a [`Front_NumVec`](@ref), and one measure can register several entries.
 
 # Algorithm
 
@@ -252,6 +252,7 @@ Records `r` as the owner of every `:risk_frontier` entry after position `first` 
   - [`risk_frontier_length`](@ref)
   - [`rebuild_risk_frontier`](@ref)
   - [`set_risk_upper_bound!`](@ref)
+  - [`GainTail`](@ref)
 """
 function set_risk_frontier_owner!(model::JuMP.Model, first::Integer,
                                   r::AbstractBaseRiskMeasure)
@@ -1026,9 +1027,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Adds the constraints of a range risk measure to `model`, as the sum of its loss tail and its gain tail.
 
-This is the build of every [`RangeRiskMeasure`](@ref) formulation that decomposes. The two tails from [`range_tails`](@ref) carry `rke = false` and no bound, so the sum alone reaches the objective and the bound. Each tail builds under its own index, which [`nested_index`](@ref) composes from the side and `i`. The keys of the two tails therefore differ, also when a range holds a range. A formulation that fuses its tails has a method of its own, which is more specific.
+This is the build of every [`RangeRiskMeasure`](@ref) formulation that decomposes. The two tails from [`range_tails`](@ref) carry `rke = false`, so the sum alone reaches the objective. A bound of a tail bounds that tail alone. Each tail builds under its own index, which [`nested_index`](@ref) composes from the side and `i`. The keys of the two tails therefore differ, also when a range holds a range. A formulation that fuses its tails has a method of its own, which is more specific.
 
-Two decomposed formulations do work of their own before the tails: [`OrderedWeightsArrayRange`](@ref) under [`ApproxOrderedWeightsArray`](@ref) checks `w1` and `w2` under their names, and [`GenericValueatRiskRange`](@ref) of two [`DistributionValueatRisk`](@ref) tails builds the cone that the tails share. Their methods hold a copy of the five steps below, and the copies agree with this method.
+Two decomposed formulations do work of their own before the tails: [`OrderedWeightsArrayRange`](@ref) under [`ApproxOrderedWeightsArray`](@ref) checks `w1` and `w2` under their names, and [`GenericValueatRiskRange`](@ref) of two [`DistributionValueatRisk`](@ref) tails builds the cone that the tails share. Their methods hold a copy of the steps below, and the copies agree with this method. The tails of an [`OrderedWeightsArrayRange`](@ref) hold no bound, so its copy records no owner.
 
 # Mathematical definition
 
@@ -1048,8 +1049,8 @@ Where:
 # Algorithm
 
  1. Read the tails `loss` and `gain` of `r` with [`range_tails`](@ref), and the key `name` of the sum with [`range_risk_key`](@ref).
- 2. Build `loss` at index `nested_index(:loss_, i)` with `loss = true`, giving `loss_risk`.
- 3. Build `gain` at index `nested_index(:gain_, i)` with `loss = false`, giving `gain_risk`. The builder then reads the negated net portfolio returns.
+ 2. Build `loss` at index `nested_index(:loss_, i)` with `loss = true`, giving `loss_risk`. Record `loss` as the owner of the frontier entries that it added with [`set_risk_frontier_owner!`](@ref), so that a sweep on the tail takes its span from the tail.
+ 3. Build `gain` at index `nested_index(:gain_, i)` with `loss = false`, giving `gain_risk`. The builder then reads the negated net portfolio returns. Record the [`GainTail`](@ref) of `gain` as the owner of the entries that it added.
  4. Register `range_risk = loss_risk + gain_risk` under the Model State key of `name` and `i`.
  5. Bound `range_risk` and add it to `risk_vec` with [`set_risk_bounds_and_expression!`](@ref), from `r.settings`.
 
@@ -1085,6 +1086,8 @@ Where:
   - [`range_tails`](@ref)
   - [`range_risk_key`](@ref)
   - [`nested_index`](@ref)
+  - [`set_risk_frontier_owner!`](@ref)
+  - [`GainTail`](@ref)
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RangeRiskMeasure,
@@ -1092,10 +1095,16 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RangeRiskMeasure,
                                prefix::Symbol = Symbol(""), kwargs...)
     (; loss, gain) = range_tails(r)
     name = range_risk_key(r)
+    # A sweep on a tail takes its span from that tail, so each tail records the measure of its
+    # own side as the owner of its entry before the whole range claims the rest.
+    first = risk_frontier_length(model)
     loss_risk = set_risk_constraints!(model, nested_index(:loss_, i), loss, opt, pr,
                                       args...; loss = true, prefix = prefix, kwargs...)
+    set_risk_frontier_owner!(model, first, loss)
+    first = risk_frontier_length(model)
     gain_risk = set_risk_constraints!(model, nested_index(:gain_, i), gain, opt, pr,
                                       args...; loss = false, prefix = prefix, kwargs...)
+    set_risk_frontier_owner!(model, first, GainTail(gain))
     range_risk = state_set!(model, prefix, name, i,
                             JuMP.@expression(model, loss_risk + gain_risk))
     set_risk_bounds_and_expression!(model, opt, range_risk, r.settings, name, i;

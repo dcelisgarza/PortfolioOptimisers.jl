@@ -1031,6 +1031,34 @@ end
                       init = gp(DataBenchmarkTracking()))
             @test optimise(o).w == optimise(gp(DataBenchmarkTracking()), r).w
         end
+        # A ratio binds the benchmark of its sides, and its view cuts a benchmark portfolio to
+        # the priced legs (#2330). The gradient of a ratio is a finite difference, and the
+        # largest gap measured is 1.3e-8.
+        am = trues(T, N)
+        am[:, N] .= false
+        Rn = copy(R)
+        Rn[.!am] .= NaN
+        pnl = AssetPanel(; amsk = am, emsk = copy(am))
+        rdn = ReturnsResult(; nx = nx, X = Rn, nb = ["BM"],
+                            B = R[:, 1:(N - 1)] * wb[1:(N - 1)], ts = ts, pnl = pnl)
+        for mk in (t -> RiskRatio(; r1 = t, r2 = StandardDeviation()),
+                   t -> NonOptimisationRiskRatio(; r1 = [t, Variance()], r2 = StandardDeviation()),
+                   t -> MeanReturnRiskRatio(; rk = t),
+                   t -> ExpectedReturnRiskRatio(; rk = [t, StandardDeviation()]))
+            go(tr) = OPS(;
+                         alg = GradientProjection(; eta = 0.05,
+                                                  obj = RiskLoss(;
+                                                                 r = mk(TrackingRiskMeasure(;
+                                                                                            tr = tr)),
+                                                                 window = 5)))
+            for r in (rdv, rdn)
+                wd = optimise(go(DataBenchmarkTracking()), r).w
+                @test isapprox(wd,
+                               optimise(go(WeightsTracking(; w = wb, fixed = true)), r).w;
+                               atol = 1e-6)
+                @test !isapprox(wd, optimise(OPS(; alg = BuyAndHold()), r).w; atol = 1e-4)
+            end
+        end
     end
 
     @testset "The numbers the docstrings state, on the fixtures they name" begin

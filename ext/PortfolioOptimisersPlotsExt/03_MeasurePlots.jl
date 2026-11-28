@@ -9,17 +9,21 @@ function PortfolioOptimisers.plot_measures(w::VecNum_VecVecNum, pr::Pr_RR,
                                                                                                              rt = ArithmeticReturn(),
                                                                                                              rf = 0),
                                            slv::Option{<:Slv_VecSlv} = nothing,
-                                           factory::Bool = true, kwargs...)
+                                           factory::Bool = true, strict::Bool = false,
+                                           kwargs...)
+    # One reduction for every axis, so one message names a held asset or a Held Gap.
+    _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     if factory
         x = PortfolioOptimisers.factory(x, pr, slv)
         y = PortfolioOptimisers.factory(y, pr, slv)
         z = isnothing(z) ? nothing : PortfolioOptimisers.factory(z, pr, slv)
         c = PortfolioOptimisers.factory(c, pr, slv)
     end
-    xr = expected_risk(x, w, pr, fees)
-    yr = expected_risk(y, w, pr, fees)
-    zr = isnothing(z) ? nothing : expected_risk(z, w, pr, fees)
-    cr = expected_risk(c, w, pr, fees)
+    # One weight vector scores to one number, so `vcat` gives the scatter a vector either way.
+    xr = vcat(expected_risk(x, w, pr, fees))
+    yr = vcat(expected_risk(y, w, pr, fees))
+    zr = isnothing(z) ? nothing : vcat(expected_risk(z, w, pr, fees))
+    cr = vcat(expected_risk(c, w, pr, fees))
     return if isnothing(zr)
         scatter(xr, yr; zcolor = cr, title = "Pareto Front", xlabel = "X", ylabel = "Y",
                 colorbar_title = "C", label = nothing, legend = true, kwargs...)
@@ -40,10 +44,20 @@ function PortfolioOptimisers.plot_measures(res_vec::AbstractVector{<:Optimisatio
                                                                                                              rf = 0),
                                            slv::Option{<:Slv_VecSlv} = nothing,
                                            fees::Option{<:Fees} = nothing,
-                                           factory::Bool = true, kwargs...)
-    views = [result_investable_view(res, pr, fees) for res in res_vec]
-    w = getindex.(views, 2)
-    pr = getindex.(views, 3)
+                                           factory::Bool = true, strict::Bool = false,
+                                           kwargs...)
+    # One reduction for each result, so every axis reads the same prior or filtered returns.
+    views = map(res_vec) do res
+        imsk, wi, pri, fi = result_investable_view(res, pr, fees)
+        # A result with no prior of its own leaves the refusal to the measure.
+        return if isnothing(pri)
+            (imsk, pri, wi, fi)
+        else
+            investable_reduction(pri, wi, fi, strict)
+        end
+    end
+    pr = getindex.(views, 2)
+    w = getindex.(views, 3)
     fees = getindex.(views, 4)
     # Each axis becomes one measure **per result**, so the broadcasts below zip correctly.
     # `Ref` is what makes that safe: a single measure is not iterable and broadcasts as a
@@ -119,10 +133,12 @@ end
 function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.BaseRM_VecBaseRM,
                                                   w::VecNum, rd::ReturnsResult,
                                                   fees::Option{<:Fees} = nothing;
-                                                  rolling::Integer = 0, kwargs...)
+                                                  rolling::Integer = 0,
+                                                  strict::Bool = false, kwargs...)
     ts = isnothing(rd.ts) ? (1:size(rd.X, 1)) : rd.ts
-    return PortfolioOptimisers.plot_rolling_measure(r, w, rd.X, fees; ts = ts,
-                                                    rolling = rolling, kwargs...)
+    ret = calc_net_returns(w, filter_held_gaps(w, rd.X, strict; nx = rd.nx), fees)
+    return PortfolioOptimisers.plot_rolling_measure(r, ret; ts = ts, rolling = rolling,
+                                                    kwargs...)
 end
 function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.BaseRM_VecBaseRM,
                                                   res::OptimisationResult,
@@ -233,7 +249,7 @@ end
 # caller gives none, as its `performance_summary` method does (#1664), because the keyword
 # goes to the verb only when the caller gives it.
 const PERFORMANCE_SUMMARY_KEYWORDS = (:ppy, :alpha, :compound, :rf, :measures, :benchmark,
-                                      :names)
+                                      :names, :strict)
 function PortfolioOptimisers.plot_performance_summary(x::Union{AbstractArray,
                                                                OptimisationResult,
                                                                PortfolioOptimisers.AbstractPredictionResult},
@@ -251,9 +267,11 @@ function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.BaseRM_
                                                   w::VecNum, X::MatNum,
                                                   fees::Option{<:Fees} = nothing;
                                                   ts::AbstractVector = 1:size(X, 1),
-                                                  rolling::Integer = 0, kwargs...)
-    return PortfolioOptimisers.plot_rolling_measure(r, calc_net_returns(w, X, fees);
-                                                    ts = ts, rolling = rolling, kwargs...)
+                                                  rolling::Integer = 0,
+                                                  strict::Bool = false, kwargs...)
+    ret = calc_net_returns(w, filter_held_gaps(w, X, strict), fees)
+    return PortfolioOptimisers.plot_rolling_measure(r, ret; ts = ts, rolling = rolling,
+                                                    kwargs...)
 end
 function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.BaseRM_VecBaseRM,
                                                   ret::VecNum; ts::AbstractVector,

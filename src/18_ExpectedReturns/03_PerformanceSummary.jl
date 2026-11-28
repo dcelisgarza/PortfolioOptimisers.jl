@@ -309,10 +309,12 @@ end
                         compound::Bool = false, rf::Number = 0, measures = (),
                         benchmark::Option{<:VecNum} = nothing) -> PerformanceSummaryResult
     performance_summary(w::Union{ArrNum, VecVecNum}, X::MatNum,
-                        fees::Option{<:Fees} = nothing; kwargs...) -> PerformanceSummaryResult
+                        fees::Option{<:Fees} = nothing; strict::Bool = false,
+                        kwargs...) -> PerformanceSummaryResult
     performance_summary(w::Union{ArrNum, VecVecNum}, rd::ReturnsResult,
-                        fees::Option{<:Fees} = nothing; kwargs...) -> PerformanceSummaryResult
-    performance_summary(res::OptimisationResult, rd::ReturnsResult;
+                        fees::Option{<:Fees} = nothing; strict::Bool = false,
+                        kwargs...) -> PerformanceSummaryResult
+    performance_summary(res::OptimisationResult, rd::ReturnsResult; strict::Bool = false,
                         kwargs...) -> PerformanceSummaryResult
     performance_summary(pred::PredRes_MultiPredRes; kwargs...) -> PerformanceSummaryResult
     performance_summary(ppred::PopulationPredictionResult;
@@ -320,7 +322,8 @@ end
     performance_summary(rets::AbstractVector{<:VecNum}; names = nothing,
                         kwargs...) -> PerformanceSummaryResult
     performance_summary(ress::AbstractVector{<:OptimisationResult}, rd::ReturnsResult;
-                        names = nothing, kwargs...) -> PerformanceSummaryResult
+                        names = nothing, strict::Bool = false,
+                        kwargs...) -> PerformanceSummaryResult
     performance_summary(preds::AbstractVector{<:AbstractPredictionResult};
                         names = nothing, kwargs...) -> PerformanceSummaryResult
 
@@ -343,6 +346,8 @@ The entries can cover different rows, and the summary does not refuse them. No f
 
 The methods that take weights and returns first make the net returns with [`calc_net_returns`](@ref). So the summary of a portfolio includes its fees.
 
+Those methods, and the methods that take an [`OptimisationResult`](@ref) and a [`ReturnsResult`](@ref), read a gap in the returns as [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref) does. [`filter_held_gaps`](@ref) sets every return that is not finite to zero, once, before the net returns are formed. So a late listing or an early delisting in the universe does not make the series `NaN`. A gap at a zero weight gives no message. A Held Gap, a gap at a weight that is not zero, contributes zero with a warning, or raises an `ArgumentError` under `strict = true`. The weights, and so `n_eff` and the exposures, do not change. The filter reads every return one time for each input, and it copies the matrix only when the matrix holds a gap. A prediction is already filtered, so its methods take no `strict`.
+
 Every method takes a `benchmark`, a second return series over the same periods, and gives the three excess statistics against it. When no benchmark is given, the three are `NaN`. A given `benchmark` applies to every entry, and its length is checked against each entry. On a method that takes a prediction, `benchmark` defaults to the benchmark of the rows that the prediction scored, which [`regret_benchmark`](@ref) reads, one series for each member. So a prediction over returns data with a `B` gives the three statistics with no keyword, and `benchmark = nothing` turns them off. The other methods hold no prediction, and they read no `B`.
 
 Each fold collapsed a benchmark matrix with its own weights, as [`collapse_benchmark`](@ref) states. Against such a benchmark, `excess_ret` is the return of ``(\\boldsymbol{X} - \\boldsymbol{B}) \\boldsymbol{w}``. That is the active return against the same weights in the benchmark assets, and not the excess over one index.
@@ -363,7 +368,7 @@ A measure that cannot read a series is refused at entry, before any figure is co
 
 `rf` is the risk-free rate for each period, at the frequency of the returns, as in [`probabilistic_sharpe_ratio`](@ref) and [`MeanReturnRiskRatio`](@ref). It enters `sharpe`, `sharpe_stderr` and `sortino`, and no other figure. At `rf = 0` every figure is the figure of a zero rate.
 
-**The series `ret` must be finite, as the Precomputed-returns contract states.** No method checks that the series is finite, because every internal caller gives a finite series. The prediction methods read the output of [`calc_net_returns`](@ref) for the fold, and a check of a long series costs time on every call. One entry that is not finite makes the mean, the volatility and every ratio not finite. The tail figure then gives a **finite wrong number** and not a `NaN`, because `partialsort` puts a `NaN` after every real number. A caller with a gapped series must first remove the gaps with `x[isfinite.(x)]`. A caller with a gapped panel must score it through [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref), which filters the Held Gaps once.
+**The series `ret` must be finite, as the Precomputed-returns contract states.** No method checks that the series is finite, because every internal caller gives a finite series. The methods that take weights or a result filter the gaps of the returns, and the prediction methods read the series of a fold, which filtered its gaps. A check of a long series costs time on every call. One entry that is not finite makes the mean, the volatility and every ratio not finite. The tail figure then gives a **finite wrong number** and not a `NaN`, because `partialsort` puts a `NaN` after every real number. A caller with a gapped series must first remove the gaps with `x[isfinite.(x)]`.
 
 The standard error of the Sharpe ratio reads every observation as independent. So on a series scored under a Weight Drift, it is less than the true standard error, as the `# Mathematical definition` states. A long-run variance estimator corrects for serial dependence, but it needs a bandwidth, and no bandwidth is correct for every sample. The library does not build one. It applies no guard and no threshold, and it gives the figure with no change.
 
@@ -440,7 +445,7 @@ The expression corrects for the third and fourth moments and **not** for serial 
 
 # Algorithm
 
-Every method checks its keywords with [`SummaryOptions`](@ref) first, so no figure is computed for a call that is not valid. Then it makes one entry for each series of the input with [`input_entries`](@ref). A method that takes weights first makes the net returns with [`calc_net_returns`](@ref). A method that takes a prediction reads each member, and a population reads each path in turn. [`summarise_entries`](@ref) does the steps below on each entry. It gives scalar fields for one entry, or stacks the entries with [`stack_summaries`](@ref).
+Every method checks its keywords with [`SummaryOptions`](@ref) first, so no figure is computed for a call that is not valid. Then it makes one entry for each series of the input with [`input_entries`](@ref). A method that takes weights filters the gaps of the returns with [`filter_held_gaps`](@ref), and then makes the net returns with [`calc_net_returns`](@ref). A method that takes a prediction reads each member, and a population reads each path in turn. [`summarise_entries`](@ref) does the steps below on each entry. It gives scalar fields for one entry, or stacks the entries with [`stack_summaries`](@ref).
 
  1. Check `alpha`, `ppy`, `rf` and `measures`, as `# Validation` states.
  2. Take `T`, the number of periods. Take `m`, the sample mean of `ret`, and clamp it to the least and the greatest entry of `ret`. Take `s`, the corrected sample standard deviation of `ret` about `m`. The clamp changes nothing in exact arithmetic. The rounded mean of a constant `ret` can differ from its common value, and the clamp makes `m` equal to that value, so `s` is exactly zero.
@@ -474,6 +479,7 @@ Every method checks its keywords with [`SummaryOptions`](@ref) first, so no figu
   - `rf`: Risk-free rate for each period, at the frequency of the returns. It defaults to `0`.
   - `measures`: A vector or a tuple of pairs `name::Symbol => r::AbstractBaseRiskMeasure`, the extra risk measures. It defaults to none.
   - `benchmark`: Benchmark return series over the same periods as each entry, or `nothing` for no excess statistics. It defaults to `nothing`, and on a prediction to the benchmark of its rows.
+  - $(arg_dict[:strict_held_gap])
 
 Every keyword other than `names` is one value for the whole call, so the entries always agree on it.
 
@@ -485,6 +491,7 @@ Every keyword other than `names` is one value for the whole call, so the entries
   - `length(benchmark) == length(ret)` for each entry when a benchmark is given. Otherwise the function raises a `DimensionMismatch`.
   - A vector input and a population are not empty. Otherwise the function raises an [`IsEmptyError`](@ref).
   - `length(names)` is the length of the input vector. Otherwise the function raises a `DimensionMismatch`.
+  - Under `strict = true`, every return at a weight that is not zero is finite. Otherwise the function raises an `ArgumentError` that names the assets.
 
 # Returns
 
@@ -499,6 +506,7 @@ Every keyword other than `names` is one value for the whole call, so the entries
   - [`number_effective_assets`](@ref)
   - [`forecast_evaluation_summary`](@ref)
   - [`calc_net_returns`](@ref)
+  - [`filter_held_gaps`](@ref)
   - [`cumulative_returns`](@ref)
   - [`drawdowns`](@ref)
   - [`calc_turnover`](@ref)
@@ -1183,10 +1191,12 @@ end
 """
     input_entries(bm::Option{<:Some}, ret::VecNum)
     input_entries(bm::Option{<:Some}, w::Union{ArrNum, VecVecNum}, X::MatNum,
-                  fees::Option{<:Fees} = nothing, ts::Option{<:AbstractVector} = nothing)
+                  fees::Option{<:Fees}, strict::Bool,
+                  ts::Option{<:AbstractVector} = nothing, nx::Option{<:VecStr} = nothing)
     input_entries(bm::Option{<:Some}, w::Union{ArrNum, VecVecNum}, rd::ReturnsResult,
-                  fees::Option{<:Fees} = nothing)
-    input_entries(bm::Option{<:Some}, res::OptimisationResult, rd::ReturnsResult)
+                  fees::Option{<:Fees}, strict::Bool)
+    input_entries(bm::Option{<:Some}, res::OptimisationResult, rd::ReturnsResult,
+                  strict::Bool)
     input_entries(bm::Option{<:Some}, pred::PredRes_MultiPredRes, path = nothing)
     input_entries(bm::Option{<:Some}, ret::VecNum, ts::Option{<:AbstractVector},
                   B::Option{<:VecNum}, pred::PredRes_MultiPredRes, path)
@@ -1196,7 +1206,7 @@ end
 
 The entries of one input of [`performance_summary`](@ref): one entry for an input that holds one series, and a vector of entries otherwise.
 
-A bare series holds no weights. Weights give their net returns through [`calc_net_returns`](@ref), and their effective number of assets and their exposures through [`weight_statistics`](@ref). A `VecVecNum` gives one entry for each member. An [`OptimisationResult`](@ref) reads its weights, its returns and its fee on its investable universe through [`result_investable_view`](@ref).
+A bare series holds no weights. Weights give their net returns through [`calc_net_returns`](@ref), and their effective number of assets and their exposures through [`weight_statistics`](@ref). A `VecVecNum` gives one entry for each member. [`filter_held_gaps`](@ref) sets the gaps of `X` to zero first, once for all the members, so one message names the Held Gaps of every member. An [`OptimisationResult`](@ref) reads its weights, its returns, its fee and its asset names on its investable universe through [`result_investable_view`](@ref).
 
 A prediction gives one entry when it holds one series, and one entry for each member when its optimiser gives many portfolios. Its method reads the series with [`regret_series`](@ref) and the benchmark of its rows with [`regret_benchmark`](@ref), and the method for the type of the series makes the entries. It does not read the first member alone: each member reads its own series, its own benchmark series through [`member_vector`](@ref), its own turnover through [`held_path_turnover`](@ref) and its own weights through [`prediction_weight_statistics`](@ref).
 
@@ -1213,8 +1223,9 @@ The steps of a population:
 # Arguments
 
   - `bm`: The benchmark of the caller, from [`summary_benchmark`](@ref).
-  - `ret`, `w`, `X`, `fees`, `rd`, `res`, `pred`, `ppred`: As [`performance_summary`](@ref) states them. In the methods of the series of a prediction, `ret` is its one series.
+  - `ret`, `w`, `X`, `fees`, `strict`, `rd`, `res`, `pred`, `ppred`: As [`performance_summary`](@ref) states them. In the methods of the series of a prediction, `ret` is its one series.
   - `ts`: The timestamps of the rows of `X`, or of the series of a prediction, or `nothing`.
+  - `nx`: The asset names of the columns of `X`, or `nothing`. The message about a Held Gap reads them.
   - `path`: The key of the path in a population, or `nothing`.
   - `rets`: The series of each member of a prediction.
   - `B`: The benchmark of the rows of a prediction, one series or one series for each member, or `nothing`.
@@ -1222,6 +1233,7 @@ The steps of a population:
 # Validation
 
   - A population holds at least one path. Otherwise the function raises an [`IsEmptyError`](@ref).
+  - Under `strict`, the rule of [`filter_held_gaps`](@ref).
 
 # Returns
 
@@ -1231,6 +1243,7 @@ The steps of a population:
 # Related
 
   - [`SummaryEntry`](@ref)
+  - [`filter_held_gaps`](@ref)
   - [`population_path_key`](@ref)
   - [`regret_series`](@ref)
   - [`regret_benchmark`](@ref)
@@ -1239,28 +1252,31 @@ The steps of a population:
 function input_entries(bm::Option{<:Some}, ret::VecNum)
     return SummaryEntry(; ret = ret, benchmark = row_benchmark(bm, nothing))
 end
-function input_entries(bm::Option{<:Some}, w::ArrNum, X::MatNum,
-                       fees::Option{<:Fees} = nothing,
-                       ts::Option{<:AbstractVector} = nothing)
-    return SummaryEntry(; ret = calc_net_returns(w, X, fees),
+function input_entries(bm::Option{<:Some}, w::ArrNum, X::MatNum, fees::Option{<:Fees},
+                       strict::Bool, ts::Option{<:AbstractVector} = nothing,
+                       nx::Option{<:VecStr} = nothing)
+    Xf = filter_held_gaps(w, X, strict; nx = nx)
+    return SummaryEntry(; ret = calc_net_returns(w, Xf, fees),
                         benchmark = row_benchmark(bm, nothing), ws = weight_statistics(w),
                         ts = ts)
 end
-function input_entries(bm::Option{<:Some}, w::VecVecNum, X::MatNum,
-                       fees::Option{<:Fees} = nothing,
-                       ts::Option{<:AbstractVector} = nothing)
+function input_entries(bm::Option{<:Some}, w::VecVecNum, X::MatNum, fees::Option{<:Fees},
+                       strict::Bool, ts::Option{<:AbstractVector} = nothing,
+                       nx::Option{<:VecStr} = nothing)
     b = row_benchmark(bm, nothing)
-    return [SummaryEntry(; ret = calc_net_returns(w[j], X, fees), benchmark = b,
+    Xf = filter_held_gaps(w, X, strict; nx = nx)
+    return [SummaryEntry(; ret = calc_net_returns(w[j], Xf, fees), benchmark = b,
                          ws = weight_statistics(w[j]), ts = ts, member = j)
             for j in eachindex(w)]
 end
 function input_entries(bm::Option{<:Some}, w::Union{ArrNum, VecVecNum}, rd::ReturnsResult,
-                       fees::Option{<:Fees} = nothing)
-    return input_entries(bm, w, rd.X, fees, rd.ts)
+                       fees::Option{<:Fees}, strict::Bool)
+    return input_entries(bm, w, rd.X, fees, strict, rd.ts, rd.nx)
 end
-function input_entries(bm::Option{<:Some}, res::OptimisationResult, rd::ReturnsResult)
-    _, w, X, fees = result_investable_view(res, rd.X)
-    return input_entries(bm, w, X, fees, rd.ts)
+function input_entries(bm::Option{<:Some}, res::OptimisationResult, rd::ReturnsResult,
+                       strict::Bool)
+    _, w, X, fees, nx = result_investable_view(res, rd.X, nothing, rd.nx)
+    return input_entries(bm, w, X, fees, strict, rd.ts, nx)
 end
 function input_entries(bm::Option{<:Some}, pred::PredRes_MultiPredRes, path = nothing)
     rets, ts = regret_series(pred)
@@ -1437,18 +1453,18 @@ function candidate_summary(kwargs, names, xs::AbstractVector, args...)
     return summarise_entries(es, opts)
 end
 function performance_summary(w::Union{ArrNum, VecVecNum}, X::MatNum,
-                             fees::Option{<:Fees} = nothing;
+                             fees::Option{<:Fees} = nothing; strict::Bool = false,
                              kwargs...)::PerformanceSummaryResult
-    return summarise_input(kwargs, w, X, fees)
+    return summarise_input(kwargs, w, X, fees, strict)
 end
 function performance_summary(w::Union{ArrNum, VecVecNum}, rd::ReturnsResult,
-                             fees::Option{<:Fees} = nothing;
+                             fees::Option{<:Fees} = nothing; strict::Bool = false,
                              kwargs...)::PerformanceSummaryResult
-    return summarise_input(kwargs, w, rd, fees)
+    return summarise_input(kwargs, w, rd, fees, strict)
 end
 function performance_summary(res::OptimisationResult, rd::ReturnsResult;
-                             kwargs...)::PerformanceSummaryResult
-    return summarise_input(kwargs, res, rd)
+                             strict::Bool = false, kwargs...)::PerformanceSummaryResult
+    return summarise_input(kwargs, res, rd, strict)
 end
 function performance_summary(pred::PredRes_MultiPredRes;
                              kwargs...)::PerformanceSummaryResult
@@ -1463,8 +1479,9 @@ function performance_summary(rets::AbstractVector{<:VecNum}; names = nothing,
     return candidate_summary(kwargs, names, rets)
 end
 function performance_summary(ress::AbstractVector{<:OptimisationResult}, rd::ReturnsResult;
-                             names = nothing, kwargs...)::PerformanceSummaryResult
-    return candidate_summary(kwargs, names, ress, rd)
+                             names = nothing, strict::Bool = false,
+                             kwargs...)::PerformanceSummaryResult
+    return candidate_summary(kwargs, names, ress, rd, strict)
 end
 function performance_summary(preds::AbstractVector{<:AbstractPredictionResult};
                              names = nothing, kwargs...)::PerformanceSummaryResult

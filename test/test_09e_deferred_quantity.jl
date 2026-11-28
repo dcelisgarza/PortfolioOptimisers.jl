@@ -1526,10 +1526,12 @@ end
     # positional constructor and asks whether that bound admits any type that declares slots.
     # Six containers were missing before the recursion was derived, and the two ordered-
     # weights containers joined when #583 widened the significance slots of the four weight
-    # builders they hold.
+    # builders they hold. `GainTail` joined with #2319: it holds the tail of a range, which
+    # has no default.
     tr = WeightsTracking(; w = fill(0.2, 5))
     function instantiate(T)
-        for f in (() -> T(), () -> T(; tr = tr), () -> T(; w = fill(0.2, 5)))
+        for f in (() -> T(), () -> T(; tr = tr), () -> T(; w = fill(0.2, 5)),
+                  () -> T(; r = ConditionalValueatRisk()))
             try
                 return f()
             catch
@@ -1550,7 +1552,7 @@ end
         x = instantiate(base(T))
         isnothing(x) || push!(declaring, x)
     end
-    @test length(declaring) == 24
+    @test length(declaring) == 25
 
     # The inner constructor states one bound per field, in field order.
     function field_bounds(T)
