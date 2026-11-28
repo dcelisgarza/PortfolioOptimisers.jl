@@ -1094,7 +1094,8 @@ end
 
         # A sample with no more rows than factors: 8 factors on 8 rows. No set of one removal
         # leaves a residual, so each backward search takes the set of the forward search of
-        # its criterion. It kept no factor of any asset before.
+        # its criterion. Without the forward search it kept no factor of any asset, and the
+        # release before #2387 gave each asset the interpolated loadings of the full set.
         rq = StableRNG(2)
         Fq = randn(rq, 8, 8) ./ 100
         Xq = Fq * randn(rq, 8, 4) .+ randn(rq, 8, 4) ./ 1000
@@ -1107,6 +1108,18 @@ end
                                        Fq))
             @test rb.M == rf.M && rb.b == rf.b && rb.edof == rf.edof
             @test all(i -> any(!iszero, rb.M[i, :]), axes(rb.M, 1)) && all(>=(1), rb.edof)
+        end
+
+        # A constant response on 4 rows: the full set saturates, and each set of one removal
+        # leaves a residual but scores NaN, so no score ranks a removal either. The backward
+        # search takes the forward set, here empty, and the warning names a missing score.
+        xc, Fc = fill(0.015625, 4), Fs[1:4, :]
+        for crit in (:r2, :adjr2, PValue())
+            re = StepwiseRegression(; crit = crit, alg = BackwardElimination())
+            @test isnothing(PO._regression(re, xc, Fc))
+            inc = @test_logs((:warn, r"Asset 3: .* leave no residual or give no score"),
+                             match_mode = :any, PO.stepwise_search(re, xc, Fc, 3))
+            @test inc == PO._regression(StepwiseRegression(; crit = crit), xc, Fc)
         end
 
         # On 2 rows no factor leaves a residual. A forward search selects none and says so. A

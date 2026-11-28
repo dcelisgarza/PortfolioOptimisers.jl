@@ -80,7 +80,7 @@ Shrinks the factor set from full, removing the factor whose removal most improve
 
 At each step the algorithm fits one model per included factor, each model without that factor, and removes the factor whose reduced model scores best. It stops when no removal improves on the score of the set that it holds. The starting score is the score of the full model, not [`regression_threshold`](@ref). Under [`PValue`](@ref) the step removes the factor with the largest p-value while a p-value exceeds `t`.
 
-When the full model and every model of one removal leave no residual, as on an asset with no more observations than factors, every candidate ties at the worst score, and no score ranks a removal. The asset then takes the factor set of [`ForwardSelection`](@ref) under the same criterion and target, and [`stepwise_search`](@ref) warns and names the asset.
+When the full model and every model of one removal leave no residual, as on an asset with no more observations than factors, every candidate ties at the worst score, and no score ranks a removal. A model of one removal that leaves a residual and scores `NaN` or the worst score, as under `:r2` on a constant response, ranks none either. The asset then takes the factor set of [`ForwardSelection`](@ref) under the same criterion and target, and [`stepwise_search`](@ref) warns and names the asset.
 
 Under a [`MinMaxValStepwiseRegressionCriterion`](@ref) the selection can be empty. When each removal improves the score, the search removes every factor. The asset then gets an intercept-only model, and its row of the loadings matrix is all zeros. [`stepwise_factor_set`](@ref) warns and names the asset when the search selects no factor. The two methods that run the steps state them: `_regression(::StepwiseRegression{<:PValue, <:BackwardElimination}, ::VecNum, ::MatNum)` and `_regression(::StepwiseRegression{<:MinMaxValStepwiseRegressionCriterion, <:BackwardElimination}, ::VecNum, ::MatNum)`.
 
@@ -621,7 +621,7 @@ A Saturated Fit has no p-value, so the p-values of the full set cannot name the 
 
 # Returns
 
-  - `removed::Int`: The factor whose removal leaves the best set that leaves a residual, or `0` when every set of one removal is a Saturated Fit. On `0` the backward search has no admissible start, and [`stepwise_search`](@ref) runs a forward search instead.
+  - `removed::Int`: The factor whose removal leaves the best set that leaves a residual, or `0` when every set of one removal is a Saturated Fit or has a largest p-value of `NaN`. On `0` the backward search has no admissible start, and [`stepwise_search`](@ref) runs a forward search instead.
 
 # Related
 
@@ -659,7 +659,7 @@ end
 
 Shrinks a factor set from full, and removes the factor of largest p-value while a p-value exceeds the threshold.
 
-A Saturated Fit, which [`is_saturated_fit`](@ref) flags, has no p-value. So when the full set leaves no residual, the method takes its first removal from [`saturated_set_pval_removal`](@ref), which ranks the sets of one removal that leave a residual. When no such set exists, no p-value can rank a removal, and the method returns `nothing`. [`stepwise_search`](@ref) then runs the forward search of the same criterion and warns.
+A Saturated Fit, which [`is_saturated_fit`](@ref) flags, has no p-value. So when the full set leaves no residual, the method takes its first removal from [`saturated_set_pval_removal`](@ref), which ranks the sets of one removal that leave a residual. When no such set exists, or each such set has a p-value of `NaN`, no p-value can rank a removal, and the method returns `nothing`. [`stepwise_search`](@ref) then runs the forward search of the same criterion and warns.
 
 # Algorithm
 
@@ -679,7 +679,7 @@ A Saturated Fit, which [`is_saturated_fit`](@ref) flags, has no p-value. So when
 
 # Returns
 
-  - `included::Option{<:VecInt}`: Indices of the selected factors, in ascending order. It holds at least one index, unless no factor has a p-value, as [`add_best_factor_after_pval_failure!`](@ref) states. It is the `1:size(F, 2)` range itself when the full model already passes the threshold, and a `Vector{Int}` otherwise. It is `nothing` when the full model and every model of one removal are Saturated Fits, because the search has no admissible start.
+  - `included::Option{<:VecInt}`: Indices of the selected factors, in ascending order. It holds at least one index, unless no factor has a p-value, as [`add_best_factor_after_pval_failure!`](@ref) states. It is the `1:size(F, 2)` range itself when the full model already passes the threshold, and a `Vector{Int}` otherwise. It is `nothing` when the full model is a Saturated Fit and [`saturated_set_pval_removal`](@ref) names no factor, because the search has no admissible start.
 
 # Related
 
@@ -776,7 +776,7 @@ Shrinks a factor set from full, removing the factor whose reduced model scores b
 
 `value[j]` is the score of the model that omits `j`. So "best" has the same meaning as in the forward direction, and not the inverse meaning. Under a minimised criterion the method removes the factor of lowest value, and under a maximised criterion it removes the factor of highest value.
 
-A Saturated Fit, which [`is_saturated_fit`](@ref) flags, scores the worst value that the criterion can take. So when the full set leaves no residual, as on an asset with no more observations than the factors plus one, the first removal that leaves a residual always happens. When no set of one removal leaves a residual either, every candidate ties at the worst score, no score can rank a removal, and the method returns `nothing`. [`stepwise_search`](@ref) then runs the forward search of the same criterion and warns.
+A Saturated Fit, which [`is_saturated_fit`](@ref) flags, scores the worst value that the criterion can take. So when the full set leaves no residual, as on an asset with no more observations than the factors plus one, the first removal that leaves a residual always happens. When no set of one removal leaves a residual either, every candidate ties at the worst score, no score can rank a removal, and the method returns `nothing`. A score of `NaN` does not improve on the worst score either, so the method also returns `nothing` when each set of one removal that leaves a residual scores `NaN` or the worst score, as under `:r2` on a constant response. [`stepwise_search`](@ref) then runs the forward search of the same criterion and warns.
 
 # Algorithm
 
@@ -903,7 +903,7 @@ end
 
 Runs the stepwise search of `re` on one asset, and gives a backward search with no admissible start the set of a forward search.
 
-A [`BackwardElimination`](@ref) search starts from the full factor set. When the full set and every set of one removal are Saturated Fits, every candidate ties at the worst score, and no score ranks a removal. Only the fit of a set that leaves a residual ranks the factors. So the two backward methods of `_regression` return `nothing`, and this function runs the [`ForwardSelection`](@ref) search of the same criterion and target. Under an unpenalised target this happens when the asset has no more observations than factors.
+A [`BackwardElimination`](@ref) search starts from the full factor set. When the full set and every set of one removal are Saturated Fits, every candidate ties at the worst score, and no score ranks a removal. A set of one removal that leaves a residual and scores `NaN` or the worst score, as under `:r2` on a constant response, ranks none either. Only the fit of a set that leaves a residual ranks the factors. So the two backward methods of `_regression` return `nothing`, and this function runs the [`ForwardSelection`](@ref) search of the same criterion and target. Under an unpenalised target this happens when the asset has no more observations than factors.
 
 # Algorithm
 
@@ -935,7 +935,7 @@ function stepwise_search(re::StepwiseRegression, x::VecNum, F::MatNum, i::Intege
     if !isnothing(included)
         return included
     end
-    @warn("Asset $i: the full factor set and every set of one removal leave no residual, so no score ranks a removal. The backward search takes the factor set of a forward search of the same criterion.",
+    @warn("Asset $i: the full factor set and every set of one removal leave no residual or give no score, so no score ranks a removal. The backward search takes the factor set of a forward search of the same criterion.",
           maxlog = log_limit(:warn), _id = @log_id())
     return _regression(rebuild_struct(re, (; alg = ForwardSelection())), x, F)
 end
@@ -1018,7 +1018,7 @@ An asset fits on the observations where its return is finite and `active_mask` i
   - `reg::Regression`: Regression result that holds:
 
       + `b`: Intercept of each asset, a view of the first column of `rr`.
-      + `M`: Coefficient of each asset and factor, a view of the remaining columns of `rr`. A factor that the asset does not use has an exact zero. A whole row is zero when the asset uses no factor. An empty entry of `re.included` gives such a row with no warning. A search that selects no factor gives it too, and [`stepwise_factor_set`](@ref) warns. [`BackwardElimination`](@ref) under a [`MinMaxValStepwiseRegressionCriterion`](@ref) can select no factor, and a [`PValue`](@ref) search selects none when no factor has a p-value. A Saturated Fit gives a row of zeros too, and [`asset_fit_coefficients`](@ref) warns.
+      + `M`: Coefficient of each asset and factor, a view of the remaining columns of `rr`. A factor that the asset does not use has an exact zero. A whole row is zero when the asset uses no factor. An empty entry of `re.included` gives such a row with no warning. A search that selects no factor gives it too, and [`stepwise_factor_set`](@ref) warns. [`BackwardElimination`](@ref) under a [`MinMaxValStepwiseRegressionCriterion`](@ref) can select no factor, a [`ForwardSelection`](@ref) search selects none when every model of one factor is a Saturated Fit, as on an asset with two observations, and a [`PValue`](@ref) search selects none when no factor has a p-value. A Saturated Fit gives a row of zeros too, and [`asset_fit_coefficients`](@ref) warns.
       + `L`: Not set. The regression runs in the original factor basis, so `reg.L` returns `reg.M` through the `swap(L, M)` property rule of the result, and `size(reg.L, 2)` is the number of columns of `F`.
       + `edof`: Degrees of freedom of the residuals of each asset, which [`residual_count`](@ref) reads off the fit of the asset. Under an unpenalised target it is the number of observations of the fit of the asset less the intercept and the factors that the search selected for that asset, an integer. Under a penalised target it is the real count that [`ElasticNetFit`](@ref) states. The count reads the selected factors alone, and not the search that selected them. It is at least one for every asset, because the search admits only a factor set that leaves a residual, and a Saturated Fit keeps the intercept alone.
 
