@@ -1088,8 +1088,8 @@ The method dispatches on the type of the bounds, on the variant, and on the fron
 
  1. With one risk ceiling and one return floor, register them as the constant expressions `noc_rk` and `noc_rt`, set the objective with [`set_near_optimal_objective_function!`](@ref), and solve once.
  2. With a vector of bounds, one for each point of a sweep, register `noc_rk` and `noc_rt` as parameters with [`set_noc_anchor_parameters!`](@ref).
- 3. For [`UnconstrainedNearOptimalCentering`](@ref), solve once for each point, with the bounds of that point.
- 4. For [`ConstrainedNearOptimalCentering`](@ref), resolve the return frontier with [`compute_ret_lbs`](@ref) and the risk frontier with [`compute_risk_ubs`](@ref), make their parameters, and solve once for each point of the product of the two axes, with the bounds of that point.
+ 3. For [`UnconstrainedNearOptimalCentering`](@ref), solve once for each point, with the bounds of that point. A point whose bounds are not finite fails with no solve, see [`set_noc_anchor!`](@ref).
+ 4. For [`ConstrainedNearOptimalCentering`](@ref), resolve the return frontier with [`compute_ret_lbs`](@ref) and the risk frontier with [`compute_risk_ubs`](@ref), make their parameters, and solve once for each point of the product of the two axes, with the bounds of that point, as in step 3.
 
 # JuMP formulation
 
@@ -1209,6 +1209,8 @@ Set the risk ceiling and the return floor of the centring model to those of swee
 
 It is the hook that [`frontier_sweep!`](@ref) calls before each solve of a swept `NearOptimalCentering`. [`near_optimal_centering_setup`](@ref) computes the bounds of point `i` from the anchor of `obj` at point `i` of the same sweep, and `i` is the flat index that [`frontier_sweep_axes`](@ref) counts. So each point is centred on the near optimal region of its own anchor.
 
+A point whose anchor did not solve has no near optimal region: its bounds are not finite. The hook then writes nothing and returns a failure, so the sweep does not solve that point, and the other points do not change.
+
 # Arguments
 
   - `p_rk`: The parameter of the risk ceiling.
@@ -1219,7 +1221,7 @@ It is the hook that [`frontier_sweep!`](@ref) calls before each solve of a swept
 
 # Returns
 
-  - `nothing`.
+  - `failure::Option{<:OptimisationFailure}`: `nothing`, or the failure of a point whose bounds are not finite.
 
 # Related
 
@@ -1228,8 +1230,13 @@ It is the hook that [`frontier_sweep!`](@ref) calls before each solve of a swept
   - [`near_optimal_centering_setup`](@ref)
 """
 function set_noc_anchor!(p_rk, p_rt, rk_units::VecNum, rt_units::VecNum, i::Integer)
-    JuMP.set_parameter_value(p_rk, rk_units[i])
-    JuMP.set_parameter_value(p_rt, rt_units[i])
+    rk, rt = rk_units[i], rt_units[i]
+    if !(isfinite(rk) && isfinite(rt))
+        return OptimisationFailure(;
+                                   res = "the near optimal region of point $i has no finite bounds: its anchor did not solve")
+    end
+    JuMP.set_parameter_value(p_rk, rk)
+    JuMP.set_parameter_value(p_rt, rt)
     return nothing
 end
 """

@@ -650,3 +650,86 @@ end
     @test_throws DomainError Frontier(; N = 0)
     @test Frontier(; N = 2).N == 2
 end
+
+@testset "MeanRisk sweep: the fallback runs only when no point solved" begin
+    ok, bad = OptimisationSuccess(), OptimisationFailure(; res = "x")
+    @test PO.any_solved(ok) && !PO.any_solved(bad)
+    @test PO.any_solved([bad, ok]) && !PO.any_solved([bad, bad])
+    @test !PO.any_solved(OptimisationFailure[])
+    @test PO.member_retcode(ok, 3) === ok && PO.member_retcode([bad, ok], 2) === ok
+    rd = ReturnsResult(; nx = string.(1:5), X = MRS_X, ts = Date(2020) .+ Day.(1:300),
+                       iv = abs.(MRS_X) .+ 0.1, ivpa = 1.2)
+    top = maximum(MRS_PR.mu)
+    function swept(lb, fb = EqualWeighted())
+        return MeanRisk(; opt = JuMPOptimiser(; slv = MRS_SLV, ret = mrs_floor(lb)),
+                        fb = fb)
+    end
+    # Every point solved. The chain once ran here, and the fallback replaced the sweep.
+    for lb in (Frontier(; N = 3), [0.0, 0.5 * top])
+        res = optimise(swept(lb), rd)
+        @test isa(res, MeanRiskResult) && isnothing(res.fb)
+        @test res.w == optimise(swept(lb, nothing), rd).w
+    end
+    # An infeasible end keeps the other points, and its own code states the failure.
+    res = optimise(swept([0.0, 0.5 * top, 1.5 * top]), rd)
+    @test isa(res, MeanRiskResult) && isnothing(res.fb)
+    @test isa.(res.retcode, OptimisationSuccess) == [true, true, false]
+    @test all(isnan, res.w[3])
+    # No point solved.
+    res = optimise(swept([1.5 * top, 2 * top]), rd)
+    @test isa(res, NaiveOptimisationResult) && length(res.fb) == 1
+    @test !PO.any_solved(res.fb[1][2].retcode)
+    # The chain stops at the first fallback with a solved point.
+    res = optimise(swept([1.5 * top], swept([2 * top, 0.0])), rd)
+    @test isa(res, MeanRiskResult) && length(res.fb) == 1
+    @test isa.(res.retcode, OptimisationSuccess) == [false, true]
+
+    # A fold whose every point failed holds the one portfolio of the fallback. Its series
+    # stands at every member of the path. A fall of the returns in the rows of one training
+    # window alone puts that fold first, and then last.
+    train = [1:150, 51:200, 101:250]
+    for (fell, k) in ((1:50, 1), (201:250, 3)), wd in (nothing, SelfFinancingDrift())
+        X = copy(MRS_X)
+        X[fell, :] .-= 0.02
+        tops = [maximum(mean(X[t, :]; dims = 1)) for t in train]
+        level = (minimum(tops) + maximum(tops)) / 2
+        opt = swept([level, 1.0001 * level])
+        p = cross_val_predict(opt,
+                              ReturnsResult(; nx = rd.nx, X = X, ts = rd.ts, iv = rd.iv,
+                                            ivpa = 1.2), IndexWalkForward(150, 50; wd = wd))
+        reached = [f != k for f in 1:3]
+        @test [isa(f.res, MeanRiskResult) for f in p.pred] == reached
+        @test length(p.mrd.X) == 2 && all(x -> length(x) == 150, p.mrd.X)
+        for (f, r) in enumerate(reached), j in 1:2
+            rows = (50 * (f - 1) + 1):(50 * f)
+            x = p.pred[f].rd.X
+            @test p.mrd.X[j][rows] == (r ? x[j] : x)
+            iv = p.pred[f].rd.iv
+            @test p.mrd.iv[j][rows] == (r ? iv[j] : iv)
+        end
+        @test length(p.mrd.ivpa) == 2 && all(==(1.2), p.mrd.ivpa)
+    end
+    # Folds whose series have two types still make one series.
+    prd(x) = PO.PredictionReturnsResult(; X = x)
+    @test PO.mapreduce_RetMtx([prd([0.1, 0.2]), prd(view([0.3, 0.4], 1:1))]) ==
+          [0.1, 0.2, 0.3]
+    # A path of sweeps alone keeps one series, and one implied volatility, for each member.
+    p = cross_val_predict(swept([0.0, 1e-6], nothing), rd, IndexWalkForward(150, 50))
+    @test p.mrd.X[2] == reduce(vcat, f.rd.X[2] for f in p.pred)
+    @test p.mrd.iv[2] == reduce(vcat, f.rd.iv[2] for f in p.pred)
+
+    # One failed vector cannot hold the members of the fold before, so it keeps its `NaN`.
+    wn = fill(NaN, 5)
+    @test PO.held_start_weights(bad, wn, [fill(0.2, 5), fill(0.2, 5)]) === wn
+
+    # A solved sweep is a solved member, and a path of sweeps has no rank.
+    cv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+    pop = cross_val_predict(swept([0.0, 1e-6], nothing), rd, cv)
+    @test all(PO.member_solved, pop.pred)
+    f = pop.pred[1].pred[1]
+    @test !PO.member_solved(PredictionResult(; res = PO.set_retcode(f.res, [ok, bad]),
+                                             rd = f.rd))
+    r = ConditionalValueatRisk()
+    @test_throws ArgumentError PO.sort_by_measure(SumScalariser(), pop, r)
+    @test_throws ArgumentError PO.quantile_by_measure(SumScalariser(), pop, r, 0.5)
+end

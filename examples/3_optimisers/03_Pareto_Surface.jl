@@ -215,10 +215,11 @@ res3 = optimise(opt3)
 #=
 The result holds `5 × 5 = 25` portfolios, one per pair of bounds.
 
-Its `retcode` shows whether every inner `MeanRisk` problem succeeded.
+Its `retcode` holds one code per portfolio, which shows whether every inner `MeanRisk` problem of
+that portfolio succeeded.
 =#
 
-isa(res3.retcode, OptimisationSuccess)
+all(x -> isa(x, OptimisationSuccess), res3.retcode)
 
 #=
 ## 5. Visualising the Pareto surface
