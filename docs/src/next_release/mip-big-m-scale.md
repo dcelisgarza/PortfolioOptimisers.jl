@@ -1,5 +1,5 @@
 ```@meta
-Description = "The default big-M constant of a mixed-integer model reads the bound that the model holds on each gated term and the scale of the variable k, in place of 1000 times the largest weight bound."
+Description = "The default big-M constant of a mixed-integer model reads the bound on each gated term and the scale of k, not 1000 times the largest weight bound."
 ```
 
 # [The default big-M constant](@id migration-next-mip-big-m-scale)
